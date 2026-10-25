@@ -108,3 +108,7 @@ def test_document_item_muted_roundtrip(client):
 def test_document_item_centered_roundtrip(client):
     created = client.post("/api/documents", json={"name": "c", "items": [{**sample_item(), "centered": True}, sample_item("plain")]}).json()
     assert [i["centered"] for i in client.get(f"/api/documents/{created['id']}").json()["items"]] == [True, False]
+
+
+def test_health(client):
+    assert client.get("/api/health").json() == {"status": "ok"}

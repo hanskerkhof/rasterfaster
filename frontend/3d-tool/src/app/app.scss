@@ -49,3 +49,8 @@ main { display: flex; flex-direction: column; min-width: 0; }
 app-object-menu { display: contents; } /* only fixed-position overlays: must not become a grid row of its own */
 .update { margin-left: auto; padding: 4px 12px; background: #2f8a4d; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .update:hover { background: #38a35c; }
+
+.version { margin-left: 6px; font-weight: 400; font-size: 10px; opacity: .5; font-family: ui-monospace, monospace; }
+.offline { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 8px 12px; width: max-content; max-width: 90%;
+           background: #a82929; color: #fff; border: 1px solid #000; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
+.offline button { padding: 3px 10px; background: rgba(0,0,0,.3); color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }

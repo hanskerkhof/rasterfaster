@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { Subscription, filter } from 'rxjs';
@@ -8,6 +8,8 @@ import { ObjectMenu } from './object-menu';
 import { DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
+import { ApiStatus } from './api-status';
+import { APP_VERSION } from './build-info';
 
 const lastStlStorageKey = 'rasterfaster.lastStl';
 const filterStorageKey = 'rasterfaster.filter';
@@ -68,6 +70,10 @@ export class App {
   private readonly swUpdate = inject(SwUpdate, { optional: true });
   /** True once the service worker has downloaded a newer build in the background; an installed PWA otherwise keeps the old one. */
   protected readonly updateAvailable = signal(false);
+  /** Version of the downloaded build (from ngsw-config.json appData), null when unknown. */
+  protected readonly updateVersion = signal<string | null>(null);
+  protected readonly appVersion = APP_VERSION;
+  protected readonly api = inject(ApiStatus);
   protected readonly panelWidthPx = signal(loadPanelWidth());
   /** The panel's width, as a CSS length that never exceeds its share of the window. */
   protected readonly panelWidthCss = computed(() => `min(${this.panelWidthPx()}px, ${maxPanelShare * 100}vw)`);
@@ -93,6 +99,13 @@ export class App {
   constructor() {
     void this.store.init();
     this.watchForUpdates();
+    this.api.start();
+    let wasOffline = false;
+    effect(() => {
+      const offline = this.api.offline();
+      if (wasOffline && !offline) void this.reloadFiles(); // the API is back: refresh what was loaded from it
+      wasOffline = offline;
+    });
     try {
       const storedFilter = localStorage.getItem(filterStorageKey);
       if (storedFilter) this.onFilter(storedFilter); // restore the filter and its results
@@ -174,10 +187,18 @@ export class App {
   private watchForUpdates() {
     const sw = this.swUpdate;
     if (!sw?.isEnabled) return;
-    sw.versionUpdates.pipe(filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY'), takeUntilDestroyed()).subscribe(() => this.updateAvailable.set(true));
+    sw.versionUpdates.pipe(filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY'), takeUntilDestroyed()).subscribe(event => {
+      const appData = event.latestVersion.appData as { version?: unknown } | undefined;
+      this.updateVersion.set(typeof appData?.version === 'string' ? appData.version : null);
+      this.updateAvailable.set(true);
+    });
     void sw.checkForUpdate();
     const timer = window.setInterval(() => void sw.checkForUpdate(), 60_000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  protected reloadPage() {
+    location.reload();
   }
 
   /** Switch to the downloaded build: activate it and reload. */

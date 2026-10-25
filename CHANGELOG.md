@@ -2,6 +2,13 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - API offline detection and versioning (0.1.0)
+
+### Added
+- **BE** (`main.py`, `tests/test_api.py`): `GET /api/health` liveness endpoint.
+- **FE** (`api-status.ts`, `app.ts`, `app.html`, `app.scss`): offline detection, like uberflussigen: the API is polled every 5 s and on browser online/offline events; after two failures a red "Offline" banner shows, and when the API is back it hides and the file list reloads.
+- **FE** (`scripts/version-metadata.mjs`, `scripts/bump-version.mjs`, `package.json`, `src/app/build-info.ts`, `ngsw-config.json`): versioning. `npm run bump:version -- X.Y.Z` updates package.json, `build-info.ts` and the service worker `appData.version`. The version (now 0.1.0) is shown in the panel header and on the "Update available" button.
+
 ## 2026-10-25 - fly-around loops
 
 ### Changed

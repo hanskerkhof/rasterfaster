@@ -56,6 +56,10 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 The production build (served by the API on http://localhost:8100 after `ng build`) is an installable PWA: manifest, icons and an Angular service worker that caches the app shell (the `/api` calls are never cached). In Chrome use *Install Rasterfaster*. When a new build is deployed an **Update** button appears in the header; click it to reload into the new version. The service worker is off in `ng serve`.
 
+## Offline detection and versions
+
+The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
+
 ## File list
 
 ⌘B or the icon in the RASTERFASTER header hides and shows the panel (it slides, and the choice is remembered). Drag the right edge of the panel to resize it (double-click resets, ← → with the handle focused); the width is remembered.

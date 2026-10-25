@@ -56,6 +56,12 @@ def natural_key(name: str) -> list:
     return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", name)]
 
 
+@app.get("/api/health")
+def health():
+    """Cheap liveness check; the frontend polls it to show an offline banner."""
+    return {"status": "ok"}
+
+
 @app.get("/api/list", response_model=list[LibraryEntry])
 def list_directory(path: str = "") -> list[LibraryEntry]:
     directory = resolve_inside_root(path)
