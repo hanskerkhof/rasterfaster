@@ -1,5 +1,8 @@
-:host { display: grid; grid-template-columns: 360px 1fr; height: 100vh; color: #dde1e8; font: 13px/1.4 system-ui, sans-serif; }
-.panel { display: flex; flex-direction: column; min-width: 0; background: #23262d; border-right: 1px solid #000; resize: horizontal; overflow: auto; }
+:host { position: fixed; inset: 0; /* fills the viewport as the browser reports it, unlike 100vh */ display: grid; grid-template-columns: 360px 1fr; /* the width is bound from app.ts */ color: #dde1e8; font: 13px/1.4 system-ui, sans-serif; }
+.panel { position: relative; display: flex; flex-direction: column; min-width: 0; background: #23262d; border-right: 1px solid #000; overflow: hidden; }
+/* the drag handle on the panel's right edge (like the sound library panel in Überflüssigen): a thin strip that lights up on hover and while dragging */
+.panel-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; cursor: col-resize; z-index: 3; touch-action: none; }
+.panel-resize:hover, .panel-resize.active, .panel-resize:focus-visible { background: #2f6fed; outline: none; }
 .panel header { padding: 10px 12px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid #000; }
 .tree { flex: 1; min-height: 0; }
 main { display: flex; flex-direction: column; min-width: 0; }

@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - resizable file panel, viewport fit
+
+### Added
+- **FE** (`app.ts`, `app.html`, `app.scss`): the file panel's right edge is a drag handle (like the sound library panel in Überflüssigen): drag to resize, double-click or Home for the default width (360 px), ← → with the handle focused (Shift: 100 px). The width stays between 240 px and 70 % of the window and is remembered in local storage. This replaces the browser's small native resize grip.
+
+### Changed
+- **FE** (`app.scss`): the app fills the viewport with `position: fixed; inset: 0` instead of `height: 100vh`, so it follows the viewport size the browser reports (100vh can go stale, e.g. around DevTools docking). Checked at 1912 × 989 and 1300 × 700.
+
 ## 2026-10-25 - one choke point for edits, drag cleanup
 
 ### Changed

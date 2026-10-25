@@ -1,4 +1,8 @@
 <aside class="panel">
+  <div class="panel-resize" [class.active]="resizing()" role="separator" aria-orientation="vertical" aria-label="Resize the file panel" tabindex="0"
+       [attr.aria-valuenow]="panelWidthPx()" title="Drag to resize · double-click for the default width · ← → with focus"
+       (pointerdown)="onResizeDown($event)" (pointermove)="onResizeMove($event)" (pointerup)="onResizeUp($event)" (pointercancel)="onResizeUp($event)"
+       (dblclick)="resetPanelWidth()" (keydown)="onResizeKey($event)"></div>
   <header>RASTERFASTER</header>
   <div class="controls">
     <div class="filter">

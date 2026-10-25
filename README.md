@@ -54,6 +54,8 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 ## File list
 
+Drag the right edge of the panel to resize it (double-click resets, ← → with the handle focused); the width is remembered.
+
 The reload button (⟳ next to Sort) re-reads the library from disk: the root and every open folder, and the search when a filter is active. The filter text is remembered across reloads.
 
 ## 3D grid

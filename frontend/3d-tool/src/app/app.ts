@@ -1,4 +1,4 @@
-import { Component, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { LibraryEntry, LibraryService, SortKey } from './library.service';
 import { DocumentPanel } from './document-panel';
@@ -9,6 +9,20 @@ import { TreePanel } from './tree-panel';
 
 const lastStlStorageKey = 'rasterfaster.lastStl';
 const filterStorageKey = 'rasterfaster.filter';
+/** Width of the file panel on the left, remembered per browser. */
+const panelWidthStorageKey = 'rasterfaster.panelWidth';
+const defaultPanelWidthPx = 360;
+const minPanelWidthPx = 240;
+/** The panel never takes more than this share of the window (also enforced live in CSS, so a smaller window can't hide the view). */
+const maxPanelShare = 0.7;
+
+function loadPanelWidth(): number {
+  try {
+    const n = Number(localStorage.getItem(panelWidthStorageKey));
+    if (Number.isFinite(n) && n >= minPanelWidthPx) return Math.round(n);
+  } catch { /* storage unavailable: use the default */ }
+  return defaultPanelWidthPx;
+}
 const viewModeStorageKey = 'rasterfaster.viewMode';
 const documentModeStorageKey = 'rasterfaster.documentMode';
 const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-shown'];
@@ -18,6 +32,7 @@ const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-s
   imports: [TreePanel, StlViewer, DocumentPanel, ObjectMenu],
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  host: { '[style.grid-template-columns]': 'columnsCss()' },
 })
 export class App {
   private readonly lib = inject(LibraryService);
@@ -39,6 +54,11 @@ export class App {
   private readonly viewer = viewChild.required(StlViewer);
   private readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
+  protected readonly panelWidthPx = signal(loadPanelWidth());
+  protected readonly columnsCss = computed(() => `min(${this.panelWidthPx()}px, ${maxPanelShare * 100}vw) 1fr`);
+  protected readonly resizing = signal(false);
+  private resizeStartX = 0;
+  private resizeStartWidth = 0;
   private loadedPath: string | null = null;
   private loadSub?: Subscription;
   private filterTimer?: ReturnType<typeof setTimeout>;
@@ -126,6 +146,55 @@ export class App {
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  // --- resizing the file panel (drag its right edge) ---------------------------------------------------------------------------
+
+  protected onResizeDown(event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.resizeStartX = event.clientX;
+    this.resizeStartWidth = Math.min(this.panelWidthPx(), window.innerWidth * maxPanelShare);
+    this.resizing.set(true);
+  }
+
+  protected onResizeMove(event: PointerEvent) {
+    if (!this.resizing()) return;
+    this.setPanelWidth(this.resizeStartWidth + (event.clientX - this.resizeStartX));
+  }
+
+  /** Also used for pointercancel: whatever width the drag reached is kept and remembered. */
+  protected onResizeUp(event: PointerEvent) {
+    if (!this.resizing()) return;
+    (event.currentTarget as HTMLElement).releasePointerCapture?.(event.pointerId);
+    this.resizing.set(false);
+    this.storePanelWidth();
+  }
+
+  /** Keyboard: ← → move the edge by 20 px (Shift: 100 px), Home resets. */
+  protected onResizeKey(event: KeyboardEvent) {
+    const step = event.shiftKey ? 100 : 20;
+    if (event.key === 'ArrowLeft') this.setPanelWidth(this.panelWidthPx() - step);
+    else if (event.key === 'ArrowRight') this.setPanelWidth(this.panelWidthPx() + step);
+    else if (event.key === 'Home') this.setPanelWidth(defaultPanelWidthPx);
+    else return;
+    event.preventDefault();
+    this.storePanelWidth();
+  }
+
+  protected resetPanelWidth() {
+    this.setPanelWidth(defaultPanelWidthPx);
+    this.storePanelWidth();
+  }
+
+  private setPanelWidth(px: number) {
+    const max = Math.max(minPanelWidthPx, window.innerWidth * maxPanelShare);
+    this.panelWidthPx.set(Math.round(Math.max(minPanelWidthPx, Math.min(px, max))));
+  }
+
+  private storePanelWidth() {
+    try { localStorage.setItem(panelWidthStorageKey, String(this.panelWidthPx())); } catch { /* the width just is not remembered */ }
   }
 
   /** Reload button: re-read the file list from disk (and redo the search when a filter is active). */

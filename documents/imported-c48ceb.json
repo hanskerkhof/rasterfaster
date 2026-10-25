@@ -9,13 +9,13 @@
       "position": [
         100.0,
         20.0,
-        6.0
+        46.0
       ],
       "rotation": [
+        1.0,
         0.0,
         0.0,
-        0.0,
-        1.0
+        -5.5511151231257815e-17
       ],
       "muted": false,
       "centered": false
@@ -159,15 +159,15 @@
       "name": "HW-059 AMP",
       "color": 16167531,
       "position": [
-        97.0,
-        40.0,
-        12.0
+        96.0,
+        42.0,
+        31.0
       ],
       "rotation": [
+        1.0,
         0.0,
         0.0,
-        0.0,
-        1.0
+        -5.5511151231257815e-17
       ],
       "muted": false,
       "centered": false
@@ -178,8 +178,8 @@
       "name": "rotary+encoder_14mm_hole_spc",
       "color": 12745632,
       "position": [
-        20.0,
-        40.0,
+        60.0,
+        -60.0,
         0.0
       ],
       "rotation": [
@@ -399,6 +399,101 @@
       ],
       "muted": false,
       "centered": false
+    },
+    {
+      "id": "1edb047f-c827-4e61-9163-4344e59f6551",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d",
+      "color": 14706278,
+      "position": [
+        100.0,
+        -60.0,
+        46.0
+      ],
+      "rotation": [
+        -0.5,
+        0.49999999999999994,
+        0.5000000000000002,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "b2f946ba-0d38-46a8-9d60-13a5dc99c5c9",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d",
+      "color": 14706278,
+      "position": [
+        100.0,
+        -60.0,
+        26.0
+      ],
+      "rotation": [
+        -0.5,
+        0.49999999999999994,
+        0.5000000000000002,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "dfc8cd5d-852e-4456-8d44-7d6bdb705a88",
+      "path": "MOUNTS/3.1.DC JACK PANEL MOUNT 12mm/3.1.DC JACK PANEL MOUNT 12mm_RF3 MNTS PASSIVE v40_4w DC 1x + LED BLIND.stl",
+      "name": "3.1.DC JACK PANEL MOUNT 12mm_RF3 MNTS PASSIVE v40_4w DC 1x + LED BLIND",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -60.0,
+        6.0
+      ],
+      "rotation": [
+        -0.5,
+        0.49999999999999994,
+        0.5000000000000002,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "0eb0b01c-8538-4a2b-939d-7ebb4c24b7ed",
+      "path": "MOUNTS/3.6.AVIATION PLUG/3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED.stl",
+      "name": "3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED",
+      "color": 7317724,
+      "position": [
+        100.0,
+        20.0,
+        6.0
+      ],
+      "rotation": [
+        -0.5000000000000002,
+        0.5,
+        0.49999999999999994,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "47f9524d-6696-4074-9ec7-100b13f6705b",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 12745632,
+      "position": [
+        243.251,
+        -56.75,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true
     }
   ]
 }
