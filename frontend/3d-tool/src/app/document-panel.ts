@@ -71,8 +71,8 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     .toolbar { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
     .picker { display: flex; gap: 4px; }
     .picker select { flex: 1; min-width: 0; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
-    .export { display: flex; align-items: center; gap: 4px; }
-    .export span { flex: 1; opacity: .8; white-space: nowrap; }
+    .export { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .export span { flex: 1 0 100%; opacity: .8; white-space: nowrap; }
     .export-error { color: #ff8a8a; font-size: 11px; }
     .status { margin-left: auto; opacity: .6; font-size: 11px; }
     .status.error { color: #ff8a8a; opacity: 1; }

@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - export buttons wrap (0.2.1)
+
+### Fixed
+- **FE** (`document-panel.ts`): the Blender and SVG export buttons were cut off at the right edge of the document panel; the export buttons now wrap onto a second line. Version 0.2.1.
+
 ## 2026-10-25 - Blender export (0.2.0)
 
 ### Added
