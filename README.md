@@ -50,6 +50,10 @@ Two-finger scroll pans the view (the scene follows your fingers), pinch zooms to
 
 Right-click a part (3D view or document list): **Dim (mute)** turns it into a barely visible ghost that ignores clicks (⌘A skips it too) — handy for working on what's inside a cover. Right-click the ghost (in the 3D view, where a solid part in front takes priority) or its row in the list to bring it back. **Center on grid** is a toggle (✓ when on, ⌖ in the list): it centers the part's footprint in the nearest 20 × 20 cell and keeps it centered while it is dragged, nudged or rotated — handy for bolts, nuts and spacers. Turn it off to move freely again. **Snap to grid…** is a one-time action: handles appear on the corners and side middles of the part (bottom plane), and clicking one puts that point on the nearest 20 mm grid intersection (height unchanged; Esc cancels; a part set to stay centered stops being centered). **Move to…** is a two-step move: first click a corner of the selected part (handles on all 8 corners of its box), then a corner of another part (handles appear on every other part): the selection snaps so the two corners coincide. Esc cancels either pick mode, whatever has keyboard focus.
 
+## Height grid
+
+X/Y snap to 20 mm. Height snaps to levels that fit a 6 mm baseplate: **0, 2, 6, 10, 14, …** mm (ground, a 2 mm step, then 4 mm steps), so the top of the baseplate is a level. Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part decides, the rest keeps its offsets) and Shift+drag snaps to the nearest level; Alt gives 1 mm steps. The base thickness is `baseThicknessMm` in `frontend/3d-tool/src/app/z-levels.ts`.
+
 ## Work area
 
 Parts stay inside a 100 × 100 cell area (±1000 mm in X/Y, −200…1000 mm in Z); drags, keys, rotations and typed values are clamped to it, and the grid never draws beyond it. Documents with corrupt or out-of-range positions are repaired when opened.

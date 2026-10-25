@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
 import { ViewMode, buildParts, clearParts } from './model-render';
+import { nearestZLevel, nextZLevel } from './z-levels';
 
 const selectedColor = 0xf0a040;
 const handleColor = 0xffe066;
@@ -528,7 +529,8 @@ export class DocumentScene {
     const grabbedSize = grabbed && this.sizeOfItem(grabbed);
     const rawX = point.x - drag.grabOffset.x, rawY = point.y - drag.grabOffset.y;
     let delta: Vec3;
-    if (drag.vertical) delta = [0, 0, snap(point.z - drag.grabOffset.z, step('z')) - start[2]];
+    // Height snaps to the z levels (0, 2, 6, 10, …); Alt gives 1 mm steps.
+    if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, 1) : nearestZLevel(point.z - drag.grabOffset.z)) - start[2]];
     else if (grabbed?.centered && grabbedSize) {
       const cell = cellCenteredPosition([rawX, rawY, start[2]], grabbedSize); // a centered item hops from cell middle to cell middle
       delta = [cell[0] - start[0], cell[1] - start[1], 0];
@@ -575,7 +577,13 @@ export class DocumentScene {
       store.commit();
       return true;
     };
-    const stepX = fine ? 1 : snapStepMm.x, stepY = fine ? 1 : snapStepMm.y, stepZ = fine ? 1 : snapStepMm.z;
+    const stepX = fine ? 1 : snapStepMm.x, stepY = fine ? 1 : snapStepMm.y;
+    // One step up/down the z levels, decided by the lowest selected item (the base); the rest of the selection keeps its offsets.
+    const moveZ = (direction: 1 | -1) => {
+      const lowest = Math.min(...store.selectedItems().map(i => i.position[2]));
+      if (!Number.isFinite(lowest)) return false;
+      return move(0, 0, fine ? direction : nextZLevel(lowest, direction) - lowest);
+    };
     let handled = true;
     if (command && e.key.toLowerCase() === 'z') (e.shiftKey ? store.redo() : store.undo());
     else if (command && e.key.toLowerCase() === 'd') store.duplicateSelected();
@@ -583,10 +591,10 @@ export class DocumentScene {
     else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z
     else if (e.key === 'ArrowRight') (e.shiftKey ? this.rotateSelected('z', -this.ctx.rotationStep()) : move(stepX, 0, 0));
     else if (!command && !e.altKey && ['x', 'y', 'z'].includes(e.key.toLowerCase())) this.rotateSelected(e.key.toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -this.ctx.rotationStep() : this.ctx.rotationStep());
-    else if (e.key === 'ArrowUp') (e.shiftKey ? move(0, 0, stepZ) : move(0, stepY, 0)); // Shift = height, like Shift+drag
-    else if (e.key === 'ArrowDown') (e.shiftKey ? move(0, 0, -stepZ) : move(0, -stepY, 0));
-    else if (e.key === 'PageUp' || e.key === ']') move(0, 0, stepZ);
-    else if (e.key === 'PageDown' || e.key === '[') move(0, 0, -stepZ);
+    else if (e.key === 'ArrowUp') (e.shiftKey ? moveZ(1) : move(0, stepY, 0)); // Shift = height, like Shift+drag
+    else if (e.key === 'ArrowDown') (e.shiftKey ? moveZ(-1) : move(0, -stepY, 0));
+    else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
+    else if (e.key === 'PageDown' || e.key === '[') moveZ(-1);
     else if (e.key === 'Delete' || e.key === 'Backspace') store.removeSelected();
     else if (e.key === 'Escape') store.select(null);
     else handled = false;

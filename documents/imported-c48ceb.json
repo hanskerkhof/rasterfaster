@@ -121,15 +121,34 @@
       "name": "11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I",
       "color": 16767334,
       "position": [
-        309.0,
-        0.0,
-        0.0
+        229.0,
+        -20.0,
+        6.0
       ],
       "rotation": [
         0.0,
         0.0,
         -1.0,
         -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "c3fc2fa2-b65e-4ed1-85e3-38b61caa847c",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
+      "color": 16767334,
+      "position": [
+        40.0,
+        0.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.1102230246251565e-16,
+        1.0
       ],
       "muted": false,
       "centered": false
