@@ -68,7 +68,7 @@ Right-click the view cube → **Camera**: Orthographic (default), Perspective, o
 
 ## Fly-around
 
-The ▶ button next to Home (document view only; also in the view cube's right-click menu) starts a slow camera flight around the assembly: about one turn per 70 s, with the camera rising and falling, breathing in and out, and its centre drifting, so over time the assembly is shown from the sides, the top and a low angle. Zooming (scroll, pinch) keeps working while flying, so you can zoom out to see the path and back in; the 🔍 button next to ⏸ resets the zoom to the flight's default. Dragging the view or pressing ⏸ stops it. **Show camera path** (view cube right-click menu, remembered) draws the path as an amber line around the assembly, with a Blender-style camera outline at the camera's current spot on it: the next ~140 s while flying, otherwise a preview from the current view direction. Zoom out to see it.
+The ▶ button next to Home (document view only; also in the view cube's right-click menu) starts a slow camera flight around the assembly: about one turn per 70 s, with the camera rising and falling, breathing in and out, and its centre drifting, so over time the assembly is shown from the sides, the top and a low angle. Zooming (scroll, pinch) keeps working while flying, so you can zoom out to see the path and back in; the 🔍 button next to ⏸ resets the zoom to the flight's default. Dragging the view or pressing ⏸ stops it. **Show camera path** (view cube right-click menu, remembered) draws the path as an amber line around the assembly, with a Blender-style camera outline at the camera's current spot on it: the whole closed loop (the flight repeats every 280 s), otherwise a preview from the current view direction. Zoom out to see it.
 
 ## 3D grid
 

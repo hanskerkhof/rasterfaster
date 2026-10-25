@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - fly-around loops
+
+### Changed
+- **FE** (`stl-viewer.ts`): the fly-around path is now a closed loop of 280 s (4 turns): each of its slow sine movements was nudged to a whole multiple of the loop frequency (at most about 5 % different in speed), so the end joins the start and the camera repeats seamlessly. The camera path line shows the whole closed loop.
+
 ## 2026-10-25 - view cube spacing
 
 ### Changed
