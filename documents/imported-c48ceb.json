@@ -249,101 +249,6 @@
       "centered": false
     },
     {
-      "id": "3e45c3ff-ebae-469a-bcb9-5b19ba335f10",
-      "path": "1.10 BASE/1.10 BASE 9x8x3h.stl",
-      "name": "1.10 BASE 9x8x3h",
-      "color": 16767334,
-      "position": [
-        100.0,
-        -60.0,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        5.551115123125783e-17,
-        1.0
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
-      "id": "3197af51-1c28-4c63-aa28-be9774e73894",
-      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
-      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
-      "color": 16767334,
-      "position": [
-        240.0,
-        -20.0,
-        6.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
-      "id": "fae8a8ed-a5db-450d-93b5-ec8c1abb783a",
-      "path": "CORNERS/CORNERS_RF6 v215_CORNER LEFT 3h.stl",
-      "name": "CORNERS_RF6 v215_CORNER LEFT 3h",
-      "color": 7317724,
-      "position": [
-        240.0,
-        40.0,
-        6.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
-      "id": "e458c749-54fd-4737-a1d4-2c4bf8733f62",
-      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
-      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
-      "color": 16767334,
-      "position": [
-        104.0,
-        20.0,
-        6.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -1.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
-      "id": "ab8fe281-1236-468e-9502-9bd418f26c97",
-      "path": "CORNERS/CORNERS_RF6 v215_CORNER LEFT 3h.stl",
-      "name": "CORNERS_RF6 v215_CORNER LEFT 3h",
-      "color": 7317724,
-      "position": [
-        104.0,
-        0.0,
-        6.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -1.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
       "id": "7efbc696-9cd2-418b-b114-4d7b2e976134",
       "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
@@ -439,25 +344,6 @@
       "centered": false
     },
     {
-      "id": "dfc8cd5d-852e-4456-8d44-7d6bdb705a88",
-      "path": "MOUNTS/3.1.DC JACK PANEL MOUNT 12mm/3.1.DC JACK PANEL MOUNT 12mm_RF3 MNTS PASSIVE v40_4w DC 1x + LED BLIND.stl",
-      "name": "3.1.DC JACK PANEL MOUNT 12mm_RF3 MNTS PASSIVE v40_4w DC 1x + LED BLIND",
-      "color": 16767334,
-      "position": [
-        100.0,
-        -60.0,
-        6.0
-      ],
-      "rotation": [
-        -0.5,
-        0.49999999999999994,
-        0.5000000000000002,
-        -0.5000000000000001
-      ],
-      "muted": false,
-      "centered": false
-    },
-    {
       "id": "0eb0b01c-8538-4a2b-939d-7ebb4c24b7ed",
       "path": "MOUNTS/3.6.AVIATION PLUG/3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED.stl",
       "name": "3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED",
@@ -494,6 +380,44 @@
       ],
       "muted": false,
       "centered": true
+    },
+    {
+      "id": "53d3750a-f099-4f87-852f-223208128beb",
+      "path": "MOUNTS/DC JACK PANEL MOUNT 12mm - def/5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1).stl",
+      "name": "5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1)",
+      "color": 16167531,
+      "position": [
+        100.0,
+        -60.0,
+        6.0
+      ],
+      "rotation": [
+        -0.5,
+        -0.4999999999999998,
+        -0.5000000000000004,
+        -0.49999999999999983
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "e7603fb3-949e-4cc3-b230-6713f555275c",
+      "path": "1.10 BASE/1.10 BASE 9x8x3h 8CORNERS UNEVEN.stl",
+      "name": "1.10 BASE 9x8x3h 8CORNERS UNEVEN",
+      "color": 16167531,
+      "position": [
+        100.0,
+        -60.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false
     }
   ]
 }

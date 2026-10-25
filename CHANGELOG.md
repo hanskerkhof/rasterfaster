@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - black band at the bottom
+
+### Fixed
+- **FE** (`app.scss`): a black band showed below the app in Chrome (it survived reloads). The layout grid had an automatic row that only grew to its content, so the panel and the 3D view ended where the file list ended (found by measuring in real Chrome: root 963 px, main 562 px). The grid now has one explicit full-height row (`grid-template-rows: minmax(0, 1fr)`), and the invisible context-menu component (`app-object-menu`) no longer takes part in the grid (`display: contents`), where it had created a second, empty row.
+
 ## 2026-10-25 - resizable file panel, viewport fit
 
 ### Added
