@@ -54,6 +54,10 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 Right-click the view cube → **3D grid** switches the ground grid to a full lattice: horizontal 20 mm grids at every height level (0, 2, 6, 10, …) up to just above the parts, plus vertical lines through every node. The choice is remembered.
 
+## Rotating around the selection
+
+With parts selected, rotating the view (dragging empty space, or dragging/clicking the view cube) pivots around the centre of the selection: the view glides to centre it first. Right-click the view cube → **Rotate around selection** turns this on or off (default on, remembered).
+
 ## Height grid
 
 X/Y snap to 20 mm. Height snaps to levels that fit a 6 mm baseplate: **0, 2, 6, 10, 14, …** mm (ground, a 2 mm step, then 4 mm steps), so the top of the baseplate is a level. Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part decides, the rest keeps its offsets) and Shift+drag snaps to the nearest level; Alt gives 1 mm steps. The base thickness is `baseThicknessMm` in `frontend/3d-tool/src/app/z-levels.ts`.

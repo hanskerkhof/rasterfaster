@@ -159,15 +159,15 @@
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
       "color": 7317724,
       "position": [
-        40.0,
-        0.0,
+        -40.0,
+        80.0,
         2.0
       ],
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        -0.7071067811865476,
+        0.7071067811865475
       ],
       "muted": false,
       "centered": false
@@ -178,15 +178,15 @@
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
       "color": 9684093,
       "position": [
+        -60.0,
         40.0,
-        0.0,
         0.0
       ],
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        -0.7071067811865476,
+        0.7071067811865475
       ],
       "muted": false,
       "centered": false

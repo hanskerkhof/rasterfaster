@@ -13,6 +13,7 @@ import { nextZLevel } from './z-levels';
 const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
+const pivotStorageKey = 'rasterfaster.pivotOnSelection';
 
 function foldDegrees(d: number) {
   const folded = ((d % 360) + 540) % 360 - 180; // -180..180
@@ -20,6 +21,10 @@ function foldDegrees(d: number) {
 }
 
 export type { ViewMode } from './model-render';
+
+function readPivotOnSelection() {
+  try { return localStorage.getItem(pivotStorageKey) !== 'false'; } catch { return true; } // default on
+}
 
 function readGrid3d() {
   try { return localStorage.getItem(grid3dStorageKey) === 'true'; } catch { return false; }
@@ -52,6 +57,9 @@ function readGrid3d() {
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
           <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
         </button>
+        <button type="button" role="menuitem" (click)="togglePivotOnSelection()">
+          <span class="tick">{{ pivotOnSelection() ? '✓' : '' }}</span>Rotate around selection<span class="hint">{{ pivotOnSelection() ? 'on' : 'off' }}</span>
+        </button>
       </div>
     }
     <button class="home" type="button" title="Home (isometric view)" aria-label="Home view" (click)="goHome()">
@@ -73,7 +81,7 @@ function readGrid3d() {
     .rotate button:disabled { opacity: .35; cursor: default; }
     .host:focus { outline: none; }
     .menu-backdrop { position: absolute; inset: 0; z-index: 8; }
-    .cube-menu { position: absolute; z-index: 9; min-width: 150px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
+    .cube-menu { position: absolute; z-index: 9; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
                  border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .cube-menu button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
     .cube-menu button:hover { background: #2f6fed; color: #fff; }
@@ -120,6 +128,9 @@ export class StlViewer implements OnDestroy {
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
   protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
+  /** Rotating the view (drag, or dragging the view cube) pivots around the selected parts instead of the current view centre. */
+  protected readonly pivotOnSelection = signal(readPivotOnSelection());
+  private pivotGoal: THREE.Vector3 | null = null;
   private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
   private readonly pickRaycaster = new THREE.Raycaster();
@@ -171,9 +182,9 @@ export class StlViewer implements OnDestroy {
     // Created first so its pointerdown handler can swallow clicks that land on the cube.
     this.viewCube = new ViewCube(this.renderer.domElement, d => this.snapTo(d), (dx, dy) => this.orbitBy(dx, dy), (clientX, clientY) => {
       const host = this.host().nativeElement.getBoundingClientRect();
-      const menuWidth = 180; // keep the menu inside the view when the cube is at the right edge
+      const menuWidth = 240; // keep the menu inside the view when the cube is at the right edge
       this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
-    });
+    }, () => this.startPivot());
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
     this.documentScene = new DocumentScene({
       scene: this.scene, camera: this.camera, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
@@ -197,6 +208,7 @@ export class StlViewer implements OnDestroy {
       this.frame = requestAnimationFrame(loop);
       this.stepSnapAnimation();
       this.stepPanAnimation();
+      this.stepPivot();
       this.documentScene.tick();
       this.controls.update();
       this.renderer.clear();
@@ -339,7 +351,11 @@ export class StlViewer implements OnDestroy {
 
   /** ⌘-click: look at the clicked surface point (or, over empty space, the point on the plane through the current target). */
   private readonly onCentreClick = (e: PointerEvent) => {
-    if (!e.metaKey || e.button !== 0) return;
+    if (!e.metaKey) { // a plain left press that reached here starts a view rotation (nothing else claimed it)
+      if (e.button === 0) this.startPivot();
+      return;
+    }
+    if (e.button !== 0) return;
     const canvas = this.renderer.domElement;
     const rect = canvas.getBoundingClientRect();
     const inCube = e.clientX > rect.right - 150 - 12 && e.clientY < rect.top + 150 + 12; // ViewCube corner has its own clicks
@@ -357,6 +373,33 @@ export class StlViewer implements OnDestroy {
     }
     if (point) this.panTo(point);
   };
+
+  /** A view rotation is starting: with a selection, make its centre the pivot (the view glides so it is centred). */
+  private startPivot() {
+    if (!this.pivotOnSelection() || !this.documentMode()) return;
+    const centre = this.documentScene.selectionCenter();
+    if (!centre) return;
+    this.panAnimation = null;
+    this.pivotGoal = centre;
+  }
+
+  /** Moves view centre and camera together towards the pivot, a bit each frame, without touching the camera's direction. */
+  private stepPivot() {
+    const goal = this.pivotGoal;
+    if (!goal) return;
+    const delta = goal.clone().sub(this.controls.target);
+    if (delta.length() < 0.05) { this.camera.position.add(delta); this.controls.target.add(delta); this.pivotGoal = null; return; }
+    delta.multiplyScalar(0.3);
+    this.camera.position.add(delta);
+    this.controls.target.add(delta);
+  }
+
+  protected togglePivotOnSelection() {
+    const on = !this.pivotOnSelection();
+    this.pivotOnSelection.set(on);
+    try { localStorage.setItem(pivotStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.cubeMenu.set(null);
+  }
 
   /** Glide the view so `point` becomes the centre; direction and distance stay. */
   private panTo(point: THREE.Vector3) {

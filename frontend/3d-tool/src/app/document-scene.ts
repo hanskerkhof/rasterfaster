@@ -334,6 +334,18 @@ export class DocumentScene {
     return box.isEmpty() ? null : box;
   }
 
+  /** Centre of the box around all selected items, or null when nothing (loaded) is selected. */
+  selectionCenter() {
+    const box = new THREE.Box3();
+    for (const item of this.ctx.store.selectedItems()) {
+      const size = this.sizeOfItem(item);
+      if (!size) continue;
+      const low = new THREE.Vector3(...item.position);
+      box.union(new THREE.Box3(low, low.clone().add(new THREE.Vector3(...size))));
+    }
+    return box.isEmpty() ? null : box.getCenter(new THREE.Vector3());
+  }
+
   /** Centre of an item's bounding box in world coordinates, or null while its geometry is still loading. */
   itemCenter(id: string) {
     const item = this.ctx.store.doc().items.find(i => i.id === id);
