@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - native .blend export (0.2.2)
+
+### Added
+- **BE** (`blenderexport.py`, `main.py`, `tests/test_blenderexport.py`): `GET /api/documents/{id}/export.blend` returns a real .blend, made by running Blender in the background on the glTF export (camera set as scene camera, frame range 0-6720, 1080p). Blender is found via `$BLENDER`, the PATH or the default install location; 503 when missing.
+
+### Changed
+- **FE** (`document-panel.ts`): the **Blender** button downloads the .blend (a .glb does not open in Blender by double-click). The glTF stays available from the API.
+
 ## 2026-10-25 - export buttons wrap (0.2.1)
 
 ### Fixed

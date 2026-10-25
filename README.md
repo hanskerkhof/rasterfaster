@@ -98,7 +98,9 @@ Parts stay inside a 100 × 100 cell area (±1000 mm in X/Y, −200…1000 mm in 
 
 ## Blender export
 
-**Blender** in the document panel downloads a `.glb` (glTF binary; API: `GET /api/documents/{id}/export.glb`, add `?camera=false` for parts only). In Blender use *File > Import > glTF 2.0*. You get one object per part (named like the part, in its colour, flat shaded) exactly as placed in the document, Z up, in metres (a 20 mm cell is 0.02 m); parts marked **Do not export** are left out. It also contains a **Fly-around camera** (35° perspective, 16:9) animated along the closed fly-around loop (280 s, so 6720 frames at 24 fps: set the scene's *End* frame to see all of it) and a **Camera path** line object with the path the camera follows. The camera starts at the isometric Home view and keeps the whole assembly in frame. Checked with Blender 5.0.
+**Blender** in the document panel downloads a native `.blend` (API: `GET /api/documents/{id}/export.blend`); double-click it to open it in Blender. The API makes it by running Blender in the background, so Blender must be installed on the machine that runs the API (found automatically at `/Applications/Blender.app` or on the PATH; set `BLENDER` to its path otherwise; without it the button reports "Blender was not found"). You get one object per part (named like the part, in its colour, flat shaded) exactly as placed in the document, Z up, in metres (a 20 mm cell is 0.02 m); parts marked **Do not export** are left out. The scene camera is a **Fly-around camera** (35° perspective, 16:9, 1080p) animated along the closed fly-around loop (280 s: frames 0 to 6720 at 24 fps), and a **Camera path** line object shows the path. The camera starts at the isometric Home view and keeps the whole assembly in frame. Checked with Blender 5.0.
+
+The same scene as glTF, without needing Blender: `GET /api/documents/{id}/export.glb` (add `?camera=false` for parts only); import it with *File > Import > glTF 2.0*.
 
 ## SVG drawing
 

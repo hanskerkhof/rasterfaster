@@ -13,6 +13,7 @@ import json
 import os
 import re
 import secrets
+import subprocess
 import sys
 import threading
 import time
@@ -269,6 +270,25 @@ def export_document_glb(documentId: str, camera: bool = True) -> Response:
         raise HTTPException(status_code=422, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".glb"
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/documents/{documentId}/export.blend")
+def export_document_blend(documentId: str) -> Response:
+    """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
+    blender = blenderexport.find_blender()
+    if not blender:
+        raise HTTPException(status_code=503, detail="Blender was not found on this machine (set the BLENDER environment variable to its path)")
+    document = exportable(read_document(documentId))
+    stlBytes = load_document_stls(document)
+    try:
+        glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True)
+        data = blenderexport.build_blend(glb, blender)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        raise HTTPException(status_code=500, detail=str(error))
+    filename = re.sub(r"[^\w.-]+", "_", document.name) + ".blend"
+    return Response(data, media_type="application/x-blender", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.get("/api/documents/{documentId}/export.svg")

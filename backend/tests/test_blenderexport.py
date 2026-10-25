@@ -79,3 +79,18 @@ def test_endpoint(tmp_path, monkeypatch):
     assert "Blend_me.glb" in response.headers["content-disposition"]
     parse_glb(response.content)
     assert "cameras" not in parse_glb(client.get(f"/api/documents/{created['id']}/export.glb", params={"camera": "false"}).content)[0]
+
+
+def test_blend_endpoint(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Blend me", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: None)
+    assert client.get(f"/api/documents/{created['id']}/export.blend").status_code == 503
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender: b"BLENDER-v500" + glb[:4])
+    response = client.get(f"/api/documents/{created['id']}/export.blend")
+    assert response.status_code == 200 and response.content.startswith(b"BLENDER") and "Blend_me.blend" in response.headers["content-disposition"]

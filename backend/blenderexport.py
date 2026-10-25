@@ -186,3 +186,50 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
     total = 12 + 8 + len(jsonBytes) + 8 + len(buffer.data)
     return (struct.pack("<III", 0x46546C67, 2, total) + struct.pack("<II", len(jsonBytes), 0x4E4F534A) + jsonBytes
             + struct.pack("<II", len(buffer.data), 0x004E4942) + bytes(buffer.data))
+
+
+blenderScript = r'''
+import sys
+import bpy
+
+source, target = sys.argv[sys.argv.index("--") + 1:]
+bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.import_scene.gltf(filepath=source)
+scene = bpy.context.scene
+scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
+scene.unit_settings.system = "METRIC"
+for obj in bpy.data.objects:
+    if obj.type == "CAMERA":
+        scene.camera = obj
+        if obj.animation_data and obj.animation_data.action:
+            first, last = obj.animation_data.action.frame_range
+            scene.frame_start, scene.frame_end = int(first), int(last)
+bpy.ops.wm.save_as_mainfile(filepath=target, compress=True)
+'''
+
+
+def find_blender() -> str | None:
+    """The Blender executable: $BLENDER, `blender` on the PATH, or the macOS / Linux default locations."""
+    import os
+    import shutil
+    from pathlib import Path
+
+    candidates = [os.environ.get("BLENDER"), shutil.which("blender"), "/Applications/Blender.app/Contents/MacOS/Blender", "/usr/bin/blender", "/snap/bin/blender"]
+    return next((c for c in candidates if c and Path(c).is_file()), None)
+
+
+def build_blend(glb: bytes, blender: str) -> bytes:
+    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, frame range of the flight, 1080p)."""
+    import subprocess
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as folder:
+        source, target, script = Path(folder, "scene.glb"), Path(folder, "scene.blend"), Path(folder, "make_blend.py")
+        source.write_bytes(glb)
+        script.write_text(blenderScript)
+        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target)],
+                                capture_output=True, text=True, timeout=120)
+        if not target.is_file():
+            raise RuntimeError(f"Blender could not write the .blend: {(result.stderr or result.stdout)[-300:]}")
+        return target.read_bytes()
