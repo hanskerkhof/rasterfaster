@@ -122,3 +122,15 @@ def test_parts_are_black_pla_unless_colours_are_asked_for():
     assert "KHR_materials_clearcoat" in gltf["extensionsUsed"]
     coloured, _ = parse_glb(blenderexport.build_glb(document, stls.__getitem__, camera=False, colours=True))
     assert {m["name"] for m in coloured["materials"]} == {"colour_000001", "colour_000002"}
+
+
+def test_zoomed_in_perspective_view_gets_its_narrow_field_of_view():
+    items, stls = items_and_stls()
+    view = blenderexport.parse_view("0,-1,0;50,20,10;240;persp;12")
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, view=view))
+    assert abs(gltf["cameras"][0]["perspective"]["yfov"] - np.radians(12)) < 1e-9
+    node = next(n for n in gltf["nodes"] if n.get("camera") == 0)
+    assert abs(node["translation"][2] - -(0.020 - 0.240 / 2 / np.tan(np.radians(6)))) < 1e-6  # far away: same framing, flatter perspective
+    assert blenderexport.parse_view("0,-1,0;0,0,0;10;persp")["fov"] == blenderexport.fovDegrees
+    with pytest.raises(ValueError):
+        blenderexport.parse_view("0,-1,0;0,0,0;10;persp;0")

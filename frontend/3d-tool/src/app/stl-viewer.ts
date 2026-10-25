@@ -349,7 +349,7 @@ export class StlViewer implements OnDestroy {
   }
 
   /**
-   * The camera of this view for the Blender export: `dx,dy,dz;tx,ty,tz;height;projection` (viewing direction from the centre to the camera,
+   * The camera of this view for the Blender export: `dx,dy,dz;tx,ty,tz;height;projection[;fov]` (viewing direction from the centre to the camera,
    * view centre in mm, visible height at the centre in mm, `persp` or `ortho`). Null outside the document view.
    */
   readonly viewParam = (): string | null => {
@@ -357,7 +357,9 @@ export class StlViewer implements OnDestroy {
     const direction = this.camera.position.clone().sub(this.controls.target).normalize();
     const target = this.controls.target;
     const round = (v: number) => Math.round(v * 1000) / 1000;
-    return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.viewHeight())};${this.projection}`;
+    // A zoomed-in perspective view has a narrower field of view than the camera's own: send the effective one so the picture looks the same.
+    const fov = this.camera instanceof THREE.PerspectiveCamera ? `;${round((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / this.camera.zoom)) * (180 / Math.PI))}` : '';
+    return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.viewHeight())};${this.projection}${fov}`;
   };
 
   protected toggleFlight() {

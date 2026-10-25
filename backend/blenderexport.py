@@ -24,16 +24,18 @@ homeDirection = np.array([1.0, -1.0, 0.8]) / np.linalg.norm([1.0, -1.0, 0.8])  #
 
 
 def parse_view(text: str) -> dict:
-    """`dx,dy,dz;tx,ty,tz;height;projection`: viewing direction (target -> camera), view centre (mm), visible height at the centre (mm), `persp` or `ortho`."""
+    """`dx,dy,dz;tx,ty,tz;height;projection[;fov]`: viewing direction (target -> camera), view centre (mm), visible height at the centre (mm),
+    `persp` or `ortho`, and for `persp` optionally the view's vertical field of view in degrees (a zoomed-in view has a narrow one, which looks flatter)."""
     try:
-        direction, target, height, projection = text.split(";")
+        direction, target, height, projection, *fov = text.split(";")
         view = {"direction": np.array([float(v) for v in direction.split(",")]), "target": np.array([float(v) for v in target.split(",")]),
-                "height": float(height), "projection": projection}
+                "height": float(height), "projection": projection, "fov": float(fov[0]) if fov else fovDegrees}
+        assert len(fov) <= 1 and 1.0 <= view["fov"] <= 120.0
         assert view["direction"].shape == (3,) and view["target"].shape == (3,) and view["projection"] in ("persp", "ortho")
         assert np.isfinite(view["direction"]).all() and np.isfinite(view["target"]).all() and np.isfinite(view["height"])
         assert np.linalg.norm(view["direction"]) > 1e-6 and view["height"] > 0
     except (ValueError, AssertionError):
-        raise ValueError("view must be dx,dy,dz;tx,ty,tz;height;persp|ortho")
+        raise ValueError("view must be dx,dy,dz;tx,ty,tz;height;persp|ortho[;fov]")
     view["direction"] = view["direction"] / np.linalg.norm(view["direction"])
     return view
 
@@ -168,9 +170,10 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
             gltf["cameras"] = [{"name": "App view camera", "type": "orthographic", "orthographic": {
                 "xmag": height / 2 * aspect * mmToMetre, "ymag": height / 2 * mmToMetre, "znear": 0.01, "zfar": 50.0}}]
         else:
-            distance = height / 2 / math.tan(math.radians(fovDegrees) / 2)
+            fov = view.get("fov", fovDegrees)
+            distance = height / 2 / math.tan(math.radians(fov) / 2)
             gltf["cameras"] = [{"name": "App view camera", "type": "perspective", "perspective": {
-                "yfov": math.radians(fovDegrees), "aspectRatio": aspect, "znear": 0.01, "zfar": 50.0}}]
+                "yfov": math.radians(fov), "aspectRatio": aspect, "znear": 0.01, "zfar": 50.0}}]
         eye = target + direction * distance
         right, up, forward = camera_basis(direction)
         rotation = quaternion(np.column_stack([toGltf @ right, toGltf @ up, -(toGltf @ forward)]))  # glTF cameras look down -Z

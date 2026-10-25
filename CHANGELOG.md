@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - Blender camera keeps the app's perspective (0.2.5)
+
+### Fixed
+- **FE** (`stl-viewer.ts` `viewParam`), **BE** (`blenderexport.py`, `tests/test_blenderexport.py`): a zoomed-in perspective view in the app has a narrow field of view (the camera zoom), but the export always used 35 degrees at the matching distance, so the Blender render looked much closer and more wide-angle than the app. The export now carries the view's effective vertical field of view (`view=...;persp;fov`) and the camera sits at the matching distance, so framing and perspective match; the lens in Blender is therefore not a fixed 35 mm any more but follows the view. Version 0.2.5.
+
 ## 2026-10-25 - Blender studio floor is see-through from below
 
 ### Changed
