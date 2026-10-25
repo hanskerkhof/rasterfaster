@@ -59,6 +59,11 @@ function readGrid3d() {
   try { return localStorage.getItem(grid3dStorageKey) === 'true'; } catch { return false; }
 }
 
+const showPathStorageKey = 'rasterfaster.showCameraPath';
+function readShowPath() {
+  try { return localStorage.getItem(showPathStorageKey) === 'true'; } catch { return false; }
+}
+
 @Component({
   selector: 'app-stl-viewer',
   template: `
@@ -119,6 +124,11 @@ function readGrid3d() {
         @if (documentMode()) {
           <button type="button" role="menuitem" (click)="toggleFlight(); cubeMenu.set(null)">
             <span class="tick">{{ flying() ? '✓' : '' }}</span>Fly-around<span class="hint">{{ flying() ? 'on' : 'off' }}</span>
+          </button>
+        }
+        @if (documentMode()) {
+          <button type="button" role="menuitem" (click)="toggleShowPath()">
+            <span class="tick">{{ showPath() ? '✓' : '' }}</span>Show camera path<span class="hint">{{ showPath() ? 'on' : 'off' }}</span>
           </button>
         }
         <button type="button" role="menuitem" (click)="togglePivotOnSelection()">
@@ -224,6 +234,8 @@ export class StlViewer implements OnDestroy {
   private pivotGoal: THREE.Vector3 | null = null;
   /** Fly-around: the camera slowly circles the assembly on a wandering path (azimuth sweep, rising and falling elevation, breathing zoom, drifting centre). */
   protected readonly flying = signal(false);
+  protected readonly showPath = signal(readShowPath());
+  private pathLine: THREE.Line | null = null;
   private flightTime = 0;
   private flightLast = 0;
   private flightAzimuth0 = 0;
@@ -315,6 +327,7 @@ export class StlViewer implements OnDestroy {
       this.stepPanAnimation();
       this.stepPivot();
       this.stepFlight();
+      this.updatePathLine();
       this.updateAutoProjection();
       this.documentScene.tick();
       this.controls.update();
@@ -336,6 +349,50 @@ export class StlViewer implements OnDestroy {
     this.flying.set(true);
   }
 
+  /** The fly-around path: where the camera wants to be `t` seconds into the flight (viewing direction, view centre, zoom relative to the fit). */
+  private flightPose(t: number, azimuth0: number, bounds: THREE.Box3) {
+    const size = bounds.getSize(new THREE.Vector3());
+    const azimuth = azimuth0 + t * 0.09; // about one turn per 70 s
+    const elevation = THREE.MathUtils.degToRad(38 + 26 * Math.sin(t * 0.13 + 0.8) + 8 * Math.sin(t * 0.31));
+    const direction = new THREE.Vector3(Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation));
+    const centre = bounds.getCenter(new THREE.Vector3()).add(new THREE.Vector3(
+      size.x * 0.16 * Math.sin(t * 0.17), size.y * 0.16 * Math.cos(t * 0.11), size.z * 0.2 * Math.sin(t * 0.23)));
+    return { direction, centre, zoomFactor: 1 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.21 - 1)) };
+  }
+
+  protected toggleShowPath() {
+    const on = !this.showPath();
+    this.showPath.set(on);
+    try { localStorage.setItem(showPathStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.cubeMenu.set(null);
+  }
+
+  /** Draws the camera path as a line (the orbit's shape, not the camera's real distance): the next 140 s of the flight while flying, otherwise a preview from the current view direction. */
+  private updatePathLine() {
+    const bounds = this.documentMode() ? this.documentScene.bounds() : null;
+    if (!this.showPath() || !bounds) {
+      if (this.pathLine) { this.scene.remove(this.pathLine); this.pathLine.geometry.dispose(); this.pathLine = null; }
+      return;
+    }
+    this.radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 60);
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const azimuth0 = this.flying() ? this.flightAzimuth0 : Math.atan2(offset.y, offset.x);
+    const from = this.flying() ? this.flightTime : 0;
+    const distance = this.radius * 1.25; // drawn as an orbit around the assembly (the real camera sits much further out, which would be off screen)
+    const points: THREE.Vector3[] = [];
+    for (let i = 0; i <= 280; i++) {
+      const pose = this.flightPose(from + i * 0.5, azimuth0, bounds);
+      points.push(pose.centre.addScaledVector(pose.direction, distance));
+    }
+    if (!this.pathLine) {
+      this.pathLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffb020, depthTest: false, transparent: true, opacity: 0.9 }));
+      this.pathLine.renderOrder = 10;
+      this.pathLine.frustumCulled = false;
+      this.scene.add(this.pathLine);
+    }
+    this.pathLine.geometry.setFromPoints(points);
+  }
+
   /**
    * One frame of the fly-around. The wanted view is a sum of slow sines with unrelated periods, so the path keeps changing and
    * covers the assembly from the sides, the top and a low angle; the real camera eases towards it (which also blends in and out smoothly).
@@ -353,12 +410,8 @@ export class StlViewer implements OnDestroy {
     const size = bounds.getSize(new THREE.Vector3());
     this.radius = Math.max(size.length() / 2, 60);
 
-    const azimuth = this.flightAzimuth0 + t * 0.09; // about one turn per 70 s
-    const elevation = THREE.MathUtils.degToRad(38 + 26 * Math.sin(t * 0.13 + 0.8) + 8 * Math.sin(t * 0.31));
-    const direction = new THREE.Vector3(Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation));
-    const centre = bounds.getCenter(new THREE.Vector3()).add(new THREE.Vector3(
-      size.x * 0.16 * Math.sin(t * 0.17), size.y * 0.16 * Math.cos(t * 0.11), size.z * 0.2 * Math.sin(t * 0.23)));
-    const zoom = this.fitZoom(size, direction) * (1 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.21 - 1)));
+    const { direction, centre, zoomFactor } = this.flightPose(t, this.flightAzimuth0, bounds);
+    const zoom = this.fitZoom(size, direction) * zoomFactor;
 
     const k = 1 - Math.exp(-dt * 1.5);
     const current = this.camera.position.clone().sub(this.controls.target);
