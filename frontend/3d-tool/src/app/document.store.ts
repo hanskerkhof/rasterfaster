@@ -327,17 +327,17 @@ export class DocumentStore {
   }
 
   /**
-   * Drops the items onto the ground plane: the lowest point of the selection goes to z = 0. A position is the bounding-box corner with
-   * the lowest z, so for one item that is simply z = 0; several items keep their heights relative to each other.
+   * Moves the items vertically so the lowest point of the selection is at `height` (0 = ground, 6 = top of the baseplate). A position is
+   * the bounding-box corner with the lowest z, so for one item that is simply z = height; several items keep their relative heights.
    */
-  moveToGround(ids: readonly string[]) {
+  moveToHeight(ids: readonly string[], height: number) {
     const wanted = new Set(ids);
     const picked = this.doc().items.filter(i => wanted.has(i.id));
     if (!picked.length) return;
-    const lowest = Math.min(...picked.map(i => i.position[2]));
-    if (lowest === 0) return;
+    const delta = height - Math.min(...picked.map(i => i.position[2]));
+    if (delta === 0) return;
     const round = (v: number) => Math.round(v * 1000) / 1000;
-    this.patchMany(new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] - lowest)] as Vec3 }])));
+    this.patchMany(new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] + delta)] as Vec3 }])));
     this.commit();
   }
 

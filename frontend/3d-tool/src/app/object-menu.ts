@@ -1,5 +1,6 @@
 import { Component, HostListener, computed, inject } from '@angular/core';
 import { DocumentStore } from './document.store';
+import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */
 @Component({
@@ -25,9 +26,13 @@ import { DocumentStore } from './document.store';
           <span class="icon">⇥</span>Move to…
           <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
         </button>
-        <button type="button" role="menuitem" [disabled]="onGround()" (click)="moveToGround()">
+        <button type="button" role="menuitem" [disabled]="lowestAt(0)" (click)="moveToHeight(0)">
           <span class="icon">⤓</span>Move to ground
-          <span class="hint">{{ onGround() ? 'already on the ground' : 'lowest point to z = 0' }}</span>
+          <span class="hint">{{ lowestAt(0) ? 'already on the ground' : 'lowest point to z = 0' }}</span>
+        </button>
+        <button type="button" role="menuitem" [disabled]="lowestAt(baseMm)" (click)="moveToHeight(baseMm)">
+          <span class="icon">⇥</span>Move to base ({{ baseMm }} mm)
+          <span class="hint">{{ lowestAt(baseMm) ? 'already on the base' : 'lowest point to z = ' + baseMm }}</span>
         </button>
       </div>
     }
@@ -54,7 +59,12 @@ export class ObjectMenu {
   protected readonly allMuted = computed(() => this.items().length > 0 && this.items().every(i => i.muted));
   /** Move to needs at least one part that is not part of the selection to snap onto. */
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
-  protected readonly onGround = computed(() => this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === 0);
+  protected readonly baseMm = baseThicknessMm;
+  /** True when the lowest point of the selection already is at `height`. */
+  protected lowestAt(height: number) {
+    return this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === height;
+  }
+
   protected readonly allCentered = computed(() => this.items().length > 0 && this.items().every(i => i.centered));
   protected readonly title = computed(() => {
     const items = this.items();
@@ -78,8 +88,8 @@ export class ObjectMenu {
     this.close();
   }
 
-  protected moveToGround() {
-    this.store.moveToGround(this.items().map(i => i.id));
+  protected moveToHeight(height: number) {
+    this.store.moveToHeight(this.items().map(i => i.id), height);
     this.close();
   }
 

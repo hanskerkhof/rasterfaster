@@ -14,6 +14,9 @@ export const zGridModes: { id: ZGridMode; title: string; detail: string }[] = [
 
 export const defaultZGridMode: ZGridMode = 'baseplate';
 
+/** Thickness of the standard RASTERFASTER baseplate (mm); "Move to base" puts a part on top of it. */
+export const baseThicknessMm = 6;
+
 /** Levels are `phase + k·step` for whole k, plus the ground (0). */
 const ladders: Record<ZGridMode, { step: number; phase: number }> = {
   fine: { step: 2, phase: 0 },
