@@ -105,7 +105,7 @@ export class ViewCube {
   /** Cube rectangle in canvas CSS px. */
   private rect() {
     const left = this.canvas.clientWidth - cubeSize - cubeMargin;
-    return { left, top: cubeMargin, size: cubeSize };
+    return { left, top: cubeMargin + 30, size: cubeSize }; // lowered so the Home / fly-around buttons above its corner have room
   }
 
   private local(e: PointerEvent) {
