@@ -50,6 +50,10 @@ Two-finger scroll pans the view (the scene follows your fingers), pinch zooms to
 
 Right-click a part (3D view or document list): **Dim (mute)** turns it into a barely visible ghost that ignores clicks (⌘A skips it too) — handy for working on what's inside a cover. Right-click the ghost (in the 3D view, where a solid part in front takes priority) or its row in the list to bring it back. **Center on grid** is a toggle (✓ when on, ⌖ in the list): it centers the part's footprint in the nearest 20 × 20 cell and keeps it centered while it is dragged, nudged or rotated — handy for bolts, nuts and spacers. Turn it off to move freely again. **Snap to grid…** is a one-time action: handles appear on the corners and side middles of the part (bottom plane), and clicking one puts that point on the nearest 20 mm grid intersection (height unchanged; Esc cancels; a part set to stay centered stops being centered). **Move to ground** drops the part so its lowest point is at z = 0, **Move to base (6 mm)** puts it on top of the 6 mm baseplate (z = 6); several parts keep their heights relative to each other. **Move to…** is a two-step move: first click a corner of the selected part (handles on all 8 corners of its box), then a corner of another part (handles appear on every other part): the selection snaps so the two corners coincide. Esc cancels either pick mode, whatever has keyboard focus.
 
+## File list
+
+The reload button (⟳ next to Sort) re-reads the library from disk: the root and every open folder, and the search when a filter is active. The filter text is remembered across reloads.
+
 ## 3D grid
 
 Right-click the view cube → **3D grid** switches the ground grid to a full lattice: horizontal 20 mm grids at every height level (0, 2, 6, 10, …) up to just above the parts, plus vertical lines through every node. The choice is remembered.

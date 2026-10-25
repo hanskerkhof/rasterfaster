@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { LibraryEntry, LibraryService } from './library.service';
 import { QuickLook } from './quick-look';
 
@@ -124,6 +125,24 @@ export class TreePanel {
       next: list => this.cache.update(m => new Map(m).set(path, list)),
       error: () => this.requested.delete(path),
     });
+  }
+
+  /**
+   * Re-reads the library from disk: the root and every folder that is currently open. The old rows stay on screen until the new
+   * lists arrive, so the tree doesn't flicker; folders that no longer exist drop out of the cache.
+   */
+  async reload() {
+    const paths = ['', ...this.flippedBrowse()];
+    await Promise.allSettled(paths.map(async path => {
+      try {
+        const list = await firstValueFrom(this.lib.list(path));
+        this.requested.add(path);
+        this.cache.update(m => new Map(m).set(path, list));
+      } catch {
+        this.requested.delete(path);
+        if (path) this.cache.update(m => { const next = new Map(m); next.delete(path); return next; });
+      }
+    }));
   }
 
   private childrenOf(e: LibraryEntry) {

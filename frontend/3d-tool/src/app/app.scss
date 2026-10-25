@@ -30,3 +30,6 @@ main { display: flex; flex-direction: column; min-width: 0; }
           background: rgba(35,38,45,.95); border: 1px solid #ffe066; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
 .banner button { padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
 .banner button:hover { background: #2f6fed; color: #fff; }
+.sort .reload { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; margin-right: 4px; }
+.sort .reload.spin svg { animation: reload-spin .8s linear infinite; }
+@keyframes reload-spin { to { transform: rotate(360deg); } }

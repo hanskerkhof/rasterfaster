@@ -8,6 +8,7 @@ import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
 
 const lastStlStorageKey = 'rasterfaster.lastStl';
+const filterStorageKey = 'rasterfaster.filter';
 const viewModeStorageKey = 'rasterfaster.viewMode';
 const documentModeStorageKey = 'rasterfaster.documentMode';
 const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-shown'];
@@ -36,6 +37,8 @@ export class App {
   protected readonly revealPath = signal<string | null>(null);
   protected readonly documentMode = signal(this.readDocumentMode());
   private readonly viewer = viewChild.required(StlViewer);
+  private readonly treePanel = viewChild(TreePanel);
+  protected readonly reloading = signal(false);
   private loadedPath: string | null = null;
   private loadSub?: Subscription;
   private filterTimer?: ReturnType<typeof setTimeout>;
@@ -49,6 +52,10 @@ export class App {
 
   constructor() {
     void this.store.init();
+    try {
+      const storedFilter = localStorage.getItem(filterStorageKey);
+      if (storedFilter) this.onFilter(storedFilter); // restore the filter and its results
+    } catch { /* storage unavailable */ }
     const last = this.readLastStl();
     if (last) {
       this.revealPath.set(last);
@@ -103,19 +110,34 @@ export class App {
 
   protected onFilter(text: string) {
     this.filterText.set(text);
+    try { text ? localStorage.setItem(filterStorageKey, text) : localStorage.removeItem(filterStorageKey); } catch { /* storage unavailable */ }
     clearTimeout(this.filterTimer);
     if (!text.trim()) { this.filtered.set(null); this.searching.set(false); return; }
     this.searching.set(true);
-    this.filterTimer = setTimeout(() => {
-      this.lib.search(text.trim()).subscribe({
-        next: flat => {
-          if (this.filterText() !== text) return; // stale response
-          this.filtered.set(this.lib.nest(flat));
-          this.searching.set(false);
-        },
-        error: () => this.searching.set(false),
-      });
-    }, 200);
+    this.filterTimer = setTimeout(() => this.runSearch(text), 200);
+  }
+
+  private runSearch(text: string) {
+    this.lib.search(text.trim()).subscribe({
+      next: flat => {
+        if (this.filterText() !== text) return; // stale response
+        this.filtered.set(this.lib.nest(flat));
+        this.searching.set(false);
+      },
+      error: () => this.searching.set(false),
+    });
+  }
+
+  /** Reload button: re-read the file list from disk (and redo the search when a filter is active). */
+  protected async reloadFiles() {
+    this.reloading.set(true);
+    try {
+      const text = this.filterText();
+      if (text.trim()) this.runSearch(text);
+      await this.treePanel()?.reload();
+    } finally {
+      this.reloading.set(false);
+    }
   }
 
   protected clearFilter() {
