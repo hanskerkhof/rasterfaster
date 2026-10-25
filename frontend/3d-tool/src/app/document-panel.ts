@@ -59,7 +59,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       </div>
     }
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
-    <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · V: dim / show the selection · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+    <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: 6px; padding: 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;

@@ -225,6 +225,7 @@ export class StlViewer implements OnDestroy {
       background: this.scene.background as THREE.Color,
       loadGeometry: path => this.loadGeometry(path),
       zGridMode: () => this.zGridMode(),
+      viewCenter: () => ({ x: this.controls.target.x, y: this.controls.target.y }),
       rotationStep: () => this.rotationStep(),
       changed: () => this.onDocumentChanged(),
     });

@@ -10,6 +10,16 @@ import { baseThicknessMm } from './z-levels';
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
       <div class="menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
         <div class="title">{{ title() }}</div>
+        <button type="button" role="menuitem" (click)="copy(false)">
+          <span class="icon">⧉</span>Copy<span class="hint">⌘C</span>
+        </button>
+        <button type="button" role="menuitem" (click)="copy(true)">
+          <span class="icon">✂</span>Cut<span class="hint">⌘X</span>
+        </button>
+        <button type="button" role="menuitem" [disabled]="!store.clipboard()" (click)="paste()">
+          <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? store.clipboard()!.items.length + ' part' + (store.clipboard()!.items.length === 1 ? '' : 's') + ' · ⌘V' : 'nothing copied' }}</span>
+        </button>
+        <div class="sep"></div>
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
           <span class="hint">{{ allMuted() ? '' : 'barely visible, ignores clicks' }}</span>
@@ -43,6 +53,7 @@ import { baseThicknessMm } from './z-levels';
             border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .title { padding: 4px 8px 6px; font-size: 11px; opacity: .55; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
+    .sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.12); }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .4; cursor: default; }
     .icon { width: 1em; text-align: center; }
@@ -70,6 +81,18 @@ export class ObjectMenu {
     const items = this.items();
     return items.length === 1 ? items[0].name : `${items.length} objects`;
   });
+
+  /** Copy (or cut) the parts the menu was opened for; the right-click already made them the selection. */
+  protected copy(cut: boolean) {
+    if (cut) this.store.cutSelection();
+    else this.store.copySelection();
+    this.close();
+  }
+
+  protected paste() {
+    this.store.pasteClipboard();
+    this.close();
+  }
 
   protected toggleMuted() {
     this.store.setMuted(this.items().map(i => i.id), !this.allMuted());

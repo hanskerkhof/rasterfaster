@@ -53,6 +53,8 @@ export interface DocumentSceneContext {
   loadGeometry: (path: string) => Promise<THREE.BufferGeometry>;
   /** Degrees per keyboard rotation press (the rotate panel's step). */
   rotationStep: () => number;
+  /** X/Y of the point the view is centred on (where pasted parts land). */
+  viewCenter: () => { x: number; y: number };
   /** Current height grid mode (fine / baseplate / coarse). */
   zGridMode: () => ZGridMode;
   /** Called after the visible items or their positions changed. */
@@ -108,6 +110,7 @@ export class DocumentScene {
     this.on(ctx.canvas, 'pointermove', e => this.onPointerMove(e as PointerEvent));
     this.on(ctx.canvas, 'pointerup', e => this.onPointerUp(e as PointerEvent));
     ctx.store.sizeOf = item => this.sizeOfItem(item);
+    ctx.store.viewCenter = ctx.viewCenter;
     this.on(ctx.canvas, 'contextmenu', e => this.onContextMenu(e as MouseEvent));
     this.on(ctx.host, 'keydown', e => this.onKey(e as KeyboardEvent));
     // Esc leaves a pick mode wherever the keyboard focus is (after choosing the menu item it is on the page body, not on the stage).
@@ -600,6 +603,9 @@ export class DocumentScene {
     };
     let handled = true;
     if (command && e.key.toLowerCase() === 'z') (e.shiftKey ? store.redo() : store.undo());
+    else if (command && e.key.toLowerCase() === 'c') store.copySelection();
+    else if (command && e.key.toLowerCase() === 'x') store.cutSelection();
+    else if (command && e.key.toLowerCase() === 'v') store.pasteClipboard();
     else if (command && e.key.toLowerCase() === 'd') store.duplicateSelected();
     else if (command && e.key.toLowerCase() === 'a') store.selectAll();
     else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z
@@ -621,6 +627,7 @@ export class DocumentScene {
 
   dispose() {
     this.ctx.store.sizeOf = null;
+    this.ctx.store.viewCenter = null;
     for (const [target, type, fn] of this.listeners) target.removeEventListener(type, fn);
     for (const runtime of this.runtimes.values()) clearParts(runtime.group);
     for (const entry of this.oriented.values()) { entry.geometry.dispose(); entry.edges?.dispose(); }

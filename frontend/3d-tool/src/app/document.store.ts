@@ -1,5 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { ClipboardContent, copyItems, pasteItems } from './clipboard';
 import { DocumentApi, DocumentSummary } from './document.api';
 
 /** Grid the document snaps to, in mm. */
@@ -64,6 +65,7 @@ export interface RfDocument {
 
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
 const currentIdStorageKey = 'rasterfaster.documentId';
+const clipboardStorageKey = 'rasterfaster.clipboard';
 const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
 const maxHistory = 200;
 const saveDelayMs = 400;
@@ -84,6 +86,14 @@ function sanitize(doc: RfDocument): boolean {
     if (!item.rotation.every(Number.isFinite)) { item.rotation = [0, 0, 0, 1]; changed = true; }
   }
   return changed;
+}
+
+function readClipboard(): ClipboardContent | null {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(clipboardStorageKey) ?? 'null');
+    if (parsed && Array.isArray(parsed.items) && parsed.items.length && Array.isArray(parsed.origin)) return parsed;
+  } catch { /* storage unavailable or corrupt */ }
+  return null;
 }
 
 function emptyDocument(): RfDocument {
@@ -339,6 +349,51 @@ export class DocumentStore {
     const round = (v: number) => Math.round(v * 1000) / 1000;
     this.patchMany(new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] + delta)] as Vec3 }])));
     this.commit();
+  }
+
+  /**
+   * Copied parts. Kept in local storage too, so the clipboard survives a reload and works across browser tabs and documents.
+   * It holds the parts' content (file, rotation, color, flags) and their offsets, never ids or absolute positions.
+   */
+  readonly clipboard = signal<ClipboardContent | null>(readClipboard());
+
+  /** Where the view is looking (X/Y in mm); set by the 3D scene. Pasted parts land here. */
+  viewCenter: (() => { x: number; y: number }) | null = null;
+
+  copySelection(): boolean {
+    const content = copyItems(this.selectedItems());
+    if (!content) return false;
+    this.clipboard.set(content);
+    try { localStorage.setItem(clipboardStorageKey, JSON.stringify(content)); } catch { /* storage unavailable */ }
+    return true;
+  }
+
+  /** Copy, then remove the selection: one undo step. */
+  cutSelection() {
+    if (this.copySelection()) this.removeSelected();
+  }
+
+  /** Pastes the clipboard at the view centre as ONE undo step and selects the new parts. Returns how many were pasted. */
+  pasteClipboard(): number {
+    const clip = this.clipboard();
+    if (!clip) return 0;
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const created = pasteItems(clip, this.viewCenter?.() ?? null, snapStepMm, (position, item) => {
+      const size = this.sizeOf?.({ path: item.path, rotation: item.rotation } as DocItem) ?? undefined; // unknown until its geometry has loaded
+      const placed = item.centered && size ? cellCenteredPosition(position, size) : (position.map(round) as Vec3);
+      return clampToWorkArea(placed, size);
+    });
+    return this.addItems(created);
+  }
+
+  /** Adds several items in one step (one undo entry) and selects them. */
+  addItems(items: Omit<DocItem, 'id'>[]): number {
+    if (!items.length) return 0;
+    const created = items.map<DocItem>(item => ({ ...item, id: crypto.randomUUID() }));
+    this.doc.update(d => ({ ...d, items: [...d.items, ...created] }));
+    this.selectedIds.set(created.map(c => c.id));
+    this.commit();
+    return created.length;
   }
 
   /** "Snap to grid…" is waiting for the user to click a corner/side handle on these items. */
