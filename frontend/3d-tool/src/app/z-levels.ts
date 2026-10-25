@@ -12,7 +12,7 @@ export const zGridModes: { id: ZGridMode; title: string; detail: string }[] = [
   { id: 'coarse', title: 'Coarse: every 4 mm', detail: '0, 4, 8, 12 …' },
 ];
 
-export const defaultZGridMode: ZGridMode = 'fine';
+export const defaultZGridMode: ZGridMode = 'baseplate';
 
 /** Levels are `phase + k·step` for whole k, plus the ground (0). */
 const ladders: Record<ZGridMode, { step: number; phase: number }> = {

@@ -62,8 +62,8 @@ With parts selected, rotating the view (dragging empty space, or dragging/clicki
 
 X/Y snap to 20 mm. Height snaps to levels that depend on the **Grid mode** (right-click the view cube → Grid mode, remembered):
 
-- **Fine: every 2 mm** — 0, 2, 4, 6, 8 … (default; for 2 mm thick parts)
-- **Baseplate: 2 mm, then 4 mm** — 0, 2, 6, 10, 14 … (the top of a 6 mm baseplate is a level)
+- **Fine: every 2 mm** — 0, 2, 4, 6, 8 … (for 2 mm thick parts)
+- **Baseplate: 2 mm, then 4 mm** — 0, 2, 6, 10, 14 … (default; the top of a 6 mm baseplate is a level)
 - **Coarse: every 4 mm** — 0, 4, 8, 12 …
 
 Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part decides, the rest keeps its offsets) and Shift+drag snaps to the nearest level; Alt gives 1 mm steps. The 3D grid follows the mode. Modes are defined in `frontend/3d-tool/src/app/z-levels.ts`.
