@@ -273,7 +273,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Fa
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = False) -> Response:
+def export_document_blend(documentId: str, colours: bool = False, studio: bool = True) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -282,7 +282,7 @@ def export_document_blend(documentId: str, colours: bool = False) -> Response:
     stlBytes = load_document_stls(document)
     try:
         glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours)
-        data = blenderexport.build_blend(glb, blender)
+        data = blenderexport.build_blend(glb, blender, studio)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:

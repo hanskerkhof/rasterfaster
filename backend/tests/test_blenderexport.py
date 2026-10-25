@@ -91,7 +91,7 @@ def test_blend_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(blenderexport, "find_blender", lambda: None)
     assert client.get(f"/api/documents/{created['id']}/export.blend").status_code == 503
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
-    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender: b"BLENDER-v500" + glb[:4])
+    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender, studio=True: b"BLENDER-v500" + glb[:4])
     response = client.get(f"/api/documents/{created['id']}/export.blend")
     assert response.status_code == 200 and response.content.startswith(b"BLENDER") and "Blend_me.blend" in response.headers["content-disposition"]
 

@@ -196,10 +196,12 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
 
 
 blenderScript = r'''
+import math
 import sys
 import bpy
+from mathutils import Vector
 
-source, target = sys.argv[sys.argv.index("--") + 1:]
+source, target, studio = sys.argv[sys.argv.index("--") + 1:]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -211,6 +213,70 @@ for obj in bpy.data.objects:
         if obj.animation_data and obj.animation_data.action:
             first, last = obj.animation_data.action.frame_range
             scene.frame_start, scene.frame_end = int(first), int(last)
+    if obj.name == "Camera path":
+        obj.hide_render = True  # a guide line, not part of the picture
+
+if studio == "1":
+    parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name != "Camera path"]
+    low = Vector((1e9,) * 3)
+    high = Vector((-1e9,) * 3)
+    for o in parts:
+        for corner in o.bound_box:
+            w = o.matrix_world @ Vector(corner)
+            low, high = Vector(map(min, low, w)), Vector(map(max, high, w))
+    centre, r = (low + high) / 2, (high - low).length / 2
+
+    # Studio floor: a dark matte disc just under the parts, so they sit on something and cast soft shadows.
+    bpy.ops.mesh.primitive_circle_add(vertices=96, radius=r * 6, fill_type="NGON", location=(centre.x, centre.y, low.z - 0.0005))
+    floor = bpy.context.active_object
+    floor.name = "Studio floor"
+    mat = bpy.data.materials.new("Studio floor")
+    mat.use_nodes = True
+    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.05, 0.055, 0.065, 1)
+    mat.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.55
+    floor.data.materials.append(mat)
+
+    # World: a dark vertical gradient with a bluish horizon glow.
+    world = bpy.data.worlds.new("Studio")
+    scene.world = world
+    world.use_nodes = True
+    nt = world.node_tree
+    nt.nodes.clear()
+    coord, mapping, grad, ramp = (nt.nodes.new(n) for n in ("ShaderNodeTexCoord", "ShaderNodeMapping", "ShaderNodeTexGradient", "ShaderNodeValToRGB"))
+    bg, out = nt.nodes.new("ShaderNodeBackground"), nt.nodes.new("ShaderNodeOutputWorld")
+    mapping.inputs["Rotation"].default_value = (math.radians(90), 0, 0)
+    nt.links.new(coord.outputs["Generated"], mapping.inputs["Vector"])
+    nt.links.new(mapping.outputs[0], grad.inputs[0])
+    nt.links.new(grad.outputs["Fac"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
+    nt.links.new(bg.outputs[0], out.inputs[0])
+    ramp.color_ramp.elements[0].color = (0.01, 0.012, 0.02, 1)
+    ramp.color_ramp.elements[1].color = (0.10, 0.14, 0.22, 1)
+    bg.inputs["Strength"].default_value = 0.12
+
+    def light(name, location, energy, color, size):
+        data = bpy.data.lights.new(name, "AREA")
+        data.energy, data.color, data.shape, data.size, data.size_y = energy, color, "RECTANGLE", size, size * 0.6
+        obj = bpy.data.objects.new(name, data)
+        obj.location = location
+        scene.collection.objects.link(obj)
+        aim = bpy.data.objects.new(name + " target", None)
+        aim.location = centre
+        scene.collection.objects.link(aim)
+        track = obj.constraints.new("TRACK_TO")
+        track.target, track.track_axis, track.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
+
+    d = r * 3
+    light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
+    light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2, (0.6, 0.75, 1.0), r * 3)
+    light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4, (1.0, 0.45, 0.8), r * 1.5)
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 96
+    scene.cycles.use_denoising = True
+    scene.view_settings.view_transform = "AgX"
+    scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.exposure = -0.3
+
 bpy.ops.wm.save_as_mainfile(filepath=target, compress=True)
 '''
 
@@ -225,8 +291,9 @@ def find_blender() -> str | None:
     return next((c for c in candidates if c and Path(c).is_file()), None)
 
 
-def build_blend(glb: bytes, blender: str) -> bytes:
-    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, frame range of the flight, 1080p)."""
+def build_blend(glb: bytes, blender: str, studio: bool = True) -> bytes:
+    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, frame range of the flight, 1080p;
+    with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles)."""
     import subprocess
     import tempfile
     from pathlib import Path
@@ -235,7 +302,7 @@ def build_blend(glb: bytes, blender: str) -> bytes:
         source, target, script = Path(folder, "scene.glb"), Path(folder, "scene.blend"), Path(folder, "make_blend.py")
         source.write_bytes(glb)
         script.write_text(blenderScript)
-        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target)],
+        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0"],
                                 capture_output=True, text=True, timeout=120)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(result.stderr or result.stdout)[-300:]}")

@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - studio lighting in the .blend export
+
+### Added
+- **BE** (`blenderexport.py`, `main.py`): the `.blend` export now includes a studio setup: a dark matte floor under the parts, a dark gradient world, three area lights (warm key, cool fill, magenta rim), Cycles (96 samples, denoising) with AgX colour; the camera path line is hidden from renders. `?studio=false` gives the plain scene. Verified by exporting the STROZZI document through the API and rendering it headless in Blender 5.0.
+
 ## 2026-10-25 - Black PLA in the Blender export (0.2.3)
 
 ### Changed
