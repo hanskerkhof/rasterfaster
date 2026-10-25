@@ -60,7 +60,7 @@
   </div>
   <div class="stage">
     <app-stl-viewer #v [data]="data()" [mode]="mode()" [documentMode]="documentMode()" />
-    @if (documentMode()) { <app-document-panel class="docpanel" (centerItem)="v.centerOnItem($event)" /> }
+    @if (documentMode()) { <app-document-panel class="docpanel" [viewProvider]="v.viewParam" (centerItem)="v.centerOnItem($event)" /> }
     @if (loading()) { <div class="overlay">Loading…</div> }
     @if (error()) { <div class="overlay err">{{ error() }}</div> }
     @if (api.offline()) {

@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - Blender export: camera where the app's view is (0.2.4)
+
+### Changed
+- **BE** (`blenderexport.py`, `main.py`, `tests/test_blenderexport.py`): the Blender export no longer contains the fly-around animation or the "Camera path" line. Its camera ("App view camera") is a single static camera placed from `?view=dx,dy,dz;tx,ty,tz;height;persp|ortho` (orthographic or perspective, same visible height at the centre), or at the isometric Home view when no view is given. Bad `view` values give a 422.
+- **FE** (`stl-viewer.ts` `viewParam`, `document-panel.ts`, `app.html`): the **Blender** button sends the 3D view's current camera, so the exported camera matches what you see. Version 0.2.4.
+
 ## 2026-10-25 - studio lighting in the .blend export
 
 ### Added

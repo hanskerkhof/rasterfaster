@@ -1,8 +1,8 @@
 """Builds a binary glTF (.glb) for Blender from a RASTERFASTER document.
 
 Blender imports glTF natively (File > Import > glTF 2.0): one object per part in black PLA (or the document's colour), placed exactly as in the
-document (Z up, 1 Blender unit = 1 m, so a 20 mm cell is 0.02 m), plus a perspective camera that follows the fly-around path
-(one closed loop of `flightLoopSeconds`, keyframed as an animation) and the path itself as a line object.
+document (Z up, 1 Blender unit = 1 m, so a 20 mm cell is 0.02 m), plus a camera placed like the app's 3D view (`view`),
+or at the isometric Home view when none is given. There is no camera animation and no camera path.
 """
 import json
 import math
@@ -13,8 +13,6 @@ import numpy as np
 
 import export3mf
 
-flightLoopSeconds = 280.0  # the same closed loop as the fly-around in the frontend (stl-viewer.ts)
-sampleSeconds = 0.5
 fovDegrees = 35.0
 aspect = 16 / 9
 mmToMetre = 0.001
@@ -22,15 +20,22 @@ mmToMetre = 0.001
 toGltf = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])
 
 
-def flight_pose(t: float, azimuth0: float, low: np.ndarray, high: np.ndarray):
-    """Direction (model -> camera), view centre and zoom factor at time t: the path of the frontend's fly-around, which closes after one loop."""
-    size = high - low
-    w = 2 * math.pi / flightLoopSeconds
-    azimuth = azimuth0 + t * 4 * w
-    elevation = math.radians(38 + 26 * math.sin(t * 6 * w + 0.8) + 8 * math.sin(t * 14 * w))
-    direction = np.array([math.cos(elevation) * math.cos(azimuth), math.cos(elevation) * math.sin(azimuth), math.sin(elevation)])
-    centre = (low + high) / 2 + np.array([size[0] * 0.16 * math.sin(t * 8 * w), size[1] * 0.16 * math.cos(t * 5 * w), size[2] * 0.2 * math.sin(t * 10 * w)])
-    return direction, centre, 1 + 0.45 * (0.5 + 0.5 * math.sin(t * 9 * w - 1))
+homeDirection = np.array([1.0, -1.0, 0.8]) / np.linalg.norm([1.0, -1.0, 0.8])  # the app's Home view
+
+
+def parse_view(text: str) -> dict:
+    """`dx,dy,dz;tx,ty,tz;height;projection`: viewing direction (target -> camera), view centre (mm), visible height at the centre (mm), `persp` or `ortho`."""
+    try:
+        direction, target, height, projection = text.split(";")
+        view = {"direction": np.array([float(v) for v in direction.split(",")]), "target": np.array([float(v) for v in target.split(",")]),
+                "height": float(height), "projection": projection}
+        assert view["direction"].shape == (3,) and view["target"].shape == (3,) and view["projection"] in ("persp", "ortho")
+        assert np.isfinite(view["direction"]).all() and np.isfinite(view["target"]).all() and np.isfinite(view["height"])
+        assert np.linalg.norm(view["direction"]) > 1e-6 and view["height"] > 0
+    except (ValueError, AssertionError):
+        raise ValueError("view must be dx,dy,dz;tx,ty,tz;height;persp|ortho")
+    view["direction"] = view["direction"] / np.linalg.norm(view["direction"])
+    return view
 
 
 def camera_basis(direction: np.ndarray):
@@ -116,7 +121,7 @@ def node_matrix(placement: export3mf.Placement) -> list[float]:
     return matrix.T.flatten().tolist()
 
 
-def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = True, colours: bool = False) -> bytes:
+def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = True, colours: bool = False, view: dict | None = None) -> bytes:
     """Parts get one shared \"Black PLA\" material; with `colours` they keep the colours of the document instead."""
     items = document["items"]
     if not items:
@@ -154,34 +159,23 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
     if camera:
         low = np.min([item["position"] for item in items], axis=0).astype(np.float64)
         high = np.max([np.array(item["position"]) + p.size for p, item in zip(placements, items)], axis=0)
-        azimuth0 = math.atan2(-1.0, 1.0)  # starts at the isometric view, like Home
-        times = np.arange(0.0, flightLoopSeconds + sampleSeconds / 2, sampleSeconds)
-        positions, rotations = [], []
-        for t in times:
-            direction, centre, zoom = flight_pose(float(t), azimuth0, low, high)
-            eye = centre + direction * fit_distance(direction, low, high) / zoom
-            right, up, forward = camera_basis(direction)
-            positions.append(mmToMetre * (toGltf @ eye))
-            rotations.append(quaternion(np.column_stack([toGltf @ right, toGltf @ up, -(toGltf @ forward)])))  # glTF cameras look down -Z
-        positions = np.array(positions, dtype=np.float32)
-        rotations = np.array(rotations, dtype=np.float32)
-        for i in range(1, len(rotations)):  # keep neighbouring quaternions on the same side so playback never spins the long way round
-            if float(rotations[i] @ rotations[i - 1]) < 0:
-                rotations[i] = -rotations[i]
-        gltf["cameras"] = [{"name": "Fly-around camera", "type": "perspective", "perspective": {
-            "yfov": math.radians(fovDegrees), "aspectRatio": aspect, "znear": 0.01, "zfar": 20.0}}]
-        nodes.append({"name": "Fly-around camera", "camera": 0, "translation": positions[0].tolist(), "rotation": rotations[0].tolist()})
-        cameraNode = len(nodes) - 1
-        pathPositions = np.vstack([positions, positions[:1]]).astype(np.float32)  # closed
-        gltf["meshes"].append({"name": "Camera path", "primitives": [{"attributes": {"POSITION": buffer.add(pathPositions, 5126, "VEC3", 34962, bounds=True)}, "mode": 3}]})
-        nodes.append({"name": "Camera path", "mesh": len(gltf["meshes"]) - 1})
-        sceneNodes += [cameraNode, len(nodes) - 1]
-        timeAccessor = buffer.add(times.astype(np.float32).reshape(-1, 1), 5126, "SCALAR", bounds=True)
-        gltf["animations"] = [{"name": "Fly-around", "samplers": [
-            {"input": timeAccessor, "output": buffer.add(positions, 5126, "VEC3"), "interpolation": "LINEAR"},
-            {"input": timeAccessor, "output": buffer.add(rotations, 5126, "VEC4"), "interpolation": "LINEAR"}],
-            "channels": [{"sampler": 0, "target": {"node": cameraNode, "path": "translation"}},
-                         {"sampler": 1, "target": {"node": cameraNode, "path": "rotation"}}]}]
+        if view is None:  # isometric Home view, the whole assembly in frame
+            distance = fit_distance(homeDirection, low, high)
+            view = {"direction": homeDirection, "target": (low + high) / 2, "projection": "persp", "height": 2 * distance * math.tan(math.radians(fovDegrees) / 2)}
+        direction, target, height = view["direction"], view["target"], view["height"]
+        if view["projection"] == "ortho":
+            distance = 4 * float(np.linalg.norm(high - low))  # distance does not change the picture, it only has to clear the parts
+            gltf["cameras"] = [{"name": "App view camera", "type": "orthographic", "orthographic": {
+                "xmag": height / 2 * aspect * mmToMetre, "ymag": height / 2 * mmToMetre, "znear": 0.01, "zfar": 50.0}}]
+        else:
+            distance = height / 2 / math.tan(math.radians(fovDegrees) / 2)
+            gltf["cameras"] = [{"name": "App view camera", "type": "perspective", "perspective": {
+                "yfov": math.radians(fovDegrees), "aspectRatio": aspect, "znear": 0.01, "zfar": 50.0}}]
+        eye = target + direction * distance
+        right, up, forward = camera_basis(direction)
+        rotation = quaternion(np.column_stack([toGltf @ right, toGltf @ up, -(toGltf @ forward)]))  # glTF cameras look down -Z
+        nodes.append({"name": "App view camera", "camera": 0, "translation": (mmToMetre * (toGltf @ eye)).tolist(), "rotation": rotation})
+        sceneNodes.append(len(nodes) - 1)
 
     gltf["scenes"] = [{"name": document["name"], "nodes": sceneNodes}]
     gltf["bufferViews"], gltf["accessors"] = buffer.views, buffer.accessors
@@ -292,7 +286,7 @@ def find_blender() -> str | None:
 
 
 def build_blend(glb: bytes, blender: str, studio: bool = True) -> bytes:
-    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, frame range of the flight, 1080p;
+    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, 1080p;
     with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles)."""
     import subprocess
     import tempfile

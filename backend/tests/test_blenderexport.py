@@ -42,24 +42,42 @@ def test_parts_are_placed_in_document_coordinates_in_metres_and_y_up():
     assert np.allclose(world.max(axis=0), [0.030, 0.030, 0.0], atol=1e-6)
 
 
-def test_camera_follows_a_closed_looping_animation():
+def camera_forward(rotation):
+    x, y, z, w = rotation
+    return -np.array([2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)])
+
+
+def test_default_camera_is_the_home_view_without_animation_or_path():
     items, stls = items_and_stls()
-    gltf, blob = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__))
-    assert gltf["cameras"][0]["type"] == "perspective"
-    assert {n["name"] for n in gltf["nodes"]} >= {"Fly-around camera", "Camera path"}
-    sampler = gltf["animations"][0]["samplers"]
-    times = read_accessor(gltf, blob, sampler[0]["input"])[:, 0]
-    translation = read_accessor(gltf, blob, sampler[0]["output"])
-    rotation = read_accessor(gltf, blob, sampler[1]["output"])
-    assert times[0] == 0 and times[-1] == blenderexport.flightLoopSeconds
-    assert np.allclose(translation[0], translation[-1], atol=1e-5) and np.allclose(rotation[0], rotation[-1], atol=1e-5)
-    assert np.allclose(np.linalg.norm(rotation, axis=1), 1, atol=1e-5)
-    # the camera looks at the assembly: its forward axis (-Z rotated) points from the eye towards the middle of the parts
-    q = rotation[0]
-    x, y, z, w = q
-    forward = -np.array([2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)])
-    centre = np.array([0.0475, 0.015, -0.0225])  # roughly the middle of the assembly in glTF axes
-    assert float(forward @ (centre - translation[0]) / np.linalg.norm(centre - translation[0])) > 0.95
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__))
+    assert gltf["cameras"][0]["type"] == "perspective" and "animations" not in gltf
+    assert "Camera path" not in {n["name"] for n in gltf["nodes"]} and all(m["name"] != "Camera path" for m in gltf["meshes"])
+    node = next(n for n in gltf["nodes"] if n.get("camera") == 0)
+    eye = np.array(node["translation"])
+    # looking at the middle of the parts (document (47.5, 15, 22.5) mm = glTF (x, z, -y)) from the +X, -Y, +Z side
+    centre = np.array([0.0475, 0.0225, -0.015])
+    to_centre = (centre - eye) / np.linalg.norm(centre - eye)
+    assert float(camera_forward(node["rotation"]) @ to_centre) > 0.99
+    assert eye[0] > centre[0] and eye[2] > centre[2] and eye[1] > centre[1]  # +X, -Y (glTF +Z), +Z (glTF +Y) in the document
+
+
+def test_camera_follows_the_apps_view():
+    items, stls = items_and_stls()
+    view = blenderexport.parse_view("0,-1,0;50,20,10;240;persp")  # looking along +Y at (50, 20, 10) mm, 240 mm visible
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, view=view))
+    node = next(n for n in gltf["nodes"] if n.get("camera") == 0)
+    distance = 0.240 / 2 / np.tan(np.radians(blenderexport.fovDegrees) / 2)
+    # document (50, 20 - distance, 10) mm -> glTF (x, z, -y)
+    assert np.allclose(node["translation"], [0.050, 0.010, -(0.020 - distance)], atol=1e-6)
+    assert np.allclose(camera_forward(node["rotation"]), [0, 0, -1], atol=1e-6)  # looking along +Y in the document = along -Z in glTF
+    ortho, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, view=blenderexport.parse_view("1,0,0;0,0,0;100;ortho")))
+    assert ortho["cameras"][0]["type"] == "orthographic" and abs(ortho["cameras"][0]["orthographic"]["ymag"] - 0.05) < 1e-9
+
+
+@pytest.mark.parametrize("text", ["", "1,2;3,4,5;6;persp", "0,0,0;0,0,0;10;persp", "1,0,0;0,0,0;-5;persp", "1,0,0;0,0,0;10;fisheye", "a,b,c;0,0,0;10;persp"])
+def test_bad_view_is_rejected(text):
+    with pytest.raises(ValueError):
+        blenderexport.parse_view(text)
 
 
 def test_no_items_is_an_error():

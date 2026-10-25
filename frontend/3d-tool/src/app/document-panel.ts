@@ -1,4 +1,4 @@
-import { Component, inject, output, signal } from '@angular/core';
+import { Component, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
@@ -31,7 +31,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf('assembly')">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Every part flat on the plate in its library orientation, ready to print" (click)="export3mf('print')">Print plate</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="3MF with the document's own coordinates (Z up), for opening in Fusion 360" (click)="export3mf('fusion')">Fusion</button>
-      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): coloured parts as placed, plus a camera that flies the camera path" (click)="exportBlender()">Blender</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): Black PLA parts as placed, studio lighting, and a camera where the 3D view is now" (click)="exportBlender()">Blender</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
     </div>
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
@@ -100,6 +100,8 @@ export class DocumentPanel {
   protected readonly store = inject(DocumentStore);
   /** Double-click on a list item: the viewer should centre on it. */
   readonly centerItem = output<string>();
+  /** The 3D view's camera (see StlViewer.viewParam): the Blender export puts its camera there. */
+  readonly viewProvider = input<() => string | null>(() => null);
   protected readonly bomOpen = signal(false);
   protected readonly exporting = signal(false);
   protected readonly exportError = signal('');
@@ -111,7 +113,8 @@ export class DocumentPanel {
   }
 
   protected exportBlender() {
-    return this.download('export.blend', 'scene.blend');
+    const view = this.viewProvider()();
+    return this.download(view ? `export.blend?view=${encodeURIComponent(view)}` : 'export.blend', 'scene.blend');
   }
 
   protected exportSvg() {

@@ -259,13 +259,21 @@ def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
     return stlBytes
 
 
+def parsed_view(view: str | None):
+    """The camera of the app's 3D view as passed by the frontend (see blenderexport.parse_view); None gives the isometric Home view."""
+    try:
+        return blenderexport.parse_view(view) if view else None
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+
+
 @app.get("/api/documents/{documentId}/export.glb")
-def export_document_glb(documentId: str, camera: bool = True, colours: bool = False) -> Response:
-    """glTF for Blender: the parts as placed in the document (Z up, metres) in Black PLA (or the document's colours with `colours=true`), plus, unless `camera` is false, a camera animated along the fly-around path and the path as a line."""
+def export_document_glb(documentId: str, camera: bool = True, colours: bool = False, view: str | None = None) -> Response:
+    """glTF for Blender: the parts as placed in the document (Z up, metres) in Black PLA (or the document's colours with `colours=true`), plus, unless `camera` is false, a camera placed like the app's 3D view (`view`, see blenderexport.parse_view; default: the isometric Home view)."""
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
-        data = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, camera, colours)
+        data = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, camera, colours, parsed_view(view))
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".glb"
@@ -273,7 +281,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Fa
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = False, studio: bool = True) -> Response:
+def export_document_blend(documentId: str, colours: bool = False, studio: bool = True, view: str | None = None) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -281,7 +289,7 @@ def export_document_blend(documentId: str, colours: bool = False, studio: bool =
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
-        glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours)
+        glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours, parsed_view(view))
         data = blenderexport.build_blend(glb, blender, studio)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))

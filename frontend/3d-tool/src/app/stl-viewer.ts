@@ -348,6 +348,18 @@ export class StlViewer implements OnDestroy {
     loop();
   }
 
+  /**
+   * The camera of this view for the Blender export: `dx,dy,dz;tx,ty,tz;height;projection` (viewing direction from the centre to the camera,
+   * view centre in mm, visible height at the centre in mm, `persp` or `ortho`). Null outside the document view.
+   */
+  readonly viewParam = (): string | null => {
+    if (!this.documentMode()) return null;
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+    const target = this.controls.target;
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.viewHeight())};${this.projection}`;
+  };
+
   protected toggleFlight() {
     if (this.flying()) { this.flying.set(false); return; }
     if (!this.documentMode() || !this.documentScene.bounds()) return;
