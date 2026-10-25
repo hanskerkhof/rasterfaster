@@ -37,7 +37,7 @@ export class ViewCube {
   private readonly listeners: [string, EventListener][] = [];
 
   /** `snap` gets the unit direction from the model towards the camera; `orbit` gets pointer deltas in px. */
-  constructor(private readonly canvas: HTMLCanvasElement, private readonly snap: (direction: THREE.Vector3) => void, private readonly orbit: (dx: number, dy: number) => void) {
+  constructor(private readonly canvas: HTMLCanvasElement, private readonly snap: (direction: THREE.Vector3) => void, private readonly orbit: (dx: number, dy: number) => void, private readonly contextMenu: (clientX: number, clientY: number) => void = () => undefined) {
     const order = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]; // BoxGeometry face order
     const materials = order.map(n => new THREE.MeshBasicMaterial({ map: faceTexture(faceLabels[n.join(',')]) }));
     this.cube = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), materials);
@@ -53,6 +53,12 @@ export class ViewCube {
     this.on('pointerdown', e => this.onDown(e));
     this.on('pointermove', e => this.onMove(e));
     this.on('pointerup', e => this.onUp(e));
+    this.on('contextmenu', e => {
+      if (!this.inside(e as PointerEvent)) return;
+      e.preventDefault();
+      e.stopImmediatePropagation(); // not the document's object menu behind the cube
+      this.contextMenu(e.clientX, e.clientY);
+    });
     this.on('pointerleave', () => { if (!this.dragStart) this.setHover(null); });
   }
 
@@ -142,6 +148,7 @@ export class ViewCube {
   private onDown(e: PointerEvent) {
     if (!this.inside(e)) return;
     e.stopImmediatePropagation(); // keep OrbitControls out of it
+    if (e.button !== 0) return; // right-click opens the cube's menu instead of snapping the view
     const { x, y } = this.local(e);
     this.dragStart = { x, y, lastX: x, lastY: y, moved: false };
     this.canvas.setPointerCapture(e.pointerId);

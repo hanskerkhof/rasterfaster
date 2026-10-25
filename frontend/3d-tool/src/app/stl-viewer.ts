@@ -8,9 +8,11 @@ import { DocumentStore, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { ViewCube } from './view-cube';
+import { nextZLevel } from './z-levels';
 
 const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
+const grid3dStorageKey = 'rasterfaster.grid3d';
 
 function foldDegrees(d: number) {
   const folded = ((d % 360) + 540) % 360 - 180; // -180..180
@@ -18,6 +20,10 @@ function foldDegrees(d: number) {
 }
 
 export type { ViewMode } from './model-render';
+
+function readGrid3d() {
+  try { return localStorage.getItem(grid3dStorageKey) === 'true'; } catch { return false; }
+}
 
 @Component({
   selector: 'app-stl-viewer',
@@ -40,6 +46,14 @@ export type { ViewMode } from './model-render';
       </div>
       @if (!documentMode()) { <button type="button" class="reset" (click)="resetObjectRotation()">Reset</button> }
     </div>
+    @if (cubeMenu(); as menu) {
+      <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
+      <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+        <button type="button" role="menuitem" (click)="toggleGrid3d()">
+          <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
+        </button>
+      </div>
+    }
     <button class="home" type="button" title="Home (isometric view)" aria-label="Home view" (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
@@ -58,6 +72,13 @@ export type { ViewMode } from './model-render';
     .rotate button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     .rotate button:disabled { opacity: .35; cursor: default; }
     .host:focus { outline: none; }
+    .menu-backdrop { position: absolute; inset: 0; z-index: 8; }
+    .cube-menu { position: absolute; z-index: 9; min-width: 150px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
+                 border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
+    .cube-menu button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
+    .cube-menu button:hover { background: #2f6fed; color: #fff; }
+    .cube-menu .tick { width: 1em; text-align: center; }
+    .cube-menu .hint { margin-left: auto; opacity: .55; font-size: 11px; }
     .rotate button.active { background: #d9822b; color: #fff; }
     small { font-weight: 400; opacity: .85; color: #dde1e8; }
     .reset { width: 100%; }`,
@@ -96,6 +117,10 @@ export class StlViewer implements OnDestroy {
   private documentScene!: DocumentScene;
   private needsDocumentFit = true;
   private gridKey = '';
+  /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
+  protected readonly grid3d = signal(readGrid3d());
+  protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
+  private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
   private readonly pickRaycaster = new THREE.Raycaster();
   private lastItemCount = 0;
@@ -116,6 +141,10 @@ export class StlViewer implements OnDestroy {
     effect(() => {
       const documentMode = this.documentMode();
       if (this.ready()) untracked(() => this.enterMode(documentMode));
+    });
+    effect(() => {
+      this.grid3d();
+      if (this.ready()) untracked(() => this.rebuildGrid());
     });
     // Another document was opened: fit the camera to it once its geometry has loaded.
     effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.lastItemCount = 0; }); });
@@ -140,7 +169,11 @@ export class StlViewer implements OnDestroy {
     // STL / 3D-printing convention: Z is up. Classic isometric: look along (-1,-1,-1).
     this.camera.up.set(0, 0, 1);
     // Created first so its pointerdown handler can swallow clicks that land on the cube.
-    this.viewCube = new ViewCube(this.renderer.domElement, d => this.snapTo(d), (dx, dy) => this.orbitBy(dx, dy));
+    this.viewCube = new ViewCube(this.renderer.domElement, d => this.snapTo(d), (dx, dy) => this.orbitBy(dx, dy), (clientX, clientY) => {
+      const host = this.host().nativeElement.getBoundingClientRect();
+      const menuWidth = 180; // keep the menu inside the view when the cube is at the right edge
+      this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
+    });
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
     this.documentScene = new DocumentScene({
       scene: this.scene, camera: this.camera, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
@@ -208,7 +241,7 @@ export class StlViewer implements OnDestroy {
       this.onDocumentChanged();
     } else if (this.geometry) {
       const size = new THREE.Box3().setFromBufferAttribute(this.geometry.getAttribute('position') as THREE.BufferAttribute).getSize(new THREE.Vector3());
-      this.buildGrid(new THREE.Vector3(0, 0, 0), size);
+      this.buildGrid(new THREE.Vector3(0, 0, 0), size, size.z);
       // Back to the previewed model: re-centre on it, keeping the viewing direction.
       this.radius = this.geometry.boundingSphere?.radius ?? this.radius;
       const direction = this.camera.position.clone().sub(this.controls.target).normalize();
@@ -232,7 +265,7 @@ export class StlViewer implements OnDestroy {
       this.gridKey = key;
       const fallback = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(12 * gridCellMm, 8 * gridCellMm, 0));
       const area = bounds ? bounds.clone().union(fallback) : fallback;
-      this.buildGrid(area.min, area.max);
+      this.buildGrid(area.min, area.max, bounds ? bounds.max.z : 0);
     }
     if (this.needsDocumentFit && this.documentScene.readyCount() === count && count > 0) {
       this.needsDocumentFit = false;
@@ -426,7 +459,7 @@ export class StlViewer implements OnDestroy {
     const size = box.getSize(new THREE.Vector3());
     this.info.set(`${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm · ${(g.attributes['position'].count / 3).toLocaleString()} triangles`);
     this.radius = g.boundingSphere!.radius;
-    if (!this.documentMode()) this.buildGrid(new THREE.Vector3(0, 0, 0), size);
+    if (!this.documentMode()) this.buildGrid(new THREE.Vector3(0, 0, 0), size, size.z);
 
     // Keep the user's viewing direction; first model starts isometric. Rotating keeps the camera offset as is.
     const target = size.clone().multiplyScalar(0.5);
@@ -442,8 +475,24 @@ export class StlViewer implements OnDestroy {
     this.applyMode();
   }
 
-  /** Ground-plane grid with 20 mm cells (the RASTERFASTER base grid) covering min..max plus a two-cell margin. */
-  private buildGrid(min: THREE.Vector3, max: THREE.Vector3) {
+  /** Switches the 3D grid on or off (view cube menu) and remembers the choice. */
+  protected toggleGrid3d() {
+    const on = !this.grid3d();
+    this.grid3d.set(on);
+    try { localStorage.setItem(grid3dStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.cubeMenu.set(null);
+  }
+
+  private rebuildGrid() {
+    if (this.lastGrid) this.buildGrid(this.lastGrid.min, this.lastGrid.max, this.lastGrid.zTop);
+  }
+
+  /**
+   * Grid with 20 mm cells (the RASTERFASTER base grid) covering min..max plus a two-cell margin: the ground grid, or with the 3D grid
+   * on a lattice that also has horizontal grids at every z level up to `zTop` and vertical lines through every node.
+   */
+  private buildGrid(min: THREE.Vector3, max: THREE.Vector3, zTop: number) {
+    this.lastGrid = { min: min.clone(), max: max.clone(), zTop };
     if (this.grid) {
       this.scene.remove(this.grid);
       this.grid.geometry.dispose();
@@ -455,13 +504,27 @@ export class StlViewer implements OnDestroy {
     const limit = workArea.max[0];
     const minX = Math.max(Math.floor(min.x / cell) * cell - margin, -limit), minY = Math.max(Math.floor(min.y / cell) * cell - margin, -limit);
     const maxX = Math.min(Math.ceil(max.x / cell) * cell + margin, limit), maxY = Math.min(Math.ceil(max.y / cell) * cell + margin, limit);
+    const ground = -0.05; // a hair below the model's underside so the two never z-fight
+    const levels = [ground];
+    if (this.grid3d()) {
+      const top = Math.min(Math.max(zTop + 12, 40), workArea.max[2]);
+      for (let z = nextZLevel(0, 1); levels.length < 400; z = nextZLevel(z, 1)) { // z levels: 2, 6, 10, … (ground is 0)
+        levels.push(z);
+        if (z >= top) break;
+      }
+    }
+    const highest = levels[levels.length - 1];
     const points: number[] = [];
-    const z = -0.05; // a hair below the model's underside so the two never z-fight
-    for (let x = minX; x <= maxX; x += cell) points.push(x, minY, z, x, maxY, z);
-    for (let y = minY; y <= maxY; y += cell) points.push(minX, y, z, maxX, y, z);
+    for (const z of levels) {
+      for (let x = minX; x <= maxX; x += cell) points.push(x, minY, z, x, maxY, z);
+      for (let y = minY; y <= maxY; y += cell) points.push(minX, y, z, maxX, y, z);
+    }
+    if (levels.length > 1) {
+      for (let x = minX; x <= maxX; x += cell) for (let y = minY; y <= maxY; y += cell) points.push(x, y, ground, x, y, highest);
+    }
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
-    this.grid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: gridColor }));
+    this.grid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: gridColor, transparent: levels.length > 1, opacity: levels.length > 1 ? 0.7 : 1 }));
     this.scene.add(this.grid);
   }
 

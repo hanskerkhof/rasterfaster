@@ -36,7 +36,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false
     },
     {
@@ -140,14 +140,52 @@
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
       "color": 16767334,
       "position": [
-        40.0,
-        0.0,
+        140.0,
+        -60.0,
         6.0
       ],
       "rotation": [
         0.0,
         0.0,
         -1.1102230246251565e-16,
+        1.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "e62cf025-06ff-4d22-b714-c50e796819f9",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
+      "color": 7317724,
+      "position": [
+        40.0,
+        0.0,
+        2.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "363b3dfb-5b85-4531-be31-d14167f78208",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
+      "color": 9684093,
+      "position": [
+        40.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
         1.0
       ],
       "muted": false,

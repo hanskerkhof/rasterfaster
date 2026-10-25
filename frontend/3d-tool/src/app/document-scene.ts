@@ -590,6 +590,10 @@ export class DocumentScene {
     else if (command && e.key.toLowerCase() === 'a') store.selectAll();
     else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z
     else if (e.key === 'ArrowRight') (e.shiftKey ? this.rotateSelected('z', -this.ctx.rotationStep()) : move(stepX, 0, 0));
+    else if (!command && !e.altKey && e.key.toLowerCase() === 'v') { // V: dim / show the selection (the same as the menu's Dim)
+      const selected = store.selectedItems();
+      if (selected.length) store.setMuted(selected.map(i => i.id), !selected.every(i => i.muted));
+    }
     else if (!command && !e.altKey && ['x', 'y', 'z'].includes(e.key.toLowerCase())) this.rotateSelected(e.key.toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -this.ctx.rotationStep() : this.ctx.rotationStep());
     else if (e.key === 'ArrowUp') (e.shiftKey ? moveZ(1) : move(0, stepY, 0)); // Shift = height, like Shift+drag
     else if (e.key === 'ArrowDown') (e.shiftKey ? moveZ(-1) : move(0, -stepY, 0));
