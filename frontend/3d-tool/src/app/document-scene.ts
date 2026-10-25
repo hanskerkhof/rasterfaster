@@ -113,12 +113,34 @@ export class DocumentScene {
     ctx.store.viewCenter = ctx.viewCenter;
     this.on(ctx.canvas, 'contextmenu', e => this.onContextMenu(e as MouseEvent));
     this.on(ctx.host, 'keydown', e => this.onKey(e as KeyboardEvent));
-    // Esc leaves a pick mode wherever the keyboard focus is (after choosing the menu item it is on the page body, not on the stage).
+    // Esc leaves a pick mode wherever the keyboard focus is (after choosing the menu item it is on the page body, not on the stage),
+    // and puts a part being dragged back where it was.
     this.on(document, 'keydown', e => {
-      if ((e as KeyboardEvent).key !== 'Escape' || !this.picking()) return;
+      if ((e as KeyboardEvent).key !== 'Escape') return;
+      if (this.drag) { this.cancelDrag(); e.preventDefault(); return; }
+      if (!this.picking()) return;
       ctx.store.cancelPicks();
       e.preventDefault();
     });
+    // A drag that never gets its pointerup must not leave the history gesture open or the drag state stuck:
+    // the browser cancelling the pointer aborts it; losing focus or switching tabs keeps what was done so far and ends it.
+    this.on(ctx.canvas, 'pointercancel', () => this.cancelDrag());
+    this.on(window, 'blur', () => this.finishDrag());
+    this.on(document, 'visibilitychange', () => { if (document.hidden) this.finishDrag(); });
+  }
+
+  /** Aborts the drag in progress: the parts go back to where they were and no undo step is written. */
+  private cancelDrag() {
+    if (!this.drag) return;
+    this.drag = null;
+    this.ctx.store.abortGesture();
+  }
+
+  /** Ends the drag in progress as if the mouse button had been released here (one undo step for what was moved). */
+  private finishDrag() {
+    if (!this.drag) return;
+    this.drag = null;
+    this.ctx.store.endGesture();
   }
 
   private on(target: EventTarget, type: string, fn: EventListener) {
@@ -131,7 +153,7 @@ export class DocumentScene {
     this.group.visible = active;
     this.selectionBoxes.visible = active;
     this.snapHandles.visible = active;
-    if (!active) { this.drag = null; this.ctx.store.cancelPicks(); }
+    if (!active) { this.finishDrag(); this.ctx.store.cancelPicks(); }
   }
 
   /** Redraws whatever differs between the store and the scene. Call from a reactive effect. */
@@ -420,8 +442,7 @@ export class DocumentScene {
         ),
       });
     }
-    store.patchMany(changes);
-    store.commit();
+    store.updateItems('Rotate', changes);
   }
 
   /** Shortens a move so every item in `items` stays inside the work area (the group keeps its shape at the edge). */
@@ -524,6 +545,7 @@ export class DocumentScene {
       plane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0, 0, 1), hit.point);
     }
     this.drag = { id: hit.id, starts, wasInGroup, vertical, plane, grabOffset: hit.point.clone().sub(new THREE.Vector3(...item.position)), moved: false };
+    this.ctx.store.beginGesture('Move'); // every pointer move of the drag changes the document live; the undo step is written once, at the end
     this.ctx.canvas.setPointerCapture(e.pointerId);
   }
 
@@ -564,14 +586,14 @@ export class DocumentScene {
     const target = changes.get(drag.id)!.position!;
     if (current && current[0] === target[0] && current[1] === target[1] && current[2] === target[2]) return;
     drag.moved = true;
-    this.ctx.store.patchMany(changes);
+    this.ctx.store.updateItems('Move', changes); // inside the drag's gesture: live, one undo step at the end
   }
 
   private onPointerUp(e: PointerEvent) {
     if (!this.active) return;
     if (this.drag) {
-      if (this.drag.moved) this.ctx.store.commit();
-      else if (this.drag.wasInGroup) this.ctx.store.select(this.drag.id); // plain click inside a multi-selection narrows it, like Finder
+      this.ctx.store.endGesture(); // writes the single undo step (nothing when the part never moved)
+      if (!this.drag.moved && this.drag.wasInGroup) this.ctx.store.select(this.drag.id); // plain click inside a multi-selection narrows it, like Finder
       this.drag = null;
       this.ctx.canvas.releasePointerCapture(e.pointerId);
     } else if (this.emptyDown) {
@@ -590,8 +612,7 @@ export class DocumentScene {
       if (!items.length) return false;
       const [cx, cy, cz] = this.clampDelta([dx, dy, dz], this.placed(items));
       const horizontal = cx !== 0 || cy !== 0;
-      store.patchMany(new Map(items.map(i => [i.id, { position: this.keepCentered(i, [i.position[0] + cx, i.position[1] + cy, i.position[2] + cz], horizontal) }])));
-      store.commit();
+      store.updateItems('Nudge', new Map(items.map(i => [i.id, { position: this.keepCentered(i, [i.position[0] + cx, i.position[1] + cy, i.position[2] + cz], horizontal) }])));
       return true;
     };
     const stepX = fine ? 1 : snapStepMm.x, stepY = fine ? 1 : snapStepMm.y;
@@ -620,12 +641,13 @@ export class DocumentScene {
     else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
     else if (e.key === 'PageDown' || e.key === '[') moveZ(-1);
     else if (e.key === 'Delete' || e.key === 'Backspace') store.removeSelected();
-    else if (e.key === 'Escape') store.select(null);
+    else if (e.key === 'Escape') { if (!this.drag) store.select(null); } // while dragging, Esc only cancels the drag
     else handled = false;
     if (handled) e.preventDefault();
   }
 
   dispose() {
+    this.finishDrag();
     this.ctx.store.sizeOf = null;
     this.ctx.store.viewCenter = null;
     for (const [target, type, fn] of this.listeners) target.removeEventListener(type, fn);

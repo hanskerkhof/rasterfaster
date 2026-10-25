@@ -2,39 +2,20 @@
   "name": "STROZZI",
   "items": [
     {
-      "id": "9fe5ce56-1b25-429d-8bba-00c4a1e2b887",
-      "path": "3.39 BIRTHDAY ROCK 8x8x3/3.39 BIRTHDAY ROCK 8x8x3 COVER.stl",
-      "name": "3.39 BIRTHDAY ROCK 8x8x3 COVER",
-      "color": 16167531,
-      "position": [
-        120.0,
-        -60.0,
-        202.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": true,
-      "centered": false
-    },
-    {
       "id": "7adcaef4-a129-43ec-afdc-e563888c99fd",
       "path": "MOUNTS/11.16.HW-059 THUMB WHEEL VOLUME AMP/11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I.stl",
       "name": "11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I",
       "color": 16767334,
       "position": [
-        229.0,
+        100.0,
         20.0,
         6.0
       ],
       "rotation": [
         0.0,
         0.0,
-        -1.0,
-        -5.5511151231257815e-17
+        0.0,
+        1.0
       ],
       "muted": false,
       "centered": false
@@ -45,7 +26,7 @@
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
       "color": 16767334,
       "position": [
-        174.2,
+        214.2,
         51.108000000000004,
         6.0
       ],
@@ -64,7 +45,7 @@
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
       "color": 7317724,
       "position": [
-        138.98,
+        158.98,
         0.0,
         8.0
       ],
@@ -83,7 +64,7 @@
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
       "color": 9684093,
       "position": [
-        140.0,
+        160.0,
         0.0,
         6.0
       ],
@@ -102,7 +83,7 @@
       "name": "serial mp3 player.stp",
       "color": 16167531,
       "position": [
-        153.0,
+        173.0,
         24.0,
         10.0
       ],
@@ -178,15 +159,15 @@
       "name": "HW-059 AMP",
       "color": 16167531,
       "position": [
-        230.0,
-        42.0,
+        97.0,
+        40.0,
         12.0
       ],
       "rotation": [
         0.0,
         0.0,
-        -1.0,
-        -5.5511151231257815e-17
+        0.0,
+        1.0
       ],
       "muted": false,
       "centered": false
@@ -197,8 +178,8 @@
       "name": "rotary+encoder_14mm_hole_spc",
       "color": 12745632,
       "position": [
-        0.0,
-        0.0,
+        20.0,
+        40.0,
         0.0
       ],
       "rotation": [
@@ -217,7 +198,7 @@
       "color": 9338051,
       "position": [
         274.0,
-        -60.0,
+        -20.0,
         6.0
       ],
       "rotation": [
@@ -236,7 +217,7 @@
       "color": 14706278,
       "position": [
         270.0,
-        -42.0,
+        -2.0,
         34.0
       ],
       "rotation": [
@@ -255,7 +236,7 @@
       "color": 7317724,
       "position": [
         272.82,
-        -60.0,
+        -20.0,
         26.0
       ],
       "rotation": [
@@ -293,8 +274,8 @@
       "color": 16767334,
       "position": [
         240.0,
-        20.0,
-        0.0
+        -20.0,
+        6.0
       ],
       "rotation": [
         0.0,
@@ -312,8 +293,8 @@
       "color": 7317724,
       "position": [
         240.0,
-        0.0,
-        0.0
+        40.0,
+        6.0
       ],
       "rotation": [
         0.0,
@@ -330,9 +311,9 @@
       "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
       "color": 16767334,
       "position": [
-        100.0,
-        40.0,
-        0.0
+        104.0,
+        20.0,
+        6.0
       ],
       "rotation": [
         0.0,
@@ -349,15 +330,72 @@
       "name": "CORNERS_RF6 v215_CORNER LEFT 3h",
       "color": 7317724,
       "position": [
-        100.0,
-        20.0,
-        0.0
+        104.0,
+        0.0,
+        6.0
       ],
       "rotation": [
         0.0,
         0.0,
         -1.0,
         -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "7efbc696-9cd2-418b-b114-4d7b2e976134",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
+      "color": 7317724,
+      "position": [
+        180.0,
+        0.0,
+        8.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "dffda44f-44af-4f9b-8e13-862156a0cbbf",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
+      "color": 9684093,
+      "position": [
+        181.02,
+        0.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "b4bf1f84-3712-491c-80da-2c9cd2131abb",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player) VERTICAL/models/serial mp3 player.stp.stl",
+      "name": "serial mp3 player.stp",
+      "color": 16167531,
+      "position": [
+        194.02,
+        24.0,
+        10.0
+      ],
+      "rotation": [
+        -5.551115123125784e-17,
+        0.7071067811865476,
+        5.551115123125784e-17,
+        0.7071067811865476
       ],
       "muted": false,
       "centered": false

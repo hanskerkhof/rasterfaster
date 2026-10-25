@@ -68,6 +68,8 @@ const currentIdStorageKey = 'rasterfaster.documentId';
 const clipboardStorageKey = 'rasterfaster.clipboard';
 const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
 const maxHistory = 200;
+/** A gesture open this long never got its end (lost pointer, tab switch): treat it as finished. */
+const gestureStaleMs = 30_000;
 const saveDelayMs = 400;
 
 export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error';
@@ -130,6 +132,8 @@ export class DocumentStore {
   private past: string[] = [];
   private future: string[] = [];
   private committed = JSON.stringify(this.doc());
+  private gestureLabel: string | null = null;
+  private gestureStartedAt = 0;
   private saveTimer?: ReturnType<typeof setTimeout>;
   private saving = false;
   private dirty = false;
@@ -265,33 +269,75 @@ export class DocumentStore {
     return itemColors[this.doc().items.length % itemColors.length];
   }
 
+  /**
+   * THE choke point: every change to the document goes through here (the undo history and autosave hang off it, so no action can
+   * forget them). `change` returns the new document; when nothing actually changed there is no undo entry and no save. Inside a
+   * gesture (a drag) the change is applied live but the undo entry is written once, when the gesture ends.
+   * `label` names the step (handy when debugging history). Returns whether anything changed.
+   */
+  mutate(label: string, change: (doc: RfDocument) => RfDocument): boolean {
+    if (this.gestureLabel && Date.now() - this.gestureStartedAt > gestureStaleMs) this.endGesture(); // a drag that never got its end
+    const current = this.doc();
+    const next = change(current);
+    if (next === current || JSON.stringify(next) === JSON.stringify(current)) return false;
+    this.doc.set(next);
+    if (!this.gestureLabel) this.commit();
+    return true;
+  }
+
+  /** Changes properties of several items in one step. */
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'muted' | 'centered'>>>): boolean {
+    if (!changes.size) return false;
+    return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
+  }
+
+  /**
+   * A gesture groups many live changes (every pointer move of a drag) into ONE undo step: changes show immediately, the step is
+   * written by endGesture(), and abortGesture() puts the document back as it was when the gesture began.
+   */
+  beginGesture(label: string) {
+    if (this.gestureLabel) this.endGesture();
+    this.gestureLabel = label;
+    this.gestureStartedAt = Date.now();
+  }
+
+  endGesture() {
+    if (!this.gestureLabel) return;
+    this.gestureLabel = null;
+    this.commit();
+  }
+
+  abortGesture() {
+    if (!this.gestureLabel) return;
+    this.gestureLabel = null;
+    this.doc.set(JSON.parse(this.committed)); // back to the last undo step; nothing to save
+    const present = new Set(this.doc().items.map(i => i.id));
+    this.selectedIds.update(ids => ids.filter(id => present.has(id)));
+  }
+
+  get gestureOpen() {
+    return this.gestureLabel !== null;
+  }
+
   addItem(item: Omit<DocItem, 'id'>) {
     const created: DocItem = { ...item, id: crypto.randomUUID() };
-    this.doc.update(d => ({ ...d, items: [...d.items, created] }));
+    this.mutate('Add part', d => ({ ...d, items: [...d.items, created] }));
     this.selectedIds.set([created.id]);
-    this.commit();
     return created;
   }
 
-  patch(id: string, changes: Partial<Pick<DocItem, 'position' | 'rotation' | 'name' | 'color' | 'muted' | 'centered'>>) {
-    this.doc.update(d => ({ ...d, items: d.items.map(i => (i.id === id ? { ...i, ...changes } : i)) }));
-  }
-
   remove(id: string) {
-    this.doc.update(d => ({ ...d, items: d.items.filter(i => i.id !== id) }));
+    this.mutate('Remove part', d => ({ ...d, items: d.items.filter(i => i.id !== id) }));
     this.selectedIds.update(ids => ids.filter(selected => selected !== id));
-    this.commit();
   }
 
   rename(name: string) {
-    this.doc.update(d => ({ ...d, name }));
-    this.commit();
+    this.mutate('Rename document', d => ({ ...d, name }));
   }
 
   clear() {
-    this.doc.update(d => ({ ...d, items: [] }));
+    this.mutate('Clear document', d => ({ ...d, items: [] }));
     this.selectedIds.set([]);
-    this.commit();
   }
 
   select(id: string | null) {
@@ -310,8 +356,7 @@ export class DocumentStore {
 
   /** Dims or restores items (one undo step). */
   setMuted(ids: readonly string[], muted: boolean) {
-    this.patchMany(new Map(ids.map(id => [id, { muted }])));
-    this.commit();
+    this.updateItems(muted ? 'Dim parts' : 'Show parts', new Map(ids.map(id => [id, { muted }])));
   }
 
   /** Bounding-box size of an item as drawn (after rotation); set by the 3D scene, null while its geometry is loading. */
@@ -331,9 +376,7 @@ export class DocumentStore {
       if (size) change.position = clampToWorkArea(cellCenteredPosition(item.position, size), size);
       changes.set(item.id, change);
     }
-    if (!changes.size) return;
-    this.patchMany(changes);
-    this.commit();
+    this.updateItems(flag ? 'Center on grid' : 'Stop centering', changes);
   }
 
   /**
@@ -347,8 +390,7 @@ export class DocumentStore {
     const delta = height - Math.min(...picked.map(i => i.position[2]));
     if (delta === 0) return;
     const round = (v: number) => Math.round(v * 1000) / 1000;
-    this.patchMany(new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] + delta)] as Vec3 }])));
-    this.commit();
+    this.updateItems('Move to height', new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] + delta)] as Vec3 }])));
   }
 
   /**
@@ -390,9 +432,8 @@ export class DocumentStore {
   addItems(items: Omit<DocItem, 'id'>[]): number {
     if (!items.length) return 0;
     const created = items.map<DocItem>(item => ({ ...item, id: crypto.randomUUID() }));
-    this.doc.update(d => ({ ...d, items: [...d.items, ...created] }));
+    this.mutate('Add parts', d => ({ ...d, items: [...d.items, ...created] }));
     this.selectedIds.set(created.map(c => c.id));
-    this.commit();
     return created.length;
   }
 
@@ -439,9 +480,7 @@ export class DocumentStore {
       const moved = item.position.map((v, i) => round(v + delta[i])) as Vec3;
       changes.set(item.id, { position: clampToWorkArea(moved, size), ...(item.centered ? { centered: false } : {}) });
     }
-    if (!changes.size) return;
-    this.patchMany(changes);
-    this.commit();
+    this.updateItems('Move to', changes);
   }
 
   /**
@@ -463,9 +502,7 @@ export class DocumentStore {
       const position = clampToWorkArea([round(item.position[0] + dx), round(item.position[1] + dy), item.position[2]], size);
       changes.set(item.id, { position, ...(item.centered ? { centered: false } : {}) });
     }
-    if (!changes.size) return;
-    this.patchMany(changes);
-    this.commit();
+    this.updateItems('Snap to grid', changes);
   }
 
   /** Right-click menu for objects: where to show it and which items it acts on. */
@@ -477,17 +514,11 @@ export class DocumentStore {
     this.contextMenu.set({ x, y, ids: [...this.selectedIds()] });
   }
 
-  /** Changes several items in one step (one signal update). */
-  patchMany(changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'muted' | 'centered'>>>) {
-    this.doc.update(d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
-  }
-
   removeSelected() {
     const ids = new Set(this.selectedIds());
     if (!ids.size) return;
-    this.doc.update(d => ({ ...d, items: d.items.filter(i => !ids.has(i.id)) }));
+    this.mutate('Delete parts', d => ({ ...d, items: d.items.filter(i => !ids.has(i.id)) }));
     this.selectedIds.set([]);
-    this.commit();
   }
 
   /** Copies every selected item one grid cell over and selects the copies. */
@@ -496,13 +527,12 @@ export class DocumentStore {
       ...source, id: crypto.randomUUID(), position: [source.position[0] + snapStepMm.x, source.position[1] + snapStepMm.y, source.position[2]], rotation: [...source.rotation],
     }));
     if (!copies.length) return;
-    this.doc.update(d => ({ ...d, items: [...d.items, ...copies] }));
+    this.mutate('Duplicate parts', d => ({ ...d, items: [...d.items, ...copies] }));
     this.selectedIds.set(copies.map(c => c.id));
-    this.commit();
   }
 
-  /** Close the current edit: it becomes one undo step (no-op when nothing changed). */
-  commit() {
+  /** Writes the undo step for what changed since the last one (no-op when nothing changed). Only mutate() and endGesture() call this. */
+  private commit() {
     const now = JSON.stringify(this.doc());
     if (now === this.committed) return;
     this.past.push(this.committed);

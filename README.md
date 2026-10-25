@@ -42,7 +42,7 @@ GET /api/documents/{id}/export.3mf?layout=assembly|print&bed=256
 
 Copy / paste (Document mode): ⌘C copies the selected parts, ⌘X cuts them, ⌘V pastes at the view centre (the copied group's lowest corner snaps to the nearest grid intersection, heights and spacing are kept, parts set to Center on grid are re-centered). One paste is one undo step and the pasted parts become the selection. The clipboard holds content only (file, rotation, color, dimmed/centered flags, offsets), never ids, and is kept in local storage, so it survives reloads and works across documents and tabs. The part context menu has Copy / Cut / Paste too.
 
-Keyboard (Document mode): arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = 1 mm steps, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
+Keyboard (Document mode): arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = 1 mm steps, Esc during a drag puts the part back, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
 
 ## Trackpad / mouse
 

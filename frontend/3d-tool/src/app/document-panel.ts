@@ -186,7 +186,6 @@ export class DocumentPanel {
     if (!Number.isFinite(value)) return;
     const position: [number, number, number] = [...item.position];
     position[axis] = value;
-    this.store.patch(item.id, { position: clampToWorkArea(position) }); // typed values stay inside the work area too
-    this.store.commit();
+    this.store.updateItems('Set position', new Map([[item.id, { position: clampToWorkArea(position) }]])); // typed values stay inside the work area too
   }
 }
