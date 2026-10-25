@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - Black PLA in the Blender export (0.2.3)
+
+### Changed
+- **BE** (`blenderexport.py`, `main.py`, `tests/test_blenderexport.py`): in the glTF / .blend export every part now uses one shared "Black PLA" material (near-black base colour, roughness 0.42, clearcoat 0.12 via `KHR_materials_clearcoat`) instead of the document colours. `?colours=true` on `export.glb` / `export.blend` keeps the document colours. Verified in Blender 5.0: one material, base colour, roughness and coat imported as set.
+
 ## 2026-10-25 - native .blend export (0.2.2)
 
 ### Added

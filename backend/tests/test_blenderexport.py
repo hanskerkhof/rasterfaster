@@ -94,3 +94,13 @@ def test_blend_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender: b"BLENDER-v500" + glb[:4])
     response = client.get(f"/api/documents/{created['id']}/export.blend")
     assert response.status_code == 200 and response.content.startswith(b"BLENDER") and "Blend_me.blend" in response.headers["content-disposition"]
+
+
+def test_parts_are_black_pla_unless_colours_are_asked_for():
+    items, stls = items_and_stls()
+    document = {"name": "Doc", "items": items}
+    gltf, _ = parse_glb(blenderexport.build_glb(document, stls.__getitem__, camera=False))
+    assert [m["name"] for m in gltf["materials"]] == ["Black PLA"] and len(gltf["meshes"]) == 2
+    assert "KHR_materials_clearcoat" in gltf["extensionsUsed"]
+    coloured, _ = parse_glb(blenderexport.build_glb(document, stls.__getitem__, camera=False, colours=True))
+    assert {m["name"] for m in coloured["materials"]} == {"colour_000001", "colour_000002"}

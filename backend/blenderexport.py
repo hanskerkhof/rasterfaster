@@ -1,6 +1,6 @@
 """Builds a binary glTF (.glb) for Blender from a RASTERFASTER document.
 
-Blender imports glTF natively (File > Import > glTF 2.0): one object per part with the document's colour, placed exactly as in the
+Blender imports glTF natively (File > Import > glTF 2.0): one object per part in black PLA (or the document's colour), placed exactly as in the
 document (Z up, 1 Blender unit = 1 m, so a 20 mm cell is 0.02 m), plus a perspective camera that follows the fly-around path
 (one closed loop of `flightLoopSeconds`, keyframed as an animation) and the path itself as a line object.
 """
@@ -73,6 +73,12 @@ def quaternion(matrix: np.ndarray) -> list[float]:
     return [v / norm for v in q]
 
 
+def black_pla() -> dict:
+    """Satin black filament: very dark, fairly rough, with a thin glossy coat for the sheen of printed PLA."""
+    return {"name": "Black PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.012, 0.012, 0.014, 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.42},
+            "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}}}
+
+
 def srgb_to_linear(value: float) -> float:
     return value / 12.92 if value <= 0.04045 else ((value + 0.055) / 1.055) ** 2.4
 
@@ -110,7 +116,8 @@ def node_matrix(placement: export3mf.Placement) -> list[float]:
     return matrix.T.flatten().tolist()
 
 
-def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = True) -> bytes:
+def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = True, colours: bool = False) -> bytes:
+    """Parts get one shared \"Black PLA\" material; with `colours` they keep the colours of the document instead."""
     items = document["items"]
     if not items:
         raise ValueError("document has no items")
@@ -126,10 +133,10 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
     gltfMeshes, materials, materialIndex, meshIndex = [], [], {}, {}
     nodes, partNodes = [], []
     for item, placement in zip(items, placements):
-        colour = int(item["color"]) & 0xFFFFFF
+        colour = (int(item["color"]) & 0xFFFFFF) if colours else -1  # -1: Black PLA
         if colour not in materialIndex:
             materialIndex[colour] = len(materials)
-            materials.append({"name": f"colour_{colour:06x}", "pbrMetallicRoughness": {
+            materials.append(black_pla() if colour < 0 else {"name": f"colour_{colour:06x}", "pbrMetallicRoughness": {
                 "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.6}})
         key = (item["path"], colour)  # one glTF mesh per library file and colour; parts used several times share it
         if key not in meshIndex:
@@ -141,7 +148,7 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
         partNodes.append(len(nodes) - 1)
 
     sceneNodes = list(partNodes)
-    gltf: dict = {"asset": {"version": "2.0", "generator": "RASTERFASTER composition tool"}, "scene": 0,
+    gltf: dict = {"extensionsUsed": ["KHR_materials_clearcoat"], "asset": {"version": "2.0", "generator": "RASTERFASTER composition tool"}, "scene": 0,
                   "meshes": gltfMeshes, "materials": materials, "nodes": nodes}
 
     if camera:

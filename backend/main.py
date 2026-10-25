@@ -260,12 +260,12 @@ def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
 
 
 @app.get("/api/documents/{documentId}/export.glb")
-def export_document_glb(documentId: str, camera: bool = True) -> Response:
-    """glTF for Blender: the parts as placed in the document (Z up, metres) plus, unless `camera` is false, a camera animated along the fly-around path and the path as a line."""
+def export_document_glb(documentId: str, camera: bool = True, colours: bool = False) -> Response:
+    """glTF for Blender: the parts as placed in the document (Z up, metres) in Black PLA (or the document's colours with `colours=true`), plus, unless `camera` is false, a camera animated along the fly-around path and the path as a line."""
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
-        data = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, camera)
+        data = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, camera, colours)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".glb"
@@ -273,7 +273,7 @@ def export_document_glb(documentId: str, camera: bool = True) -> Response:
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str) -> Response:
+def export_document_blend(documentId: str, colours: bool = False) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -281,7 +281,7 @@ def export_document_blend(documentId: str) -> Response:
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
-        glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True)
+        glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours)
         data = blenderexport.build_blend(glb, blender)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
