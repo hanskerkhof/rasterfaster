@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - fly-around
+
+### Added
+- **FE** (`stl-viewer.ts`): fly-around toggle (▶/⏸ button beside Home in document view, and an item in the view cube menu). The camera eases onto a wandering path around the assembly (azimuth sweep, elevation 12-72°, zoom relative to the fit for the current direction, drifting centre). Dragging or scrolling the view stops it. Works with both cameras.
+
 ## 2026-10-25 - BOM section for parts that are not exported
 
 ### Changed

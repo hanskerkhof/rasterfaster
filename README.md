@@ -66,6 +66,10 @@ The reload button (⟳ next to Sort) re-reads the library from disk: the root an
 
 Right-click the view cube → **Camera**: Orthographic (default), Perspective, or Perspective with ortho faces (orthographic only while looking straight at a face of the cube, like Fusion 360). Remembered across reloads.
 
+## Fly-around
+
+The ▶ button next to Home (document view only; also in the view cube's right-click menu) starts a slow camera flight around the assembly: about one turn per 70 s, with the camera rising and falling, breathing in and out, and its centre drifting, so over time the assembly is shown from the sides, the top and a low angle. Grabbing the view (drag or scroll) or pressing ⏸ stops it.
+
 ## 3D grid
 
 Right-click the view cube → **3D grid** switches the ground grid to a full lattice: horizontal 20 mm grids at every height level (0, 2, 6, 10, …) up to just above the parts, plus vertical lines through every node. The choice is remembered.

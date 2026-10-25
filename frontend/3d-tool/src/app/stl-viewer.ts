@@ -116,10 +116,24 @@ function readGrid3d() {
             </div>
           }
         </div>
+        @if (documentMode()) {
+          <button type="button" role="menuitem" (click)="toggleFlight(); cubeMenu.set(null)">
+            <span class="tick">{{ flying() ? '✓' : '' }}</span>Fly-around<span class="hint">{{ flying() ? 'on' : 'off' }}</span>
+          </button>
+        }
         <button type="button" role="menuitem" (click)="togglePivotOnSelection()">
           <span class="tick">{{ pivotOnSelection() ? '✓' : '' }}</span>Rotate around selection<span class="hint">{{ pivotOnSelection() ? 'on' : 'off' }}</span>
         </button>
       </div>
+    }
+    @if (documentMode()) {
+      <button class="home fly" type="button" [class.on]="flying()" [title]="flying() ? 'Stop the fly-around' : 'Fly-around: slowly circle the assembly'" aria-label="Fly-around" [attr.aria-pressed]="flying()" (click)="toggleFlight()">
+        @if (flying()) {
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+        }
+      </button>
     }
     <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
@@ -130,6 +144,7 @@ function readGrid3d() {
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
     .home { position: absolute; top: 12px; right: 132px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
+    .home.fly { right: 98px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .rotate { position: absolute; top: 12px; left: 12px; width: 124px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
@@ -207,6 +222,12 @@ export class StlViewer implements OnDestroy {
   /** Rotating the view (drag, or dragging the view cube) pivots around the selected parts instead of the current view centre. */
   protected readonly pivotOnSelection = signal(readPivotOnSelection());
   private pivotGoal: THREE.Vector3 | null = null;
+  /** Fly-around: the camera slowly circles the assembly on a wandering path (azimuth sweep, rising and falling elevation, breathing zoom, drifting centre). */
+  protected readonly flying = signal(false);
+  private flightTime = 0;
+  private flightLast = 0;
+  private flightAzimuth0 = 0;
+  private readonly stopFlight = () => this.flying.set(false);
   private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
   private readonly pickRaycaster = new THREE.Raycaster();
@@ -276,6 +297,8 @@ export class StlViewer implements OnDestroy {
     });
     // ⌘-click centres the view on the clicked point. Registered before OrbitControls so it can swallow the click.
     this.renderer.domElement.addEventListener('pointerdown', this.onCentreClick);
+    this.renderer.domElement.addEventListener('pointerdown', this.stopFlight); // grabbing the view takes over from the fly-around
+    this.renderer.domElement.addEventListener('wheel', this.stopFlight, { passive: true });
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.applyCameraMode(); // start in the saved mode (controls exist now)
@@ -291,6 +314,7 @@ export class StlViewer implements OnDestroy {
       this.stepSnapAnimation();
       this.stepPanAnimation();
       this.stepPivot();
+      this.stepFlight();
       this.updateAutoProjection();
       this.documentScene.tick();
       this.controls.update();
@@ -299,6 +323,51 @@ export class StlViewer implements OnDestroy {
       this.viewCube.render(this.renderer, this.camera, this.controls.target);
     };
     loop();
+  }
+
+  protected toggleFlight() {
+    if (this.flying()) { this.flying.set(false); return; }
+    if (!this.documentMode() || !this.documentScene.bounds()) return;
+    this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    this.flightAzimuth0 = Math.atan2(offset.y, offset.x);
+    this.flightTime = 0;
+    this.flightLast = performance.now();
+    this.flying.set(true);
+  }
+
+  /**
+   * One frame of the fly-around. The wanted view is a sum of slow sines with unrelated periods, so the path keeps changing and
+   * covers the assembly from the sides, the top and a low angle; the real camera eases towards it (which also blends in and out smoothly).
+   * The zoom is relative to the fit for the current direction, so the whole assembly stays in view.
+   */
+  private stepFlight() {
+    if (!this.flying()) return;
+    const bounds = this.documentScene.bounds();
+    if (!this.documentMode() || !bounds) { this.flying.set(false); return; }
+    const now = performance.now();
+    const dt = Math.min((now - this.flightLast) / 1000, 0.1);
+    this.flightLast = now;
+    this.flightTime += dt;
+    const t = this.flightTime;
+    const size = bounds.getSize(new THREE.Vector3());
+    this.radius = Math.max(size.length() / 2, 60);
+
+    const azimuth = this.flightAzimuth0 + t * 0.09; // about one turn per 70 s
+    const elevation = THREE.MathUtils.degToRad(38 + 26 * Math.sin(t * 0.13 + 0.8) + 8 * Math.sin(t * 0.31));
+    const direction = new THREE.Vector3(Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation));
+    const centre = bounds.getCenter(new THREE.Vector3()).add(new THREE.Vector3(
+      size.x * 0.16 * Math.sin(t * 0.17), size.y * 0.16 * Math.cos(t * 0.11), size.z * 0.2 * Math.sin(t * 0.23)));
+    const zoom = this.fitZoom(size, direction) * (1 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.21 - 1)));
+
+    const k = 1 - Math.exp(-dt * 1.5);
+    const current = this.camera.position.clone().sub(this.controls.target);
+    const heading = current.lengthSq() > 1e-6 ? current.normalize() : direction.clone();
+    heading.lerp(direction, k).normalize();
+    this.controls.target.lerp(centre, k);
+    this.camera.zoom += (zoom - this.camera.zoom) * k;
+    this.camera.position.copy(this.controls.target).addScaledVector(heading, this.fitDistance());
+    this.camera.updateProjectionMatrix();
   }
 
   /** Animate the camera to look at the model from `direction` (unit vector model -> camera). */
@@ -790,6 +859,8 @@ export class StlViewer implements OnDestroy {
   ngOnDestroy() {
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
+    this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);
+    this.renderer?.domElement.removeEventListener('wheel', this.stopFlight);
     this.renderer?.domElement.removeEventListener('wheel', this.onWheel);
     this.ro?.disconnect();
     this.clearModel();
