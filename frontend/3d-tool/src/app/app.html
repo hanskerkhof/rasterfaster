@@ -9,12 +9,12 @@
       }
     </div>
     <div class="sort">
-      <button class="reload" type="button" title="Reload the file list" aria-label="Reload the file list" [class.spin]="reloading()" [disabled]="reloading()" (click)="reloadFiles()">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>
-      </button>
       Sort
       <button [class.on]="sortKey() === 'name'" (click)="setSort('name')">Name {{ sortKey() === 'name' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
       <button [class.on]="sortKey() === 'date'" (click)="setSort('date')">Date {{ sortKey() === 'date' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
+      <button class="reload" type="button" title="Reload the file list" aria-label="Reload the file list" [class.spin]="reloading()" [disabled]="reloading()" (click)="reloadFiles()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>
+      </button>
     </div>
   </div>
   <div class="tree">
