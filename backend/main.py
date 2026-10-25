@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import uvicorn
+import blenderexport
 import export3mf
 import svgexport
 from fastapi import FastAPI, HTTPException
@@ -255,6 +256,19 @@ def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
     if missing:
         raise HTTPException(status_code=422, detail=f"STL files not found: {', '.join(missing)}")
     return stlBytes
+
+
+@app.get("/api/documents/{documentId}/export.glb")
+def export_document_glb(documentId: str, camera: bool = True) -> Response:
+    """glTF for Blender: the parts as placed in the document (Z up, metres) plus, unless `camera` is false, a camera animated along the fly-around path and the path as a line."""
+    document = exportable(read_document(documentId))
+    stlBytes = load_document_stls(document)
+    try:
+        data = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, camera)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    filename = re.sub(r"[^\w.-]+", "_", document.name) + ".glb"
+    return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 @app.get("/api/documents/{documentId}/export.svg")

@@ -31,6 +31,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf('assembly')">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Every part flat on the plate in its library orientation, ready to print" (click)="export3mf('print')">Print plate</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="3MF with the document's own coordinates (Z up), for opening in Fusion 360" (click)="export3mf('fusion')">Fusion</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="glTF for Blender (File > Import > glTF 2.0): coloured parts as placed, plus a camera that flies the camera path" (click)="exportBlender()">Blender</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
     </div>
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
@@ -107,6 +108,10 @@ export class DocumentPanel {
 
   protected export3mf(layout: 'assembly' | 'print' | 'fusion') {
     return this.download(`export.3mf?layout=${layout}`, `${layout}.3mf`);
+  }
+
+  protected exportBlender() {
+    return this.download('export.glb', 'blender.glb');
   }
 
   protected exportSvg() {

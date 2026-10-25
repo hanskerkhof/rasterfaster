@@ -2,6 +2,13 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - Blender export (0.2.0)
+
+### Added
+- **BE** (`blenderexport.py`, `main.py`, `tests/test_blenderexport.py`): `GET /api/documents/{id}/export.glb` builds a glTF binary for Blender: one node per part with its colour, in document coordinates (Z up, metres), parts used several times sharing a mesh, "Do not export" parts left out. Unless `camera=false` it also holds a perspective camera animated (every 0.5 s, 280 s, closed loop) along the same path as the fly-around, framing the whole assembly, and the path as a line object. Verified by importing into Blender 5.0.
+- **FE** (`document-panel.ts`): **Blender** export button.
+- **FE** (`package.json`, `build-info.ts`, `ngsw-config.json`): version 0.2.0.
+
 ## 2026-10-25 - view cube labels
 
 ### Changed

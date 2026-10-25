@@ -96,6 +96,10 @@ Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part 
 
 Parts stay inside a 100 × 100 cell area (±1000 mm in X/Y, −200…1000 mm in Z); drags, keys, rotations and typed values are clamped to it, and the grid never draws beyond it. Documents with corrupt or out-of-range positions are repaired when opened.
 
+## Blender export
+
+**Blender** in the document panel downloads a `.glb` (glTF binary; API: `GET /api/documents/{id}/export.glb`, add `?camera=false` for parts only). In Blender use *File > Import > glTF 2.0*. You get one object per part (named like the part, in its colour, flat shaded) exactly as placed in the document, Z up, in metres (a 20 mm cell is 0.02 m); parts marked **Do not export** are left out. It also contains a **Fly-around camera** (35° perspective, 16:9) animated along the closed fly-around loop (280 s, so 6720 frames at 24 fps: set the scene's *End* frame to see all of it) and a **Camera path** line object with the path the camera follows. The camera starts at the isometric Home view and keeps the whole assembly in frame. Checked with Blender 5.0.
+
 ## SVG drawing
 
 ```
