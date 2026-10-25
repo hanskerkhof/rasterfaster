@@ -9,7 +9,7 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
 .name { opacity: .6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stage { position: relative; flex: 1; min-height: 0; }
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .overlay { position: absolute; top: 12px; left: 12px; padding: 6px 10px; background: rgba(0,0,0,.6); border-radius: 4px; }
 .overlay.err { color: #ff8a8a; }
 .info { position: absolute; bottom: 8px; left: 12px; opacity: .6; pointer-events: none; }

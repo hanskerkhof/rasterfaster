@@ -1,10 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { DocumentApi, DocumentSummary } from './document.api';
-import { zStepMm } from './z-levels';
 
 /** Grid the document snaps to, in mm. */
-export const snapStepMm = { x: 20, y: 20, z: zStepMm } as const;
+/** X/Y snap steps in mm. Height (Z) follows the grid mode, see z-levels.ts. */
+export const snapStepMm = { x: 20, y: 20 } as const;
 
 export type Vec3 = [number, number, number];
 

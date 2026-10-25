@@ -8,12 +8,13 @@ import { DocumentStore, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { ViewCube } from './view-cube';
-import { nextZLevel } from './z-levels';
+import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels';
 
 const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
+const zGridModeStorageKey = 'rasterfaster.zGridMode';
 
 function foldDegrees(d: number) {
   const folded = ((d % 360) + 540) % 360 - 180; // -180..180
@@ -21,6 +22,14 @@ function foldDegrees(d: number) {
 }
 
 export type { ViewMode } from './model-render';
+
+function readZGridMode(): ZGridMode {
+  try {
+    const stored = localStorage.getItem(zGridModeStorageKey);
+    if (zGridModes.some(m => m.id === stored)) return stored as ZGridMode;
+  } catch { /* storage unavailable */ }
+  return defaultZGridMode;
+}
 
 function readPivotOnSelection() {
   try { return localStorage.getItem(pivotStorageKey) !== 'false'; } catch { return true; } // default on
@@ -57,6 +66,21 @@ function readGrid3d() {
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
           <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
         </button>
+        <div class="submenu-host" (mouseenter)="gridModeOpen.set(true)" (mouseleave)="gridModeOpen.set(false)">
+          <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="gridModeOpen()" (click)="gridModeOpen.set(!gridModeOpen())">
+            <span class="tick"></span>Grid mode<span class="hint">{{ currentGridModeTitle() }} ◂</span>
+          </button>
+          @if (gridModeOpen()) {
+            <div class="flyout" role="menu">
+              @for (m of zGridModes; track m.id) {
+                <button type="button" role="menuitemradio" [attr.aria-checked]="zGridMode() === m.id" (click)="setZGridMode(m.id)">
+                  <span class="tick">{{ zGridMode() === m.id ? '✓' : '' }}</span>
+                  <span class="two-line"><span>{{ m.title }}</span><small>{{ m.detail }}</small></span>
+                </button>
+              }
+            </div>
+          }
+        </div>
         <button type="button" role="menuitem" (click)="togglePivotOnSelection()">
           <span class="tick">{{ pivotOnSelection() ? '✓' : '' }}</span>Rotate around selection<span class="hint">{{ pivotOnSelection() ? 'on' : 'off' }}</span>
         </button>
@@ -85,6 +109,11 @@ function readGrid3d() {
                  border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .cube-menu button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
     .cube-menu button:hover { background: #2f6fed; color: #fff; }
+    .submenu-host { position: relative; }
+    .flyout { position: absolute; right: calc(100% - 2px); top: -4px; min-width: 250px; padding: 4px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18);
+              border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .two-line { display: flex; flex-direction: column; gap: 1px; }
+    .two-line small { opacity: .55; font-size: 11px; }
     .cube-menu .tick { width: 1em; text-align: center; }
     .cube-menu .hint { margin-left: auto; opacity: .55; font-size: 11px; }
     .rotate button.active { background: #d9822b; color: #fff; }
@@ -128,6 +157,10 @@ export class StlViewer implements OnDestroy {
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
   protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
+  /** Height grid: fine (2 mm), baseplate (2 mm then 4 mm) or coarse (4 mm). Chosen in the view cube menu's "Grid mode" fly-out. */
+  protected readonly zGridMode = signal(readZGridMode());
+  protected readonly zGridModes = zGridModes;
+  protected readonly gridModeOpen = signal(false);
   /** Rotating the view (drag, or dragging the view cube) pivots around the selected parts instead of the current view centre. */
   protected readonly pivotOnSelection = signal(readPivotOnSelection());
   private pivotGoal: THREE.Vector3 | null = null;
@@ -155,6 +188,7 @@ export class StlViewer implements OnDestroy {
     });
     effect(() => {
       this.grid3d();
+      this.zGridMode(); // the 3D grid's levels follow the mode
       if (this.ready()) untracked(() => this.rebuildGrid());
     });
     // Another document was opened: fit the camera to it once its geometry has loaded.
@@ -182,7 +216,7 @@ export class StlViewer implements OnDestroy {
     // Created first so its pointerdown handler can swallow clicks that land on the cube.
     this.viewCube = new ViewCube(this.renderer.domElement, d => this.snapTo(d), (dx, dy) => this.orbitBy(dx, dy), (clientX, clientY) => {
       const host = this.host().nativeElement.getBoundingClientRect();
-      const menuWidth = 240; // keep the menu inside the view when the cube is at the right edge
+      const menuWidth = 300; // keep the menu inside the view when the cube is at the right edge
       this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
     }, () => this.startPivot());
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
@@ -190,6 +224,7 @@ export class StlViewer implements OnDestroy {
       scene: this.scene, camera: this.camera, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
       background: this.scene.background as THREE.Color,
       loadGeometry: path => this.loadGeometry(path),
+      zGridMode: () => this.zGridMode(),
       rotationStep: () => this.rotationStep(),
       changed: () => this.onDocumentChanged(),
     });
@@ -519,6 +554,17 @@ export class StlViewer implements OnDestroy {
   }
 
   /** Switches the 3D grid on or off (view cube menu) and remembers the choice. */
+  protected currentGridModeTitle() {
+    return zGridModes.find(m => m.id === this.zGridMode())?.title.split(':')[0] ?? '';
+  }
+
+  protected setZGridMode(mode: ZGridMode) {
+    this.zGridMode.set(mode);
+    try { localStorage.setItem(zGridModeStorageKey, mode); } catch { /* storage unavailable */ }
+    this.gridModeOpen.set(false);
+    this.cubeMenu.set(null);
+  }
+
   protected toggleGrid3d() {
     const on = !this.grid3d();
     this.grid3d.set(on);
@@ -551,7 +597,8 @@ export class StlViewer implements OnDestroy {
     const levels = [ground];
     if (this.grid3d()) {
       const top = Math.min(Math.max(zTop + 12, 40), workArea.max[2]);
-      for (let z = nextZLevel(0, 1); levels.length < 400; z = nextZLevel(z, 1)) { // z levels: 2, 6, 10, … (ground is 0)
+      const mode = this.zGridMode();
+      for (let z = nextZLevel(0, 1, mode); levels.length < 400; z = nextZLevel(z, 1, mode)) { // z levels above the ground (0)
         levels.push(z);
         if (z >= top) break;
       }

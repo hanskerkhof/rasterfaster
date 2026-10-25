@@ -58,9 +58,15 @@ Right-click the view cube → **3D grid** switches the ground grid to a full lat
 
 With parts selected, rotating the view (dragging empty space, or dragging/clicking the view cube) pivots around the centre of the selection: the view glides to centre it first. Right-click the view cube → **Rotate around selection** turns this on or off (default on, remembered).
 
-## Height grid
+## Height grid (grid mode)
 
-X/Y snap to 20 mm. Height snaps to levels that fit a 6 mm baseplate: **0, 2, 6, 10, 14, …** mm (ground, a 2 mm step, then 4 mm steps), so the top of the baseplate is a level. Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part decides, the rest keeps its offsets) and Shift+drag snaps to the nearest level; Alt gives 1 mm steps. The base thickness is `baseThicknessMm` in `frontend/3d-tool/src/app/z-levels.ts`.
+X/Y snap to 20 mm. Height snaps to levels that depend on the **Grid mode** (right-click the view cube → Grid mode, remembered):
+
+- **Fine: every 2 mm** — 0, 2, 4, 6, 8 … (default; for 2 mm thick parts)
+- **Baseplate: 2 mm, then 4 mm** — 0, 2, 6, 10, 14 … (the top of a 6 mm baseplate is a level)
+- **Coarse: every 4 mm** — 0, 4, 8, 12 …
+
+Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part decides, the rest keeps its offsets) and Shift+drag snaps to the nearest level; Alt gives 1 mm steps. The 3D grid follows the mode. Modes are defined in `frontend/3d-tool/src/app/z-levels.ts`.
 
 ## Work area
 
