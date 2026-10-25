@@ -8,10 +8,11 @@ export interface BomRow {
   stats?: PartStats;
 }
 
-/** One row per distinct library file, counting how often it is used. */
+/** One row per distinct library file, counting how often it is used. Parts marked "Do not export" are left out. */
 export function buildBom(items: DocItem[], stats: Record<string, PartStats>): BomRow[] {
   const rows = new Map<string, BomRow>();
   for (const item of items) {
+    if (item.noExport) continue; // mock parts that are not printed
     const row = rows.get(item.path);
     if (row) row.quantity++;
     else rows.set(item.path, { path: item.path, name: item.name, quantity: 1, stats: stats[item.path] });

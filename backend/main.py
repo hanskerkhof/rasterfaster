@@ -128,6 +128,7 @@ class DocumentItem(BaseModel):
     rotation: tuple[float, float, float, float]
     muted: bool = False  # dimmed in the editor and ignored by clicks; still part of BOM and exports
     centered: bool = False  # keep the footprint centre on the middle of a grid cell when moved
+    noExport: bool = False  # mock part (e.g. a component model): left out of the 3MF and SVG exports
 
 
 class DocumentBody(BaseModel):
@@ -215,7 +216,7 @@ def update_document(documentId: str, body: DocumentBody) -> DocumentOut:
 @app.get("/api/documents/{documentId}/export.3mf")
 def export_document_3mf(documentId: str, layout: Literal["assembly", "print", "fusion"] = "assembly", bed: float = 256.0) -> Response:
     """3MF for Bambu Studio / Fusion 360. `assembly` keeps the assembled positions centred on the plate; `print` lays each part out flat on a plate of `bed` mm; `fusion` keeps the document coordinates."""
-    document = read_document(documentId)
+    document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
         data = export3mf.build_3mf(document.model_dump(), stlBytes.__getitem__, layout, bed)
@@ -223,6 +224,14 @@ def export_document_3mf(documentId: str, layout: Literal["assembly", "print", "f
         raise HTTPException(status_code=422, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", f"{document.name}-{layout}") + ".3mf"
     return Response(data, media_type="model/3mf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+def exportable(document: DocumentOut) -> DocumentOut:
+    """The document without the parts marked "Do not export" (their STL files aren't even looked for)."""
+    kept = [item for item in document.items if not item.noExport]
+    if document.items and not kept:
+        raise HTTPException(status_code=422, detail='every part is set to "Do not export"')
+    return document.model_copy(update={"items": kept})
 
 
 def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
@@ -241,7 +250,7 @@ def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
 @app.get("/api/documents/{documentId}/export.svg")
 def export_document_svg(documentId: str) -> Response:
     """Top / front / right drawing of the assembly (feature lines, 20 mm grid, numbered legend)."""
-    document = read_document(documentId)
+    document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
         svg = svgexport.build_svg(document.model_dump(), stlBytes.__getitem__)

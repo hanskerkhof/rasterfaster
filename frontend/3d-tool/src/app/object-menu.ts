@@ -32,6 +32,10 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⊞</span>Snap to grid…
           <span class="hint">pick which corner or side</span>
         </button>
+        <button type="button" role="menuitem" (click)="toggleNoExport()">
+          <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
+          <span class="hint">{{ allNoExport() ? 'on: left out of 3MF, SVG and BOM' : 'mock part: leave out of the exports' }}</span>
+        </button>
         <button type="button" role="menuitem" [disabled]="!hasOthers()" (click)="moveTo()">
           <span class="icon">⇥</span>Move to…
           <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
@@ -76,6 +80,7 @@ export class ObjectMenu {
     return this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === height;
   }
 
+  protected readonly allNoExport = computed(() => this.items().length > 0 && this.items().every(i => i.noExport));
   protected readonly allCentered = computed(() => this.items().length > 0 && this.items().every(i => i.centered));
   protected readonly title = computed(() => {
     const items = this.items();
@@ -91,6 +96,11 @@ export class ObjectMenu {
 
   protected paste() {
     this.store.pasteClipboard();
+    this.close();
+  }
+
+  protected toggleNoExport() {
+    this.store.setNoExport(this.items().map(i => i.id), !this.allNoExport());
     this.close();
   }
 

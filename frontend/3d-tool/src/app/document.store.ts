@@ -48,6 +48,8 @@ export interface DocItem {
   muted?: boolean;
   /** Keeps the footprint centre on the middle of a grid cell when the item is dragged, nudged or rotated. */
   centered?: boolean;
+  /** A mock part (e.g. a component model) that is not printed: left out of the 3MF / SVG exports and the BOM. */
+  noExport?: boolean;
 }
 
 /** Measured from a part's STL as stored in the library (unrotated). */
@@ -286,7 +288,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'muted' | 'centered'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'muted' | 'centered' | 'noExport'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -503,6 +505,11 @@ export class DocumentStore {
       changes.set(item.id, { position, ...(item.centered ? { centered: false } : {}) });
     }
     this.updateItems('Snap to grid', changes);
+  }
+
+  /** Marks parts as "Do not export" (mock models that are not printed) or puts them back; one undo step. */
+  setNoExport(ids: readonly string[], noExport: boolean) {
+    this.updateItems(noExport ? 'Do not export' : 'Export again', new Map(ids.map(id => [id, { noExport }])));
   }
 
   /** Right-click menu for objects: where to show it and which items it acts on. */

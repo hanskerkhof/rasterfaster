@@ -17,7 +17,7 @@ describe('clipboard', () => {
     const clip = copyItems([item('a', [100, 60, 6]), item('b', [140, 40, 10], { muted: true, centered: true })])!;
     expect(clip.origin).toEqual([100, 40, 6]);
     expect(clip.items.map(i => i.offset)).toEqual([[0, 20, 0], [40, 0, 4]]);
-    expect(clip.items.map(i => [i.muted, i.centered])).toEqual([[false, false], [true, true]]);
+    expect(clip.items.map(i => [i.muted, i.centered, i.noExport])).toEqual([[false, false, false], [true, true, false]]);
     expect(JSON.stringify(clip)).not.toContain('"id"');
   });
 
@@ -31,6 +31,13 @@ describe('clipboard', () => {
   it('pastes one grid cell away from the original when there is no anchor', () => {
     const clip = copyItems([item('a', [100, 60, 6])])!;
     expect(pasteItems(clip, null, step, identity)[0].position).toEqual([120, 80, 6]);
+  });
+
+  it('carries the do-not-export flag along', () => {
+    const clip = copyItems([item('a', [0, 0, 0], { noExport: true }), item('b', [20, 0, 0])])!;
+    const pasted = pasteItems(clip, null, step, identity);
+    expect(pasted[0].noExport).toBe(true);
+    expect('noExport' in pasted[1]).toBe(false);
   });
 
   it('keeps muted/centered only when set, and lets `place` have the last word', () => {

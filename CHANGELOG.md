@@ -7,6 +7,12 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 ### Added
 - **FE** (`stl-viewer.ts`, `document-scene.ts`): camera choice like Fusion 360, in the view cube's right-click menu under **Camera**: **Orthographic** (default), **Perspective**, and **Perspective with ortho faces** (perspective, but orthographic while the view looks straight at a cube face). Switching keeps the viewing direction and the apparent size at the view centre, so the model does not jump. Selecting, dragging, snapping handles (which keep their on-screen size), two-finger pan, pinch zoom, ⌘-click centering and rotating around the selection all work with both cameras. The choice is remembered in local storage.
 
+## 2026-10-25 - Do not export
+
+### Added
+- **FE/BE** (`object-menu.ts`, `document.store.ts`, `bom.ts`, `backend/main.py`): part context menu item **Do not export** (toggle, ✓ when on) for mock models that are not printed. The flag is saved with the part (`noExport`); flagged parts get a ⊘ mark in the list and are left out of the 3MF exports (assembly, print plate, Fusion), the SVG drawing and the BOM (the BOM dialog notes how many parts were left out). The exporter does not even look for their STL files, so a mock without a file no longer blocks an export. An export where every part is flagged is refused with a clear message. Copy / paste keeps the flag.
+- **BE** (`tests/test_export3mf.py`) and **FE** (`bom.spec.ts`, `clipboard.spec.ts`): tests for the flag in the exports, the BOM and the clipboard.
+
 ## 2026-10-25 - Home fits tighter
 
 ### Changed

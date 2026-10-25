@@ -32,6 +32,9 @@ import { DocumentStore } from './document.store';
       } @else {
         <p class="empty">The document is empty. Add parts first.</p>
       }
+      @if (excluded() > 0) {
+        <p class="excluded">{{ excluded() }} part{{ excluded() === 1 ? '' : 's' }} left out: set to “Do not export”.</p>
+      }
       <footer>
         <button type="button" [disabled]="!rows().length" (click)="downloadCsv()">Download CSV</button>
         <button type="button" [disabled]="!rows().length" (click)="copyCsv()">{{ copied ? 'Copied ✓' : 'Copy CSV' }}</button>
@@ -52,6 +55,7 @@ import { DocumentStore } from './document.store';
     .name { display: block; font-weight: 600; } .path { display: block; opacity: .45; font-size: 11px; word-break: break-all; }
     tfoot td { font-weight: 700; border-bottom: 0; }
     .empty { opacity: .6; font-style: italic; }
+    .excluded { margin: 10px 0 0; opacity: .6; font-size: 11px; }
     footer { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
     button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; } button:disabled { opacity: .35; cursor: default; }
@@ -65,6 +69,7 @@ export class BomDialog {
   protected copied = false;
 
   protected readonly rows = computed(() => buildBom(this.store.doc().items, this.store.partStats()));
+  protected readonly excluded = computed(() => this.store.doc().items.filter(i => i.noExport).length);
   protected readonly totalQuantity = computed(() => this.rows().reduce((sum, r) => sum + r.quantity, 0));
   protected readonly totalVolume = computed(() => this.rows().reduce((sum, r) => sum + (r.stats ? r.stats.volumeCm3 * r.quantity : 0), 0));
 

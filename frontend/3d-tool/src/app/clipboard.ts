@@ -8,6 +8,7 @@ export interface ClipboardItem {
   rotation: Quat;
   muted: boolean;
   centered: boolean;
+  noExport: boolean;
   offset: Vec3;
 }
 
@@ -25,7 +26,7 @@ export function copyItems(items: readonly DocItem[]): ClipboardContent | null {
     origin,
     items: items.map(i => ({
       path: i.path, name: i.name, color: i.color, rotation: [...i.rotation] as Quat,
-      muted: !!i.muted, centered: !!i.centered,
+      muted: !!i.muted, centered: !!i.centered, noExport: !!i.noExport,
       offset: [i.position[0] - origin[0], i.position[1] - origin[1], i.position[2] - origin[2]],
     })),
   };
@@ -50,6 +51,7 @@ export function pasteItems(
     path: item.path, name: item.name, color: item.color, rotation: [...item.rotation] as Quat,
     ...(item.muted ? { muted: true } : {}),
     ...(item.centered ? { centered: true } : {}),
+    ...(item.noExport ? { noExport: true } : {}),
     position: place([base[0] + item.offset[0], base[1] + item.offset[1], base[2] + item.offset[2]], item),
   }));
 }

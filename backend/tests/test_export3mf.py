@@ -139,3 +139,25 @@ def test_fusion_layout_keeps_document_coordinates():
     for (objectId, transform), item in zip(build, items):
         low, _ = world_bounds(objects[objectId], transform)
         assert np.allclose(low, item["position"], atol=1e-3)
+
+
+def test_parts_marked_do_not_export_are_left_out_and_not_even_read(client):
+    items, _ = items_and_stls()
+    items[1] = {**items[1], "noExport": True}  # the rotated "small" part
+    items[2] = {**items[2], "path": "gone.stl", "noExport": True}  # a mock whose STL isn't in the library at all
+    document = client.post("/api/documents", json={"name": "mock", "items": items}).json()
+    assert [i["noExport"] for i in document["items"]] == [False, True, True]
+    threemf = client.get(f"/api/documents/{document['id']}/export.3mf")
+    assert threemf.status_code == 200
+    _, objects, build = parse(threemf.content)
+    assert len(build) == 1 and len(objects) == 1  # only "Big" remains
+    svg = client.get(f"/api/documents/{document['id']}/export.svg")
+    assert svg.status_code == 200 and "Small" not in svg.text and "Big" in svg.text
+
+
+def test_export_with_every_part_excluded_is_refused(client):
+    items, _ = items_and_stls()
+    document = client.post("/api/documents", json={"name": "all mock", "items": [{**i, "noExport": True} for i in items]}).json()
+    for kind in ("export.3mf", "export.svg"):
+        response = client.get(f"/api/documents/{document['id']}/{kind}")
+        assert response.status_code == 422 and "Do not export" in response.json()["detail"]
