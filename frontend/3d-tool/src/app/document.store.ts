@@ -326,6 +326,21 @@ export class DocumentStore {
     this.commit();
   }
 
+  /**
+   * Drops the items onto the ground plane: the lowest point of the selection goes to z = 0. A position is the bounding-box corner with
+   * the lowest z, so for one item that is simply z = 0; several items keep their heights relative to each other.
+   */
+  moveToGround(ids: readonly string[]) {
+    const wanted = new Set(ids);
+    const picked = this.doc().items.filter(i => wanted.has(i.id));
+    if (!picked.length) return;
+    const lowest = Math.min(...picked.map(i => i.position[2]));
+    if (lowest === 0) return;
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    this.patchMany(new Map(picked.map(i => [i.id, { position: [i.position[0], i.position[1], round(i.position[2] - lowest)] as Vec3 }])));
+    this.commit();
+  }
+
   /** "Snap to grid…" is waiting for the user to click a corner/side handle on these items. */
   readonly snapPick = signal<string[] | null>(null);
 

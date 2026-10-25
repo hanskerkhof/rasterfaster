@@ -25,6 +25,10 @@ import { DocumentStore } from './document.store';
           <span class="icon">⇥</span>Move to…
           <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
         </button>
+        <button type="button" role="menuitem" [disabled]="onGround()" (click)="moveToGround()">
+          <span class="icon">⤓</span>Move to ground
+          <span class="hint">{{ onGround() ? 'already on the ground' : 'lowest point to z = 0' }}</span>
+        </button>
       </div>
     }
   `,
@@ -50,6 +54,7 @@ export class ObjectMenu {
   protected readonly allMuted = computed(() => this.items().length > 0 && this.items().every(i => i.muted));
   /** Move to needs at least one part that is not part of the selection to snap onto. */
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
+  protected readonly onGround = computed(() => this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === 0);
   protected readonly allCentered = computed(() => this.items().length > 0 && this.items().every(i => i.centered));
   protected readonly title = computed(() => {
     const items = this.items();
@@ -70,6 +75,11 @@ export class ObjectMenu {
   /** Starts the two-step move: pick a corner of the selection, then a corner of another part. */
   protected moveTo() {
     this.store.beginMovePick(this.items().map(i => i.id));
+    this.close();
+  }
+
+  protected moveToGround() {
+    this.store.moveToGround(this.items().map(i => i.id));
     this.close();
   }
 
