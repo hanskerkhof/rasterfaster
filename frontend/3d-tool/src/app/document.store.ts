@@ -332,8 +332,45 @@ export class DocumentStore {
     this.snapPick.set(ids.length ? [...ids] : null);
   }
 
-  cancelSnapPick() {
+  /**
+   * "Move to…" in two clicks: first a corner of the selection's box (`source`), then a corner of another item, which the selection
+   * snaps onto. `source` is null while waiting for the first click.
+   */
+  readonly movePick = signal<{ ids: string[]; source: Vec3 | null } | null>(null);
+
+  beginMovePick(ids: readonly string[]) {
+    this.movePick.set(ids.length ? { ids: [...ids], source: null } : null);
+  }
+
+  setMoveSource(point: Vec3) {
+    const pick = this.movePick();
+    if (pick) this.movePick.set({ ...pick, source: point });
+  }
+
+  /** Leaves whichever pick mode is active (Esc, Cancel button, or a click on nothing). */
+  cancelPicks() {
     this.snapPick.set(null);
+    this.movePick.set(null);
+  }
+
+  /** Moves the picked items by (target - source), so the chosen corner lands exactly on the other item's corner. */
+  applyMoveTo(target: Vec3) {
+    const pick = this.movePick();
+    this.movePick.set(null);
+    if (!pick?.source) return;
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const delta = target.map((t, i) => t - pick.source![i]);
+    const ids = new Set(pick.ids);
+    const changes = new Map<string, Partial<Pick<DocItem, 'position' | 'centered'>>>();
+    for (const item of this.doc().items) {
+      if (!ids.has(item.id)) continue;
+      const size = this.sizeOf?.(item) ?? undefined;
+      const moved = item.position.map((v, i) => round(v + delta[i])) as Vec3;
+      changes.set(item.id, { position: clampToWorkArea(moved, size), ...(item.centered ? { centered: false } : {}) });
+    }
+    if (!changes.size) return;
+    this.patchMany(changes);
+    this.commit();
   }
 
   /**

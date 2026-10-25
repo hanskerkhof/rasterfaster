@@ -107,6 +107,12 @@ export class DocumentScene {
     ctx.store.sizeOf = item => this.sizeOfItem(item);
     this.on(ctx.canvas, 'contextmenu', e => this.onContextMenu(e as MouseEvent));
     this.on(ctx.host, 'keydown', e => this.onKey(e as KeyboardEvent));
+    // Esc leaves a pick mode wherever the keyboard focus is (after choosing the menu item it is on the page body, not on the stage).
+    this.on(document, 'keydown', e => {
+      if ((e as KeyboardEvent).key !== 'Escape' || !this.picking()) return;
+      ctx.store.cancelPicks();
+      e.preventDefault();
+    });
   }
 
   private on(target: EventTarget, type: string, fn: EventListener) {
@@ -119,7 +125,7 @@ export class DocumentScene {
     this.group.visible = active;
     this.selectionBoxes.visible = active;
     this.snapHandles.visible = active;
-    if (!active) { this.drag = null; this.ctx.store.cancelSnapPick(); }
+    if (!active) { this.drag = null; this.ctx.store.cancelPicks(); }
   }
 
   /** Redraws whatever differs between the store and the scene. Call from a reactive effect. */
@@ -225,7 +231,10 @@ export class DocumentScene {
     }
   }
 
-  /** While "Snap to grid…" waits for a choice: a clickable handle on each corner and side middle of the picked items. */
+  /**
+   * Clickable handles for the pick modes. Snap to grid: corners and side middles of the picked items. Move to: step 1 the 8 corners of
+   * the selection's box, step 2 the 8 corners of every other item (plus a green marker on the chosen source corner).
+   */
   private updateSnapHandles() {
     for (const handle of this.snapHandles.children as THREE.Mesh[]) {
       handle.geometry.dispose();
@@ -233,18 +242,44 @@ export class DocumentScene {
     }
     this.snapHandles.clear();
     this.hoveredHandle = null;
-    const picked = new Set(this.ctx.store.snapPick() ?? []);
-    if (!picked.size) return;
-    for (const item of this.ctx.store.doc().items) {
-      const size = picked.has(item.id) ? this.sizeOfItem(item) : null;
-      if (!size) continue;
-      for (const [fx, fy] of snapAnchors) {
-        const handle = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: handleColor, depthTest: false }));
-        handle.position.set(item.position[0] + size[0] * fx, item.position[1] + size[1] * fy, item.position[2]);
-        handle.renderOrder = 10;
-        handle.userData['anchor'] = [fx, fy];
-        this.snapHandles.add(handle);
+    const { store } = this.ctx;
+    const addHandle = (position: Vec3, data: Record<string, unknown>, color = handleColor) => {
+      const handle = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color, depthTest: false }));
+      handle.position.set(...position);
+      handle.renderOrder = 10;
+      Object.assign(handle.userData, data);
+      this.snapHandles.add(handle);
+    };
+    const corners = (low: Vec3, size: Vec3): Vec3[] => {
+      const points: Vec3[] = [];
+      for (const fx of [0, 1]) for (const fy of [0, 1]) for (const fz of [0, 1]) points.push([low[0] + size[0] * fx, low[1] + size[1] * fy, low[2] + size[2] * fz]);
+      return points;
+    };
+
+    const snapIds = new Set(store.snapPick() ?? []);
+    if (snapIds.size) {
+      for (const item of store.doc().items) {
+        const size = snapIds.has(item.id) ? this.sizeOfItem(item) : null;
+        if (!size) continue;
+        for (const [fx, fy] of snapAnchors) addHandle([item.position[0] + size[0] * fx, item.position[1] + size[1] * fy, item.position[2]], { kind: 'snap', anchor: [fx, fy] });
       }
+      return;
+    }
+
+    const move = store.movePick();
+    if (!move) return;
+    const items = store.doc().items.map(item => ({ item, size: this.sizeOfItem(item) })).filter((x): x is { item: DocItem; size: Vec3 } => !!x.size);
+    if (!move.source) {
+      const picked = items.filter(x => move.ids.includes(x.item.id));
+      if (!picked.length) return;
+      const box = picked.reduce((all, { item, size }) => all.union(new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(new THREE.Vector3(...size)))), new THREE.Box3());
+      for (const point of corners(box.min.toArray() as Vec3, box.getSize(new THREE.Vector3()).toArray() as Vec3)) addHandle(point, { kind: 'move-source', point });
+      return;
+    }
+    addHandle(move.source, { kind: 'marker' }, handleHoverColor);
+    for (const { item, size } of items) {
+      if (move.ids.includes(item.id)) continue;
+      for (const point of corners(item.position, size)) addHandle(point, { kind: 'move-target', point });
     }
   }
 
@@ -261,7 +296,13 @@ export class DocumentScene {
     const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1));
     this.raycaster.setFromCamera(ndc, this.ctx.camera);
     this.snapHandles.updateMatrixWorld(true);
-    return (this.raycaster.intersectObjects(this.snapHandles.children, false)[0]?.object as THREE.Mesh | undefined) ?? null;
+    const clickable = this.snapHandles.children.filter(h => h.userData['kind'] !== 'marker'); // the source marker is only a reminder
+    return (this.raycaster.intersectObjects(clickable, false)[0]?.object as THREE.Mesh | undefined) ?? null;
+  }
+
+  /** True while "Snap to grid…" or "Move to…" is waiting for clicks. */
+  private picking() {
+    return !!(this.ctx.store.snapPick() || this.ctx.store.movePick());
   }
 
   private hoverHandle(handle: THREE.Mesh | null) {
@@ -269,7 +310,7 @@ export class DocumentScene {
     if (this.hoveredHandle) (this.hoveredHandle.material as THREE.MeshBasicMaterial).color.setHex(handleColor);
     this.hoveredHandle = handle;
     if (handle) (handle.material as THREE.MeshBasicMaterial).color.setHex(handleHoverColor);
-    this.ctx.canvas.style.cursor = handle ? 'pointer' : this.ctx.store.snapPick() ? 'crosshair' : '';
+    this.ctx.canvas.style.cursor = handle ? 'pointer' : this.picking() ? 'crosshair' : '';
   }
 
   private clearSelectionBoxes() {
@@ -428,15 +469,18 @@ export class DocumentScene {
 
   private onPointerDown(e: PointerEvent) {
     if (!this.active || e.button !== 0) return;
-    if (this.ctx.store.snapPick()) { // choosing which corner/side snaps to the grid
+    if (this.picking()) { // "Snap to grid…" / "Move to…": the next click chooses a handle
       const handle = this.pickHandle(e);
       if (handle) {
         e.stopImmediatePropagation();
-        const [fx, fy] = handle.userData['anchor'] as [number, number];
-        this.ctx.store.applySnap(fx, fy);
+        const { store } = this.ctx;
+        const data = handle.userData;
+        if (data['kind'] === 'snap') { const [fx, fy] = data['anchor'] as [number, number]; store.applySnap(fx, fy); }
+        else if (data['kind'] === 'move-source') store.setMoveSource(data['point'] as Vec3);
+        else if (data['kind'] === 'move-target') store.applyMoveTo(data['point'] as Vec3);
         return;
       }
-      this.ctx.store.cancelSnapPick(); // a click elsewhere cancels and then acts as usual
+      this.ctx.store.cancelPicks(); // a click elsewhere cancels and then acts as usual
     }
     const hit = this.pickItem(e);
     if (e.metaKey) {
@@ -466,7 +510,7 @@ export class DocumentScene {
   }
 
   private onPointerMove(e: PointerEvent) {
-    if (this.active && this.ctx.store.snapPick()) this.hoverHandle(this.pickHandle(e));
+    if (this.active && this.picking()) this.hoverHandle(this.pickHandle(e));
     const drag = this.drag;
     if (!this.active || !drag) return;
     const rect = this.ctx.canvas.getBoundingClientRect();
@@ -521,7 +565,6 @@ export class DocumentScene {
     if (!this.active || ['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return; // typing / choosing, not editing the scene
     const { store } = this.ctx;
     const command = e.metaKey || e.ctrlKey;
-    if (e.key === 'Escape' && store.snapPick()) { store.cancelSnapPick(); e.preventDefault(); return; }
     const fine = e.altKey;
     const move = (dx: number, dy: number, dz: number) => {
       const items = store.selectedItems();

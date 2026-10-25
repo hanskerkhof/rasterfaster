@@ -44,7 +44,15 @@
     @if (store.snapPick()) {
       <div class="banner">
         <span>Snap to grid: click the <b>corner or side</b> of the part that should land on a grid intersection</span>
-        <button type="button" (click)="store.cancelSnapPick()">Cancel (Esc)</button>
+        <button type="button" (click)="store.cancelPicks()">Cancel (Esc)</button>
+      </div>
+    } @else if (store.movePick(); as move) {
+      <div class="banner">
+        <span>
+          @if (move.source) { Move to — step 2 of 2: click a <b>corner of another part</b> to snap the selection onto it }
+          @else { Move to — step 1 of 2: click the <b>corner of the selected part</b> that should move }
+        </span>
+        <button type="button" (click)="store.cancelPicks()">Cancel (Esc)</button>
       </div>
     }
     <div class="info">{{ v.info() }}</div>

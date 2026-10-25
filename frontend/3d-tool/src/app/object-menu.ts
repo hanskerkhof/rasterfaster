@@ -21,6 +21,10 @@ import { DocumentStore } from './document.store';
           <span class="icon">⊞</span>Snap to grid…
           <span class="hint">pick which corner or side</span>
         </button>
+        <button type="button" role="menuitem" [disabled]="!hasOthers()" (click)="moveTo()">
+          <span class="icon">⇥</span>Move to…
+          <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
+        </button>
       </div>
     }
   `,
@@ -30,7 +34,8 @@ import { DocumentStore } from './document.store';
             border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .title { padding: 4px 8px 6px; font-size: 11px; opacity: .55; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
-    button:hover { background: #2f6fed; color: #fff; }
+    button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
+    button:disabled { opacity: .4; cursor: default; }
     .icon { width: 1em; text-align: center; }
     .hint { margin-left: auto; opacity: .5; font-size: 11px; }
   `,
@@ -43,6 +48,8 @@ export class ObjectMenu {
     return this.store.doc().items.filter(i => ids.has(i.id));
   });
   protected readonly allMuted = computed(() => this.items().length > 0 && this.items().every(i => i.muted));
+  /** Move to needs at least one part that is not part of the selection to snap onto. */
+  protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
   protected readonly allCentered = computed(() => this.items().length > 0 && this.items().every(i => i.centered));
   protected readonly title = computed(() => {
     const items = this.items();
@@ -60,6 +67,12 @@ export class ObjectMenu {
   }
 
   /** Starts the pick: handles appear on the corners and side middles, the next click chooses the anchor. */
+  /** Starts the two-step move: pick a corner of the selection, then a corner of another part. */
+  protected moveTo() {
+    this.store.beginMovePick(this.items().map(i => i.id));
+    this.close();
+  }
+
   protected snapToGrid() {
     this.store.beginSnapPick(this.items().map(i => i.id));
     this.close();
