@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - perspective camera
+
+### Added
+- **FE** (`stl-viewer.ts`, `document-scene.ts`): camera choice like Fusion 360, in the view cube's right-click menu under **Camera**: **Orthographic** (default), **Perspective**, and **Perspective with ortho faces** (perspective, but orthographic while the view looks straight at a cube face). Switching keeps the viewing direction and the apparent size at the view centre, so the model does not jump. Selecting, dragging, snapping handles (which keep their on-screen size), two-finger pan, pinch zoom, ⌘-click centering and rotating around the selection all work with both cameras. The choice is remembered in local storage.
+
 ## 2026-10-25 - hide / show the file panel, Home button in the cube corner
 
 ### Added

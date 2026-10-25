@@ -44,7 +44,8 @@ interface DragState {
 
 export interface DocumentSceneContext {
   scene: THREE.Scene;
-  camera: THREE.Camera;
+  /** The camera in use right now (a getter: it changes with the camera mode). */
+  readonly camera: THREE.OrthographicCamera | THREE.PerspectiveCamera;
   canvas: HTMLCanvasElement;
   /** Element whose keydown events (bubbled from the canvas and the panels inside it) drive the shortcuts. */
   host: HTMLElement;
@@ -314,9 +315,14 @@ export class DocumentScene {
   /** Called every frame: keeps the snap handles the same size on screen whatever the zoom. */
   tick() {
     if (!this.snapHandles.children.length) return;
-    const camera = this.ctx.camera as THREE.OrthographicCamera;
-    const mmPerPixel = (camera.top - camera.bottom) / camera.zoom / this.ctx.canvas.clientHeight;
-    for (const handle of this.snapHandles.children) handle.scale.setScalar(mmPerPixel * handleRadiusPx);
+    const camera = this.ctx.camera;
+    const height = this.ctx.canvas.clientHeight;
+    for (const handle of this.snapHandles.children) {
+      const mmPerPixel = camera instanceof THREE.PerspectiveCamera
+        ? (camera.position.distanceTo(handle.position) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / camera.zoom / height // grows with distance
+        : (camera.top - camera.bottom) / camera.zoom / height;
+      handle.scale.setScalar(mmPerPixel * handleRadiusPx);
+    }
   }
 
   private pickHandle(e: PointerEvent) {

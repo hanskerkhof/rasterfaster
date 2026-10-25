@@ -58,6 +58,10 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 The reload button (⟳ next to Sort) re-reads the library from disk: the root and every open folder, and the search when a filter is active. The filter text is remembered across reloads.
 
+## Camera
+
+Right-click the view cube → **Camera**: Orthographic (default), Perspective, or Perspective with ortho faces (orthographic only while looking straight at a face of the cube, like Fusion 360). Remembered across reloads.
+
 ## 3D grid
 
 Right-click the view cube → **3D grid** switches the ground grid to a full lattice: horizontal 20 mm grids at every height level (0, 2, 6, 10, …) up to just above the parts, plus vertical lines through every node. The choice is remembered.

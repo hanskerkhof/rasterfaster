@@ -15,6 +15,24 @@ const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
 const zGridModeStorageKey = 'rasterfaster.zGridMode';
+const cameraModeStorageKey = 'rasterfaster.cameraMode';
+const perspectiveFovDegrees = 35;
+
+/** Fusion-style camera choice. Ortho faces = perspective, but orthographic while looking straight at a face of the cube. */
+export type CameraMode = 'orthographic' | 'perspective' | 'perspective-ortho-faces';
+const cameraModes: { id: CameraMode; title: string; detail: string }[] = [
+  { id: 'orthographic', title: 'Orthographic', detail: 'parallel lines, no foreshortening (default)' },
+  { id: 'perspective', title: 'Perspective', detail: 'things further away look smaller' },
+  { id: 'perspective-ortho-faces', title: 'Perspective with ortho faces', detail: 'orthographic when looking straight at a face' },
+];
+
+function readCameraMode(): CameraMode {
+  try {
+    const stored = localStorage.getItem(cameraModeStorageKey);
+    if (cameraModes.some(m => m.id === stored)) return stored as CameraMode;
+  } catch { /* storage unavailable */ }
+  return 'orthographic';
+}
 
 function foldDegrees(d: number) {
   const folded = ((d % 360) + 540) % 360 - 180; // -180..180
@@ -66,7 +84,22 @@ function readGrid3d() {
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
           <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
         </button>
-        <div class="submenu-host" (mouseenter)="gridModeOpen.set(true)" (mouseleave)="gridModeOpen.set(false)">
+        <div class="submenu-host" (mouseenter)="cameraMenuOpen.set(true); gridModeOpen.set(false)" (mouseleave)="cameraMenuOpen.set(false)">
+          <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="cameraMenuOpen()" (click)="cameraMenuOpen.set(!cameraMenuOpen())">
+            <span class="tick"></span>Camera<span class="hint">{{ currentCameraTitle() }} ◂</span>
+          </button>
+          @if (cameraMenuOpen()) {
+            <div class="flyout" role="menu">
+              @for (m of cameraModes; track m.id) {
+                <button type="button" role="menuitemradio" [attr.aria-checked]="cameraMode() === m.id" (click)="setCameraMode(m.id)">
+                  <span class="tick">{{ cameraMode() === m.id ? '✓' : '' }}</span>
+                  <span class="two-line"><span>{{ m.title }}</span><small>{{ m.detail }}</small></span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+        <div class="submenu-host" (mouseenter)="gridModeOpen.set(true); cameraMenuOpen.set(false)" (mouseleave)="gridModeOpen.set(false)">
           <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="gridModeOpen()" (click)="gridModeOpen.set(!gridModeOpen())">
             <span class="tick"></span>Grid mode<span class="hint">{{ currentGridModeTitle() }} ◂</span>
           </button>
@@ -134,7 +167,14 @@ export class StlViewer implements OnDestroy {
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private renderer!: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100000, 100000);
+  private readonly orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100000, 100000);
+  private readonly perspectiveCamera = new THREE.PerspectiveCamera(perspectiveFovDegrees, 1, 1, 100000);
+  /** The camera in use; everything (controls, picking, the view cube, pan and zoom) goes through it. */
+  private camera: THREE.OrthographicCamera | THREE.PerspectiveCamera = this.orthoCamera;
+  private projection: 'ortho' | 'persp' = 'ortho';
+  protected readonly cameraMode = signal<CameraMode>(readCameraMode());
+  protected readonly cameraModes = cameraModes;
+  protected readonly cameraMenuOpen = signal(false);
   private controls!: OrbitControls;
   private model = new THREE.Group();
   private geometry: THREE.BufferGeometry | null = null;
@@ -213,7 +253,8 @@ export class StlViewer implements OnDestroy {
     dir.position.set(1, -2, 3);
     this.scene.add(dir);
     // STL / 3D-printing convention: Z is up. Classic isometric: look along (-1,-1,-1).
-    this.camera.up.set(0, 0, 1);
+    this.orthoCamera.up.set(0, 0, 1);
+    this.perspectiveCamera.up.set(0, 0, 1);
     // Created first so its pointerdown handler can swallow clicks that land on the cube.
     this.viewCube = new ViewCube(this.renderer.domElement, d => this.snapTo(d), (dx, dy) => this.orbitBy(dx, dy), (clientX, clientY) => {
       const host = this.host().nativeElement.getBoundingClientRect();
@@ -221,8 +262,9 @@ export class StlViewer implements OnDestroy {
       this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
     }, () => this.startPivot());
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
+    const viewer = this; // the scene reads the *current* camera (it changes with the camera mode)
     this.documentScene = new DocumentScene({
-      scene: this.scene, camera: this.camera, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
+      scene: this.scene, get camera() { return viewer.camera; }, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
       background: this.scene.background as THREE.Color,
       loadGeometry: path => this.loadGeometry(path),
       zGridMode: () => this.zGridMode(),
@@ -234,6 +276,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.domElement.addEventListener('pointerdown', this.onCentreClick);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+    this.applyCameraMode(); // start in the saved mode (controls exist now)
     // Trackpad like Fusion 360: two-finger scroll pans, pinch zooms (towards the cursor). OrbitControls keeps rotate (drag).
     this.controls.enableZoom = false;
     this.renderer.domElement.addEventListener('wheel', this.onWheel, { passive: false });
@@ -246,6 +289,7 @@ export class StlViewer implements OnDestroy {
       this.stepSnapAnimation();
       this.stepPanAnimation();
       this.stepPivot();
+      this.updateAutoProjection();
       this.documentScene.tick();
       this.controls.update();
       this.renderer.clear();
@@ -295,7 +339,7 @@ export class StlViewer implements OnDestroy {
       this.radius = this.geometry.boundingSphere?.radius ?? this.radius;
       const direction = this.camera.position.clone().sub(this.controls.target).normalize();
       this.controls.target.copy(size).multiplyScalar(0.5);
-      this.camera.position.copy(this.controls.target).add(direction.multiplyScalar(this.radius * 4));
+      this.camera.position.copy(this.controls.target).add(direction.multiplyScalar(this.fitDistance()));
       this.camera.zoom = 1;
       this.resize();
     }
@@ -330,7 +374,7 @@ export class StlViewer implements OnDestroy {
     const offset = this.camera.position.clone().sub(this.controls.target);
     const direction = offset.lengthSq() > 1e-6 ? offset.normalize() : this.homeDirection.clone(); // no view yet: start isometric
     this.controls.target.copy(center);
-    this.camera.position.copy(center).add(direction.multiplyScalar(this.radius * 4));
+    this.camera.position.copy(center).add(direction.multiplyScalar(this.fitDistance()));
     this.camera.zoom = 1;
     this.resize();
   }
@@ -355,7 +399,7 @@ export class StlViewer implements OnDestroy {
    */
   private panByPixels(dx: number, dy: number) {
     const canvas = this.renderer.domElement;
-    const worldPerPixel = (this.camera.top - this.camera.bottom) / this.camera.zoom / canvas.clientHeight;
+    const worldPerPixel = this.viewHeight() / canvas.clientHeight;
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
     const up = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 1);
     const shift = right.multiplyScalar(dx * worldPerPixel).addScaledVector(up, -dy * worldPerPixel);
@@ -491,8 +535,85 @@ export class StlViewer implements OnDestroy {
     if (!w || !h) return;
     this.renderer.setSize(w, h, false);
     const aspect = w / h, s = this.radius * 1.3;
-    Object.assign(this.camera, { left: -s * aspect, right: s * aspect, top: s, bottom: -s });
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      this.camera.aspect = aspect;
+      this.camera.near = Math.max(1, this.radius * 0.05);
+      this.camera.far = Math.max(10000, this.radius * 200);
+    } else {
+      Object.assign(this.camera, { left: -s * aspect, right: s * aspect, top: s, bottom: -s });
+    }
     this.camera.updateProjectionMatrix();
+  }
+
+  /** Height of the world that is visible at the view centre, in mm (the same measure for both cameras). */
+  private viewHeight() {
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      const distance = this.camera.position.distanceTo(this.controls.target);
+      return (2 * distance * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / this.camera.zoom;
+    }
+    return (this.camera.top - this.camera.bottom) / this.camera.zoom;
+  }
+
+  /** How far the camera sits from the view centre so that the model fills the view the same way in both projections. */
+  private fitDistance() {
+    return this.projection === 'persp'
+      ? (this.radius * 1.3) / Math.tan(THREE.MathUtils.degToRad(perspectiveFovDegrees / 2))
+      : this.radius * 4;
+  }
+
+  /**
+   * Switches between the orthographic and the perspective camera. The apparent size at the view centre and the viewing direction
+   * stay the same, so the model does not jump when the projection changes.
+   */
+  private setProjection(kind: 'ortho' | 'persp') {
+    if (kind === this.projection) return;
+    const target = this.controls.target;
+    const offset = this.camera.position.clone().sub(target);
+    const direction = offset.lengthSq() > 1e-6 ? offset.clone().normalize() : this.homeDirection.clone();
+    const halfHeight = this.viewHeight() / 2;
+    const next = kind === 'persp' ? this.perspectiveCamera : this.orthoCamera;
+    next.up.copy(this.camera.up);
+    if (kind === 'persp') {
+      next.zoom = 1;
+      next.position.copy(target).add(direction.multiplyScalar(halfHeight / Math.tan(THREE.MathUtils.degToRad(perspectiveFovDegrees / 2))));
+    } else {
+      next.zoom = (this.radius * 1.3) / halfHeight; // visible half height = frustum half height / zoom
+      next.position.copy(target).add(direction.multiplyScalar(Math.max(offset.length(), 1)));
+    }
+    this.camera = next;
+    this.projection = kind;
+    this.controls.object = next;
+    next.lookAt(target);
+    next.updateMatrixWorld();
+    this.resize();
+  }
+
+  /** Applies the chosen camera mode (explicit projection, or the automatic one for "perspective with ortho faces"). */
+  private applyCameraMode() {
+    const mode = this.cameraMode();
+    if (mode === 'orthographic') this.setProjection('ortho');
+    else if (mode === 'perspective') this.setProjection('persp');
+    else this.updateAutoProjection();
+  }
+
+  /** "Perspective with ortho faces": orthographic while the view looks straight along an axis (a cube face), perspective otherwise. */
+  private updateAutoProjection() {
+    if (this.cameraMode() !== 'perspective-ortho-faces') return;
+    const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+    const alongAxis = Math.max(Math.abs(direction.x), Math.abs(direction.y), Math.abs(direction.z)) > 0.99995;
+    this.setProjection(alongAxis ? 'ortho' : 'persp');
+  }
+
+  protected setCameraMode(mode: CameraMode) {
+    this.cameraMode.set(mode);
+    try { localStorage.setItem(cameraModeStorageKey, mode); } catch { /* storage unavailable */ }
+    this.applyCameraMode();
+    this.cameraMenuOpen.set(false);
+    this.cubeMenu.set(null);
+  }
+
+  protected currentCameraTitle() {
+    return cameraModes.find(m => m.id === this.cameraMode())?.title ?? '';
   }
 
   private setModel(buf: ArrayBuffer) {
@@ -545,8 +666,8 @@ export class StlViewer implements OnDestroy {
     const target = size.clone().multiplyScalar(0.5);
     const offset = this.hasView
       ? this.camera.position.clone().sub(this.controls.target)
-      : this.homeDirection.clone().multiplyScalar(this.radius * 4);
-    if (isNewModel && this.hasView) offset.setLength(this.radius * 4);
+      : this.homeDirection.clone().multiplyScalar(this.fitDistance());
+    if (isNewModel && this.hasView) offset.setLength(this.fitDistance());
     this.hasView = true;
     if (isNewModel) this.camera.zoom = 1;
     this.camera.position.copy(target).add(offset);
