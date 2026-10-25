@@ -6,7 +6,14 @@ const edgeZone = 0.62; // |coordinate| beyond this on an axis counts as "that si
 
 const faceLabels: Record<string, string> = { '0,0,1': 'TOP', '0,0,-1': 'BOTTOM', '0,-1,0': 'FRONT', '0,1,0': 'BACK', '1,0,0': 'RIGHT', '-1,0,0': 'LEFT' };
 
-function faceTexture(label: string) {
+/** Quarter turns that make the labels read right on the cube: RIGHT turned counter-clockwise, BACK upside down. */
+function labelRotation(n: number[]) {
+  if (n[0] === 1) return Math.PI / 2;
+  if (n[1] === 1) return Math.PI;
+  return 0;
+}
+
+function faceTexture(label: string, rotation = 0) {
   const c = document.createElement('canvas');
   c.width = c.height = 128;
   const g = c.getContext('2d')!;
@@ -19,6 +26,8 @@ function faceTexture(label: string) {
   g.fillText(label, 64, 66);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.center.set(0.5, 0.5);
+  t.rotation = rotation;
   return t;
 }
 
@@ -39,7 +48,7 @@ export class ViewCube {
   /** `snap` gets the unit direction from the model towards the camera; `orbit` gets pointer deltas in px. */
   constructor(private readonly canvas: HTMLCanvasElement, private readonly snap: (direction: THREE.Vector3) => void, private readonly orbit: (dx: number, dy: number) => void, private readonly contextMenu: (clientX: number, clientY: number) => void = () => undefined, private readonly dragStarted: () => void = () => undefined) {
     const order = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]; // BoxGeometry face order
-    const materials = order.map(n => new THREE.MeshBasicMaterial({ map: faceTexture(faceLabels[n.join(',')]) }));
+    const materials = order.map(n => new THREE.MeshBasicMaterial({ map: faceTexture(faceLabels[n.join(',')], labelRotation(n)) }));
     this.cube = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), materials);
     this.cube.add(new THREE.LineSegments(new THREE.EdgesGeometry(this.cube.geometry), new THREE.LineBasicMaterial({ color: 0x5b6272 })));
     this.scene.add(this.cube);

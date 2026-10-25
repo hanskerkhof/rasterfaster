@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - view cube labels
+
+### Changed
+- **FE** (`view-cube.ts`): the RIGHT label on the view cube is turned 90° counter-clockwise and the BACK label (which was upside down) is turned 180°.
+
 ## 2026-10-25 - API offline detection and versioning (0.1.0)
 
 ### Added
