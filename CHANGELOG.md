@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - fly-around zoom and camera outline
+
+### Added
+- **FE** (`stl-viewer.ts`): the fly-around keeps zooming (wheel / pinch): the zoom you add is a factor on top of the flight's own zoom. A new button next to the play/pause button (shown while flying) resets that factor.
+- **FE** (`stl-viewer.ts`): with **Show camera path** on, a Blender-style camera outline (pyramid, frame, "up" triangle) is drawn at the camera's current point on the path.
+
+### Changed
+- **FE** (`stl-viewer.ts`): scrolling no longer stops the fly-around (dragging the view still does).
+
 ## 2026-10-25 - fly-around
 
 ### Added

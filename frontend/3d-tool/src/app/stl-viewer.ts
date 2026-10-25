@@ -145,6 +145,11 @@ function readShowPath() {
         }
       </button>
     }
+    @if (documentMode() && flying()) {
+      <button class="home fly reset" type="button" title="Reset the zoom of the fly-around" aria-label="Reset fly-around zoom" (click)="resetFlightZoom()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M8.5 11h5"/></svg>
+      </button>
+    }
     <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
@@ -154,7 +159,7 @@ function readShowPath() {
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
     .home { position: absolute; top: 12px; right: 132px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
-    .home.fly { right: 98px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
+    .home.fly { right: 98px; } .home.fly.reset { right: 64px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .rotate { position: absolute; top: 12px; left: 12px; width: 124px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
@@ -236,6 +241,10 @@ export class StlViewer implements OnDestroy {
   protected readonly flying = signal(false);
   protected readonly showPath = signal(readShowPath());
   private pathLine: THREE.Line | null = null;
+  /** Zoom the user added on top of the flight's own zoom (wheel / pinch keep working while flying); the reset button sets it back to 1. */
+  private userZoom = 1;
+  private flightZoomSet = 0;
+  private cameraBody: THREE.LineSegments | null = null;
   private flightTime = 0;
   private flightLast = 0;
   private flightAzimuth0 = 0;
@@ -310,7 +319,6 @@ export class StlViewer implements OnDestroy {
     // ⌘-click centres the view on the clicked point. Registered before OrbitControls so it can swallow the click.
     this.renderer.domElement.addEventListener('pointerdown', this.onCentreClick);
     this.renderer.domElement.addEventListener('pointerdown', this.stopFlight); // grabbing the view takes over from the fly-around
-    this.renderer.domElement.addEventListener('wheel', this.stopFlight, { passive: true });
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.applyCameraMode(); // start in the saved mode (controls exist now)
@@ -345,6 +353,8 @@ export class StlViewer implements OnDestroy {
     const offset = this.camera.position.clone().sub(this.controls.target);
     this.flightAzimuth0 = Math.atan2(offset.y, offset.x);
     this.flightTime = 0;
+    this.userZoom = 1;
+    this.flightZoomSet = this.camera.zoom;
     this.flightLast = performance.now();
     this.flying.set(true);
   }
@@ -360,6 +370,10 @@ export class StlViewer implements OnDestroy {
     return { direction, centre, zoomFactor: 1 + 0.45 * (0.5 + 0.5 * Math.sin(t * 0.21 - 1)) };
   }
 
+  protected resetFlightZoom() {
+    this.userZoom = 1;
+  }
+
   protected toggleShowPath() {
     const on = !this.showPath();
     this.showPath.set(on);
@@ -372,6 +386,7 @@ export class StlViewer implements OnDestroy {
     const bounds = this.documentMode() ? this.documentScene.bounds() : null;
     if (!this.showPath() || !bounds) {
       if (this.pathLine) { this.scene.remove(this.pathLine); this.pathLine.geometry.dispose(); this.pathLine = null; }
+      if (this.cameraBody) { this.scene.remove(this.cameraBody); this.cameraBody.geometry.dispose(); this.cameraBody = null; }
       return;
     }
     this.radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 60);
@@ -391,6 +406,34 @@ export class StlViewer implements OnDestroy {
       this.scene.add(this.pathLine);
     }
     this.pathLine.geometry.setFromPoints(points);
+    this.updateCameraBody(this.flightPose(from, azimuth0, bounds), distance);
+  }
+
+  /** A Blender-style camera outline (pyramid, frame and "up" triangle) at the current point of the path, looking at the view centre. */
+  private updateCameraBody(pose: { direction: THREE.Vector3; centre: THREE.Vector3 }, distance: number) {
+    if (!this.cameraBody) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(22 * 3), 3));
+      this.cameraBody = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: 0xffb020, depthTest: false }));
+      this.cameraBody.renderOrder = 11;
+      this.cameraBody.frustumCulled = false;
+      this.scene.add(this.cameraBody);
+    }
+    const apex = pose.centre.clone().addScaledVector(pose.direction, distance);
+    const forward = pose.direction.clone().negate();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 0, 1)).normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    const el = this.host().nativeElement;
+    const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
+    const depth = this.radius * 0.16, hh = depth * 0.45, hw = hh * aspect;
+    const corner = (sx: number, sy: number) => apex.clone().addScaledVector(forward, depth).addScaledVector(right, sx * hw).addScaledVector(up, sy * hh);
+    const bl = corner(-1, -1), br = corner(1, -1), tr = corner(1, 1), tl = corner(-1, 1);
+    const peak = apex.clone().addScaledVector(forward, depth).addScaledVector(up, hh * 1.6);
+    const v = [apex, bl, apex, br, apex, tr, apex, tl, bl, br, br, tr, tr, tl, tl, bl, tl, peak, peak, tr];
+    const attr = this.cameraBody.geometry.getAttribute('position') as THREE.BufferAttribute;
+    v.forEach((p, i) => attr.setXYZ(i, p.x, p.y, p.z));
+    attr.needsUpdate = true;
+    this.cameraBody.geometry.setDrawRange(0, v.length);
   }
 
   /**
@@ -418,7 +461,9 @@ export class StlViewer implements OnDestroy {
     const heading = current.lengthSq() > 1e-6 ? current.normalize() : direction.clone();
     heading.lerp(direction, k).normalize();
     this.controls.target.lerp(centre, k);
-    this.camera.zoom += (zoom - this.camera.zoom) * k;
+    if (this.flightZoomSet > 0 && Math.abs(this.camera.zoom / this.flightZoomSet - 1) > 1e-6) this.userZoom *= this.camera.zoom / this.flightZoomSet; // changed by the wheel
+    this.camera.zoom += (zoom * this.userZoom - this.camera.zoom) * k;
+    this.flightZoomSet = this.camera.zoom;
     this.camera.position.copy(this.controls.target).addScaledVector(heading, this.fitDistance());
     this.camera.updateProjectionMatrix();
   }
@@ -913,7 +958,6 @@ export class StlViewer implements OnDestroy {
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
     this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);
-    this.renderer?.domElement.removeEventListener('wheel', this.stopFlight);
     this.renderer?.domElement.removeEventListener('wheel', this.onWheel);
     this.ro?.disconnect();
     this.clearModel();
