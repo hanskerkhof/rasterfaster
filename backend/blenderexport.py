@@ -226,8 +226,20 @@ if studio == "1":
     floor.name = "Studio floor"
     mat = bpy.data.materials.new("Studio floor")
     mat.use_nodes = True
-    mat.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.05, 0.055, 0.065, 1)
-    mat.node_tree.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.55
+    tree = mat.node_tree
+    surface = tree.nodes["Principled BSDF"]
+    surface.inputs["Base Color"].default_value = (0.05, 0.055, 0.065, 1)
+    surface.inputs["Roughness"].default_value = 0.55
+    # Solid seen from above, invisible seen from below: a camera under the floor looks straight through it (it still catches the shadows from above).
+    clear, back, mix, material_output = (tree.nodes.new(n) for n in ("ShaderNodeBsdfTransparent", "ShaderNodeNewGeometry", "ShaderNodeMixShader", "ShaderNodeOutputMaterial"))
+    tree.links.new(back.outputs["Backfacing"], mix.inputs["Fac"])
+    tree.links.new(surface.outputs["BSDF"], mix.inputs[1])
+    tree.links.new(clear.outputs["BSDF"], mix.inputs[2])
+    tree.links.new(mix.outputs["Shader"], material_output.inputs["Surface"])
+    for node in tree.nodes:
+        if node.type == "OUTPUT_MATERIAL" and node is not material_output:
+            node.is_active_output = False
+    material_output.is_active_output = True
     floor.data.materials.append(mat)
 
     # World: a dark vertical gradient with a bluish horizon glow.
@@ -263,6 +275,7 @@ if studio == "1":
     d = r * 3
     light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
     light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2, (0.6, 0.75, 1.0), r * 3)
+    light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
     light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4, (1.0, 0.45, 0.8), r * 1.5)
     scene.render.engine = "CYCLES"
     scene.cycles.samples = 96

@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - Blender studio floor is see-through from below
+
+### Changed
+- **BE** (`blenderexport.py`): the studio floor in the .blend export is transparent when seen from below (backface mix with a transparent shader), so a camera below the floor plane sees the parts instead of a grey ground; it still catches shadows from above. Added a soft cool "Under fill" light so the underside of the parts is not black. Verified by exporting STROZZI with a camera below the floor and rendering it in Blender 5.0; a view from above still shows the floor and shadows.
+
 ## 2026-10-25 - Blender export: camera where the app's view is (0.2.4)
 
 ### Changed
