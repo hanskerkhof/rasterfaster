@@ -8,7 +8,7 @@ import { baseThicknessMm } from './z-levels';
   template: `
     @if (store.contextMenu(); as menu) {
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
-      <div class="menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+      <div class="menu" role="menu" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)">
         <div class="title">{{ title() }}</div>
         <button type="button" role="menuitem" (click)="copy(false)">
           <span class="icon">⧉</span>Copy<span class="hint">⌘C</span>
@@ -32,10 +32,6 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⊞</span>Snap to grid…
           <span class="hint">pick which corner or side</span>
         </button>
-        <button type="button" role="menuitem" (click)="toggleNoExport()">
-          <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
-          <span class="hint">{{ allNoExport() ? 'on: left out of 3MF, SVG and BOM' : 'mock part: leave out of the exports' }}</span>
-        </button>
         <button type="button" role="menuitem" [disabled]="!hasOthers()" (click)="moveTo()">
           <span class="icon">⇥</span>Move to…
           <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
@@ -48,12 +44,17 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⇥</span>Move to base ({{ baseMm }} mm)
           <span class="hint">{{ lowestAt(baseMm) ? 'already on the base' : 'lowest point to z = ' + baseMm }}</span>
         </button>
+        <div class="sep"></div>
+        <button type="button" role="menuitem" (click)="toggleNoExport()">
+          <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
+          <span class="hint">{{ allNoExport() ? 'on: left out of 3MF, SVG and BOM' : 'mock part: leave out of the exports' }}</span>
+        </button>
       </div>
     }
   `,
   styles: `
     .backdrop { position: fixed; inset: 0; z-index: 30; }
-    .menu { position: fixed; z-index: 31; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
+    .menu { position: fixed; z-index: 31; max-height: calc(100vh - 16px); overflow-y: auto; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
             border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .title { padding: 4px 8px 6px; font-size: 11px; opacity: .55; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
@@ -75,6 +76,15 @@ export class ObjectMenu {
   /** Move to needs at least one part that is not part of the selection to snap onto. */
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
   protected readonly baseMm = baseThicknessMm;
+
+  /** Keeps the menu inside the window: it is about 420 px tall and 310 px wide, so it moves up / left near the bottom / right edge. */
+  protected left(x: number) {
+    return Math.max(8, Math.min(x, window.innerWidth - 310 - 8));
+  }
+
+  protected top(y: number) {
+    return Math.max(8, Math.min(y, window.innerHeight - 420 - 8));
+  }
   /** True when the lowest point of the selection already is at `height`. */
   protected lowestAt(height: number) {
     return this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === height;

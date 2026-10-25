@@ -7,6 +7,14 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 ### Added
 - **FE** (`stl-viewer.ts`, `document-scene.ts`): camera choice like Fusion 360, in the view cube's right-click menu under **Camera**: **Orthographic** (default), **Perspective**, and **Perspective with ortho faces** (perspective, but orthographic while the view looks straight at a cube face). Switching keeps the viewing direction and the apparent size at the view centre, so the model does not jump. Selecting, dragging, snapping handles (which keep their on-screen size), two-finger pan, pinch zoom, ⌘-click centering and rotating around the selection all work with both cameras. The choice is remembered in local storage.
 
+## 2026-10-25 - part menu layout
+
+### Changed
+- **FE** (`object-menu.ts`): **Do not export** is the last item of the part context menu, below a divider (the order is now Copy / Cut / Paste, divider, Dim, Center on grid, Snap to grid…, Move to…, Move to ground, Move to base, divider, Do not export).
+
+### Fixed
+- **FE** (`object-menu.ts`): the part menu is kept inside the window (it moves up / left near the bottom / right edge and scrolls if the window is very short) instead of running off the bottom when opened low in the list.
+
 ## 2026-10-25 - Do not export
 
 ### Added
