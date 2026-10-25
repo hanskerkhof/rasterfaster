@@ -17,6 +17,8 @@ const pivotStorageKey = 'rasterfaster.pivotOnSelection';
 const zGridModeStorageKey = 'rasterfaster.zGridMode';
 const cameraModeStorageKey = 'rasterfaster.cameraMode';
 const perspectiveFovDegrees = 35;
+/** Home / fit leaves this much room around what it frames (1 = touching the edge of the view). */
+const fitMargin = 1.35;
 
 /** Fusion-style camera choice. Ortho faces = perspective, but orthographic while looking straight at a face of the cube. */
 export type CameraMode = 'orthographic' | 'perspective' | 'perspective-ortho-faces';
@@ -338,9 +340,10 @@ export class StlViewer implements OnDestroy {
       // Back to the previewed model: re-centre on it, keeping the viewing direction.
       this.radius = this.geometry.boundingSphere?.radius ?? this.radius;
       const direction = this.camera.position.clone().sub(this.controls.target).normalize();
+      const zoom = this.fitZoom(size, direction);
       this.controls.target.copy(size).multiplyScalar(0.5);
       this.camera.position.copy(this.controls.target).add(direction.multiplyScalar(this.fitDistance()));
-      this.camera.zoom = 1;
+      this.camera.zoom = zoom;
       this.resize();
     }
   }
@@ -370,12 +373,14 @@ export class StlViewer implements OnDestroy {
   private fitDocument() {
     const bounds = this.documentScene.bounds() ?? new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(12 * gridCellMm, 8 * gridCellMm, 40));
     const center = bounds.getCenter(new THREE.Vector3());
-    this.radius = Math.max(bounds.getSize(new THREE.Vector3()).length() / 2, 60);
+    const size = bounds.getSize(new THREE.Vector3());
+    this.radius = Math.max(size.length() / 2, 60);
     const offset = this.camera.position.clone().sub(this.controls.target);
     const direction = offset.lengthSq() > 1e-6 ? offset.normalize() : this.homeDirection.clone(); // no view yet: start isometric
+    const zoom = this.fitZoom(size, direction);
     this.controls.target.copy(center);
     this.camera.position.copy(center).add(direction.multiplyScalar(this.fitDistance()));
-    this.camera.zoom = 1;
+    this.camera.zoom = zoom;
     this.resize();
   }
 
@@ -545,6 +550,28 @@ export class StlViewer implements OnDestroy {
     this.camera.updateProjectionMatrix();
   }
 
+  /**
+   * The zoom at which a box (`size` mm across, centred on the view centre) fills the view along `direction` with `fitMargin` to spare.
+   * It uses the box's real extent as seen from that direction (not its bounding sphere) and the window's aspect ratio.
+   */
+  private fitZoom(size: THREE.Vector3, direction: THREE.Vector3) {
+    const forward = direction.clone().negate(); // from the camera towards the centre
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 0, 1));
+    if (right.lengthSq() < 1e-8) right.set(1, 0, 0); // looking straight down or up
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    let halfWidth = 0, halfHeight = 0;
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const corner = new THREE.Vector3((sx * size.x) / 2, (sy * size.y) / 2, (sz * size.z) / 2);
+      halfWidth = Math.max(halfWidth, Math.abs(corner.dot(right)));
+      halfHeight = Math.max(halfHeight, Math.abs(corner.dot(up)));
+    }
+    const el = this.host().nativeElement;
+    const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
+    const needed = Math.max(halfHeight, halfWidth / aspect, 1) * fitMargin;
+    return Math.min(Math.max((this.radius * 1.3) / needed, 0.05), 60); // the frustum at zoom 1 is radius * 1.3 high
+  }
+
   /** Height of the world that is visible at the view centre, in mm (the same measure for both cameras). */
   private viewHeight() {
     if (this.camera instanceof THREE.PerspectiveCamera) {
@@ -669,7 +696,7 @@ export class StlViewer implements OnDestroy {
       : this.homeDirection.clone().multiplyScalar(this.fitDistance());
     if (isNewModel && this.hasView) offset.setLength(this.fitDistance());
     this.hasView = true;
-    if (isNewModel) this.camera.zoom = 1;
+    if (isNewModel) this.camera.zoom = this.fitZoom(size, offset.clone().normalize());
     this.camera.position.copy(target).add(offset);
     this.controls.target.copy(target);
     this.resize();

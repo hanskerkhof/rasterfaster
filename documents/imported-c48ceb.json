@@ -216,8 +216,8 @@
       "name": "TM1637.stp",
       "color": 14706278,
       "position": [
-        270.0,
-        -2.0,
+        260.0,
+        -20.0,
         34.0
       ],
       "rotation": [
@@ -415,6 +415,25 @@
         0.0,
         0.0,
         1.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
+      "color": 7775663,
+      "position": [
+        214.2,
+        51.108000000000004,
+        38.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
       ],
       "muted": false,
       "centered": false
