@@ -40,25 +40,6 @@
       "centered": false
     },
     {
-      "id": "22070b81-a833-402b-b7bc-afd00861649e",
-      "path": "SPACERS/spacers_RF1 v236_20.stl",
-      "name": "spacers_RF1 v236_20",
-      "color": 7775663,
-      "position": [
-        103.251,
-        -96.75,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true
-    },
-    {
       "id": "7adcaef4-a129-43ec-afdc-e563888c99fd",
       "path": "MOUNTS/11.16.HW-059 THUMB WHEEL VOLUME AMP/11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I.stl",
       "name": "11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I",
@@ -84,7 +65,7 @@
       "color": 16767334,
       "position": [
         140.0,
-        -60.0,
+        120.0,
         6.0
       ],
       "rotation": [
@@ -152,6 +133,63 @@
       ],
       "muted": false,
       "centered": false
+    },
+    {
+      "id": "9a6289c5-1a8a-4bfd-a269-4fb0daa86a3a",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V",
+      "color": 7317724,
+      "position": [
+        140.0,
+        -60.0,
+        34.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "c2cc52e8-05ab-4309-8cec-45b7472a5ef6",
+      "path": "MOUNTS/LM2596 - STEP DOWN BUCK CONVERTER DC-DC/LM25596 SCREWS - RF2.30.stl",
+      "name": "LM25596 SCREWS - RF2.30",
+      "color": 9684093,
+      "position": [
+        160.0,
+        -60.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.6653345369377348e-16,
+        -1.0
+      ],
+      "muted": false,
+      "centered": false
+    },
+    {
+      "id": "054d7a3d-167c-4968-a245-8be8094986d1",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 12745632,
+      "position": [
+        143.251,
+        -36.75,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true
     }
   ]
 }
