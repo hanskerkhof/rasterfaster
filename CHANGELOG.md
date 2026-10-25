@@ -5,7 +5,7 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 ## 2026-10-25 - view cube spacing
 
 ### Changed
-- **FE** (`view-cube.ts`, `stl-viewer.ts`): the view cube sits 30 px lower, and the Home, fly-around and zoom reset buttons are 12 px further from it, so they no longer crowd the cube.
+- **FE** (`view-cube.ts`, `stl-viewer.ts`, `app.scss`): the view cube and the document panel below it sit 30 px lower, and the Home, fly-around and zoom reset buttons are 12 px further from it, so they no longer crowd the cube.
 
 ### Fixed
 - **FE** (`stl-viewer.ts`): the fly-around zoom reset button was stretched across the view because its class name clashed with the rotate panel's Reset button.
