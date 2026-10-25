@@ -157,9 +157,9 @@ function readShowPath() {
     :host, .host { display: block; width: 100%; height: 100%; } .host { position: relative; overflow: hidden; }
     :host { position: relative; }
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
-    .home { position: absolute; top: 12px; right: 132px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
+    .home { position: absolute; top: 12px; right: 144px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
-    .home.fly { right: 98px; } .home.fly.zoom-reset { right: 64px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
+    .home.fly { right: 110px; } .home.fly.zoom-reset { right: 76px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .rotate { position: absolute; top: 12px; left: 12px; width: 124px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
