@@ -1,11 +1,11 @@
-import { DecimalPipe } from '@angular/common';
+import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, output } from '@angular/core';
 import { BomRow, bomToCsv, buildBom } from './bom';
 import { DocumentStore } from './document.store';
 
 @Component({
   selector: 'app-bom-dialog',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, NgTemplateOutlet],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <section class="dialog" role="dialog" aria-label="Bill of materials" (keydown.escape)="close.emit()">
@@ -15,29 +15,39 @@ import { DocumentStore } from './document.store';
       </header>
       @if (rows().length) {
         <table>
-          <thead><tr><th>Part</th><th class="n">Qty</th><th class="n">Size X × Y × Z (mm)</th><th class="n">Volume each</th><th class="n">Volume total</th></tr></thead>
-          <tbody>
-            @for (r of rows(); track r.path) {
-              <tr>
-                <td><span class="name">{{ r.name }}</span><span class="path">{{ r.path }}</span></td>
-                <td class="n">{{ r.quantity }}</td>
-                <td class="n">{{ size(r) }}</td>
-                <td class="n">{{ r.stats ? (r.stats.volumeCm3 | number: '1.1-1') + ' cm³' : '…' }}</td>
-                <td class="n">{{ r.stats ? (r.stats.volumeCm3 * r.quantity | number: '1.1-1') + ' cm³' : '…' }}</td>
-              </tr>
-            }
-          </tbody>
+          <thead><ng-container *ngTemplateOutlet="head" /></thead>
+          <tbody><ng-container *ngTemplateOutlet="body; context: { $implicit: rows() }" /></tbody>
           <tfoot><tr><td>Total</td><td class="n">{{ totalQuantity() }}</td><td></td><td></td><td class="n">{{ totalVolume() | number: '1.1-1' }} cm³</td></tr></tfoot>
         </table>
+      } @else if (mockRows().length) {
+        <p class="empty">Every part is set to “Do not export”.</p>
       } @else {
         <p class="empty">The document is empty. Add parts first.</p>
       }
-      @if (excluded() > 0) {
-        <p class="excluded">{{ excluded() }} part{{ excluded() === 1 ? '' : 's' }} left out: set to “Do not export”.</p>
+      @if (mockRows().length) {
+        <h3>Not exported <small>mock parts, set to “Do not export”: not in the 3MF / SVG exports</small></h3>
+        <table class="mock">
+          <thead><ng-container *ngTemplateOutlet="head" /></thead>
+          <tbody><ng-container *ngTemplateOutlet="body; context: { $implicit: mockRows() }" /></tbody>
+        </table>
       }
+      <ng-template #head>
+        <tr><th>Part</th><th class="n">Qty</th><th class="n">Size X × Y × Z (mm)</th><th class="n">Volume each</th><th class="n">Volume total</th></tr>
+      </ng-template>
+      <ng-template #body let-list>
+        @for (r of list; track r.path) {
+          <tr>
+            <td><span class="name">{{ r.name }}</span><span class="path">{{ r.path }}</span></td>
+            <td class="n">{{ r.quantity }}</td>
+            <td class="n">{{ size(r) }}</td>
+            <td class="n">{{ r.stats ? (r.stats.volumeCm3 | number: '1.1-1') + ' cm³' : '…' }}</td>
+            <td class="n">{{ r.stats ? (r.stats.volumeCm3 * r.quantity | number: '1.1-1') + ' cm³' : '…' }}</td>
+          </tr>
+        }
+      </ng-template>
       <footer>
-        <button type="button" [disabled]="!rows().length" (click)="downloadCsv()">Download CSV</button>
-        <button type="button" [disabled]="!rows().length" (click)="copyCsv()">{{ copied ? 'Copied ✓' : 'Copy CSV' }}</button>
+        <button type="button" [disabled]="!hasAnything()" (click)="downloadCsv()">Download CSV</button>
+        <button type="button" [disabled]="!hasAnything()" (click)="copyCsv()">{{ copied ? 'Copied ✓' : 'Copy CSV' }}</button>
         <span class="note">Volumes are solid model volume, before infill/shells.</span>
       </footer>
     </section>
@@ -55,7 +65,8 @@ import { DocumentStore } from './document.store';
     .name { display: block; font-weight: 600; } .path { display: block; opacity: .45; font-size: 11px; word-break: break-all; }
     tfoot td { font-weight: 700; border-bottom: 0; }
     .empty { opacity: .6; font-style: italic; }
-    .excluded { margin: 10px 0 0; opacity: .6; font-size: 11px; }
+    h3 { margin: 18px 0 6px; font-size: 13px; } h3 small { font-weight: 400; opacity: .55; margin-left: 6px; font-size: 11px; }
+    table.mock { opacity: .75; }
     footer { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
     button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; } button:disabled { opacity: .35; cursor: default; }
@@ -69,7 +80,8 @@ export class BomDialog {
   protected copied = false;
 
   protected readonly rows = computed(() => buildBom(this.store.doc().items, this.store.partStats()));
-  protected readonly excluded = computed(() => this.store.doc().items.filter(i => i.noExport).length);
+  protected readonly mockRows = computed(() => buildBom(this.store.doc().items, this.store.partStats(), true));
+  protected readonly hasAnything = computed(() => this.rows().length > 0 || this.mockRows().length > 0);
   protected readonly totalQuantity = computed(() => this.rows().reduce((sum, r) => sum + r.quantity, 0));
   protected readonly totalVolume = computed(() => this.rows().reduce((sum, r) => sum + (r.stats ? r.stats.volumeCm3 * r.quantity : 0), 0));
 
@@ -78,7 +90,7 @@ export class BomDialog {
   }
 
   protected downloadCsv() {
-    const blob = new Blob([bomToCsv(this.rows())], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([bomToCsv(this.rows(), this.mockRows())], { type: 'text/csv;charset=utf-8' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-bom.csv`;
@@ -87,7 +99,7 @@ export class BomDialog {
   }
 
   protected async copyCsv() {
-    await navigator.clipboard.writeText(bomToCsv(this.rows()));
+    await navigator.clipboard.writeText(bomToCsv(this.rows(), this.mockRows()));
     this.copied = true;
     setTimeout(() => (this.copied = false), 1500);
   }
