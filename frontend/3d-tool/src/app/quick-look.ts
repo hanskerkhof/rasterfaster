@@ -143,6 +143,10 @@ export class QuickLook implements OnDestroy {
     clearParts(this.model);
     this.geometry?.dispose();
     this.edges?.dispose();
+    // dispose() frees GPU resources but not the WebGL context itself. Browsers allow ~16 live contexts and then drop the oldest
+    // one, which would be the main 3D view (it turned white after many previews), so give the context back explicitly.
     this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
+    this.renderer?.domElement.remove();
   }
 }

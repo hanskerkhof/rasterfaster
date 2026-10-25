@@ -646,5 +646,6 @@ export class StlViewer implements OnDestroy {
     this.documentScene?.dispose();
     this.viewCube?.dispose();
     this.renderer?.dispose();
+    this.renderer?.forceContextLoss();
   }
 }
