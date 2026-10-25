@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - hide / show the file panel, Home button in the cube corner
+
+### Added
+- **FE** (`app.ts`, `app.html`, `app.scss`): the file panel can be hidden and shown with an icon button in the RASTERFASTER header or with **⌘B**; while it is hidden the same icon appears at the left end of the toolbar. The panel slides out and in (160 ms, the content keeps its width and is cropped instead of squeezed), the 3D view takes the freed width, the hidden panel is inert (no focus or tab stops inside) and the choice is remembered in local storage. The animation only runs for the toggle, so drag-resizing the panel stays instant.
+
+### Changed
+- **FE** (`stl-viewer.ts`, `app.scss`): the Home button is a small house icon in the top-left corner of the view cube's area (like Fusion 360) instead of a wide bar below the cube; the document panel moved up into the freed space.
+
 ## 2026-10-25 - black band at the bottom
 
 ### Fixed

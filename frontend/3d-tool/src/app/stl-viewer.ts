@@ -86,15 +86,16 @@ function readGrid3d() {
         </button>
       </div>
     }
-    <button class="home" type="button" title="Home (isometric view)" aria-label="Home view" (click)="goHome()">
+    <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
   styles: `
     :host, .host { display: block; width: 100%; height: 100%; } .host { position: relative; overflow: hidden; }
     :host { position: relative; }
-    .home { position: absolute; top: 168px; right: 12px; width: 150px; height: 26px; display: flex; align-items: center; justify-content: center;
-            background: rgba(213,217,226,.15); color: #d5d9e2; border: 1px solid rgba(255,255,255,.15); border-radius: 4px; cursor: pointer; }
-    .home:hover { background: #2f6fed; color: #fff; }
+    /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
+    .home { position: absolute; top: 12px; right: 132px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
+            background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
+    .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .rotate { position: absolute; top: 12px; left: 12px; width: 124px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
     .title { font-weight: 600; opacity: .8; }

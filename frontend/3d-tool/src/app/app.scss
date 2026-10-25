@@ -1,9 +1,19 @@
 :host { position: fixed; inset: 0; /* fills the viewport as the browser reports it, unlike 100vh */ display: grid; grid-template-columns: 360px 1fr; /* the width is bound from app.ts */ grid-template-rows: minmax(0, 1fr); /* one row that fills the height (an auto row only grew to its content in Chrome: black band below) */ color: #dde1e8; font: 13px/1.4 system-ui, sans-serif; }
-.panel { position: relative; display: flex; flex-direction: column; min-width: 0; background: #23262d; border-right: 1px solid #000; overflow: hidden; }
+.panel { position: relative; min-width: 0; background: #23262d; border-right: 1px solid #000; overflow: hidden; }
+/* The content keeps the panel's full width and is anchored to the right edge, so while the column shrinks to 0 it is cropped and
+   slides out to the left instead of being squeezed. */
+.panel-inner { position: absolute; top: 0; bottom: 0; right: 0; width: var(--panel-w); display: flex; flex-direction: column; }
+.panel.hidden { border-right-width: 0; }
+.panel.hidden .panel-resize { pointer-events: none; }
+:host(.sliding) { transition: grid-template-columns 160ms cubic-bezier(.2, .8, .2, 1); }
+:host(.sliding) .panel { transition: border-width 160ms; }
+.panel-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; cursor: pointer; opacity: .75; }
+.panel-toggle:hover { opacity: 1; background: #31353f; border-color: #000; }
+.panel-toggle.show { margin-right: 4px; }
 /* the drag handle on the panel's right edge (like the sound library panel in Überflüssigen): a thin strip that lights up on hover and while dragging */
 .panel-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; cursor: col-resize; z-index: 3; touch-action: none; }
 .panel-resize:hover, .panel-resize.active, .panel-resize:focus-visible { background: #2f6fed; outline: none; }
-.panel header { padding: 10px 12px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid #000; }
+.panel header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid #000; }
 .tree { flex: 1; min-height: 0; }
 main { display: flex; flex-direction: column; min-width: 0; }
 .toolbar { display: flex; align-items: center; gap: 16px; padding: 8px 12px; background: #23262d; border-bottom: 1px solid #000; }
@@ -28,7 +38,7 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .hint { padding: 6px 12px; opacity: .5; font-style: italic; }
 .add { padding: 5px 12px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; }
 .add:disabled { opacity: .4; cursor: default; }
-.docpanel { position: absolute; top: 202px; right: 12px; width: 226px; max-height: calc(100% - 242px); }
+.docpanel { position: absolute; top: 172px; right: 12px; width: 226px; max-height: calc(100% - 212px); }
 .banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 12px; z-index: 5;
           background: rgba(35,38,45,.95); border: 1px solid #ffe066; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
 .banner button { padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }

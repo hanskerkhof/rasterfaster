@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, HostListener, computed, inject, signal, viewChild } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { LibraryEntry, LibraryService, SortKey } from './library.service';
 import { DocumentPanel } from './document-panel';
@@ -12,9 +12,17 @@ const filterStorageKey = 'rasterfaster.filter';
 /** Width of the file panel on the left, remembered per browser. */
 const panelWidthStorageKey = 'rasterfaster.panelWidth';
 const defaultPanelWidthPx = 360;
+/** Whether the file panel is hidden (⌘B or the icon button), remembered per browser. */
+const panelHiddenStorageKey = 'rasterfaster.panelHidden';
+/** How long the slide in / out takes (ms); the CSS transition uses the same value. */
+const panelSlideMs = 160;
 const minPanelWidthPx = 240;
 /** The panel never takes more than this share of the window (also enforced live in CSS, so a smaller window can't hide the view). */
 const maxPanelShare = 0.7;
+
+function readPanelHidden(): boolean {
+  try { return localStorage.getItem(panelHiddenStorageKey) === 'true'; } catch { return false; }
+}
 
 function loadPanelWidth(): number {
   try {
@@ -32,7 +40,7 @@ const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-s
   imports: [TreePanel, StlViewer, DocumentPanel, ObjectMenu],
   templateUrl: './app.html',
   styleUrl: './app.scss',
-  host: { '[style.grid-template-columns]': 'columnsCss()' },
+  host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
 })
 export class App {
   private readonly lib = inject(LibraryService);
@@ -55,7 +63,13 @@ export class App {
   private readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
   protected readonly panelWidthPx = signal(loadPanelWidth());
-  protected readonly columnsCss = computed(() => `min(${this.panelWidthPx()}px, ${maxPanelShare * 100}vw) 1fr`);
+  /** The panel's width, as a CSS length that never exceeds its share of the window. */
+  protected readonly panelWidthCss = computed(() => `min(${this.panelWidthPx()}px, ${maxPanelShare * 100}vw)`);
+  protected readonly panelHidden = signal(readPanelHidden());
+  /** True only while the panel slides, so the width animates for ⌘B / the button but follows the pointer instantly when dragging. */
+  protected readonly sliding = signal(false);
+  private slidingTimer?: ReturnType<typeof setTimeout>;
+  protected readonly columnsCss = computed(() => `${this.panelHidden() ? '0px' : this.panelWidthCss()} 1fr`);
   protected readonly resizing = signal(false);
   private resizeStartX = 0;
   private resizeStartWidth = 0;
@@ -146,6 +160,27 @@ export class App {
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  // --- hiding / showing the file panel ---------------------------------------------------------------------------------------
+
+  /** Slides the file panel out or in (icon button or ⌘B) and remembers the choice. */
+  protected togglePanel() {
+    const hidden = !this.panelHidden();
+    this.sliding.set(true);
+    clearTimeout(this.slidingTimer);
+    this.slidingTimer = setTimeout(() => this.sliding.set(false), panelSlideMs + 40);
+    this.panelHidden.set(hidden);
+    try { localStorage.setItem(panelHiddenStorageKey, String(hidden)); } catch { /* the choice just is not remembered */ }
+    if (hidden) (document.activeElement as HTMLElement | null)?.blur(); // focus must not stay inside the hidden panel
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  protected onGlobalKey(event: KeyboardEvent) {
+    if (event.code === 'KeyB' && event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
+      event.preventDefault();
+      this.togglePanel();
+    }
   }
 
   // --- resizing the file panel (drag its right edge) ---------------------------------------------------------------------------
