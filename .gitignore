@@ -1,0 +1,21 @@
+# Python
+.venv*/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+.sass-cache/
+
+# IDEs and OS
+.idea/
+.vscode/*.local.json
+.DS_Store
+
+# Local configuration and logs
+.env
+.env.*
+*.log

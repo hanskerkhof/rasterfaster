@@ -1,0 +1,53 @@
+<aside class="panel">
+  <header>RASTERFASTER</header>
+  <div class="controls">
+    <div class="filter">
+      <input type="text" placeholder="Filter files and folders…" [value]="filterText()"
+             (input)="onFilter($any($event.target).value)" (keydown.escape)="clearFilter()" />
+      @if (filterText()) {
+        <button class="clear" type="button" aria-label="Clear filter" (click)="clearFilter()">✕</button>
+      }
+    </div>
+    <div class="sort">
+      Sort
+      <button [class.on]="sortKey() === 'name'" (click)="setSort('name')">Name {{ sortKey() === 'name' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
+      <button [class.on]="sortKey() === 'date'" (click)="setSort('date')">Date {{ sortKey() === 'date' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
+    </div>
+  </div>
+  <div class="tree">
+    @if (searching() && !filtered()) {
+      <div class="hint">searching…</div>
+    } @else {
+      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (select)="open($event)" (add)="addToDocument($event)" />
+    }
+  </div>
+</aside>
+<main>
+  <div class="toolbar">
+    <div class="modes">
+      <button [class.on]="!documentMode()" (click)="setDocumentMode(false)">Preview</button>
+      <button [class.on]="documentMode()" (click)="setDocumentMode(true)">Document</button>
+    </div>
+    <button class="add" [disabled]="!selected()" title="Add the selected file to the document" (click)="addToDocument()">＋ Add to document</button>
+    <div class="modes">
+      @for (m of modes; track m.id) {
+        <button [class.on]="mode() === m.id" (click)="setMode(m.id)">{{ m.label }}</button>
+      }
+    </div>
+    <span class="name">{{ selected() ?? 'Select an .stl file' }}</span>
+  </div>
+  <div class="stage">
+    <app-stl-viewer #v [data]="data()" [mode]="mode()" [documentMode]="documentMode()" />
+    @if (documentMode()) { <app-document-panel class="docpanel" (centerItem)="v.centerOnItem($event)" /> }
+    @if (loading()) { <div class="overlay">Loading…</div> }
+    @if (error()) { <div class="overlay err">{{ error() }}</div> }
+    @if (store.snapPick()) {
+      <div class="banner">
+        <span>Snap to grid: click the <b>corner or side</b> of the part that should land on a grid intersection</span>
+        <button type="button" (click)="store.cancelSnapPick()">Cancel (Esc)</button>
+      </div>
+    }
+    <div class="info">{{ v.info() }}</div>
+  </div>
+</main>
+<app-object-menu />
