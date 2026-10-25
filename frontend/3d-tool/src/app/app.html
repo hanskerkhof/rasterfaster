@@ -54,6 +54,9 @@
       }
     </div>
     <span class="name">{{ selected() ?? 'Select an .stl file' }}</span>
+    @if (updateAvailable()) {
+      <button class="update" type="button" title="A newer version of Rasterfaster is ready: click to reload into it" (click)="applyUpdate()">Update available · reload</button>
+    }
   </div>
   <div class="stage">
     <app-stl-viewer #v [data]="data()" [mode]="mode()" [documentMode]="documentMode()" />

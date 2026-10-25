@@ -1,5 +1,7 @@
-import { Component, HostListener, computed, inject, signal, viewChild } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Component, DestroyRef, HostListener, computed, inject, signal, viewChild } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
+import { Subscription, filter } from 'rxjs';
 import { LibraryEntry, LibraryService, SortKey } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
@@ -62,6 +64,10 @@ export class App {
   private readonly viewer = viewChild.required(StlViewer);
   private readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
+  /** Null when there is no service worker (dev server, tests). */
+  private readonly swUpdate = inject(SwUpdate, { optional: true });
+  /** True once the service worker has downloaded a newer build in the background; an installed PWA otherwise keeps the old one. */
+  protected readonly updateAvailable = signal(false);
   protected readonly panelWidthPx = signal(loadPanelWidth());
   /** The panel's width, as a CSS length that never exceeds its share of the window. */
   protected readonly panelWidthCss = computed(() => `min(${this.panelWidthPx()}px, ${maxPanelShare * 100}vw)`);
@@ -86,6 +92,7 @@ export class App {
 
   constructor() {
     void this.store.init();
+    this.watchForUpdates();
     try {
       const storedFilter = localStorage.getItem(filterStorageKey);
       if (storedFilter) this.onFilter(storedFilter); // restore the filter and its results
@@ -160,6 +167,23 @@ export class App {
       },
       error: () => this.searching.set(false),
     });
+  }
+
+  // --- updates (PWA) ------------------------------------------------------------------------------------------------------------
+
+  private watchForUpdates() {
+    const sw = this.swUpdate;
+    if (!sw?.isEnabled) return;
+    sw.versionUpdates.pipe(filter((event): event is VersionReadyEvent => event.type === 'VERSION_READY'), takeUntilDestroyed()).subscribe(() => this.updateAvailable.set(true));
+    void sw.checkForUpdate();
+    const timer = window.setInterval(() => void sw.checkForUpdate(), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  /** Switch to the downloaded build: activate it and reload. */
+  protected async applyUpdate() {
+    try { await this.swUpdate?.activateUpdate(); } catch { /* reload anyway */ }
+    location.reload();
   }
 
   // --- hiding / showing the file panel ---------------------------------------------------------------------------------------

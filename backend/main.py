@@ -4,6 +4,7 @@
     GET /api/search?q=<text>            -> matching dirs/.stl files plus their ancestor dirs
     GET /api/file?path=<relative file>  -> raw .stl bytes
     GET/POST /api/documents, GET/PUT/DELETE /api/documents/{id}   -> assembly documents (JSON files)
+    GET /...                            -> the built Angular app (a PWA), when frontend/3d-tool/dist exists (override: RF_FRONTEND)
     POST /api/runtime/restart           -> re-exec this process in place (picks up code edits, same PID)
 
 Run: .venv1/bin/python main.py   (env: RF_ROOT, PORT)
@@ -24,10 +25,13 @@ import export3mf
 import svgexport
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
+from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
 
 libraryRoot = Path(os.environ.get("RF_ROOT", "/Users/hanskerkhof/Documents/3D/RASTERFASTER")).resolve()
 apiPort = int(os.environ.get("PORT", "8100"))
+frontendDist = Path(os.environ.get("RF_FRONTEND", Path(__file__).resolve().parent.parent / "frontend" / "3d-tool" / "dist" / "3d-tool" / "browser")).resolve()
 documentsRoot = Path(os.environ.get("RF_DOCS", Path(__file__).resolve().parent.parent / "documents")).resolve()
 
 app = FastAPI(title="RASTERFASTER API")
@@ -308,6 +312,42 @@ def runtime_restart(body: RuntimeRestartRequest | None = None) -> RuntimeRestart
     delayMs = max(100, min(5000, (body.delay_ms if body else None) or 400))
     schedule_runtime_restart(delayMs)
     return RuntimeRestartResponse(reason=reason, delay_ms=delayMs, utc=datetime.now(timezone.utc).isoformat())
+
+
+class SpaStaticFiles(StaticFiles):
+    """The built app, with the single-page fallback: an unknown route (no file extension) gets index.html. Never for /api/."""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as error:
+            isRoute = error.status_code == 404 and not path.startswith("api/") and "." not in Path(path).name
+            if isRoute:
+                return await super().get_response("index.html", scope)
+            raise
+
+
+# Files the service worker / browser must always re-check, or a new build would not be noticed.
+revalidatedFiles = {"index.html", "ngsw.json", "ngsw-worker.js", "safety-worker.js", "manifest.webmanifest"}
+
+
+def mount_frontend(application: FastAPI, directory: Path) -> bool:
+    """Serves the built frontend at / (mounted last, so the /api routes win). Returns whether there was a build to serve."""
+    if not (directory / "index.html").is_file():
+        return False
+
+    @application.middleware("http")
+    async def revalidate_app_shell(request, call_next):
+        response = await call_next(request)
+        if request.method == "GET" and not request.url.path.startswith("/api/") and (request.url.path == "/" or request.url.path.rsplit("/", 1)[-1] in revalidatedFiles):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+    application.mount("/", SpaStaticFiles(directory=directory, html=True), name="frontend")
+    return True
+
+
+mount_frontend(app, frontendDist)
 
 
 if __name__ == "__main__":

@@ -47,3 +47,5 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .sort .reload.spin svg { animation: reload-spin .8s linear infinite; }
 @keyframes reload-spin { to { transform: rotate(360deg); } }
 app-object-menu { display: contents; } /* only fixed-position overlays: must not become a grid row of its own */
+.update { margin-left: auto; padding: 4px 12px; background: #2f8a4d; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.update:hover { background: #38a35c; }

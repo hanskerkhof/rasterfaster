@@ -1,0 +1,18 @@
+{
+  "name": "Rasterfaster",
+  "short_name": "Rasterfaster",
+  "description": "Compose and check RASTERFASTER assemblies on the 20 mm grid before printing",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#1b1d22",
+  "background_color": "#1b1d22",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    { "src": "icons/icon-192x192-v1.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512x512-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512x512-maskable-v1.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

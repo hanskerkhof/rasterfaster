@@ -2,6 +2,17 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-25 - BOM section for parts that are not exported
+
+### Changed
+- **FE** (`bom.ts`, `bom-dialog.ts`, `object-menu.ts`, `document-panel.ts`, `bom.spec.ts`): parts set to **Do not export** are now in the BOM, in a separate "Not exported" section below the main table (no total). The CSV has the same second section. The main list and its total still only count exported parts.
+
+## 2026-10-25 - PWA
+
+### Added
+- **FE** (`public/manifest.webmanifest`, `public/icons/`, `public/apple-touch-icon.png`, `public/favicon.ico`, `ngsw-config.json`, `index.html`, `angular.json`, `app.config.ts`, `app.ts`, `app.html`, `app.scss`): installable PWA with manifest, icons (192, 512, maskable), theme colour and an Angular service worker (production only). An **Update** button appears when a new version is ready.
+- **BE** (`main.py`, `tests/test_frontend.py`): the API serves the built frontend (SPA fallback) at `/`, with no-cache headers for the app shell and service worker files.
+
 ## 2026-10-25 - perspective camera
 
 ### Added

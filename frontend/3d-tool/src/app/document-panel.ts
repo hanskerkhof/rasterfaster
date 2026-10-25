@@ -40,7 +40,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
-          @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF, SVG and BOM">⊘</span> }
+          @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
         </div>
       } @empty {

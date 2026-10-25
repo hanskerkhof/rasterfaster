@@ -47,7 +47,7 @@ import { baseThicknessMm } from './z-levels';
         <div class="sep"></div>
         <button type="button" role="menuitem" (click)="toggleNoExport()">
           <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
-          <span class="hint">{{ allNoExport() ? 'on: left out of 3MF, SVG and BOM' : 'mock part: leave out of the exports' }}</span>
+          <span class="hint">{{ allNoExport() ? 'on: not in 3MF / SVG, own BOM section' : 'mock part: leave out of the exports' }}</span>
         </button>
       </div>
     }
