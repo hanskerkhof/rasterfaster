@@ -152,7 +152,7 @@ cd backend && RF_ROOT=$S/rlib RF_DOCS=$S/rdocs RF_BACKUP=$S/rbak PORT=8110 .venv
 
 - Every change: a dated entry in `CHANGELOG.md` (newest first; bullets prefixed **FE**/**BE** with file paths), README updated, version bumped with `cd frontend/3d-tool && npm run bump:version -- X.Y.Z` (features: minor, fixes: patch).
 - Commit only when asked; end commit messages with the co-author line; never commit the user's own documents under `documents/` unless told to.
-- The user's API on port 8100 is theirs: never kill it; pick up backend changes with `POST /api/runtime/restart`. After a backend change they need that restart, and `scripts/build-app.sh --install` to update the installed app.
+- The user's API on port 8100 is theirs: never kill it; pick up backend changes with `POST /api/runtime/restart`. After a backend change they need that restart, and `scripts/build-app.sh` to update the installed app.
 - Ask before destructive moves on real data; prefer dry runs and the Trash.
 
 ## 11. Open decisions

@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - f3dsearch: find components inside Fusion 360 files (0.10.4)
+
+### Added
+- **BE** (`backend/f3dsearch.py`, `backend/requirements-tools.txt`, `backend/tests/test_f3dsearch.py`): a command-line tool that searches the component and body names inside Fusion 360 designs (`.f3d`) without opening Fusion. An `.f3d` is a zip whose entries are zstd-compressed (method 93, which Python's `zipfile` cannot read); the names are UTF-16 text in the design's `BulkStream.dat` (`Design1/` in older files, `FusionDesignSegmentType1/` in newer ones). `index` reads the Fusion cache (`~/Library/Application Support/Autodesk/Autodesk Fusion 360/<id>/W.login/F`) and any folders of exported `.f3d` files you give it (remembered), only files that are new or changed; `search WORD...` lists the components whose name has every word, per design; `list` shows what is indexed. The index is `~/Library/Application Support/Rasterfaster/f3d-index.json`. On this Mac: 12 cached designs, 6.5 GB read in about 15 s, a search takes 0.03 s. Tested with synthetic files (zstd and stored entries, both stream names, a name split between two read chunks, incremental indexing). The names are extracted as text, not read by a real parser of Fusion's format, and a cached design can be older than the cloud version.
+
+## 2026-10-26 - build-app.sh installs by default (0.10.3)
+
+### Changed
+- `scripts/build-app.sh` copies the app to /Applications by default; `--no-install` only builds it (`--install` is still accepted). README and handoff updated.
+
 ## 2026-10-26 - M for Move to… (0.10.3)
 
 ### Added

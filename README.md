@@ -51,6 +51,20 @@ Two-finger scroll pans the view (the scene follows your fingers), pinch zooms to
 
 Right-click a part (3D view or document list): **Dim (mute)** turns it into a barely visible ghost that ignores clicks (⌘A skips it too; in the hidden-line views its own back edges are hidden, what is behind it stays visible) — handy for working on what's inside a cover. Right-click the ghost (in the 3D view, where a solid part in front takes priority) or its row in the list to bring it back. **Center on grid** is a toggle (✓ when on, ⌖ in the list): it centers the part's footprint in the nearest 20 × 20 cell and keeps it centered while it is dragged, nudged or rotated — handy for bolts, nuts and spacers. Turn it off to move freely again. **Snap to grid…** is a one-time action: handles appear on the corners and side middles of the part (bottom plane), and clicking one puts that point on the nearest 20 mm grid intersection (height unchanged; Esc cancels; a part set to stay centered stops being centered). **Move to ground** drops the part so its lowest point is at z = 0, **Move to base (6 mm)** puts it on top of the 6 mm baseplate (z = 6); several parts keep their heights relative to each other. **Do not export** (toggle) marks a mock part that is not printed: it stays in the document but is left out of the 3MF and SVG exports; the BOM lists it in its own "Not exported" section (also in the CSV, without a total). **Move to…** is a two-step move: first click a corner of the selected part (handles on all 8 corners of its box), then a corner of another part (handles appear on every other part): the selection snaps so the two corners coincide. Esc cancels either pick mode, whatever has keyboard focus.
 
+## Searching inside Fusion 360 files (f3dsearch)
+
+Opening big cloud designs in Fusion to find one component takes ages. `backend/f3dsearch.py` finds component and body names inside `.f3d` files without Fusion:
+
+```
+cd backend && .venv1/bin/pip install -r requirements-tools.txt     # once (zstandard)
+.venv1/bin/python f3dsearch.py index                    # the designs Fusion cached on this Mac (~/Library/Application Support/Autodesk/Autodesk Fusion 360/<id>/W.login/F)
+.venv1/bin/python f3dsearch.py index ~/Documents/Fusion-exports   # and a folder of exported .f3d files (remembered next time)
+.venv1/bin/python f3dsearch.py search ESP32 "ALT IV"    # components whose name contains every word, grouped per design
+.venv1/bin/python f3dsearch.py list
+```
+
+Only designs that are on this Mac can be searched: the cache holds the designs you opened in Fusion; for the others export them (File > Export > Fusion Archive, or Download in the Data Panel) into a folder and index that. The first index reads every file (about 15 s for 6.5 GB), later runs only the new or changed ones; searching is instant. The index is `~/Library/Application Support/Rasterfaster/f3d-index.json`. The names are read as text, not with a real parser of Fusion's format.
+
 ## Install as an app (PWA)
 
 The production build (served by the API on http://localhost:8100 after `ng build`) is an installable PWA: manifest, icons and an Angular service worker that caches the app shell (the `/api` calls are never cached). In Chrome use *Install Rasterfaster*. When a new build is deployed an **Update** button appears in the header; click it to reload into the new version. The service worker is off in `ng serve`.
@@ -58,8 +72,8 @@ The production build (served by the API on http://localhost:8100 after `ng build
 ## Rasterfaster Server.app (API + Dock icon, opens the PWA)
 
 ```bash
-scripts/build-app.sh             # builds dist/Rasterfaster Server.app (about 40 MB: Python, the API and the Angular app inside)
-scripts/build-app.sh --install   # ... and copies it to /Applications (replacing an older Rasterfaster.app / Rasterfaster Server.app)
+scripts/build-app.sh               # builds dist/Rasterfaster Server.app (about 40 MB: Python, the API and the Angular app inside) and copies it to /Applications (replacing an older Rasterfaster.app / Rasterfaster Server.app)
+scripts/build-app.sh --no-install  # ... only builds it
 ```
 
 Click **Rasterfaster Server**: it starts the API (which also serves the web app on http://localhost:8100/) and opens the installed **Rasterfaster PWA**; it has no Dock icon of its own while the PWA is its window. **Closing the PWA window (or quitting the PWA) stops the API** a few seconds later and the server app ends too, so the backend only runs while you use the app. The PWA is the real Chrome app, so browser storage (sort order, filter, panel width, last mode), copy/paste, the dev tools and updates all work as in Chrome. Clicking "Rasterfaster Server" again while it runs just brings the PWA forward. Pin "Rasterfaster Server" to the Dock (or find it in Launchpad / Spotlight) as the one icon to click; the PWA's own icon alone does not start a backend (you would see the red offline banner).
@@ -75,7 +89,7 @@ Development is unchanged: `cd backend && .venv1/bin/python main.py` and `cd fron
 1. Develop with the two dev processes above (backend changes: `POST /api/runtime/restart` re-execs the running API in place).
 2. Test: `cd backend && .venv1/bin/python -m pytest` and `cd frontend/3d-tool && npm test`.
 3. Bump the version and write the changelog: `cd frontend/3d-tool && npm run bump:version -- X.Y.Z` (updates `package.json`, `src/app/build-info.ts` and the service worker's `appData.version`, so the PWA's update button shows the new number) and add a dated entry to `CHANGELOG.md` (FE / BE bullets with file paths).
-4. Build and install the app: `scripts/build-app.sh --install` (builds the Angular app, the icon and `dist/Rasterfaster Server.app`, copies it to /Applications). Restart the API you have running so it has the new backend code (`POST /api/runtime/restart`), because an old API ignores new endpoints.
+4. Build and install the app: `scripts/build-app.sh` (builds the Angular app, the icon and `dist/Rasterfaster Server.app`, copies it to /Applications). Restart the API you have running so it has the new backend code (`POST /api/runtime/restart`), because an old API ignores new endpoints.
 5. Open the app: click **Rasterfaster Server**; the PWA shows the green **Update available vX.Y.Z · reload** button within a minute; click it.
 6. Commit and push to `main`.
 
