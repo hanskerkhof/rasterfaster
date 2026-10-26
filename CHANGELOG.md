@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - Rasterfaster.app
+
+### Added
+- **BE** (`app.py`, `appconfig.py`, `main.py`, `rasterfaster.spec`, `requirements-app.txt`, `tests/test_appconfig.py`): a launcher that starts the API in a thread and shows the UI in a native pywebview window; `appconfig.resolve_paths` keeps the source layout when run normally and uses the bundle, `~/Library/Application Support/Rasterfaster` (documents, `config.json`) and a first-run seed of the existing documents when packaged. The restart endpoint works in the packaged app.
+- `scripts/build-app.sh`: builds the Angular app, the icon (from the PWA icon) and `dist/Rasterfaster.app` with PyInstaller (`--install` copies it to /Applications). Tested: the built app serves the UI and API from its bundle, seeds and lists documents, loads the library, produces 3MF, SVG, glTF and .blend exports, restarts itself, and opens a 1440x900 window.
+
 ## 2026-10-26 - recover the document when the API comes back (0.2.6)
 
 ### Fixed

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import uvicorn
+import appconfig
 import blenderexport
 import export3mf
 import svgexport
@@ -31,10 +32,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
 
-libraryRoot = Path(os.environ.get("RF_ROOT", "/Users/hanskerkhof/Documents/3D/RASTERFASTER")).resolve()
+_paths = appconfig.resolve_paths(os.environ, Path(__file__).resolve().parent.parent, Path.home(), appconfig.is_frozen(), appconfig.bundle_dir())
+libraryRoot = _paths["libraryRoot"]
 apiPort = int(os.environ.get("PORT", "8100"))
-frontendDist = Path(os.environ.get("RF_FRONTEND", Path(__file__).resolve().parent.parent / "frontend" / "3d-tool" / "dist" / "3d-tool" / "browser")).resolve()
-documentsRoot = Path(os.environ.get("RF_DOCS", Path(__file__).resolve().parent.parent / "documents")).resolve()
+frontendDist = _paths["frontendDist"]
+documentsRoot = _paths["documentsRoot"]
+if appconfig.is_frozen() and not os.environ.get("RF_DOCS"):
+    appconfig.seed_documents(documentsRoot, (appconfig.bundle_dir() or Path(".")) / "seed_documents")
 
 app = FastAPI(title="RASTERFASTER API")
 
@@ -347,7 +351,8 @@ def schedule_runtime_restart(delayMs: int) -> None:
                     os.set_inheritable(fileDescriptor, False)
                 except OSError:
                     pass
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # frozen (packaged app): sys.argv[0] is the executable already
+            os.execv(sys.executable, sys.argv if appconfig.is_frozen() else [sys.executable] + sys.argv)
         except Exception:
             os._exit(1)
 

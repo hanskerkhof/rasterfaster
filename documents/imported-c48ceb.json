@@ -468,7 +468,7 @@
       "color": 16767334,
       "position": [
         100.0,
-        -60.0,
+        -64.0,
         14.0
       ],
       "rotation": [
@@ -477,7 +477,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },

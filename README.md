@@ -56,6 +56,17 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 The production build (served by the API on http://localhost:8100 after `ng build`) is an installable PWA: manifest, icons and an Angular service worker that caches the app shell (the `/api` calls are never cached). In Chrome use *Install Rasterfaster*. When a new build is deployed an **Update** button appears in the header; click it to reload into the new version. The service worker is off in `ng serve`.
 
+## Build the app (Rasterfaster.app)
+
+```bash
+scripts/build-app.sh             # builds dist/Rasterfaster.app (about 40 MB: Python, the API and the Angular app inside)
+scripts/build-app.sh --install   # ... and copies it to /Applications
+```
+
+Double-click the app: it starts the API in the background and opens the UI in a native window (closing the window quits everything). The build uses its own `backend/.venv-app` (pywebview and PyInstaller, see `backend/requirements-app.txt`); the normal development setup is untouched: `cd backend && .venv1/bin/python main.py` and `cd frontend/3d-tool && npm start -- --open` work as before, and the PWA is still served on :8100 from `ng build`. Paths in the packaged app (`backend/appconfig.py`): documents in `~/Library/Application Support/Rasterfaster/documents` (the documents that exist at build time are copied there on the first run, nothing is overwritten), the STL library from `config.json` in that folder (`libraryRoot`, default `~/Documents/3D/RASTERFASTER`; a folder dialog asks if it is missing), `RF_ROOT` / `RF_DOCS` / `RF_FRONTEND` / `PORT` still override. If something already answers on port 8100 (for example the dev API), the window opens on that instead of starting a second API; with the port taken by something else the app picks a free port. The app is unsigned: the first time, open it with right-click > Open (or run `xattr -dr com.apple.quarantine /Applications/Rasterfaster.app`). Blender export needs Blender installed (found at /Applications/Blender.app).
+
+Run the launcher from source without building: `cd backend && .venv-app/bin/python app.py`.
+
 ## Offline detection and versions
 
 The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The document recovers too: if the app was started while the API was down, the document loads as soon as the API answers; edits made while it was down are saved again (they are never replaced by what is on disk). The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
