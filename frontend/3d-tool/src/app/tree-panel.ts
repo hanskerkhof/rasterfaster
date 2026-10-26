@@ -1,8 +1,9 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, RenameResult, TrashResult } from './library.service';
+import { LibraryEntry, LibraryService, RenameResult, TrashBatchResult } from './library.service';
 import { QuickLook } from './quick-look';
+import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
 
 interface Row {
   entry: LibraryEntry;
@@ -22,7 +23,7 @@ interface Row {
     @if (listNotice()) { <div class="list-notice" role="status">{{ listNotice() }}</div> }
     @if (pendingTrash(); as pending) {
       <div class="list-notice confirm" role="alert">
-        “{{ pending.name }}” is used by {{ pending.parts }} part{{ pending.parts === 1 ? '' : 's' }} in {{ pending.documents }} document file{{ pending.documents === 1 ? '' : 's' }}: they show as missing until you put it back from the Trash.
+        {{ pending.what }} used by {{ pending.parts }} part{{ pending.parts === 1 ? '' : 's' }} in {{ pending.documents }} document file{{ pending.documents === 1 ? '' : 's' }}: they show as missing until you put {{ pending.paths.length === 1 ? 'it' : 'them' }} back from the Trash.
         <div class="buttons">
           <button type="button" (click)="confirmTrash()">Move to Trash</button>
           <button type="button" (click)="pendingTrash.set(null)">Cancel</button>
@@ -31,7 +32,7 @@ interface Row {
     }
     <div class="tree" tabindex="0" (keydown)="onKey($event)" (mousedown)="onTreeMouseDown($event)">
       @for (r of rows(); track r.entry.path) {
-        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()"
+        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)"
              [class.sel]="r.entry.type === 'file' && r.entry.path === selected()"
              [style.padding-left.px]="6 + r.depth * 14" (click)="onClick(r, $event)" (dblclick)="onDoubleClick(r)" (contextmenu)="onContextMenu($event, r)">
           <span class="caret">{{ r.entry.type === 'dir' ? (r.open ? '▾' : '▸') : '' }}</span>
@@ -65,8 +66,9 @@ interface Row {
     @if (menu(); as m) {
       <div class="menu-backdrop" (mousedown)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
       <div class="menu" role="menu" [style.left.px]="m.x" [style.top.px]="m.y">
-        <button type="button" role="menuitem" (click)="startRename(m.path)">Rename…<span class="key">↵</span></button>
-        <button type="button" role="menuitem" (click)="requestTrash(m.path)">Move to Trash<span class="key">⌘⌫</span></button>
+        <button type="button" role="menuitem" [disabled]="!m.files.length" (click)="addFromMenu(m.files)">{{ m.files.length > 1 ? 'Add ' + m.files.length + ' Files to Document' : 'Add to Document' }}<span class="key">⌘↓</span></button>
+        <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="startRename(m.paths[0])">Rename…<span class="key">↵</span></button>
+        <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
       </div>
     }
     @if (quickLook() && focusedFile(); as file) {
@@ -84,6 +86,11 @@ interface Row {
     .date { flex: none; opacity: .4; font-size: 11px; font-variant-numeric: tabular-nums; }
     .sel { box-shadow: inset 2px 0 0 #2f6fed; }
     .focus { background: rgba(255,255,255,.16) !important; }
+    .picked { background: rgba(255,255,255,.16); }
+    .tree:focus .picked { background: #2f6fed; color: #fff; }
+    .tree:focus .picked .date { opacity: .8; }
+    .menu button:disabled { opacity: .35; cursor: default; }
+    .menu button:disabled:hover { background: transparent; color: inherit; }
     .tree:focus .focus { background: #2f6fed !important; color: #fff; }
     .tree:focus .focus .date { opacity: .8; }
     .muted { opacity: .5; font-style: italic; padding-left: 12px; }
@@ -117,18 +124,20 @@ export class TreePanel {
   readonly fileSelected = output<string>();
   /** Double-click or ⌘↓ on a file: put it into the document. */
   readonly add = output<string>();
+  /** ⌘↓ with the selection: put all selected files into the document (a folder in the selection is ignored). */
+  readonly addMany = output<string[]>();
   /** A file or directory was renamed (the tree already follows; the app updates what refers to it). */
   readonly renamed = output<RenameResult>();
-  /** A file or directory was moved to the Trash (the tree already dropped it). */
-  readonly trashed = output<TrashResult>();
+  /** One or more files or directories were moved to the Trash (the tree already dropped them). */
+  readonly trashed = output<TrashBatchResult>();
 
   protected readonly focused = signal<string | null>(null);
   /** The context menu (right-click on a row), and the row being renamed in place. */
-  protected readonly menu = signal<{ x: number; y: number; path: string } | null>(null);
+  protected readonly menu = signal<{ x: number; y: number; paths: string[]; files: string[] } | null>(null);
   /** A short note shown above the list (the list was out of date and has been refreshed). */
   protected readonly listNotice = signal('');
   /** A Trash move that waits for a yes because documents use the item. */
-  protected readonly pendingTrash = signal<{ path: string; name: string; parts: number; documents: number } | null>(null);
+  protected readonly pendingTrash = signal<{ paths: string[]; what: string; parts: number; documents: number } | null>(null);
   protected readonly renaming = signal<{ path: string; value: string; error: string; busy: boolean } | null>(null);
   /** Space toggles a Finder-style preview of the focused file; it then follows the focus. */
   protected readonly quickLook = signal(false);
@@ -144,9 +153,40 @@ export class TreePanel {
   /** Dirs flipped away from their default state (default: open only in filter mode when they hold matches). */
   private readonly flippedBrowse = signal(new Set<string>());
   private readonly flippedFilter = signal(new Set<string>());
+  /**
+   * The selected rows (the Finder's selection). `focused` is the row the keyboard cursor is on (its file is the one the app shows), `anchor`
+   * is where a Shift-range starts. Plain click and plain arrows select just the focused row.
+   */
+  protected readonly selection = signal<ReadonlySet<string>>(new Set());
+  private anchor: string | null = null;
   private openTimer?: ReturnType<typeof setTimeout>;
   /** The filter text the current search results belong to. */
   private resultsFilter = '';
+
+  private readonly visiblePaths = computed(() => this.rows().map(r => r.entry.path));
+
+  /** The selected files (not folders) in row order, when more than one row is selected; empty otherwise. */
+  readonly pickedFiles = computed(() => {
+    if (this.selection().size < 2) return [];
+    return this.rows().filter(r => r.entry.type === 'file' && this.selection().has(r.entry.path)).map(r => r.entry.path);
+  });
+
+  /** Highlighted as part of a multi-selection (a single selection is just the focused row). */
+  protected isPicked(path: string) {
+    return this.selection().size > 1 && this.selection().has(path);
+  }
+
+  private selectOnly(path: string | null) {
+    this.selection.set(path === null ? new Set() : new Set([path]));
+    this.anchor = path;
+  }
+
+  /** What an action (Move to Trash...) acts on: the selection when the focused row is in it, else just the focused row. */
+  private targets(): string[] {
+    const focused = this.focused();
+    if (focused !== null && this.selection().has(focused)) return actedOn(this.visiblePaths(), this.selection());
+    return focused === null ? [] : [focused];
+  }
 
   protected readonly rows = computed<Row[]>(() => {
     const out: Row[] = [];
@@ -173,6 +213,12 @@ export class TreePanel {
       this.resultsFilter = filter;
       this.flippedFilter.set(new Set());
       this.focused.set(null);
+      this.selectOnly(null);
+    });
+    // Rows that are gone (reloaded, filtered away) leave the selection.
+    effect(() => {
+      const visible = this.visiblePaths();
+      untracked(() => this.selection.update(s => (s.size ? pruned(visible, s) : s)));
     });
     // Expand every ancestor folder of the revealed file and focus it.
     effect(() => {
@@ -182,6 +228,7 @@ export class TreePanel {
       for (const folder of folders) this.load(folder);
       this.flippedBrowse.update(s => new Set([...s, ...folders]));
       this.focused.set(path);
+      this.selectOnly(path);
     });
     // Keep the focused row in view.
     effect(() => {
@@ -246,6 +293,12 @@ export class TreePanel {
   /** After a slow second click the rename starts when no double-click follows within this time. */
   private static readonly renameDelayMs = 400;
 
+  protected addFromMenu(files: string[]) {
+    this.menu.set(null);
+    if (files.length > 1) this.addMany.emit(files);
+    else if (files.length === 1) this.add.emit(files[0]);
+  }
+
   protected onTreeMouseDown(ev: MouseEvent) {
     this.treeWasFocused = document.activeElement === ev.currentTarget;
   }
@@ -262,8 +315,21 @@ export class TreePanel {
     this.lastClick = { path, at: now };
     const plain = !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey;
     const onArrow = (ev.target as HTMLElement).closest('.caret') !== null;
-    const slowSecondClick = path === this.focused() && this.treeWasFocused && plain && !onArrow && sinceLast > TreePanel.doubleClickMs && !this.renaming() && !this.menu();
+    const alone = this.selection().size <= 1;
+    const slowSecondClick = path === this.focused() && this.treeWasFocused && plain && alone && !onArrow && sinceLast > TreePanel.doubleClickMs && !this.renaming() && !this.menu();
+    if (ev.shiftKey && !onArrow) { // Shift-click: everything from the anchor to here
+      this.selection.set(new Set(rangeBetween(this.visiblePaths(), this.anchor ?? this.focused(), path)));
+      this.focused.set(path);
+      return;
+    }
+    if ((ev.metaKey || ev.ctrlKey) && !onArrow) { // ⌘-click: this row in or out of the selection
+      this.selection.update(s => toggled(s, path));
+      this.anchor = path;
+      this.focused.set(path);
+      return;
+    }
     this.focused.set(path);
+    if (!slowSecondClick) this.selectOnly(path);
     if (slowSecondClick) {
       this.slowClickTimer = setTimeout(() => void this.startRename(path), TreePanel.renameDelayMs);
       return;
@@ -282,8 +348,13 @@ export class TreePanel {
     if (r.entry.type === 'file') this.add.emit(r.entry.path);
   }
 
-  private focusRow(row: Row) {
+  private focusRow(row: Row, extend = false) {
     this.focused.set(row.entry.path);
+    if (extend) { // Shift+arrow: the selection grows from the anchor to the new row
+      this.selection.set(new Set(rangeBetween(this.visiblePaths(), this.anchor ?? row.entry.path, row.entry.path)));
+      return;
+    }
+    this.selectOnly(row.entry.path);
     clearTimeout(this.openTimer);
     // Finder previews as you arrow through; debounce so holding ↓ doesn't fetch every file.
     if (row.entry.type === 'file') this.openTimer = setTimeout(() => this.fileSelected.emit(row.entry.path), 120);
@@ -293,16 +364,23 @@ export class TreePanel {
     clearTimeout(this.slowClickTimer);
     // ⌘↓ = "open" like Finder: put the focused file into the document (the app closes the quick look when it adds a part).
     if (ev.metaKey && ev.key === 'ArrowDown' && !ev.ctrlKey && !ev.altKey) {
-      const file = this.focusedFile();
-      if (file) {
-        this.add.emit(file);
+      const files = this.pickedFiles();
+      if (files.length > 1) {
+        this.addMany.emit(files);
+        ev.preventDefault();
+      } else if (this.focusedFile()) {
+        this.add.emit(this.focusedFile()!);
         ev.preventDefault();
       }
       return;
     }
     if (ev.metaKey && ev.key === 'Backspace' && !ev.ctrlKey && !ev.altKey) { // ⌘⌫: Move to Trash, like the Finder
-      const path = this.focused();
-      if (path && !this.renaming()) { ev.preventDefault(); void this.requestTrash(path); }
+      if (!this.renaming()) { ev.preventDefault(); void this.requestTrash(this.targets()); }
+      return;
+    }
+    if ((ev.metaKey || ev.ctrlKey) && !ev.altKey && ev.key.toLowerCase() === 'a') { // ⌘A: select all rows
+      ev.preventDefault();
+      this.selection.set(new Set(this.visiblePaths()));
       return;
     }
     if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
@@ -311,8 +389,8 @@ export class TreePanel {
     const at = rows.findIndex(r => r.entry.path === this.focused());
     const row = rows[at];
     switch (ev.key) {
-      case 'ArrowDown': this.focusRow(rows[Math.min(at + 1, rows.length - 1)]); break;
-      case 'ArrowUp': this.focusRow(rows[at < 0 ? 0 : Math.max(at - 1, 0)]); break;
+      case 'ArrowDown': this.focusRow(rows[Math.min(at + 1, rows.length - 1)], ev.shiftKey); break;
+      case 'ArrowUp': this.focusRow(rows[at < 0 ? 0 : Math.max(at - 1, 0)], ev.shiftKey); break;
       case 'ArrowRight':
         if (!row || row.entry.type !== 'dir') break;
         if (!row.open) this.setOpen(row.entry, true);
@@ -329,12 +407,15 @@ export class TreePanel {
         this.quickLook.update(open => !open);
         break;
       case 'Escape':
-        if (!this.quickLook()) return;
-        this.quickLook.set(false);
+        if (this.menu()) this.menu.set(null);
+        else if (this.quickLook()) this.quickLook.set(false);
+        else if (this.selection().size > 1) this.selectOnly(this.focused()); // back to the focused row alone
+        else return;
         break;
       case 'Enter': // like the Finder: Enter edits the name of the focused row (Enter again or Esc cancels, Enter after typing saves)
       case 'F2':
-        if (row) this.startRename(row.entry.path);
+        if (this.selection().size > 1) this.note('Select one item to rename it.');
+        else if (row) this.startRename(row.entry.path);
         break;
       case 'Home': this.focusRow(rows[0]); break;
       case 'End': this.focusRow(rows[rows.length - 1]); break;
@@ -345,46 +426,56 @@ export class TreePanel {
 
   // --- Move to Trash (like the Finder: ⌘⌫, no question asked unless documents use it) ----------------------------------------------
 
-  /** Moves the row to the Trash; when documents use it the user is asked first. */
-  protected async requestTrash(path: string) {
+  /** Moves the rows to the Trash; when documents use them the user is asked first. */
+  protected async requestTrash(paths: string[]) {
     this.menu.set(null);
     this.pendingTrash.set(null);
-    const row = this.rows().find(r => r.entry.path === path);
-    if (!row) return;
+    const chosen = actedOn(this.visiblePaths(), new Set(paths));
+    if (!chosen.length) return;
     try {
-      const dry = await firstValueFrom(this.lib.trash(path, true));
-      const parts = Object.entries(dry.documents).filter(([file]) => !file.includes('.versions/')); // the working copies are what the user sees
+      const dry = await firstValueFrom(this.lib.trashBatch(chosen, true));
+      const parts = Object.entries(dry.documents ?? {}).filter(([file]) => !file.includes('.versions/')); // the working copies are what the user sees
       if (parts.length) {
-        this.pendingTrash.set({ path, name: row.entry.name, parts: parts.reduce((sum, [, n]) => sum + n, 0), documents: parts.length });
+        const first = this.rows().find(r => r.entry.path === chosen[0])?.entry.name ?? chosen[0];
+        this.pendingTrash.set({ paths: chosen, what: chosen.length === 1 ? `“${first}” is` : `${chosen.length} items are`, parts: parts.reduce((sum, [, n]) => sum + n, 0), documents: parts.length });
         return;
       }
     } catch { /* the real call below reports what is wrong */ }
-    await this.doTrash(path);
+    await this.doTrash(chosen);
   }
 
   protected async confirmTrash() {
     const pending = this.pendingTrash();
     this.pendingTrash.set(null);
-    if (pending) await this.doTrash(pending.path);
+    if (pending) await this.doTrash(pending.paths);
   }
 
-  private async doTrash(path: string) {
+  private async doTrash(paths: string[]) {
     const rows = this.rows();
-    const at = rows.findIndex(r => r.entry.path === path);
-    const next = rows.slice(at + 1).find(r => r.parentPath === rows[at]?.parentPath) ?? rows[at - 1]; // the row that takes its place
+    const gone = (path: string) => paths.some(p => path === p || path.startsWith(p + '/'));
+    const lastAt = Math.max(...paths.map(p => rows.findIndex(r => r.entry.path === p)));
+    const firstAt = Math.min(...paths.map(p => rows.findIndex(r => r.entry.path === p)).filter(i => i >= 0));
+    const next = rows.slice(lastAt + 1).find(r => !gone(r.entry.path)) ?? [...rows.slice(0, Math.max(firstAt, 0))].reverse().find(r => !gone(r.entry.path)); // the row that takes its place
     try {
-      const result = await firstValueFrom(this.lib.trash(path));
+      const result = await firstValueFrom(this.lib.trashBatch(paths));
       this.closeQuickLook();
       await this.reload();
-      this.focused.set(next && next.entry.path !== path && !next.entry.path.startsWith(path + '/') ? next.entry.path : null);
+      this.focused.set(next?.entry.path ?? null);
+      this.selectOnly(next?.entry.path ?? null);
       this.focusTree();
+      if (result.failed.length) this.note(`${result.failed.length} of ${paths.length} could not be moved to the Trash: ${result.failed[0].error}`);
       this.trashed.emit(result);
     } catch (error) {
       const detail = (error as { error?: { detail?: unknown } }).error?.detail;
       if ((error as { status?: number }).status === 404) await this.reload();
-      this.listNotice.set(typeof detail === 'string' ? `Could not move it to the Trash: ${detail}` : 'Could not move it to the Trash');
-      setTimeout(() => this.listNotice.set(''), 6000);
+      this.note(typeof detail === 'string' ? `Could not move it to the Trash: ${detail}` : 'Could not move it to the Trash');
     }
+  }
+
+  /** A note above the list for a few seconds. */
+  private note(message: string) {
+    this.listNotice.set(message);
+    setTimeout(() => this.listNotice.set(''), 6000);
   }
 
   // --- context menu and rename -----------------------------------------------------------------------------------------------
@@ -392,7 +483,10 @@ export class TreePanel {
   protected onContextMenu(ev: MouseEvent, r: Row) {
     ev.preventDefault();
     this.focused.set(r.entry.path);
-    this.menu.set({ x: Math.min(ev.clientX, innerWidth - 190), y: Math.min(ev.clientY, innerHeight - 50), path: r.entry.path });
+    if (!this.selection().has(r.entry.path)) this.selectOnly(r.entry.path); // right-click inside a selection keeps it (the Finder)
+    const selectedFiles = this.pickedFiles();
+    const files = selectedFiles.length > 1 ? selectedFiles : r.entry.type === 'file' ? [r.entry.path] : []; // folders cannot be added
+    this.menu.set({ x: Math.min(ev.clientX, innerWidth - 220), y: Math.min(ev.clientY, innerHeight - 100), paths: this.targets(), files });
   }
 
   /** Turns the row into a text field with the name (a file without its .stl) selected. */
@@ -471,6 +565,8 @@ export class TreePanel {
     this.flippedBrowse.update(s => new Set([...s].map(map)));
     this.flippedFilter.update(s => new Set([...s].map(map)));
     this.focused.update(path => (path ? map(path) : path));
+    this.selection.update(s => new Set([...s].map(map)));
+    if (this.anchor) this.anchor = map(this.anchor);
     // listings of folders at or below the old name are of folders that do not exist any more
     this.cache.update(m => new Map([...m].filter(([path]) => !underOld(path))));
     for (const path of [...this.requested]) if (underOld(path)) this.requested.delete(path);

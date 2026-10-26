@@ -22,7 +22,7 @@ import { baseThicknessMm } from './z-levels';
         <div class="sep"></div>
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
-          <span class="hint">{{ allMuted() ? '' : 'barely visible, ignores clicks' }}</span>
+          <span class="hint">{{ allMuted() ? 'V' : 'barely visible, ignores clicks · V' }}</span>
         </button>
         <button type="button" role="menuitem" (click)="toggleCentered()">
           <span class="icon">{{ allCentered() ? '✓' : '⌖' }}</span>Center on grid

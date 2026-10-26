@@ -2,7 +2,7 @@ import { Component, DestroyRef, HostListener, computed, effect, inject, signal, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, RenameResult, SortKey, TrashResult } from './library.service';
+import { LibraryEntry, LibraryService, RenameResult, SortKey, TrashBatchResult } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
 import { DocumentStore } from './document.store';
@@ -152,17 +152,18 @@ export class App {
 
   protected readonly trashOpen = signal(false);
   /** The last Move to Trash, offered for undo for a few seconds (the Finder's "Undo Move to Trash"). */
-  protected readonly undoTrash = signal<{ id: string; name: string } | null>(null);
+  protected readonly undoTrash = signal<{ ids: string[]; label: string } | null>(null);
   private undoTimer?: ReturnType<typeof setTimeout>;
 
-  /** Something was moved to the Trash: forget it as the selection, refresh the search and offer Undo. */
-  protected onTrashed(result: TrashResult) {
+  /** Items were moved to the Trash: forget them as the selection, refresh the search and offer Undo for the whole batch. */
+  protected onTrashed(result: TrashBatchResult) {
     const selected = this.selected();
-    if (selected && (selected === result.path || selected.startsWith(result.path + '/'))) { this.selected.set(null); this.writeLastStl(null); }
+    if (selected && result.results.some(r => selected === r.path || selected.startsWith(r.path + '/'))) { this.selected.set(null); this.writeLastStl(null); }
     if (this.filterText().trim()) this.onFilter(this.filterText());
     void this.lib.refreshTrash();
-    if (result.id) {
-      this.undoTrash.set({ id: result.id, name: result.name });
+    if (result.results.length) {
+      const label = result.results.length === 1 ? `“${result.results[0].name}”` : `${result.results.length} items`;
+      this.undoTrash.set({ ids: result.results.map(r => r.id).filter((id): id is string => !!id), label });
       clearTimeout(this.undoTimer);
       this.undoTimer = setTimeout(() => this.undoTrash.set(null), 10000);
     }
@@ -172,12 +173,13 @@ export class App {
     const undo = this.undoTrash();
     if (!undo) return;
     this.undoTrash.set(null);
-    try {
-      await firstValueFrom(this.lib.putBack(undo.id));
-      this.store.announce(`Put back “${undo.name}”`);
-    } catch (error) {
-      this.store.announce((error as { status?: number }).status === 409 ? `“${undo.name}” could not be put back: its place is taken (see the Trash)` : `“${undo.name}” could not be put back (see the Trash)`, 7000);
+    let back = 0;
+    let taken = 0;
+    for (const id of [...undo.ids].reverse()) {
+      try { await firstValueFrom(this.lib.putBack(id)); back++; } catch (error) { if ((error as { status?: number }).status === 409) taken++; }
     }
+    const missed = undo.ids.length - back;
+    this.store.announce(missed === 0 ? `Put back ${undo.label}` : `Put back ${back} of ${undo.ids.length}: ${taken ? 'a place is taken' : 'some could not be put back'} (see the Trash)`, missed ? 7000 : 4000);
     await this.treePanel()?.reload();
     if (this.filterText().trim()) this.onFilter(this.filterText());
     void this.lib.refreshTrash();
@@ -187,6 +189,18 @@ export class App {
   protected async onTrashChanged() {
     await this.treePanel()?.reload();
     if (this.filterText().trim()) this.onFilter(this.filterText());
+  }
+
+  /** The selected files of a multi-selection (what ⌘↓ and the Add button put into the document). */
+  protected readonly pickedFiles = computed(() => this.treePanel()?.pickedFiles() ?? []);
+
+  /** Puts several library files next to each other into the document as one undo step. */
+  protected addFilesToDocument(paths: string[]) {
+    if (!paths.length) return;
+    this.selected.set(paths[paths.length - 1]);
+    this.writeLastStl(paths[paths.length - 1]);
+    this.treePanel()?.closeQuickLook();
+    this.viewer().addObjects(paths).catch(e => this.error.set(`Could not add: ${e.message ?? e}`));
   }
 
   /** Puts a library file into the document (defaults to the selected one). */

@@ -291,3 +291,52 @@ def test_api_trash_round_trip(client, world):
     assert client.delete("/api/library/trash").json() == {"removed": 1} and client.get("/api/library/trash").json() == []
     assert client.post("/api/library/trash", json={"path": "../x"}).status_code == 403
     assert client.post("/api/library/trash/nope/put-back").status_code == 404
+
+
+# --- batch trash (multi-select) --------------------------------------------------------------------------------------------------
+
+def test_collapse_nested_keeps_only_the_folder_and_drops_duplicates():
+    paths = ["a/b/c.stl", "a", "a/x.stl", "z.stl", "z.stl", "ab/q.stl", "/y/"]
+    assert library_ops.collapse_nested(paths) == ["a", "z.stl", "ab/q.stl", "y"]  # "ab/q.stl" is not inside "a"
+
+
+def test_trash_batch_moves_everything_under_one_batch_id(world):
+    result = library_ops.trash_batch(world["library"], world["backup"], world["documents"], ["TOP.stl", "1.4.BOLTS & NUTS/other.stl", "1.4.BOLTS & NUTS/Long old name (1).stl"])
+    assert result["failed"] == [] and len(result["results"]) == 3
+    assert {r["path"] for r in result["results"]} == {"TOP.stl", "1.4.BOLTS & NUTS/other.stl", "1.4.BOLTS & NUTS/Long old name (1).stl"}
+    items = library_ops.list_trash(world["backup"])
+    assert len(items) == 3 and {i["batchId"] for i in items} == {result["batchId"]}
+    log = json.loads((world["backup"] / ".rasterfaster" / "log.json").read_text())
+    assert {e["batchId"] for e in log} == {result["batchId"]}
+
+
+def test_trash_batch_treats_a_folder_and_its_contents_as_the_folder(world):
+    result = library_ops.trash_batch(world["library"], world["backup"], world["documents"], ["1.4.BOLTS & NUTS/other.stl", "1.4.BOLTS & NUTS", "TOP.stl"])
+    assert sorted(r["path"] for r in result["results"]) == ["1.4.BOLTS & NUTS", "TOP.stl"]
+    assert len(library_ops.list_trash(world["backup"])) == 2
+
+
+def test_trash_batch_dry_run_sums_the_documents_and_moves_nothing(world):
+    result = library_ops.trash_batch(world["library"], world["backup"], world["documents"], ["1.4.BOLTS & NUTS/other.stl", "TOP.stl"], dryRun=True)
+    assert result["batchId"] is None and result["documents"] == {"d1.json": 2}
+    assert (world["library"] / "TOP.stl").is_file() and not world["backup"].exists()
+
+
+def test_trash_batch_with_a_bad_item_moves_nothing(world):
+    for bad, status in [("nope.stl", 404), ("../outside.stl", 403)]:
+        with pytest.raises(library_ops.LibraryError) as error:
+            library_ops.trash_batch(world["library"], world["backup"], world["documents"], ["TOP.stl", bad])
+        assert error.value.status == status
+    assert (world["library"] / "TOP.stl").is_file() and not world["backup"].exists()
+    with pytest.raises(library_ops.LibraryError):
+        library_ops.trash_batch(world["library"], world["backup"], world["documents"], [])
+
+
+def test_api_trash_batch_and_put_everything_back(client, world):
+    done = client.post("/api/library/trash-batch", json={"paths": ["TOP.stl", "1.4.BOLTS & NUTS/other.stl"]}).json()
+    assert len(done["results"]) == 2 and not (world["library"] / "TOP.stl").exists()
+    for item in done["results"]:
+        assert client.post(f"/api/library/trash/{item['id']}/put-back").status_code == 200
+    assert (world["library"] / "TOP.stl").is_file() and (world["library"] / "1.4.BOLTS & NUTS" / "other.stl").is_file()
+    assert client.post("/api/library/trash-batch", json={"paths": []}).status_code == 422
+    assert client.post("/api/library/trash-batch", params={"dryRun": True}, json={"paths": ["TOP.stl"]}).json()["documents"] == {"d1.json": 1}

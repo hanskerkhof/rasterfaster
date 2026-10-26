@@ -517,6 +517,11 @@ export class StlViewer implements OnDestroy {
     return this.documentScene.addObject(path);
   }
 
+  /** Adds several library STLs next to each other as one undo step. */
+  addObjects(paths: string[]) {
+    return this.documentScene.addObjects(paths);
+  }
+
   private enterMode(documentMode: boolean) {
     this.model.visible = !documentMode;
     this.documentScene.setActive(documentMode);

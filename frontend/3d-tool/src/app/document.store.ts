@@ -501,6 +501,16 @@ export class DocumentStore {
     return created;
   }
 
+  /** Adds several parts as one undo step and selects them all (their colours continue the cycle). */
+  addParts(items: Omit<DocItem, 'id' | 'color'>[]) {
+    const base = this.doc().items.length;
+    const created: DocItem[] = items.map((item, i) => ({ ...item, color: itemColors[(base + i) % itemColors.length], id: crypto.randomUUID() }));
+    if (!created.length) return created;
+    this.mutate(created.length === 1 ? 'Add part' : 'Add parts', d => ({ ...d, items: [...d.items, ...created] }));
+    this.selectedIds.set(created.map(c => c.id));
+    return created;
+  }
+
   remove(id: string) {
     this.mutate('Remove part', d => ({ ...d, items: d.items.filter(i => i.id !== id) }));
     this.selectedIds.update(ids => ids.filter(selected => selected !== id));

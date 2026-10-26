@@ -1,5 +1,7 @@
 # File management in the file list: plan
 
+> Superseded for building: see `docs/file-management-handoff.md` (current state, rules, every phase in detail, how to test). This file is the shorter, earlier plan.
+
 The file list (the library tree) becomes a file and directory management tool, in phases. Phase 1 is the first one to build.
 
 ## Principles

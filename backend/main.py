@@ -109,6 +109,21 @@ def move_library_entry_to_trash(body: TrashRequest, dryRun: bool = False) -> dic
             raise HTTPException(status_code=error.status, detail=str(error))
 
 
+class TrashBatchRequest(BaseModel):
+    paths: list[str] = Field(max_length=2000)
+
+
+@app.post("/api/library/trash-batch")
+def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False) -> dict:
+    """Moves several library items to the Trash as one action (a folder and things inside it count as the folder). `dryRun=true` lists them
+    and the documents that use them."""
+    with documentWriteLock:
+        try:
+            return library_ops.trash_batch(libraryRoot, backupRoot, documentsRoot, body.paths, dryRun)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
 @app.get("/api/library/trash")
 def list_library_trash() -> list[dict]:
     return library_ops.list_trash(backupRoot)

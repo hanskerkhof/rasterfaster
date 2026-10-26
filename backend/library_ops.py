@@ -272,7 +272,7 @@ def list_trash(backupRoot: Path) -> list[dict]:
     return sorted(items, key=lambda item: -item["deletedAt"])
 
 
-def move_to_trash(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: str, dryRun: bool = False) -> dict:
+def move_to_trash(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: str, dryRun: bool = False, batchId: str | None = None) -> dict:
     """Moves a library file or directory to the Trash (nothing is copied or rewritten). Returns what happened, or what would."""
     source = (libraryRoot / relative).resolve()
     if not relative or source == libraryRoot or libraryRoot not in source.parents:
@@ -289,6 +289,8 @@ def move_to_trash(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, rela
     itemId = trash_item_id()
     destination = trash_dir(backupRoot) / itemId / source.name
     entry = {"time": time.time(), "kind": f"trash-{result['kind']}", "from": relative, "to": str(destination), "status": "pending"}
+    if batchId:
+        entry["batchId"] = batchId
     append_log(backupRoot, entry)
     try:
         size = tree_size(source)
@@ -301,7 +303,8 @@ def move_to_trash(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, rela
         if taken:
             atomic_write_json(registryFile, kept)
         write_trash_index(backupRoot, read_trash_index(backupRoot) + [
-            {"id": itemId, "name": source.name, "originalPath": relative, "kind": result["kind"], "deletedAt": time.time(), "size": size, "registry": taken}])
+            {"id": itemId, "name": source.name, "originalPath": relative, "kind": result["kind"], "deletedAt": time.time(), "size": size, "registry": taken,
+             **({"batchId": batchId} if batchId else {})}])
     except Exception as error:
         finish_log(backupRoot, entry, "failed", error=str(error))
         if destination.exists() and not source.exists():
@@ -375,3 +378,32 @@ def delete_immediately(backupRoot: Path, itemId: str | None) -> int:
     write_trash_index(backupRoot, [i for i in items if i not in doomed])
     finish_log(backupRoot, entry, "done", removed=len(doomed))
     return len(doomed)
+
+
+def collapse_nested(paths: list[str]) -> list[str]:
+    """The Finder's rule: when a folder and something inside it are both selected, only the folder is acted on. Also drops duplicates."""
+    unique = list(dict.fromkeys(path.strip("/") for path in paths if path.strip("/")))
+    return [path for path in unique if not any(other != path and path.startswith(other + "/") for other in unique)]
+
+
+def trash_batch(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, paths: list[str], dryRun: bool = False) -> dict:
+    """Moves several library items to the Trash as one action (one `batchId`, so they can be put back together). Everything is checked first: an
+    item that does not exist or is not allowed stops the whole batch before anything moves. Returns {batchId, results, failed}."""
+    chosen = collapse_nested(paths)
+    if not chosen:
+        raise LibraryError("nothing is selected")
+    checked = [move_to_trash(libraryRoot, backupRoot, documentsRoot, path, dryRun=True) for path in chosen]  # raises for a bad item, moves nothing
+    if dryRun:
+        documents: dict[str, int] = {}
+        for item in checked:
+            for file, count in item["documents"].items():
+                documents[file] = documents.get(file, 0) + count
+        return {"batchId": None, "dryRun": True, "results": checked, "failed": [], "documents": documents}
+    batchId = trash_item_id()
+    results, failed = [], []
+    for path in chosen:
+        try:
+            results.append(move_to_trash(libraryRoot, backupRoot, documentsRoot, path, batchId=batchId))
+        except LibraryError as error:
+            failed.append({"path": path, "error": str(error)})
+    return {"batchId": batchId, "dryRun": False, "results": results, "failed": failed}

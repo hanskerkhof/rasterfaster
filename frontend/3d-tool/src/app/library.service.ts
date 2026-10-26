@@ -32,6 +32,15 @@ export interface TrashResult {
   documents: Record<string, number>;
 }
 
+export interface TrashBatchResult {
+  batchId: string | null;
+  dryRun: boolean;
+  results: TrashResult[];
+  failed: { path: string; error: string }[];
+  /** Dry run only: the document files that use any of the items, with the number of parts. */
+  documents?: Record<string, number>;
+}
+
 export interface TrashItem {
   id: string;
   name: string;
@@ -81,6 +90,11 @@ export class LibraryService {
   /** Moves a file or directory to the Trash (like the Finder); `dryRun` only reports the documents that use it. */
   trash(path: string, dryRun = false) {
     return this.http.post<TrashResult>('/api/library/trash', { path }, { params: dryRun ? { dryRun: true } : {} });
+  }
+
+  /** Moves several items to the Trash as one action (a folder and things inside it count as the folder). */
+  trashBatch(paths: string[], dryRun = false) {
+    return this.http.post<TrashBatchResult>('/api/library/trash-batch', { paths }, { params: dryRun ? { dryRun: true } : {} });
   }
 
   trashList() {

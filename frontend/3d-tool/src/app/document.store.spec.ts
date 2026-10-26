@@ -137,3 +137,24 @@ describe('DocumentStore older versions', () => {
     expect(store.mutate('Edit', d => ({ ...d, name: 'changed' }))).toBe(true);
   });
 });
+
+describe('DocumentStore.addParts', () => {
+  it('adds several parts as one undo step, selects them all and continues the colour cycle', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    store.addItem(part());
+    const before = store.doc().items.length;
+    const created = store.addParts([
+      { path: 'a.stl', name: 'a', position: [20, 0, 0], rotation: [0, 0, 0, 1] },
+      { path: 'b.stl', name: 'b', position: [40, 0, 0], rotation: [0, 0, 0, 1] },
+      { path: 'c.stl', name: 'c', position: [60, 0, 0], rotation: [0, 0, 0, 1] },
+    ]);
+    expect(store.doc().items.length).toBe(before + 3);
+    expect(new Set(created.map(c => c.color)).size).toBe(3); // different colours
+    expect(store.selectedIds()).toEqual(created.map(c => c.id));
+    store.undo(); // one step takes all three away
+    expect(store.doc().items.length).toBe(before);
+    expect(store.addParts([])).toEqual([]);
+  });
+});

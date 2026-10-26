@@ -396,22 +396,31 @@ export class DocumentScene {
   }
 
   /** Loads the file and drops it into the first free spot along +X at ground level. */
-  async addObject(path: string) {
+  addObject(path: string) {
+    return this.addObjects([path]);
+  }
+
+  /** Loads the files and drops them next to each other into the first free spots along +X at ground level, as one undo step. */
+  async addObjects(paths: string[]) {
     const { store } = this.ctx;
-    const base = await this.loadBase(path);
-    const size = this.orient(base, [0, 0, 0, 1]).size;
     const taken = store.doc().items
       .map(item => { const entry = this.entryFor(item); return entry && new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(entry.size)); })
       .filter((b): b is THREE.Box3 => !!b);
-    let x = 0;
-    for (let attempt = 0; attempt < 200; attempt++) {
-      const candidate = new THREE.Box3(new THREE.Vector3(x + 0.01, 0.01, 0.01), new THREE.Vector3(x + size.x - 0.01, size.y - 0.01, size.z - 0.01));
-      const blocker = taken.find(b => b.intersectsBox(candidate));
-      if (!blocker) break;
-      x = Math.max(x + snapStepMm.x, Math.ceil(blocker.max.x / snapStepMm.x) * snapStepMm.x);
+    const created: Omit<DocItem, 'id' | 'color'>[] = [];
+    for (const path of paths) {
+      const base = await this.loadBase(path);
+      const size = this.orient(base, [0, 0, 0, 1]).size;
+      let x = 0;
+      for (let attempt = 0; attempt < 200; attempt++) {
+        const candidate = new THREE.Box3(new THREE.Vector3(x + 0.01, 0.01, 0.01), new THREE.Vector3(x + size.x - 0.01, size.y - 0.01, size.z - 0.01));
+        const blocker = taken.find(b => b.intersectsBox(candidate));
+        if (!blocker) break;
+        x = Math.max(x + snapStepMm.x, Math.ceil(blocker.max.x / snapStepMm.x) * snapStepMm.x);
+      }
+      taken.push(new THREE.Box3(new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, 0, 0).add(size))); // the next file of this batch goes after it
+      created.push({ path, name: path.split('/').pop()!.replace(/\.stl$/i, ''), position: [x, 0, 0], rotation: [0, 0, 0, 1] });
     }
-    const name = path.split('/').pop()!.replace(/\.stl$/i, '');
-    store.addItem({ path, name, color: store.nextColor(), position: [x, 0, 0], rotation: [0, 0, 0, 1] });
+    store.addParts(created);
   }
 
   /**

@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - add several files at once (0.9.1)
+
+### Added
+- **FE** (`tree-panel.ts`, `document-scene.ts`, `document.store.ts`, `stl-viewer.ts`, `app.ts`, `app.html`): with several files selected in the file list, **⌘↓**, the **＋ Add N files to document** button and the new **Add N Files to Document** item in the file context menu add all of them as parts in one go (next free slot along +X each, colours cycle, all new parts selected, one undo step). The context menu also has **Add to Document** (⌘↓) for a single file; it is greyed out on a folder. Folders in a selection are skipped.
+- **FE** (`object-menu.ts`): the Dim item in the part menu shows its shortcut, **V**.
+
+## 2026-10-26 - selecting several items in the file list (0.9.0)
+
+### Added
+- **FE** (`tree-panel.ts`, `tree-selection.ts`, `tree-selection.spec.ts`, `app.ts`, `app.html`, `library.service.ts`): a Finder-style selection in the file list: ⌘-click toggles a row, Shift-click selects the range from the anchor, Shift+↑/↓ extends, ⌘A selects all visible rows, Esc goes back to the focused row (and closes the context menu first); a plain click or plain arrows select one row. Multi-selected rows are highlighted, right-click inside the selection keeps it, and the context menu says "Move N Items to Trash" with Rename greyed out; Rename (Enter/F2) and the slow-click rename need exactly one row. Move to Trash (⌘⌫, menu) acts on the selection: a folder and selected things inside it count as the folder; one confirm when documents use any of it, one Undo for the whole batch ("Moved 3 items to the Trash" puts all back). The selection follows renames and is pruned when rows disappear. The rules (range, toggle, nested folders, pruning) are pure functions with a spec.
+- **BE** (`library_ops.py`, `main.py`, `tests/test_library_ops.py`): `POST /api/library/trash-batch {paths}` (`?dryRun=true`): collapses nested paths and duplicates, checks every item first (a bad item moves nothing), moves the rest under one `batchId` (stored in the log entries and the Trash items) and returns `{batchId, results, failed}`; the dry run sums the documents that use the items. Tested in the browser on a throwaway library: ⌘-click, Shift-click, Shift+arrows, ⌘A, Esc, the confirm for used files (with plural wording), moving two items and undoing both, the menu on a selection, and a folder plus its child (only the folder is moved).
+
 ## 2026-10-26 - the Trash: delete like the Finder (0.8.0)
 
 ### Added
