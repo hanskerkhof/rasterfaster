@@ -53,8 +53,33 @@ function buildGhostParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: 
   if (mode === 'wireframe') {
     return [new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: style.wire, wireframe: true, transparent: true, opacity: ghostOpacity * 1.5, depthWrite: false }))];
   }
-  // hidden-line modes: outline only, without the depth-writing fill
-  return [new THREE.LineSegments(style.edges(), new THREE.LineBasicMaterial({ color: style.line, transparent: true, opacity: ghostOpacity * 2, depthWrite: false }))];
+  // Hidden-line modes: the ghost's own back edges are hidden by a depth-only fill (no colour). The ghost is drawn after everything else
+  // (transparent pass, renderOrder), so that fill only hides edges drawn later, i.e. this ghost's own back edges: what is behind the ghost
+  // is already in the picture and stays visible. Each ghost gets its own pair of orders so ghosts don't hide each other's edges.
+  const order = nextGhostOrder();
+  const fill = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: true, transparent: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+  fill.renderOrder = order;
+  const edges = style.edges();
+  const lines = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: style.line, transparent: true, opacity: ghostOpacity * 2, depthWrite: false }));
+  lines.renderOrder = order + 0.001;
+  const parts: THREE.Object3D[] = [fill, lines];
+  if (mode === 'hidden-shown') {
+    const dashed = new THREE.LineSegments(edges, new THREE.LineDashedMaterial({
+      color: style.dashed, dashSize: style.radius / 60, gapSize: style.radius / 80, depthFunc: THREE.GreaterDepth, transparent: true, opacity: ghostOpacity * 2, depthWrite: false,
+    }));
+    dashed.computeLineDistances();
+    dashed.renderOrder = order + 0.001;
+    parts.push(dashed);
+  }
+  return parts;
+}
+
+let ghostCounter = 0;
+
+/** Draw order for one ghost's fill (the edges come right after): between 1 and 3, above plain ghosts and below the selection gizmos. */
+function nextGhostOrder() {
+  ghostCounter = (ghostCounter + 1) % 1000;
+  return 1 + ghostCounter * 0.002;
 }
 
 /** Disposes the materials of everything in `group` and empties it; geometries are shared and stay alive. */

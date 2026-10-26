@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - muted parts hide their own back edges (0.5.3)
+
+### Changed
+- **FE** (`model-render.ts`): in the hidden-line views (Hidden lines removed / dashed) a muted (dimmed) part now hides its own back edges: it is drawn after everything else with a depth-only fill (no colour), so the fill only hides edges drawn later, that is its own back edges, and what lies behind the ghost stays visible. Each ghost gets its own draw order, so ghosts do not hide each other's edges (a later ghost's edges can still be hidden by an earlier ghost's fill). Hidden dashed mode shows the part's own hidden edges dashed. Checked in the browser on a throwaway document with a muted part and parts behind it (edge opacity raised for the check, document deleted afterwards).
+
 ## 2026-10-26 - README: the build and release flow
 
 ### Changed
