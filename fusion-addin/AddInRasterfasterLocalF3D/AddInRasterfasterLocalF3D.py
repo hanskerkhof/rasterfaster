@@ -12,6 +12,7 @@ Assign keyboard shortcuts to them in Fusion (Preferences > General > Keyboard sh
 import json
 import os
 import re
+import time
 import traceback
 
 import adsk.core
@@ -172,6 +173,25 @@ def keep(handler):
     return handler
 
 
+def export_with_progress(design, target):
+    """Shows a dialog while the file is written. The export blocks Fusion until it is done (and the dialog cannot be updated meanwhile),
+    so the dialog has an empty bar, the name and the time the last save took. Returns the seconds it took."""
+    message = f'Writing {os.path.basename(target)} ...\nFusion does not respond until the file is saved.'
+    last = settings().get('last_export')
+    if last:
+        message += f'\nThe last save ({last["mb"]} MB) took {last["seconds"]} s.'
+    dialog = ui.createProgressDialog()
+    dialog.isCancelButtonShown = False
+    dialog.show('Save Local Copy', message, 0, 100, 0)  # the bar stays empty: the value cannot be updated while the export runs (minimum = maximum is refused)
+    adsk.doEvents()  # let Fusion draw the dialog before the export starts
+    started = time.time()
+    try:
+        export_to(design, target)
+    finally:
+        dialog.hide()
+    return time.time() - started
+
+
 def save_directory(design):
     known = sources.get(token(design))
     return os.path.dirname(known) if known else folder()
@@ -214,9 +234,11 @@ def on_save_execute(args):
         if answer != adsk.core.DialogResults.DialogYes:
             return
     save_settings(versioned=versioned)
-    export_to(design, target)
+    seconds = export_with_progress(design, target)
     sources[token(design)] = target
-    ui.messageBox(f'Saved {target}\n({os.path.getsize(target) / 1e6:.0f} MB)', 'Save Local Copy')
+    size = os.path.getsize(target) / 1e6
+    save_settings(last_export={'seconds': round(seconds), 'mb': round(size)})
+    ui.messageBox(f'Saved {os.path.basename(target)}\n\n{target}\n{size:.0f} MB, {seconds:.0f} s', 'Save Local Copy')
 
 
 def on_open_created(args):

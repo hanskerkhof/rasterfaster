@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - Save Local Copy shows a dialog while it writes (0.10.11)
+
+### Changed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): while the export runs a progress dialog shows the file name, "Fusion does not respond until the file is saved" and how long the last save took (kept in `localf3d.json`); when it is done a message shows the file, its folder, size and time. The bar itself stays empty: the export blocks Fusion's main thread, so a dialog cannot be updated meanwhile (Fusion refuses a bar with minimum = maximum, and the API has no progress callback for an export). `ProgressDialog.show`, `adsk.doEvents` and `hide` were checked in Fusion with a throwaway dialog; the dialog during a real save has not been seen yet.
+
 ## 2026-10-26 - f3dsearch shows each design once (0.10.10)
 
 ### Changed

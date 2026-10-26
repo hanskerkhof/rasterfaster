@@ -45,7 +45,7 @@ In **Scripts and Add-Ins**, switch the add-in off, select it and click the unlin
    - **Add version (v&lt;N&gt;)**: on by default, and remembered. The file is called `<name>_v<N>.f3d`, where N is one more than the highest version of that name already in the folder, so every save is a new file and nothing is overwritten. `RF14_v2` and `RF14 v4` both count as versions of `RF14`. With it off, the file is `<name>.f3d`, and an existing file is replaced after you confirm.
    - **Save as**: the exact file name that will be written, updated as you type, with the latest version already on disk.
    - **Folder**: where it goes.
-3. Click **Save**. A message shows the path and the size.
+3. Click **Save**. A dialog shows the file name and how long the last save took while Fusion writes the file (the bar stays empty and Fusion does not respond meanwhile); when it is done a message shows the file, its folder, the size and the time.
 
 A big design takes a while to export, and Fusion cannot be used meanwhile. The file is written to a hidden temporary file first and then moved into place, so a failed export never damages the file that is already there.
 
