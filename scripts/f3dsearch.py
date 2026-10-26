@@ -9,7 +9,7 @@ out and keeps what looks like a name. The result is cached in an index (re-read 
     f3dsearch.py search WORD [WORD ...]   components whose name contains every word (case-insensitive), grouped by design
     f3dsearch.py list                     the indexed designs
 
-Needs `zstandard` (backend/requirements-tools.txt). The names are extracted as text, not read by a real parser of Fusion's format: now and then
+Needs `zstandard` (scripts/requirements-f3dsearch.txt). The names are extracted as text, not read by a real parser of Fusion's format: now and then
 a stray string slips in, and a design file that is older than the cloud version has older names.
 """
 import argparse

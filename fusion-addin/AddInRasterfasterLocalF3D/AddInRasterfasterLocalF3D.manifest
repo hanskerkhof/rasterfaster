@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion",
+  "type": "addin",
+  "id": "342746cf-2a12-4839-98b5-2ccad677858a",
+  "author": "Rasterfaster",
+  "description": {
+    "": "Save a design as a local .f3d file and open local .f3d files, without the Fusion cloud."
+  },
+  "version": "1.0.0",
+  "runOnStartup": false,
+  "supportedOS": "mac",
+  "editEnabled": true
+}

@@ -53,17 +53,27 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 ## Searching inside Fusion 360 files (f3dsearch)
 
-Opening big cloud designs in Fusion to find one component takes ages. `backend/f3dsearch.py` finds component and body names inside `.f3d` files without Fusion:
+Opening big cloud designs in Fusion to find one component takes ages. `scripts/f3dsearch.py` finds component and body names inside `.f3d` files without Fusion:
 
 ```
-cd backend && .venv1/bin/pip install -r requirements-tools.txt     # once (zstandard)
-.venv1/bin/python f3dsearch.py index                    # the designs Fusion cached on this Mac (~/Library/Application Support/Autodesk/Autodesk Fusion 360/<id>/W.login/F)
-.venv1/bin/python f3dsearch.py index ~/Documents/Fusion-exports   # and a folder of exported .f3d files (remembered next time)
-.venv1/bin/python f3dsearch.py search ESP32 "ALT IV"    # components whose name contains every word, grouped per design
-.venv1/bin/python f3dsearch.py list
+backend/.venv1/bin/pip install -r scripts/requirements-f3dsearch.txt     # once (zstandard)
+backend/.venv1/bin/python scripts/f3dsearch.py index                    # the designs Fusion cached on this Mac (~/Library/Application Support/Autodesk/Autodesk Fusion 360/<id>/W.login/F)
+backend/.venv1/bin/python scripts/f3dsearch.py index ~/Documents/Fusion-exports   # and a folder of exported .f3d files (remembered next time)
+backend/.venv1/bin/python scripts/f3dsearch.py search ESP32 "ALT IV"    # components whose name contains every word, grouped per design
+backend/.venv1/bin/python scripts/f3dsearch.py list
 ```
 
 Only designs that are on this Mac can be searched: the cache holds the designs you opened in Fusion; for the others export them (File > Export > Fusion Archive, or Download in the Data Panel) into a folder and index that. The first index reads every file (about 15 s for 6.5 GB), later runs only the new or changed ones; searching is instant. The index is `~/Library/Application Support/Rasterfaster/f3d-index.json`. The names are read as text, not with a real parser of Fusion's format.
+
+## Fusion 360 add-in: local .f3d files (AddInRasterfasterLocalF3D)
+
+For working without the Fusion cloud (the free Personal Use plan allows 10 active documents): `fusion-addin/AddInRasterfasterLocalF3D` adds three commands to Fusion's Utilities tab > Add-Ins panel:
+
+- **Save Local Copy**: exports the open design into the local folder (default `~/Documents/FUSION360`). With **Add version** ticked (the default) the file is `<name>_v<N>.f3d` with N one above the highest version of that name in the folder (`RF14_v2` and `RF14 v4` are versions of `RF14`), so each save is a new file; without it the file is `<name>.f3d` and an existing one is replaced after a question. It writes a hidden temporary file first and then moves it over the old copy, so a failed export never damages the file that is there. A design opened with **Open Local File** saves back to the file it came from.
+- **Open Local File**: imports a local `.f3d` as a new, unsaved document. It is not in the cloud unless you save it there; when you close it choose *Don't save*.
+- **Local Folder**: picks another folder (remembered in `localf3d.json` next to the add-in).
+
+The full install and usage guide is in [fusion-addin/README.md](fusion-addin/README.md). In short, to add it to Fusion once: Utilities > Add-Ins > Scripts and Add-Ins, click **+** (Script or add-in from device) and choose the folder `fusion-addin/AddInRasterfasterLocalF3D`; Fusion keeps working from that folder, so a change in the repo is live after you stop and run the add-in again (tick *Run on Startup* to keep it running). Do not also copy it into Fusion's AddIns folder: Fusion would list it twice. Assign keyboard shortcuts to the three commands in Fusion's preferences. Exports of big designs take a while and Fusion is busy meanwhile. After saving, run `scripts/f3dsearch.py index` to update the name index.
 
 ## Install as an app (PWA)
 

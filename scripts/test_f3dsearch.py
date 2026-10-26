@@ -1,10 +1,12 @@
 import struct
+import sys
 import zipfile
 from pathlib import Path
 
 import pytest
 
 zstandard = pytest.importorskip("zstandard")
+sys.path.insert(0, str(Path(__file__).parent))
 import f3dsearch
 
 
