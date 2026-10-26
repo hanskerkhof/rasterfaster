@@ -1,6 +1,6 @@
 # RASTERFASTER composition tool
 
-Two processes:
+Development: two processes (to just use the app, build and install **Rasterfaster Server.app**, see [below](#rasterfaster-serverapp-api--dock-icon-opens-the-pwa)):
 
 ```bash
 # 1. API (FastAPI; first time: /opt/homebrew/bin/python3.13 -m venv .venv1 && .venv1/bin/pip install -r requirements.txt): lists / serves .stl files from ~/Documents/3D/RASTERFASTER (override with RF_ROOT, PORT)
@@ -35,14 +35,13 @@ DELETE /api/documents/{id}   delete -> 204
 ## 3MF export (Bambu Studio)
 
 ```
-GET /api/documents/{id}/export.3mf?layout=assembly|print&bed=256
+GET /api/documents/{id}/export.3mf?bed=256
 ```
-- `assembly` – parts exactly as assembled, centred on the plate.
-- `print` – every part flat in its library orientation, shelf-packed on a `bed` × `bed` mm plate (overflow continues past the edge; use Arrange in Studio).
+The **Assembly** button: the parts exactly as assembled, centred on a `bed` × `bed` mm plate; import the file in Bambu Studio and work with it there. Parts set to Do not export are left out.
 
-Copy / paste (Document mode): ⌘C copies the selected parts, ⌘X cuts them, ⌘V pastes at the view centre (the copied group's lowest corner snaps to the nearest grid intersection, heights and spacing are kept, parts set to Center on grid are re-centered). One paste is one undo step and the pasted parts become the selection. The clipboard holds content only (file, rotation, color, dimmed/centered flags, offsets), never ids, and is kept in local storage, so it survives reloads and works across documents and tabs. The part context menu has Copy / Cut / Paste too.
+Copy / paste: ⌘C copies the selected parts, ⌘X cuts them, ⌘V pastes at the view centre (the copied group's lowest corner snaps to the nearest grid intersection, heights and spacing are kept, parts set to Center on grid are re-centered). One paste is one undo step and the pasted parts become the selection. The clipboard holds content only (file, rotation, color, dimmed/centered flags, offsets), never ids, and is kept in local storage, so it survives reloads and works across documents and tabs. The part context menu has Copy / Cut / Paste too.
 
-Keyboard (Document mode): arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = 1 mm steps, Esc during a drag puts the part back, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
+Keyboard: arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = 1 mm steps, Esc during a drag puts the part back, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
 
 ## Trackpad / mouse
 
@@ -56,20 +55,49 @@ Right-click a part (3D view or document list): **Dim (mute)** turns it into a ba
 
 The production build (served by the API on http://localhost:8100 after `ng build`) is an installable PWA: manifest, icons and an Angular service worker that caches the app shell (the `/api` calls are never cached). In Chrome use *Install Rasterfaster*. When a new build is deployed an **Update** button appears in the header; click it to reload into the new version. The service worker is off in `ng serve`.
 
-## Build the app (Rasterfaster.app)
+## Rasterfaster Server.app (API + Dock icon, opens the PWA)
 
 ```bash
-scripts/build-app.sh             # builds dist/Rasterfaster.app (about 40 MB: Python, the API and the Angular app inside)
-scripts/build-app.sh --install   # ... and copies it to /Applications
+scripts/build-app.sh             # builds dist/Rasterfaster Server.app (about 40 MB: Python, the API and the Angular app inside)
+scripts/build-app.sh --install   # ... and copies it to /Applications (replacing an older Rasterfaster.app / Rasterfaster Server.app)
 ```
 
-Double-click the app: it starts the API in the background and opens the UI in a native window (closing the window quits everything). The build uses its own `backend/.venv-app` (pywebview and PyInstaller, see `backend/requirements-app.txt`); the normal development setup is untouched: `cd backend && .venv1/bin/python main.py` and `cd frontend/3d-tool && npm start -- --open` work as before, and the PWA is still served on :8100 from `ng build`. Paths in the packaged app (`backend/appconfig.py`): documents in `~/Library/Application Support/Rasterfaster/documents` (the documents that exist at build time are copied there on the first run, nothing is overwritten), the STL library from `config.json` in that folder (`libraryRoot`, default `~/Documents/3D/RASTERFASTER`; a folder dialog asks if it is missing), `RF_ROOT` / `RF_DOCS` / `RF_FRONTEND` / `PORT` still override. If something already answers on port 8100 (for example the dev API), the window opens on that instead of starting a second API; with the port taken by something else the app picks a free port. The app is unsigned: the first time, open it with right-click > Open (or run `xattr -dr com.apple.quarantine /Applications/Rasterfaster.app`). Blender export needs Blender installed (found at /Applications/Blender.app).
+Click **Rasterfaster Server**: it starts the API (which also serves the web app on http://localhost:8100/) and opens the installed **Rasterfaster PWA**; it has no Dock icon of its own while the PWA is its window. **Closing the PWA window (or quitting the PWA) stops the API** a few seconds later and the server app ends too, so the backend only runs while you use the app. The PWA is the real Chrome app, so browser storage (sort order, filter, panel width, last mode), copy/paste, the dev tools and updates all work as in Chrome. Clicking "Rasterfaster Server" again while it runs just brings the PWA forward. Pin "Rasterfaster Server" to the Dock (or find it in Launchpad / Spotlight) as the one icon to click; the PWA's own icon alone does not start a backend (you would see the red offline banner).
 
-Run the launcher from source without building: `cd backend && .venv-app/bin/python app.py`.
+One-time setup: install the PWA from the *production* address: start the server app, open http://localhost:8100/ in Chrome and use *Install Rasterfaster* (uninstall the old one that was installed from http://localhost:4200/ first; that is the `ng serve` dev address). Without an installed PWA the server app opens http://localhost:8100/ in Chrome instead and keeps a Dock icon (Quit stops the API); it also keeps its Dock icon if the PWA never shows up within a minute. After a new build the PWA shows the "Update available" button.
+
+Paths in the packaged app (`backend/appconfig.py`): documents in `~/Library/Application Support/Rasterfaster/documents` (the documents that exist at build time are copied there on the first run, nothing is overwritten), the STL library from `config.json` in that folder (`libraryRoot`, default `~/Documents/3D/RASTERFASTER`), `RF_ROOT` / `RF_DOCS` / `RF_FRONTEND` / `PORT` still override. If an API already answers on port 8100 (for example `python main.py`), the app uses that one and does not start a second; if something else holds the port it picks a free one (the PWA then has a different address). The app is unsigned: the first time, open it with right-click > Open. Blender export needs Blender installed (found at /Applications/Blender.app).
+
+Development is unchanged: `cd backend && .venv1/bin/python main.py` and `cd frontend/3d-tool && npm start -- --open`. The build uses its own `backend/.venv-app` (PyInstaller and the macOS Cocoa bindings, see `backend/requirements-app.txt`). `python app.py` (in that venv) runs the same server app without packaging. If the STL library folder does not exist on another machine, put its path in `~/Library/Application Support/Rasterfaster/config.json` as `{"libraryRoot": "/path"}`.
+
+### Shipping a change (the flow)
+
+1. Develop with the two dev processes above (backend changes: `POST /api/runtime/restart` re-execs the running API in place).
+2. Test: `cd backend && .venv1/bin/python -m pytest` and `cd frontend/3d-tool && npm test`.
+3. Bump the version and write the changelog: `cd frontend/3d-tool && npm run bump:version -- X.Y.Z` (updates `package.json`, `src/app/build-info.ts` and the service worker's `appData.version`, so the PWA's update button shows the new number) and add a dated entry to `CHANGELOG.md` (FE / BE bullets with file paths).
+4. Build and install the app: `scripts/build-app.sh --install` (builds the Angular app, the icon and `dist/Rasterfaster Server.app`, copies it to /Applications). Restart the API you have running so it has the new backend code (`POST /api/runtime/restart`), because an old API ignores new endpoints.
+5. Open the app: click **Rasterfaster Server**; the PWA shows the green **Update available vX.Y.Z · reload** button within a minute; click it.
+6. Commit and push to `main`.
+
+## Document versions (v1, v2, ...)
+
+Like Fusion 360: the document is autosaved as ever (the working copy), and a **version** is a numbered, immutable snapshot of it. The pill next to the document name shows the newest version (`v3`), with a dot (`v3 •`) while the working copy has changes since; **⌘S** saves a new version (nothing is created when nothing changed), and clicking the pill opens the versions list: **View** shows an older version read-only (a blue bar says so; edits are off), **Promote** makes it the working copy again and saves it as the newest version (older versions are never rewritten), and **Back to the working copy** leaves the old version. Versions live next to the document as `documents/<id>.versions/v1.json`, `v2.json`, ... (deleted with the document). API: `GET/POST /api/documents/{id}/versions`, `GET /api/documents/{id}/versions/{n}`, `POST /api/documents/{id}/versions/{n}/promote`; a document now also reports `version` and `changedSinceVersion`.
+
+## Saving a document as a file and restoring it
+
+In the document panel, **Document file → Save file** downloads the open document as `<name>-v<n>.rasterfaster.json` (`v<n>` is the newest saved version, `-edited` is added when the working copy has changes since it, and there is no suffix before the first version): the parts and everything about them (colour, position, rotation, dimmed, centered, do-not-export) plus **all its versions**. **Open file…** restores such a file: a document that does not exist (any more) comes back exactly as it was, with the same id, its version history and its working copy, and is opened; if a document with that id exists you choose **Replace it** (working copy and history become the file's), **Import as a copy** (new id, the existing one stays) or Cancel. Other windows pick the restored or replaced document up through the normal sync (up to 5 s). API: `GET /api/documents/{id}/export.rasterfaster`, `POST /api/documents/import[?onConflict=replace|copy]` (409 when the id exists and no choice was given; 422 for files that are not documents). The library STL files themselves are not in the file: they are found by their library path.
+
+## Two windows on the same document
+
+The app polls `/api/health` every 5 s; it carries the newest modification time of any document. When that changes, a window checks whether the open document was saved by another window (the dev app on :4200 and the PWA on :8100 share the same API and documents): without unsaved edits it reloads silently ("Updated from another window"); with unsaved edits it shows an orange banner: **Load the other version** (drops your unsaved edits) or **Keep mine (overwrite)**. Saves send the `modified` time they are based on (`PUT /api/documents/{id}?baseModified=...`) and the API answers **409** with the current document when it is older, so a stale window can never silently overwrite a newer save. Without `baseModified` the API still overwrites, as before. The delay is up to 5 s.
 
 ## Offline detection and versions
 
 The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The document recovers too: if the app was started while the API was down, the document loads as soon as the API answers; edits made while it was down are saved again (they are never replaced by what is on disk). The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
+
+## Looking at a library file
+
+There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, Enter or a double-click; adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
 
 ## File list
 
@@ -119,7 +147,3 @@ The same scene as glTF, without needing Blender: `GET /api/documents/{id}/export
 GET /api/documents/{id}/export.svg
 ```
 Top / front / right view of the assembly: feature lines (sharp edges, silhouette, open boundaries) in each part's colour on a 20 mm grid, numbered legend, overall size; hidden edges are dashed. No occlusion between parts.
-
-## Known issues
-
-- 3MF in Bambu Studio: a problem was reported but not yet described (which layout / what looks wrong). Not verified in Studio yet.

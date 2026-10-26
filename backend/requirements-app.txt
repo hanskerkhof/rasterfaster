@@ -1,4 +1,5 @@
 # Only needed to run app.py and to build Rasterfaster.app (see scripts/build-app.sh); day-to-day development uses requirements.txt.
 -r requirements.txt
-pywebview==6.1
+pyobjc-framework-Cocoa==12.2.2
+pyobjc-framework-Quartz==12.2.2
 pyinstaller==6.16.0

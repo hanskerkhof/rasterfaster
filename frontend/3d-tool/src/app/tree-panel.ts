@@ -37,7 +37,7 @@ interface Row {
       }
     </div>
     @if (quickLook() && focusedFile(); as file) {
-      <app-quick-look [path]="file" [left]="popoverLeft()" [added]="addedFlash()" (closed)="quickLook.set(false)" (interacted)="focusTree()" />
+      <app-quick-look [path]="file" [left]="popoverLeft()" (closed)="quickLook.set(false)" (interacted)="focusTree()" />
     }
   `,
   styles: `
@@ -74,6 +74,11 @@ export class TreePanel {
   protected readonly focused = signal<string | null>(null);
   /** Space toggles a Finder-style preview of the focused file; it then follows the focus. */
   protected readonly quickLook = signal(false);
+
+  /** Closes the quick look popover (the app does this whenever a part is added to the document). */
+  closeQuickLook() {
+    this.quickLook.set(false);
+  }
   protected readonly popoverLeft = signal(392);
   protected readonly focusedFile = computed(() => this.rows().find(r => r.entry.path === this.focused() && r.entry.type === 'file')?.entry.path ?? null);
   private readonly cache = signal(new Map<string, LibraryEntry[]>());
@@ -82,8 +87,6 @@ export class TreePanel {
   private readonly flippedBrowse = signal(new Set<string>());
   private readonly flippedFilter = signal(new Set<string>());
   private openTimer?: ReturnType<typeof setTimeout>;
-  private flashTimer?: ReturnType<typeof setTimeout>;
-  protected readonly addedFlash = signal(false);
 
   protected readonly rows = computed<Row[]>(() => {
     const out: Row[] = [];
@@ -187,14 +190,11 @@ export class TreePanel {
   }
 
   protected onKey(ev: KeyboardEvent) {
-    // ⌘↓ = "open" like Finder: put the focused file into the document (the preview stays so you can keep adding).
+    // ⌘↓ = "open" like Finder: put the focused file into the document (the app closes the quick look when it adds a part).
     if (ev.metaKey && ev.key === 'ArrowDown' && !ev.ctrlKey && !ev.altKey) {
       const file = this.focusedFile();
       if (file) {
         this.add.emit(file);
-        this.addedFlash.set(true);
-        clearTimeout(this.flashTimer);
-        this.flashTimer = setTimeout(() => this.addedFlash.set(false), 1600);
         ev.preventDefault();
       }
       return;

@@ -1,7 +1,7 @@
 import { Component, DestroyRef, HostListener, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
-import { Subscription, filter } from 'rxjs';
+import { filter } from 'rxjs';
 import { LibraryEntry, LibraryService, SortKey } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
@@ -36,7 +36,6 @@ function loadPanelWidth(): number {
   return defaultPanelWidthPx;
 }
 const viewModeStorageKey = 'rasterfaster.viewMode';
-const documentModeStorageKey = 'rasterfaster.documentMode';
 const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-shown'];
 
 @Component({
@@ -51,9 +50,7 @@ export class App {
   protected readonly store = inject(DocumentStore);
 
   protected readonly selected = signal<string | null>(null);
-  protected readonly data = signal<ArrayBuffer | null>(null);
   protected readonly mode = signal<ViewMode>(this.readViewMode());
-  protected readonly loading = signal(false);
   protected readonly error = signal('');
   protected readonly filterText = signal('');
   protected readonly filtered = signal<LibraryEntry[] | null>(null);
@@ -62,7 +59,6 @@ export class App {
   protected readonly sortAscending = this.lib.sortAscending;
   /** Set once on startup so the tree expands to the restored file; later selections don't re-trigger it. */
   protected readonly revealPath = signal<string | null>(null);
-  protected readonly documentMode = signal(this.readDocumentMode());
   private readonly viewer = viewChild.required(StlViewer);
   private readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
@@ -85,8 +81,6 @@ export class App {
   protected readonly resizing = signal(false);
   private resizeStartX = 0;
   private resizeStartWidth = 0;
-  private loadedPath: string | null = null;
-  private loadSub?: Subscription;
   private filterTimer?: ReturnType<typeof setTimeout>;
 
   protected readonly modes: { id: ViewMode; label: string }[] = [
@@ -105,6 +99,13 @@ export class App {
       const offline = this.api.offline();
       if (wasOffline && !offline) void this.reloadFiles(); // the API is back: refresh what was loaded from it
       wasOffline = offline;
+    });
+    let lastStamp: number | null = null;
+    effect(() => {
+      // Another window saved a document: check whether it is the open one (and reload it, or ask when this window has unsaved edits).
+      const stamp = this.api.documentsStamp();
+      if (lastStamp !== null && stamp !== lastStamp) void this.store.checkRemote();
+      lastStamp = stamp;
     });
     effect(() => {
       // Every time the API answers: if the document never loaded (the API started after the app) or a save failed, recover now.
@@ -134,23 +135,12 @@ export class App {
     try { localStorage.setItem(viewModeStorageKey, mode); } catch { /* storage unavailable */ }
   }
 
-  private readDocumentMode() {
-    try { return localStorage.getItem(documentModeStorageKey) === 'true'; } catch { return false; }
-  }
-
-  protected setDocumentMode(on: boolean) {
-    this.documentMode.set(on);
-    try { localStorage.setItem(documentModeStorageKey, String(on)); } catch { /* storage unavailable */ }
-    const path = this.selected();
-    if (!on && path && path !== this.loadedPath) this.loadPreview(path);
-  }
-
-  /** Puts a library file into the document (defaults to the selected one) and switches to the document. */
+  /** Puts a library file into the document (defaults to the selected one). */
   protected addToDocument(path: string | null = this.selected()) {
     if (!path) return;
     this.selected.set(path);
     this.writeLastStl(path);
-    this.setDocumentMode(true);
+    this.treePanel()?.closeQuickLook(); // adding a part (any way) closes the quick look
     this.viewer().addObject(path).catch(e => this.error.set(`Could not add: ${e.message ?? e}`));
   }
 
@@ -230,6 +220,10 @@ export class App {
       event.preventDefault();
       this.togglePanel();
     }
+    if (event.code === 'KeyS' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
+      event.preventDefault(); // not the browser's "save page": ⌘S saves a new version of the document
+      void this.store.saveVersion();
+    }
   }
 
   // --- resizing the file panel (drag its right edge) ---------------------------------------------------------------------------
@@ -299,25 +293,6 @@ export class App {
 
   protected open(path: string) {
     this.selected.set(path);
-    this.writeLastStl(path);
-    if (!this.documentMode()) this.loadPreview(path); // in the document the tree just chooses what to add
-  }
-
-  private loadPreview(path: string) {
-    this.loading.set(true);
-    this.error.set('');
-    this.loadSub?.unsubscribe(); // drop a still-running download when the selection moves on
-    this.loadSub = this.lib.loadStl(path).subscribe({
-      next: buf => { this.data.set(buf); this.loadedPath = path; this.loading.set(false); },
-      error: e => {
-        this.loading.set(false);
-        if (e.status === 404) { // remembered file was moved/deleted: forget it quietly
-          this.writeLastStl(null);
-          this.selected.set(null);
-          return;
-        }
-        this.error.set(`Could not load: ${e.message}`);
-      },
-    });
+    this.writeLastStl(path); // the tree just chooses what to add; Space opens a quick look
   }
 }

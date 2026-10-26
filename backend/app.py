@@ -1,21 +1,26 @@
-"""Rasterfaster as a desktop app: starts the API in a background thread and shows the UI in a native window.
+"""Rasterfaster Server: starts the API (which also serves the web app), opens the installed Rasterfaster PWA and stops the API when
+the PWA is closed.
 
-Run from source:  .venv-app/bin/python app.py      Packaged (see scripts/build-app.sh): double-click Rasterfaster.app.
-`python main.py` + `npm start` stay the way to develop; this file only wraps main.app.
+    python app.py     start the API and open the PWA installed from http://localhost:<port>/ (no Dock icon of its own: the PWA is the app);
+                      when the PWA window is closed (or the PWA quits) the API stops and this process ends.
+                      Without an installed PWA it opens the address in Chrome and keeps a Dock icon (Quit stops the API).
+
+Packaged (scripts/build-app.sh): click "Rasterfaster Server.app". `python main.py` + `npm start` stay the way to develop.
+Environment: RF_NO_OPEN=1 starts without opening or watching anything (tests).
 """
+import os
+import plistlib
 import socket
+import subprocess
 import threading
 import time
 import urllib.request
 from pathlib import Path
 
 import uvicorn
-import webview
 
-import appconfig
 import main
 
-windowTitle = "Rasterfaster"
 preferredPort = main.apiPort
 
 
@@ -50,30 +55,148 @@ def start_server(port: int) -> uvicorn.Server:
     return server
 
 
-def ask_for_library(window: webview.Window) -> None:
-    """The STL library folder does not exist (first run on another machine): let the user pick it, remember it, and reload the UI."""
-    if main.libraryRoot.is_dir():
+def pwa_app(port: int, appsDir: Path | None = None) -> Path | None:
+    """The Chrome PWA (an .app in ~/Applications/Chrome Apps.localized) that was installed from this server's address, if there is one."""
+    folder = appsDir or Path.home() / "Applications" / "Chrome Apps.localized"
+    wanted = {f"http://localhost:{port}/", f"http://127.0.0.1:{port}/"}
+    for bundle in sorted(folder.glob("*.app")):
+        try:
+            info = plistlib.loads((bundle / "Contents" / "Info.plist").read_bytes())
+        except (OSError, ValueError):
+            continue
+        if str(info.get("CrAppModeShortcutURL", "")) in wanted:
+            return bundle
+    return None
+
+
+def open_pwa(port: int) -> None:
+    """Opens the installed PWA; without one, opens the address in Chrome (where it can be installed) or the default browser."""
+    if os.environ.get("RF_NO_OPEN"):
         return
-    picked = window.create_file_dialog(webview.FOLDER_DIALOG, directory=str(Path.home()))
-    if picked:
-        main.libraryRoot = Path(picked[0]).resolve()
-        appconfig.save_library_root(Path.home(), main.libraryRoot)
-        window.evaluate_js("location.reload()")
+    url = f"http://localhost:{port}/"
+    bundle = pwa_app(port)
+    if bundle:
+        subprocess.run(["open", str(bundle)], check=False)
+    elif Path("/Applications/Google Chrome.app").exists():
+        subprocess.run(["open", "-a", "Google Chrome", url], check=False)
+    else:
+        subprocess.run(["open", url], check=False)
 
 
-def run() -> None:
-    server = None
+def start_api() -> tuple[int, uvicorn.Server | None]:
+    """Starts the API, unless one already answers on the preferred port (then that one is used and left alone)."""
     port = preferredPort
-    if not answers(port):
-        if not port_is_free(port):
-            port = free_port()
-        server = start_server(port)
-    webview.settings["ALLOW_DOWNLOADS"] = True  # the export buttons download files
-    window = webview.create_window(windowTitle, f"http://127.0.0.1:{port}/", width=1440, height=900, min_size=(900, 600))
-    webview.start(ask_for_library, window)
-    if server:
-        server.should_exit = True
+    if answers(port):
+        return port, None
+    if not port_is_free(port):
+        port = free_port()
+    return port, start_server(port)
+
+
+class PwaWatch:
+    """Decides from once-a-second samples ("is the PWA open?") when it has been closed: it must have been seen open first, then be gone for
+    `closeAfter` seconds (a window being reopened or moved between spaces does not count). Never seen open within `startupGrace` seconds: "never"."""
+
+    def __init__(self, closeAfter: float = 6.0, startupGrace: float = 60.0, clock=time.monotonic):
+        self.closeAfter, self.startupGrace, self.clock = closeAfter, startupGrace, clock
+        self.started = clock()
+        self.seen = False
+        self.goneSince: float | None = None
+
+    def sample(self, isOpen: bool) -> str:
+        """"open", "closed" (it was open and is gone), "never" (it did not open at all) or "waiting"."""
+        now = self.clock()
+        if isOpen:
+            self.seen, self.goneSince = True, None
+            return "open"
+        if not self.seen:
+            return "never" if now - self.started > self.startupGrace else "waiting"
+        self.goneSince = self.goneSince if self.goneSince is not None else now
+        return "closed" if now - self.goneSince >= self.closeAfter else "waiting"
+
+
+def pwa_bundle_id(bundle: Path) -> str | None:
+    try:
+        return plistlib.loads((bundle / "Contents" / "Info.plist").read_bytes()).get("CFBundleIdentifier")
+    except (OSError, ValueError):
+        return None
+
+
+def pwa_open(bundleId: str) -> bool:
+    """True while the PWA is running and has a real window (closing the window may leave the app running in the Dock)."""
+    import Quartz
+    from AppKit import NSWorkspace
+
+    pids = {app.processIdentifier() for app in NSWorkspace.sharedWorkspace().runningApplications() if app.bundleIdentifier() == bundleId}
+    if not pids:
+        return False
+    for window in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionAll, Quartz.kCGNullWindowID):
+        bounds = window.get("kCGWindowBounds", {})
+        if window.get("kCGWindowOwnerPID") in pids and window.get("kCGWindowLayer") == 0 and bounds.get("Width", 0) > 200 and bounds.get("Height", 0) > 200:
+            return True
+    return False
+
+
+def quit_pwa(bundleId: str) -> None:
+    from AppKit import NSWorkspace
+
+    for app in NSWorkspace.sharedWorkspace().runningApplications():
+        if app.bundleIdentifier() == bundleId:
+            app.terminate()
+
+
+def run_serve() -> None:
+    """Starts the API, opens the PWA and ends everything when the PWA is closed. Without an installed PWA there is a Dock icon with Quit."""
+    from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSApplicationActivationPolicyRegular, NSMenu, NSMenuItem, NSObject
+    from PyObjCTools import AppHelper
+
+    port, server = start_api()
+    bundle = None if os.environ.get("RF_NO_OPEN") else pwa_app(port)
+    bundleId = pwa_bundle_id(bundle) if bundle else None
+
+    class Delegate(NSObject):
+        def applicationShouldHandleReopen_hasVisibleWindows_(self, application, hasWindows):
+            open_pwa(port)
+            return True
+
+        def openPwa_(self, sender):
+            open_pwa(port)
+
+        def applicationWillTerminate_(self, notification):
+            if server:
+                server.should_exit = True
+
+    application = NSApplication.sharedApplication()
+    delegate = Delegate.alloc().init()
+    application.setDelegate_(delegate)
+    menubar, appItem, appMenu = NSMenu.alloc().init(), NSMenuItem.alloc().init(), NSMenu.alloc().init()
+    menubar.addItem_(appItem)
+    openItem = appMenu.addItemWithTitle_action_keyEquivalent_("Open Rasterfaster", "openPwa:", "o")
+    openItem.setTarget_(delegate)
+    appMenu.addItemWithTitle_action_keyEquivalent_("Quit Rasterfaster Server", "terminate:", "q")
+    appItem.setSubmenu_(appMenu)
+    application.setMainMenu_(menubar)
+    # With a PWA the PWA is the app: no Dock icon here. Without one (or when it never shows up) keep a Dock icon so it can be quit.
+    application.setActivationPolicy_(NSApplicationActivationPolicyAccessory if bundleId else NSApplicationActivationPolicyRegular)
+
+    def watch() -> None:
+        pwa = PwaWatch()
+        while True:
+            time.sleep(1)
+            state = pwa.sample(pwa_open(bundleId))
+            if state == "closed":
+                quit_pwa(bundleId)  # the window is gone but the app may linger in the Dock
+                AppHelper.callAfter(application.terminate_, None)
+                return
+            if state == "never":
+                AppHelper.callAfter(application.setActivationPolicy_, NSApplicationActivationPolicyRegular)
+                return
+
+    open_pwa(port)
+    if bundleId:
+        threading.Thread(target=watch, name="rasterfaster-pwa-watch", daemon=True).start()
+    application.run()
 
 
 if __name__ == "__main__":
-    run()
+    run_serve()

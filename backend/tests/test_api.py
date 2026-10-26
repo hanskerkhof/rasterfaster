@@ -111,4 +111,132 @@ def test_document_item_centered_roundtrip(client):
 
 
 def test_health(client):
-    assert client.get("/api/health").json() == {"status": "ok"}
+    first = client.get("/api/health").json()
+    assert first["status"] == "ok" and first["documents"] == 0
+    created = client.post("/api/documents", json={"name": "A"}).json()
+    assert client.get("/api/health").json()["documents"] == created["modified"]  # changes when a document is written
+
+
+def test_update_with_a_stale_base_is_refused_with_the_current_document(client):
+    created = client.post("/api/documents", json={"name": "Shared"}).json()
+    base = created["modified"]
+    first = client.put(f"/api/documents/{created['id']}", params={"baseModified": base}, json={"name": "From window one", "items": []})
+    assert first.status_code == 200 and first.json()["name"] == "From window one"
+    stale = client.put(f"/api/documents/{created['id']}", params={"baseModified": base}, json={"name": "From window two", "items": []})
+    assert stale.status_code == 409
+    detail = stale.json()["detail"]
+    assert detail["current"]["name"] == "From window one" and detail["current"]["modified"] == first.json()["modified"]
+    assert client.get(f"/api/documents/{created['id']}").json()["name"] == "From window one"  # nothing was overwritten
+    again = client.put(f"/api/documents/{created['id']}", params={"baseModified": first.json()["modified"]}, json={"name": "Merged", "items": []})
+    assert again.status_code == 200
+
+
+def test_update_without_a_base_still_overwrites(client):
+    created = client.post("/api/documents", json={"name": "Old school"}).json()
+    client.put(f"/api/documents/{created['id']}", json={"name": "One", "items": []})
+    assert client.put(f"/api/documents/{created['id']}", json={"name": "Two", "items": []}).status_code == 200
+
+
+def item(name="a"):
+    return {"id": name, "path": "a.stl", "name": name, "color": 1, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+
+
+def test_versions_are_numbered_snapshots_of_the_working_copy(client):
+    doc = client.post("/api/documents", json={"name": "Versioned", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    assert doc["version"] == 0 and doc["changedSinceVersion"] is True and client.get(f"{url}/versions").json() == []
+    v1 = client.post(f"{url}/versions").json()
+    assert v1["version"] == 1 and v1["created"] is True and v1["itemCount"] == 1
+    again = client.post(f"{url}/versions").json()
+    assert again["version"] == 1 and again["created"] is False  # nothing changed: no v2
+    now = client.get(url).json()
+    assert now["version"] == 1 and now["changedSinceVersion"] is False
+    client.put(url, json={"name": "Versioned", "items": [item("one"), item("two")]})
+    assert client.get(url).json()["changedSinceVersion"] is True
+    v2 = client.post(f"{url}/versions").json()
+    assert v2["version"] == 2 and v2["itemCount"] == 2
+    listing = client.get(f"{url}/versions").json()
+    assert [v["version"] for v in listing] == [2, 1] and listing[1]["itemCount"] == 1  # newest first, v1 untouched
+    assert [i["name"] for i in client.get(f"{url}/versions/1").json()["items"]] == ["one"]
+    assert client.get(f"{url}/versions/9").status_code == 404
+
+
+def test_promote_makes_an_old_version_the_working_copy_and_a_new_latest(client):
+    doc = client.post("/api/documents", json={"name": "Promote", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    client.post(f"{url}/versions")
+    client.put(url, json={"name": "Promote", "items": [item("one"), item("two")]})
+    client.post(f"{url}/versions")
+    promoted = client.post(f"{url}/versions/1/promote").json()
+    assert [i["name"] for i in promoted["items"]] == ["one"] and promoted["version"] == 3 and promoted["changedSinceVersion"] is False
+    assert [v["version"] for v in client.get(f"{url}/versions").json()] == [3, 2, 1]
+    assert [i["name"] for i in client.get(f"{url}/versions/2").json()["items"]] == ["one", "two"]  # v2 is not rewritten
+    assert client.post(f"{url}/versions/9/promote").status_code == 404
+
+
+def test_deleting_a_document_deletes_its_versions(client):
+    doc = client.post("/api/documents", json={"name": "Gone", "items": []}).json()
+    url = f"/api/documents/{doc['id']}"
+    client.post(f"{url}/versions")
+    assert client.delete(url).status_code == 204
+    assert client.get(f"{url}/versions").status_code == 404
+    assert not (main.documentsRoot / f"{doc['id']}.versions").exists()
+
+
+def test_document_file_round_trip_restores_everything_including_versions(client):
+    doc = client.post("/api/documents", json={"name": "Backup me", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    client.post(f"{url}/versions")
+    client.put(url, json={"name": "Backup me", "items": [item("one"), item("two")]})
+    client.post(f"{url}/versions")
+    client.put(url, json={"name": "Backup me", "items": [item("one"), item("two"), item("three")]})  # working copy ahead of v2
+    saved = client.get(f"{url}/export.rasterfaster")
+    assert saved.status_code == 200 and "Backup_me-v2-edited.rasterfaster.json" in saved.headers["content-disposition"]  # v2 is the newest version, the working copy is ahead of it
+    assert [v["version"] for v in saved.json()["versions"]] == [1, 2]
+    assert client.delete(url).status_code == 204
+    restored = client.post("/api/documents/import", content=saved.content, headers={"Content-Type": "application/json"})
+    assert restored.status_code == 201
+    body = restored.json()
+    assert body["id"] == doc["id"] and [i["name"] for i in body["items"]] == ["one", "two", "three"]
+    assert body["version"] == 2 and body["changedSinceVersion"] is True
+    assert [v["version"] for v in client.get(f"{url}/versions").json()] == [2, 1]
+    assert [i["name"] for i in client.get(f"{url}/versions/1").json()["items"]] == ["one"]
+
+
+def test_importing_over_an_existing_document_asks_then_replaces_or_copies(client):
+    doc = client.post("/api/documents", json={"name": "Original", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    client.post(f"{url}/versions")
+    saved = client.get(f"{url}/export.rasterfaster").content
+    client.put(url, json={"name": "Edited later", "items": []})
+    client.post(f"{url}/versions")
+    ask = client.post("/api/documents/import", content=saved, headers={"Content-Type": "application/json"})
+    assert ask.status_code == 409 and ask.json()["detail"]["existing"]["name"] == "Edited later"
+    copy = client.post("/api/documents/import", params={"onConflict": "copy"}, content=saved, headers={"Content-Type": "application/json"})
+    assert copy.status_code == 201 and copy.json()["id"] != doc["id"] and copy.json()["name"] == "Original"
+    assert client.get(url).json()["name"] == "Edited later"  # the existing one is untouched
+    replaced = client.post("/api/documents/import", params={"onConflict": "replace"}, content=saved, headers={"Content-Type": "application/json"})
+    assert replaced.status_code == 201 and replaced.json()["name"] == "Original" and replaced.json()["id"] == doc["id"]
+    assert [v["version"] for v in client.get(f"{url}/versions").json()] == [1]  # the history is the file's, not the old one
+
+
+@pytest.mark.parametrize("payload", [
+    {"format": "something-else", "formatVersion": 1, "id": "x", "name": "n", "items": []},
+    {"format": "rasterfaster-document", "formatVersion": 2, "id": "x", "name": "n", "items": []},
+    {"format": "rasterfaster-document", "formatVersion": 1, "id": "../evil", "name": "n", "items": []},
+    {"format": "rasterfaster-document", "formatVersion": 1, "id": "ok", "name": "n", "items": [], "versions": [
+        {"version": 1, "savedAt": 1, "name": "n", "items": []}, {"version": 1, "savedAt": 2, "name": "n", "items": []}]},
+    {"not": "a document"},
+])
+def test_import_rejects_files_that_are_not_documents(client, payload):
+    assert client.post("/api/documents/import", json=payload).status_code == 422
+
+
+def test_document_file_name_carries_the_version(client):
+    doc = client.post("/api/documents", json={"name": "Named", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    assert 'filename="Named.rasterfaster.json"' in client.get(f"{url}/export.rasterfaster").headers["content-disposition"]  # no version yet
+    client.post(f"{url}/versions")
+    assert 'filename="Named-v1.rasterfaster.json"' in client.get(f"{url}/export.rasterfaster").headers["content-disposition"]
+    client.put(url, json={"name": "Named", "items": []})
+    assert 'filename="Named-v1-edited.rasterfaster.json"' in client.get(f"{url}/export.rasterfaster").headers["content-disposition"]

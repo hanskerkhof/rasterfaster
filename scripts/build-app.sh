@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds dist/Rasterfaster.app: the Angular app, then a PyInstaller bundle with the API, Python and the frontend inside.
+# Builds dist/Rasterfaster Server.app: the Angular app, then a PyInstaller bundle with the API, Python and the frontend inside.
 # Usage: scripts/build-app.sh [--install]    (--install copies the app to /Applications)
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,10 +25,10 @@ rm -rf "$iconset"
 
 cd "$root/backend"
 "$venv/bin/pyinstaller" --noconfirm --clean --distpath "$root/dist" --workpath "$root/backend/build" rasterfaster.spec
-echo "Built $root/dist/Rasterfaster.app"
+echo "Built $root/dist/Rasterfaster Server.app"
 
 if [ "${1:-}" = "--install" ]; then
-  rm -rf /Applications/Rasterfaster.app
-  cp -R "$root/dist/Rasterfaster.app" /Applications/
-  echo "Installed to /Applications/Rasterfaster.app"
+  rm -rf /Applications/Rasterfaster.app "/Applications/Rasterfaster Server.app"   # the first version of the app was called Rasterfaster.app
+  cp -R "$root/dist/Rasterfaster Server.app" /Applications/
+  echo "Installed to /Applications/Rasterfaster Server.app"
 fi

@@ -13,6 +13,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import threading
@@ -24,6 +25,7 @@ from typing import Annotated, Literal
 import uvicorn
 import appconfig
 import blenderexport
+import versions
 import export3mf
 import svgexport
 from fastapi import FastAPI, HTTPException
@@ -64,8 +66,15 @@ def natural_key(name: str) -> list:
 
 @app.get("/api/health")
 def health():
-    """Cheap liveness check; the frontend polls it to show an offline banner."""
-    return {"status": "ok"}
+    """Cheap liveness check; the frontend polls it to show an offline banner. `documents` is the newest modification time of any
+    document: when it changes the frontend checks whether the open document was changed by another window."""
+    stamp = 0.0
+    for file in documentsRoot.glob("*.json") if documentsRoot.is_dir() else []:
+        try:
+            stamp = max(stamp, file.stat().st_mtime)
+        except OSError:
+            pass
+    return {"status": "ok", "documents": stamp}
 
 
 @app.get("/api/list", response_model=list[LibraryEntry])
@@ -155,6 +164,23 @@ class DocumentBody(BaseModel):
 class DocumentOut(DocumentBody):
     id: str
     modified: float
+    version: int = 0  # the newest saved version (v1, v2, ...); 0 when none was saved yet
+    changedSinceVersion: bool = True  # the working copy differs from that version
+
+
+class VersionSummary(BaseModel):
+    version: int
+    savedAt: float
+    name: str
+    itemCount: int
+
+
+class VersionOut(VersionSummary):
+    created: bool = True  # False: nothing changed since the newest version, so no new one was made
+
+
+class VersionDetail(VersionSummary):
+    items: list[DocumentItem]
 
 
 class DocumentSummary(BaseModel):
@@ -181,7 +207,11 @@ def read_document(documentId: str) -> DocumentOut:
         raise HTTPException(status_code=404, detail="document not found")
     except (ValueError, OSError) as error:
         raise HTTPException(status_code=500, detail=f"document unreadable: {error}")
-    return DocumentOut(id=documentId, modified=file.stat().st_mtime, **body.model_dump())
+    directory = versions.versions_dir(documentsRoot, documentId)
+    newest = versions.latest(directory)
+    latestData = versions.read(directory, newest) if newest else None
+    changed = latestData is None or not versions.same_content(latestData, body.model_dump())
+    return DocumentOut(id=documentId, modified=file.stat().st_mtime, version=newest, changedSinceVersion=changed, **body.model_dump())
 
 
 def write_document(documentId: str, body: DocumentBody) -> DocumentOut:
@@ -222,23 +252,130 @@ def get_document(documentId: str) -> DocumentOut:
     return read_document(documentId)
 
 
+documentWriteLock = threading.Lock()
+
+
 @app.put("/api/documents/{documentId}", response_model=DocumentOut)
-def update_document(documentId: str, body: DocumentBody) -> DocumentOut:
-    if not document_file(documentId).is_file():
-        raise HTTPException(status_code=404, detail="document not found")
-    return write_document(documentId, body)
+def update_document(documentId: str, body: DocumentBody, baseModified: float | None = None) -> DocumentOut:
+    """Replaces the document. With `baseModified` (the `modified` the client last saw) the write is refused with 409 when the document
+    was changed since (another window, an edited file): the response carries the current document so the client can offer to load it."""
+    with documentWriteLock:
+        if not document_file(documentId).is_file():
+            raise HTTPException(status_code=404, detail="document not found")
+        if baseModified is not None:
+            current = read_document(documentId)
+            if abs(current.modified - baseModified) > 1e-3:
+                raise HTTPException(status_code=409, detail={"message": "the document was changed elsewhere", "current": current.model_dump()})
+        return write_document(documentId, body)
+
+
+@app.get("/api/documents/{documentId}/versions", response_model=list[VersionSummary])
+def list_versions(documentId: str) -> list[dict]:
+    read_document(documentId)  # 404 for an unknown document
+    return versions.listing(versions.versions_dir(documentsRoot, documentId))
+
+
+@app.post("/api/documents/{documentId}/versions", response_model=VersionOut)
+def save_version(documentId: str) -> dict:
+    """Snapshots the working copy as the next version (v1, v2, ...); a no-op when nothing changed since the newest one."""
+    with documentWriteLock:
+        document = read_document(documentId)
+        directory = versions.versions_dir(documentsRoot, documentId)
+        if document.version and not document.changedSinceVersion:
+            return {**versions.summary(versions.read(directory, document.version)), "created": False}
+        return {**versions.summary(versions.save(directory, {"name": document.name, "items": [i.model_dump() for i in document.items]})), "created": True}
+
+
+@app.get("/api/documents/{documentId}/versions/{number}", response_model=VersionDetail)
+def get_version(documentId: str, number: int) -> dict:
+    read_document(documentId)
+    data = versions.read(versions.versions_dir(documentsRoot, documentId), number)
+    if not data:
+        raise HTTPException(status_code=404, detail="version not found")
+    return {**versions.summary(data), "items": data["items"]}
+
+
+@app.post("/api/documents/{documentId}/versions/{number}/promote", response_model=DocumentOut)
+def promote_version(documentId: str, number: int) -> DocumentOut:
+    """Makes an older version the working copy again and saves it as a new, latest version (the older versions stay as they are)."""
+    with documentWriteLock:
+        read_document(documentId)
+        directory = versions.versions_dir(documentsRoot, documentId)
+        data = versions.read(directory, number)
+        if not data:
+            raise HTTPException(status_code=404, detail="version not found")
+        body = DocumentBody(name=data["name"], items=data["items"])
+        write_document(documentId, body)
+        versions.save(directory, body.model_dump())
+        return read_document(documentId)
+
+
+documentFileFormat = "rasterfaster-document"
+
+
+class StoredVersion(BaseModel):
+    version: int = Field(ge=1, le=100000)
+    savedAt: float
+    name: str = Field(min_length=1, max_length=120)
+    items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+
+
+class DocumentFile(BaseModel):
+    """What a document looks like in a saved file: the document itself plus its whole version history."""
+    format: Literal["rasterfaster-document"]
+    formatVersion: int = Field(ge=1, le=1)
+    exportedAt: float | None = None
+    appVersion: str | None = None
+    id: str = Field(max_length=81)
+    name: str = Field(min_length=1, max_length=120)
+    items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+    versions: list[StoredVersion] = Field(default_factory=list, max_length=1000)
+
+
+@app.get("/api/documents/{documentId}/export.rasterfaster")
+def export_document_file(documentId: str) -> Response:
+    """The document and all its versions as one JSON file (import it again with POST /api/documents/import)."""
+    document = read_document(documentId)
+    directory = versions.versions_dir(documentsRoot, documentId)
+    history = [data for number in versions.numbers(directory) if (data := versions.read(directory, number))]
+    payload = DocumentFile(format=documentFileFormat, formatVersion=1, exportedAt=time.time(), id=documentId, name=document.name,
+                           items=document.items, versions=history)
+    label = (f"-v{document.version}" + ("-edited" if document.changedSinceVersion else "")) if document.version else ""  # e.g. Name-v3 (or Name-v3-edited: the working copy is ahead of v3)
+    filename = re.sub(r"[^\w.-]+", "_", document.name) + label + ".rasterfaster.json"
+    return Response(payload.model_dump_json(indent=2), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.post("/api/documents/import", response_model=DocumentOut, status_code=201)
+def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "copy"] = "ask") -> DocumentOut:
+    """Recovers a saved document file. A document with that id that does not exist is restored as it was (same id, all versions).
+    If it exists: `onConflict=replace` overwrites it (working copy and versions), `copy` imports it under a new id, and the default answers 409."""
+    if not documentIdPattern.match(file.id):
+        raise HTTPException(status_code=422, detail="the file has an invalid document id")
+    documentId = file.id
+    with documentWriteLock:
+        exists = document_file(documentId).is_file()
+        if exists and onConflict == "ask":
+            raise HTTPException(status_code=409, detail={"message": "a document with this id already exists", "existing": read_document(documentId).model_dump(include={"id", "name", "modified", "version"})})
+        if exists and onConflict == "copy":
+            documentId = new_document_id(file.name)
+        stored = [{"version": v.version, "savedAt": v.savedAt, "name": v.name, "items": [i.model_dump() for i in v.items]} for v in sorted(file.versions, key=lambda v: v.version)]
+        if len({v["version"] for v in stored}) != len(stored):
+            raise HTTPException(status_code=422, detail="the file has duplicate version numbers")
+        write_document(documentId, DocumentBody(name=file.name, items=file.items))
+        versions.replace_all(versions.versions_dir(documentsRoot, documentId), stored)
+        return read_document(documentId)
 
 
 @app.get("/api/documents/{documentId}/export.3mf")
-def export_document_3mf(documentId: str, layout: Literal["assembly", "print", "fusion"] = "assembly", bed: float = 256.0) -> Response:
-    """3MF for Bambu Studio / Fusion 360. `assembly` keeps the assembled positions centred on the plate; `print` lays each part out flat on a plate of `bed` mm; `fusion` keeps the document coordinates."""
+def export_document_3mf(documentId: str, bed: float = 256.0) -> Response:
+    """3MF of the assembly for Bambu Studio: the parts exactly as assembled, centred on a plate of `bed` mm."""
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
-        data = export3mf.build_3mf(document.model_dump(), stlBytes.__getitem__, layout, bed)
+        data = export3mf.build_3mf(document.model_dump(), stlBytes.__getitem__, bed)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
-    filename = re.sub(r"[^\w.-]+", "_", f"{document.name}-{layout}") + ".3mf"
+    filename = re.sub(r"[^\w.-]+", "_", f"{document.name}-assembly") + ".3mf"
     return Response(data, media_type="model/3mf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
@@ -323,6 +460,7 @@ def delete_document(documentId: str) -> None:
         file.unlink()
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="document not found")
+    shutil.rmtree(versions.versions_dir(documentsRoot, documentId), ignore_errors=True)
 
 
 class RuntimeRestartRequest(BaseModel):

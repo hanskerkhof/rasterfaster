@@ -1,23 +1,14 @@
-"""Builds a 3MF package (core spec, readable by Bambu Studio) from a RASTERFASTER document.
-
-Layouts:
-  assembly  parts exactly where they sit in the document, centred on the plate
-  fusion    like assembly but keeping the document's own coordinates (for Fusion 360 / CAD)
-  print     every part in its library orientation, laid out in rows on the plate
-"""
+"""Builds a 3MF package (core spec, readable by Bambu Studio) from a RASTERFASTER document: the assembly, with the parts exactly where they
+sit in the document, centred on the plate."""
 import io
 import re
 import struct
 import zipfile
 from dataclasses import dataclass
-from typing import Callable, Literal
+from typing import Callable
 from xml.sax.saxutils import escape, quoteattr
 
 import numpy as np
-
-Layout = Literal["assembly", "print", "fusion"]
-plateMargin = 5.0
-partGap = 5.0
 
 contentTypesXml = (
     '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -96,26 +87,6 @@ def place_assembly(items: list[dict], meshes: dict[str, Mesh], plateSize: float,
     return placements
 
 
-def place_print(items: list[dict], meshes: dict[str, Mesh], plateSize: float) -> list[Placement]:
-    """Library orientation (rotation ignored), lowest point on the plate, shelf-packed row by row. Overflow runs past the plate edge."""
-    sizes = []
-    for item in items:
-        vertices = meshes[item["path"]].vertices
-        sizes.append((vertices.min(axis=0), vertices.max(axis=0) - vertices.min(axis=0)))
-    order = sorted(range(len(items)), key=lambda i: -sizes[i][1][1])  # deepest first keeps rows tidy
-    placements: list[Placement | None] = [None] * len(items)
-    x = y = plateMargin
-    rowDepth = 0.0
-    for index in order:
-        low, size = sizes[index]
-        if x > plateMargin and x + size[0] > plateSize - plateMargin:
-            x, y, rowDepth = plateMargin, y + rowDepth + partGap, 0.0
-        placements[index] = Placement(np.eye(3), np.array([x, y, 0.0]) - low, size)
-        x += size[0] + partGap
-        rowDepth = max(rowDepth, size[1])
-    return placements  # type: ignore[return-value]
-
-
 def transform_attribute(placement: Placement) -> str:
     """3MF stores row-vector transforms: v' = v @ A + t, so A is the transpose of our column-vector rotation."""
     matrix = placement.rotation.T
@@ -130,15 +101,12 @@ def object_xml(objectId: int, name: str, mesh: Mesh) -> str:
             f"<vertices>{vertices}</vertices><triangles>{triangles}</triangles></mesh></object>")
 
 
-def build_3mf(document: dict, load_stl: Callable[[str], bytes], layout: Layout = "assembly", plateSize: float = 256.0) -> bytes:
+def build_3mf(document: dict, load_stl: Callable[[str], bytes], plateSize: float = 256.0) -> bytes:
     items = document["items"]
     if not items:
         raise ValueError("document has no items")
     meshes = {path: read_stl(load_stl(path)) for path in dict.fromkeys(item["path"] for item in items)}
-    if layout == "print":
-        placements = place_print(items, meshes, plateSize)
-    else:
-        placements = place_assembly(items, meshes, plateSize, centre=layout == "assembly")
+    placements = place_assembly(items, meshes, plateSize)
 
     objectIds = {path: index + 1 for index, path in enumerate(meshes)}
     names: dict[str, str] = {}

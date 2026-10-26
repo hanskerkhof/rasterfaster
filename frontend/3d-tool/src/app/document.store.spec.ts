@@ -122,3 +122,18 @@ describe('DocumentStore history (mutate, gestures, undo)', () => {
     expect(positions()).toEqual([[0, 0, 0]]);
   });
 });
+
+describe('DocumentStore older versions', () => {
+  it('ignore edits while an older version is being looked at', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    store.addItem(part());
+    expect(store.doc().items).toHaveLength(1);
+    store.viewing.set(1); // what viewVersion() does after loading v1
+    expect(store.mutate('Edit', d => ({ ...d, name: 'changed' }))).toBe(false);
+    expect(store.doc().name).not.toBe('changed');
+    store.viewing.set(null);
+    expect(store.mutate('Edit', d => ({ ...d, name: 'changed' }))).toBe(true);
+  });
+});

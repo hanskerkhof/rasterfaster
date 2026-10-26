@@ -1,6 +1,6 @@
 {
   "name": "3d-tool",
-  "version": "0.2.6",
+  "version": "0.5.2",
   "scripts": {
     "bump:version": "node scripts/bump-version.mjs",
     "ng": "ng",

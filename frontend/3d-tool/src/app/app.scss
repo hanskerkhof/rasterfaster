@@ -21,7 +21,6 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; cursor: pointer; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
-.name { opacity: .6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .overlay { position: absolute; top: 12px; left: 12px; padding: 6px 10px; background: rgba(0,0,0,.6); border-radius: 4px; }
 .overlay.err { color: #ff8a8a; }
@@ -54,3 +53,12 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .offline { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 8px 12px; width: max-content; max-width: 90%;
            background: #a82929; color: #fff; border: 1px solid #000; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
 .offline button { padding: 3px 10px; background: rgba(0,0,0,.3); color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
+
+.conflict { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 7; display: flex; align-items: center; gap: 10px; padding: 8px 12px; width: max-content; max-width: 90%;
+            background: #8a5a00; color: #fff; border: 1px solid #000; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
+.conflict button { padding: 3px 10px; background: rgba(0,0,0,.3); color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
+.notice { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 6; padding: 6px 12px; background: rgba(35,38,45,.95); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; font-size: 12px; }
+
+.viewing { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 8px 12px; width: max-content; max-width: 90%;
+           background: #1f4f8f; color: #fff; border: 1px solid #000; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
+.viewing button { padding: 3px 10px; background: rgba(0,0,0,.3); color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }

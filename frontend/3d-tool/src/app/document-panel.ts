@@ -1,10 +1,11 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
+import { VersionsDialog } from './versions-dialog';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
 @Component({
   selector: 'app-document-panel',
-  imports: [BomDialog],
+  imports: [BomDialog, VersionsDialog],
   template: `
     <div class="picker">
       <select aria-label="Open document" (change)="open($any($event.target).value)">
@@ -16,7 +17,8 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       <button type="button" title="Delete this document" [disabled]="!store.docId()" (click)="deleteDocument()">🗑</button>
     </div>
     <div class="head">
-      <input class="docname" type="text" [value]="store.doc().name" aria-label="Document name" (change)="store.rename($any($event.target).value)" />
+      <input class="docname" type="text" [value]="store.doc().name" aria-label="Document name" [disabled]="store.viewing() !== null" (change)="store.rename($any($event.target).value)" />
+      <button type="button" class="ver" [title]="versionTitle()" (click)="versionsOpen.set(true)">{{ versionLabel() }}</button>
     </div>
     <div class="toolbar">
       <button type="button" [disabled]="!store.canUndo()" title="Undo (⌘Z)" (click)="store.undo()">↶</button>
@@ -28,12 +30,26 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     </div>
     <div class="export">
       <span>Export</span>
-      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf('assembly')">Assembly</button>
-      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Every part flat on the plate in its library orientation, ready to print" (click)="export3mf('print')">Print plate</button>
-      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="3MF with the document's own coordinates (Z up), for opening in Fusion 360" (click)="export3mf('fusion')">Fusion</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf()">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): Black PLA parts as placed, studio lighting, and a camera where the 3D view is now" (click)="exportBlender()">Blender</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
     </div>
+    <div class="export">
+      <span>Document file</span>
+      <button type="button" [disabled]="!store.docId() || exporting()" title="Save this document, with all its versions, as a file you can keep (⤓)" (click)="exportDocumentFile()">Save file</button>
+      <button type="button" title="Restore a document from a saved file (with its versions)" (click)="fileInput.click()">Open file…</button>
+      <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />
+    </div>
+    @if (pendingImport(); as pending) {
+      <div class="import-ask" role="alert">
+        A document “{{ pending.existing.name }}” with this id already exists.
+        <div class="buttons">
+          <button type="button" (click)="finishImport('replace')">Replace it</button>
+          <button type="button" (click)="finishImport('copy')">Import as a copy</button>
+          <button type="button" (click)="pendingImport.set(null)">Cancel</button>
+        </div>
+      </div>
+    }
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
     <div class="list">
       @for (item of store.doc().items; track item.id) {
@@ -61,12 +77,16 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       </div>
     }
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
+    @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
     <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
   `,
   styles: `
     :host { display: flex; flex-direction: column; gap: 6px; padding: 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
             background: rgba(35,38,45,.9); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
-    .docname { width: 100%; box-sizing: border-box; font-weight: 600; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; padding: 3px 4px; font: inherit; }
+    .head { display: flex; gap: 6px; align-items: center; }
+    .ver { flex: none; padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .ver:hover { background: #2f6fed; color: #fff; }
+    .docname { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; font-weight: 600; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; padding: 3px 4px; font: inherit; }
     .docname:hover, .docname:focus { border-color: rgba(255,255,255,.25); background: #1b1d22; outline: none; }
     .toolbar { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
     .picker { display: flex; gap: 4px; }
@@ -74,6 +94,8 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     .export { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
     .export span { flex: 1 0 100%; opacity: .8; white-space: nowrap; }
     .export-error { color: #ff8a8a; font-size: 11px; }
+    .import-ask { padding: 6px 8px; background: #3a3320; border: 1px solid #6b5a20; border-radius: 6px; font-size: 11px; }
+    .import-ask .buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .status { margin-left: auto; opacity: .6; font-size: 11px; }
     .status.error { color: #ff8a8a; opacity: 1; }
     button { padding: 3px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
@@ -103,18 +125,63 @@ export class DocumentPanel {
   /** The 3D view's camera (see StlViewer.viewParam): the Blender export puts its camera there. */
   readonly viewProvider = input<() => string | null>(() => null);
   protected readonly bomOpen = signal(false);
+  protected readonly versionsOpen = signal(false);
+
+  /** "v3" (latest saved version), with a dot while the working copy has changes since it; "v–" before the first version. */
+  protected versionLabel() {
+    const shown = this.store.viewing() ?? this.store.version();
+    return `${shown ? 'v' + shown : 'no version'}${this.store.viewing() === null && this.store.changedSinceVersion() ? ' •' : ''}`;
+  }
+
+  protected versionTitle() {
+    if (this.store.viewing() !== null) return `Viewing v${this.store.viewing()} (read-only). Click for the versions.`;
+    const base = this.store.version() ? `Latest saved version: v${this.store.version()}` : 'No version saved yet';
+    return `${base}${this.store.changedSinceVersion() ? ' · changes since (⌘S saves a new version)' : ''}. Click for all versions.`;
+  }
   protected readonly exporting = signal(false);
   protected readonly exportError = signal('');
   protected readonly axes = ['x', 'y', 'z'] as const;
   protected readonly step = snapStepMm;
 
-  protected export3mf(layout: 'assembly' | 'print' | 'fusion') {
-    return this.download(`export.3mf?layout=${layout}`, `${layout}.3mf`);
+  protected export3mf() {
+    return this.download('export.3mf', 'assembly.3mf');
   }
 
   protected exportBlender() {
     const view = this.viewProvider()();
     return this.download(view ? `export.blend?view=${encodeURIComponent(view)}` : 'export.blend', 'scene.blend');
+  }
+
+  protected exportDocumentFile() {
+    return this.download('export.rasterfaster', 'document.rasterfaster.json');
+  }
+
+  /** The file the user picked is waiting for their choice because a document with that id exists. */
+  protected readonly pendingImport = signal<{ text: string; existing: { id: string; name: string } } | null>(null);
+
+  protected async importFile(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = ''; // the same file can be picked again
+    if (!file) return;
+    this.exportError.set('');
+    try {
+      const text = await file.text();
+      const { conflictWith } = await this.store.importDocumentFile(text);
+      if (conflictWith) this.pendingImport.set({ text, existing: conflictWith });
+    } catch (error) {
+      this.exportError.set(`Import failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  protected async finishImport(choice: 'replace' | 'copy') {
+    const pending = this.pendingImport();
+    this.pendingImport.set(null);
+    if (!pending) return;
+    try {
+      await this.store.importDocumentFile(pending.text, choice);
+    } catch (error) {
+      this.exportError.set(`Import failed: ${error instanceof Error ? error.message : error}`);
+    }
   }
 
   protected exportSvg() {

@@ -2,6 +2,73 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - README: the build and release flow
+
+### Changed
+- **README**: "Shipping a change (the flow)" under the Rasterfaster Server.app section (test, bump version and changelog, `scripts/build-app.sh --install`, restart the API, update the PWA, commit); the top of the README points to the app for using it and keeps the two dev processes for developing.
+
+## 2026-10-26 - toolbar file name removed (0.5.2)
+
+### Removed
+- **FE** (`app.html`, `app.scss`): the selected library file's path in the toolbar (the `.name` span, "Select an .stl file"): the tree, quick look and the document list already show it.
+
+## 2026-10-26 - only the Assembly 3MF is left (0.5.1)
+
+### Removed
+- **FE** (`document-panel.ts`): the **Print plate** and **Fusion** export buttons. The export row is now Assembly, Blender and SVG.
+- **BE** (`export3mf.py`, `main.py`, `tests/test_export3mf.py`): the `print` and `fusion` layouts and their logic (`place_print`, the `layout` parameter of `GET /api/documents/{id}/export.3mf`, the plate-packing constants and their tests). The 3MF is now always the assembly, named `<name>-assembly.3mf`; `bed` still sets the plate size it is centred on.
+- **README**: the "Known issues" note about the 3MF problem in Bambu Studio (the assembly 3MF imports fine) and the layout descriptions.
+
+## 2026-10-26 - version in the document file name
+
+### Changed
+- **BE** (`main.py`, `tests/test_api.py`): the saved document file is named `<name>-v<n>.rasterfaster.json`, with `-edited` added when the working copy is ahead of the newest version (no suffix before the first version).
+
+## 2026-10-26 - save a document as a file, restore it (0.5.0)
+
+### Added
+- **BE** (`main.py`, `versions.py`, `tests/test_api.py`): `GET /api/documents/{id}/export.rasterfaster` (one JSON file: the document and all its versions, `format: rasterfaster-document`) and `POST /api/documents/import[?onConflict=replace|copy]`: restores the document with its id and history; an existing id gives 409 unless `replace` (working copy and history replaced) or `copy` (new id). Invalid files (wrong format or version, bad id, duplicate version numbers) give 422.
+- **FE** (`document-panel.ts`, `document.store.ts`, `document.api.ts`): "Document file" row with **Save file** and **Open file…** and an inline Replace / Import as copy / Cancel choice when the id exists. The restored document is opened; the two-window sync shows it in other windows. Tested against a throwaway API: delete a document with 2 versions and a working copy ahead of v2, import the file (same id, 3 parts, versions 2 and 1, changes since v2 kept), importing again asks, copy gives a second document, a damaged file is rejected, and replacing a document that was open in a second window updated that window. Version 0.5.0.
+
+## 2026-10-26 - document versions v1, v2, ... (0.4.0)
+
+### Added
+- **BE** (`versions.py`, `main.py`, `tests/test_api.py`): immutable numbered snapshots of a document in `documents/<id>.versions/v<n>.json`. `POST /api/documents/{id}/versions` snapshots the working copy as the next version (no new one when nothing changed), `GET .../versions` lists them (newest first), `GET .../versions/{n}` reads one, `POST .../versions/{n}/promote` makes an old version the working copy and the new latest. Documents report `version` and `changedSinceVersion`; deleting a document deletes its versions.
+- **FE** (`document.store.ts`, `document.api.ts`, `versions-dialog.ts`, `document-panel.ts`, `app.ts`, `app.html`, `app.scss`): a version pill next to the document name (`v3`, `v3 •` with changes since), ⌘S saves a new version, a versions dialog (view read-only, promote, back to the working copy) and a blue "Viewing vN (read-only)" bar; the store ignores edits and autosave while an older version is shown. Tested against a throwaway API: save v1, change, ⌘S gives v2, view v1 (read-only, name field disabled, working copy untouched on the server), promote gives v3 with v1's content. Version 0.4.0.
+
+## 2026-10-26 - two windows on one document no longer overwrite each other (0.3.4)
+
+### Added
+- **BE** (`main.py`, `tests/test_api.py`): `PUT /api/documents/{id}?baseModified=<modified>` refuses with 409 (and the current document in `detail.current`) when the stored document is newer than the client's base; writes are serialised with a lock. `/api/health` now also returns `documents`, the newest modification time of any document. Without `baseModified` nothing changes.
+- **FE** (`document.store.ts`, `document.api.ts`, `api-status.ts`, `app.ts`, `app.html`, `app.scss`): the store remembers the `modified` time it is based on and sends it with every save. When the health stamp changes, `checkRemote()` reloads the open document if another window saved it (notice "Updated from another window"), or, with unsaved local edits (or on a 409), shows a banner to load the other version or keep mine. Tested with two windows against a throwaway API: silent reload, conflict banner, keep mine (saved) and load theirs (saved state, other version shown). Version 0.3.4.
+
+## 2026-10-26 - adding a part closes the quick look (0.3.3)
+
+### Changed
+- **FE** (`app.ts`, `tree-panel.ts`, `quick-look.ts`): every way of adding a part to the document (＋ Add to document, ⌘↓, Enter, double-click) closes the quick look popover; the "Added to document" flash is gone. Checked in the browser with a throwaway document (deleted afterwards).
+
+## 2026-10-26 - quick look: always inside the window, solid view lit (0.3.2)
+
+### Fixed
+- **FE** (`quick-look.ts`): the quick look card is never larger than the free space in the window, however big the remembered size is (it keeps 12 px from the edges, shifts left on very small windows and follows window resizes); the remembered size itself is kept and applies again when the window is big enough. The corner handle therefore always stays reachable. Checked with a stored size of 3000x2500 and windows down to 480x360.
+- **FE** (`quick-look.ts`): the solid view in the quick look was black because its scene had no lights. It now has an ambient light and a key light that follows the camera, so details show whichever way you orbit.
+
+## 2026-10-26 - no more Preview mode (0.3.0, quick look size remembered in 0.3.1)
+
+### Changed
+- **FE** (`app.html`, `app.ts`, `quick-look.ts`): the Preview / Document switch is gone; the app is always the document. A file is looked at with the Space quick look, which now has its own view-mode switch (Solid, Wireframe, Hidden removed, Hidden dashed; stored as `rasterfaster.quickLookMode`) and can be resized by dragging its bottom-right corner (the size is remembered in local storage as `rasterfaster.quickLookSize`). Selecting a file in the tree no longer loads it into the 3D view. The old Preview code paths in `stl-viewer.ts` are unused and still there (to be removed later).
+
+## 2026-10-26 - the API lives and dies with the PWA
+
+### Changed
+- **BE** (`app.py`, `requirements-app.txt`, `rasterfaster.spec`, `tests/test_appconfig.py`): Rasterfaster Server starts the API, opens the PWA and watches it: once the PWA window is closed (or the PWA quits) for 6 seconds the API stops, the PWA app is quit and the server app ends; it has no Dock icon in between. Without an installed PWA (or if it never opens) it keeps a Dock icon with Quit. `PwaWatch` holds the decision logic (tested with a fake clock); the window check uses Quartz (`pyobjc-framework-Quartz`).
+- A launchd background service was tried and dropped: the backend should only run while the app is open.
+
+## 2026-10-26 - Rasterfaster Server: the PWA is the UI
+
+### Changed
+- **BE** (`app.py`, `rasterfaster.spec`, `scripts/build-app.sh`, `tests/test_appconfig.py`): the packaged app is now **Rasterfaster Server.app**: it starts the API, shows a Dock icon (reopen opens the PWA, Quit stops the API) and opens the Rasterfaster PWA installed from the same address (found in `~/Applications/Chrome Apps.localized`), or the address in Chrome. The native pywebview window is removed (it ran in private mode, so localStorage was wiped on every start and no document showed): `pywebview` and its folder dialog are gone, `requirements-app.txt` now needs `pyobjc-framework-Cocoa` for the Dock icon; a missing library folder is set in `config.json` (see README).
+
 ## 2026-10-26 - Rasterfaster.app
 
 ### Added

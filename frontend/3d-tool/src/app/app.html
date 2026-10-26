@@ -43,26 +43,35 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m14 10 2 2-2 2"/></svg>
       </button>
     }
-    <div class="modes">
-      <button [class.on]="!documentMode()" (click)="setDocumentMode(false)">Preview</button>
-      <button [class.on]="documentMode()" (click)="setDocumentMode(true)">Document</button>
-    </div>
     <button class="add" [disabled]="!selected()" title="Add the selected file to the document" (click)="addToDocument()">＋ Add to document</button>
     <div class="modes">
       @for (m of modes; track m.id) {
         <button [class.on]="mode() === m.id" (click)="setMode(m.id)">{{ m.label }}</button>
       }
     </div>
-    <span class="name">{{ selected() ?? 'Select an .stl file' }}</span>
     @if (updateAvailable()) {
       <button class="update" type="button" title="A newer version of Rasterfaster is ready: click to reload into it" (click)="applyUpdate()">Update available{{ updateVersion() ? ' v' + updateVersion() : '' }} · reload</button>
     }
   </div>
   <div class="stage">
-    <app-stl-viewer #v [data]="data()" [mode]="mode()" [documentMode]="documentMode()" />
-    @if (documentMode()) { <app-document-panel class="docpanel" [viewProvider]="v.viewParam" (centerItem)="v.centerOnItem($event)" /> }
-    @if (loading()) { <div class="overlay">Loading…</div> }
+    <app-stl-viewer #v [data]="null" [mode]="mode()" [documentMode]="true" />
+    <app-document-panel class="docpanel" [viewProvider]="v.viewParam" (centerItem)="v.centerOnItem($event)" />
     @if (error()) { <div class="overlay err">{{ error() }}</div> }
+    @if (store.viewing(); as shown) {
+      <div class="viewing" role="status">
+        <div><strong>Viewing v{{ shown }} (read-only).</strong> Edits are off until you go back or promote it.</div>
+        <button type="button" (click)="store.promoteVersion()">Promote to latest</button>
+        <button type="button" (click)="store.backToWorkingCopy()">Back to the working copy</button>
+      </div>
+    }
+    @if (store.conflict()) {
+      <div class="conflict" role="alert">
+        <div><strong>This document was changed in another window.</strong><br />You have unsaved edits here. Which version do you want to keep?</div>
+        <button type="button" (click)="store.useRemoteVersion()">Load the other version</button>
+        <button type="button" (click)="store.keepMyVersion()">Keep mine (overwrite)</button>
+      </div>
+    }
+    @if (store.notice(); as notice) { <div class="notice" role="status">{{ notice }}</div> }
     @if (api.offline()) {
       <div class="offline" role="alert">
         <div><strong>Offline: the API does not answer.</strong><br />Changes are not saved and the file list may be out of date. Reconnecting automatically…</div>

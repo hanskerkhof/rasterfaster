@@ -12,6 +12,8 @@ export class ApiStatus {
   readonly offline = signal(false);
   /** Bumped on every successful check, so the app can react to "the API is there" (also when it was never shown as offline). */
   readonly checks = signal(0);
+  /** Newest modification time of any document on the server (from /api/health): when it changes another window may have saved. */
+  readonly documentsStamp = signal(0);
   private failures = 0;
   private started = false;
 
@@ -29,6 +31,7 @@ export class ApiStatus {
     try {
       const response = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(timeoutMs) });
       ok = response.ok;
+      if (ok) this.documentsStamp.set(Number((await response.json()).documents) || 0);
     } catch { /* unreachable */ }
     this.failures = ok ? 0 : this.failures + 1;
     this.offline.set(this.failures >= failuresBeforeOffline);

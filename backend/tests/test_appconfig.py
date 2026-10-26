@@ -44,3 +44,54 @@ def test_seed_documents_copy_once_and_never_overwrite(tmp_path):
     assert appconfig.seed_documents(target, seed) == 0  # the folder exists now: left alone
     assert json.loads((target / "a.json").read_text())["name"] == "edited"
     assert appconfig.seed_documents(tmp_path / "other", None) == 0
+
+
+def make_pwa(folder: Path, name: str, url: str):
+    import plistlib
+
+    contents = folder / f"{name}.app" / "Contents"
+    contents.mkdir(parents=True)
+    (contents / "Info.plist").write_bytes(plistlib.dumps({"CrAppModeShortcutURL": url}))
+
+
+def test_pwa_app_is_found_by_the_address_it_was_installed_from(tmp_path):
+    import app
+
+    make_pwa(tmp_path, "Other", "https://example.com/")
+    make_pwa(tmp_path, "Rasterfaster dev", "http://localhost:4200/")
+    make_pwa(tmp_path, "Rasterfaster", "http://localhost:8100/")
+    (tmp_path / "Broken.app" / "Contents").mkdir(parents=True)  # no Info.plist: skipped
+    assert app.pwa_app(8100, tmp_path).name == "Rasterfaster.app"
+    assert app.pwa_app(4200, tmp_path).name == "Rasterfaster dev.app"
+    assert app.pwa_app(9999, tmp_path) is None
+    assert app.pwa_app(8100, tmp_path / "missing") is None
+
+
+def test_pwa_watch_closes_only_after_it_was_seen_open_and_stayed_gone():
+    import app
+
+    now = [0.0]
+    watch = app.PwaWatch(closeAfter=6, startupGrace=60, clock=lambda: now[0])
+
+    def at(t, isOpen):
+        now[0] = t
+        return watch.sample(isOpen)
+
+    assert at(1, False) == "waiting"  # still starting
+    assert at(5, True) == "open"
+    assert at(6, False) == "waiting"  # gone, but not for long enough
+    assert at(8, True) == "open"  # came back (window moved / reopened): the countdown restarts
+    assert at(9, False) == "waiting"
+    assert at(14, False) == "waiting"
+    assert at(15.5, False) == "closed"
+
+
+def test_pwa_watch_gives_up_when_it_never_opens():
+    import app
+
+    now = [0.0]
+    watch = app.PwaWatch(startupGrace=60, clock=lambda: now[0])
+    now[0] = 30
+    assert watch.sample(False) == "waiting"
+    now[0] = 61
+    assert watch.sample(False) == "never"

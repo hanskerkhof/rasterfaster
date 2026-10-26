@@ -65,7 +65,7 @@ def test_read_stl_ascii():
 
 def test_assembly_layout_keeps_positions_and_centres_on_plate():
     items, stls = items_and_stls()
-    model, objects, build = parse(export3mf.build_3mf({"name": "Doc & co", "items": items}, stls.__getitem__, "assembly", 256))
+    model, objects, build = parse(export3mf.build_3mf({"name": "Doc & co", "items": items}, stls.__getitem__, 256))
     ns = {"m": "http://schemas.microsoft.com/3dmanufacturing/core/2015/02"}
     root = ElementTree.fromstring(model)  # well-formed even with & and " in names
     assert root.find("m:metadata", ns).text == "Doc & co"
@@ -82,18 +82,6 @@ def test_assembly_layout_keeps_positions_and_centres_on_plate():
     low = np.min([b[0] for b in bounds], axis=0)
     high = np.max([b[1] for b in bounds], axis=0)
     assert np.allclose((low + high)[:2] / 2, [128, 128], atol=1e-3) and shift[2] == pytest.approx(0)
-
-
-def test_print_layout_lays_parts_flat_on_the_plate_without_overlap():
-    items, stls = items_and_stls()
-    _, objects, build = parse(export3mf.build_3mf({"name": "d", "items": items}, stls.__getitem__, "print", 100))
-    boxes = [world_bounds(objects[i], t) for i, t in build]
-    assert all(low[2] == pytest.approx(0, abs=1e-6) for low, _ in boxes)  # on the plate, rotation ignored
-    assert np.allclose(boxes[1][1] - boxes[1][0], [10, 20, 30], atol=1e-3)
-    for i in range(len(boxes)):
-        for j in range(i + 1, len(boxes)):
-            (l1, h1), (l2, h2) = boxes[i], boxes[j]
-            assert not (np.all(l1[:2] < h2[:2]) and np.all(l2[:2] < h1[:2])), f"{i} overlaps {j}"
 
 
 def test_empty_document_is_rejected():
@@ -115,12 +103,11 @@ def client(tmp_path: Path, monkeypatch):
 def test_export_endpoint(client):
     items, _ = items_and_stls()
     document = client.post("/api/documents", json={"name": "My Box", "items": items}).json()
-    response = client.get(f"/api/documents/{document['id']}/export.3mf", params={"layout": "print"})
+    response = client.get(f"/api/documents/{document['id']}/export.3mf")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("model/3mf")
-    assert 'filename="My_Box-print.3mf"' in response.headers["content-disposition"]
+    assert 'filename="My_Box-assembly.3mf"' in response.headers["content-disposition"]
     assert len(parse(response.content)[2]) == 3
-    assert client.get(f"/api/documents/{document['id']}/export.3mf", params={"layout": "nope"}).status_code == 422
 
 
 def test_export_reports_missing_stl_and_empty_document(client):
@@ -131,14 +118,6 @@ def test_export_reports_missing_stl_and_empty_document(client):
     assert response.status_code == 422 and "gone.stl" in response.json()["detail"]
     empty = client.post("/api/documents", json={"name": "e"}).json()
     assert client.get(f"/api/documents/{empty['id']}/export.3mf").status_code == 422
-
-
-def test_fusion_layout_keeps_document_coordinates():
-    items, stls = items_and_stls()
-    _, objects, build = parse(export3mf.build_3mf({"name": "d", "items": items}, stls.__getitem__, "fusion", 256))
-    for (objectId, transform), item in zip(build, items):
-        low, _ = world_bounds(objects[objectId], transform)
-        assert np.allclose(low, item["position"], atol=1e-3)
 
 
 def test_parts_marked_do_not_export_are_left_out_and_not_even_read(client):

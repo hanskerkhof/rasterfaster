@@ -1,7 +1,8 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ClipboardContent, copyItems, pasteItems } from './clipboard';
-import { DocumentApi, DocumentSummary } from './document.api';
+import { DocumentApi, DocumentSummary, StoredDocument, VersionSummary } from './document.api';
 
 /** Grid the document snaps to, in mm. */
 /** X/Y snap steps in mm. Height (Z) follows the grid mode, see z-levels.ts. */
@@ -116,6 +117,19 @@ export class DocumentStore {
   readonly docId = signal<string | null>(null);
   readonly documents = signal<DocumentSummary[]>([]);
   readonly saveState = signal<SaveState>('saved');
+  /** Set when the open document was changed elsewhere (another window) while this one has unsaved edits: the user chooses whose version stays. */
+  readonly conflict = signal<StoredDocument | null>(null);
+  /** The newest saved version number (v1, v2, ...), 0 when none was saved yet, and whether the working copy has changes since it. */
+  readonly version = signal(0);
+  readonly changedSinceVersion = signal(true);
+  readonly versions = signal<VersionSummary[]>([]);
+  /** An older version being looked at (read-only), or null for the working copy. */
+  readonly viewing = signal<number | null>(null);
+  /** Short message such as "Updated from another window", cleared by itself. */
+  readonly notice = signal('');
+  private noticeTimer?: ReturnType<typeof setTimeout>;
+  /** The `modified` time of the stored document this one is based on; saves send it so a stale save is refused instead of overwriting. */
+  private modified = 0;
   /** Per library path, filled in as the scene loads each STL. Not part of the saved document. */
   readonly partStats = signal<Record<string, PartStats>>({});
   /** Selected item ids in selection order (⌘-click adds/removes). */
@@ -146,7 +160,7 @@ export class DocumentStore {
       const id = this.docId();
       if (!id || !this.dirty) return;
       const { name, items } = this.doc();
-      fetch(`/api/documents/${id}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items }) });
+      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items }) });
     });
   }
 
@@ -212,13 +226,15 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items });
+    this.resetTo(stored.id, { name: stored.name, items: stored.items }, stored.modified);
+    this.takeVersionInfo(stored);
   }
 
   async create(name = 'Untitled') {
     await this.flush();
     const created = await firstValueFrom(this.api.create({ name, items: [] }));
-    this.resetTo(created.id, { name: created.name, items: created.items });
+    this.resetTo(created.id, { name: created.name, items: created.items }, created.modified);
+    this.takeVersionInfo(created);
     await this.refreshList();
   }
 
@@ -234,10 +250,13 @@ export class DocumentStore {
     else await this.create('Untitled');
   }
 
-  private resetTo(id: string, doc: RfDocument) {
+  private resetTo(id: string, doc: RfDocument, modified = this.modified) {
     const repaired = sanitize(doc);
     clearTimeout(this.saveTimer);
     this.dirty = false;
+    this.modified = modified;
+    this.conflict.set(null);
+    this.viewing.set(null);
     this.docId.set(id);
     this.writeCurrentId(id);
     this.doc.set(doc);
@@ -252,16 +271,143 @@ export class DocumentStore {
 
   /** Debounced autosave. Saves are serialised so a slow PUT can't overwrite a newer one. */
   private scheduleSave() {
+    if (this.viewing() !== null) return; // an older version is read-only
     this.dirty = true;
+    this.changedSinceVersion.set(true);
     this.saveState.set('unsaved');
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.flush(), saveDelayMs);
   }
 
+  /**
+   * Called when the documents on the server changed (see ApiStatus.documentsStamp): if the open document was changed by another window
+   * it is reloaded, or, when this window has unsaved edits, offered as a conflict. Our own saves are recognised by their `modified` time.
+   */
+  async checkRemote() {
+    const id = this.docId();
+    if (!id || this.saving || this.conflict() || this.viewing() !== null) return;
+    try {
+      const [stored] = await Promise.all([firstValueFrom(this.api.get(id)), this.refreshList()]);
+      if (this.saving || this.docId() !== id || stored.modified === this.modified) return;
+      if (this.dirty) {
+        this.conflict.set(stored);
+      } else {
+        this.resetTo(id, { name: stored.name, items: stored.items }, stored.modified);
+        this.takeVersionInfo(stored);
+        this.say('Updated from another window');
+      }
+    } catch { /* offline or deleted: ApiStatus / the next check deals with it */ }
+  }
+
+  /** Conflict: drop my unsaved edits and take the version from the other window. */
+  useRemoteVersion() {
+    const remote = this.conflict();
+    if (!remote) return;
+    this.resetTo(remote.id, { name: remote.name, items: remote.items }, remote.modified);
+    this.takeVersionInfo(remote);
+  }
+
+  /** Conflict: keep my edits; they overwrite the other window's version on the next save. */
+  keepMyVersion() {
+    const remote = this.conflict();
+    if (!remote) return;
+    this.modified = remote.modified;
+    this.conflict.set(null);
+    this.scheduleSave();
+  }
+
+  private takeVersionInfo(doc: StoredDocument) {
+    this.version.set(doc.version ?? 0);
+    this.changedSinceVersion.set(doc.changedSinceVersion ?? true);
+  }
+
+  // --- versions (v1, v2, ... like Fusion 360) --------------------------------------------------------------------------------
+
+  async refreshVersions() {
+    const id = this.docId();
+    if (id) this.versions.set(await firstValueFrom(this.api.versions(id)));
+  }
+
+  /** Saves the working copy, then snapshots it as the next version. */
+  async saveVersion() {
+    const id = this.docId();
+    if (!id || this.viewing() !== null || this.conflict()) return;
+    await this.flush();
+    if (this.dirty) return; // the save failed: no version of something that is not stored
+    try {
+      const saved = await firstValueFrom(this.api.saveVersion(id));
+      this.version.set(saved.version);
+      this.changedSinceVersion.set(false);
+      this.say(saved.created ? `Saved version v${saved.version}` : `No changes since v${saved.version}`);
+      await this.refreshVersions();
+    } catch {
+      this.say('Could not save a version');
+    }
+  }
+
+  /** Shows an older version, read-only (edits are ignored until you go back or promote it). */
+  async viewVersion(version: number) {
+    const id = this.docId();
+    if (!id) return;
+    await this.flush();
+    const stored = await firstValueFrom(this.api.getVersion(id, version));
+    const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
+    this.resetTo(id, { name: stored.name, items: stored.items });
+    clearTimeout(this.saveTimer);
+    this.dirty = false;
+    this.saveState.set('saved');
+    this.version.set(keepVersion);
+    this.changedSinceVersion.set(keepChanged);
+    this.viewing.set(version);
+  }
+
+  /** Leaves the older version and loads the working copy again. */
+  async backToWorkingCopy() {
+    const id = this.docId();
+    if (id) await this.open(id);
+  }
+
+  /** Makes the version being looked at (or `version`) the working copy and the new latest version. */
+  async promoteVersion(version = this.viewing()) {
+    const id = this.docId();
+    if (!id || version === null) return;
+    const promoted = await firstValueFrom(this.api.promote(id, version));
+    this.resetTo(id, { name: promoted.name, items: promoted.items }, promoted.modified);
+    this.takeVersionInfo(promoted);
+    this.say(`Promoted v${version} to v${promoted.version}`);
+    await this.refreshVersions();
+  }
+
+  /**
+   * Recovers a document from a saved file (see the export button): the document comes back with its id and all its versions and is opened.
+   * Other windows pick it up through the normal sync. Returns the existing document when the id is taken and no choice (replace / copy) was given.
+   */
+  async importDocumentFile(text: string, onConflict?: 'replace' | 'copy'): Promise<{ conflictWith: { id: string; name: string } | null }> {
+    await this.flush();
+    try {
+      const imported = await firstValueFrom(this.api.importFile(text, onConflict));
+      await this.refreshList();
+      await this.open(imported.id);
+      await this.refreshVersions();
+      this.say(`Imported ${imported.name}`);
+      return { conflictWith: null };
+    } catch (error) {
+      if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.detail?.existing) return { conflictWith: error.error.detail.existing };
+      const detail = error instanceof HttpErrorResponse ? error.error?.detail : null;
+      throw new Error(typeof detail === 'string' ? detail : Array.isArray(detail) ? 'this is not a Rasterfaster document file' : 'import failed');
+    }
+  }
+
+  private say(message: string) {
+    this.notice.set(message);
+    clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(() => this.notice.set(''), 4000);
+  }
+
   /** Saves now if there are unsaved changes. */
   async flush() {
     clearTimeout(this.saveTimer);
-    if (this.saving || !this.dirty) return;
+    if (this.saving || !this.dirty || this.conflict()) return;
     const id = this.docId();
     if (!id) return;
     this.saving = true;
@@ -269,12 +415,15 @@ export class DocumentStore {
     this.saveState.set('saving');
     try {
       const doc = this.doc();
-      await firstValueFrom(this.api.update(id, doc));
+      const saved = await firstValueFrom(this.api.update(id, doc, this.modified));
+      this.modified = saved.modified;
+      this.takeVersionInfo(saved);
       this.documents.update(list => list.map(d => (d.id === id ? { ...d, name: doc.name, itemCount: doc.items.length, modified: Date.now() / 1000 } : d)));
       if (!this.dirty) this.saveState.set('saved');
-    } catch {
+    } catch (error) {
       this.dirty = true;
       this.saveState.set('error');
+      if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.detail?.current) this.conflict.set(error.error.detail.current);
     } finally {
       this.saving = false;
     }
@@ -296,6 +445,7 @@ export class DocumentStore {
    * `label` names the step (handy when debugging history). Returns whether anything changed.
    */
   mutate(label: string, change: (doc: RfDocument) => RfDocument): boolean {
+    if (this.viewing() !== null) return false; // an older version is read-only
     if (this.gestureLabel && Date.now() - this.gestureStartedAt > gestureStaleMs) this.endGesture(); // a drag that never got its end
     const current = this.doc();
     const next = change(current);

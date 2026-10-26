@@ -1,4 +1,4 @@
-# PyInstaller spec for Rasterfaster.app. Build with scripts/build-app.sh (it builds the Angular app and the icon first).
+# PyInstaller spec for "Rasterfaster Server.app" (the API plus a Dock icon that opens the Rasterfaster PWA). Build with scripts/build-app.sh (it builds the Angular app and the icon first).
 import json
 import os
 
@@ -13,7 +13,7 @@ analysis = Analysis(
     ["app.py"],
     pathex=[here],
     datas=[(frontend, "frontend")] + ([(seed, "seed_documents")] if os.path.isdir(seed) else []),
-    hiddenimports=collect_submodules("uvicorn") + ["blenderexport", "export3mf", "svgexport", "appconfig"],
+    hiddenimports=collect_submodules("uvicorn") + ["AppKit", "Quartz", "PyObjCTools.AppHelper"] + ["blenderexport", "export3mf", "svgexport", "appconfig"],
     excludes=["pytest", "tkinter"],
 )
 pyz = PYZ(analysis.pure)
@@ -21,9 +21,9 @@ exe = EXE(pyz, analysis.scripts, [], exclude_binaries=True, name="Rasterfaster",
 collected = COLLECT(exe, analysis.binaries, analysis.datas, name="Rasterfaster")
 app = BUNDLE(
     collected,
-    name="Rasterfaster.app",
+    name="Rasterfaster Server.app",
     icon=os.path.join(here, "Rasterfaster.icns"),
-    bundle_identifier="nl.netmatic.rasterfaster",
+    bundle_identifier="nl.netmatic.rasterfaster.server",
     version=version,
-    info_plist={"CFBundleDisplayName": "Rasterfaster", "NSHighResolutionCapable": True},
+    info_plist={"CFBundleDisplayName": "Rasterfaster Server", "CFBundleName": "Rasterfaster Server", "NSHighResolutionCapable": True},
 )
