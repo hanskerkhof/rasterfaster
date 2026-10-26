@@ -1,10 +1,11 @@
-import { Component, ElementRef, OnDestroy, computed, afterNextRender, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnDestroy, computed, untracked, afterNextRender, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { Subscription } from 'rxjs';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
+import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
 
 const modeStorageKey = 'rasterfaster.quickLookMode';
 const sizeStorageKey = 'rasterfaster.quickLookSize';
@@ -53,7 +54,7 @@ function readMode(): ViewMode {
       </div>
       <div #host class="host"></div>
       @if (state()) { <div class="state">{{ state() }}</div> }
-      <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ or Enter add to document (closes this) · drag to orbit · drag the corner to resize</footer>
+      <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ add to document (closes this) · drag to orbit · drag the corner to resize</footer>
     </div>
   `,
   styles: `
@@ -112,6 +113,7 @@ export class QuickLook implements OnDestroy {
   private readonly keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
   private geometry: THREE.BufferGeometry | null = null;
   private edges: THREE.EdgesGeometry | null = null;
+  private silhouette: THREE.BufferGeometry | null = null;
   private radius = 1;
   private frame = 0;
   private ro?: ResizeObserver;
@@ -122,6 +124,10 @@ export class QuickLook implements OnDestroy {
     effect(() => {
       const path = this.path();
       if (this.ready()) this.load(path);
+    });
+    effect(() => {
+      silhouetteEdges(); // the setting in the view cube menu changed: redraw the loaded file
+      if (this.ready()) untracked(() => this.rebuild());
     });
   }
 
@@ -178,6 +184,7 @@ export class QuickLook implements OnDestroy {
     clearParts(this.model);
     this.geometry?.dispose();
     this.edges?.dispose();
+    this.silhouette?.dispose();
     const geometry = new THREE.BufferGeometry().copy(new STLLoader().parse(buffer));
     geometry.computeBoundingBox();
     const box = geometry.boundingBox!;
@@ -186,6 +193,7 @@ export class QuickLook implements OnDestroy {
     geometry.computeBoundingSphere();
     this.geometry = geometry;
     this.edges = null;
+    this.silhouette = null;
     const size = box.getSize(new THREE.Vector3());
     this.radius = geometry.boundingSphere!.radius;
     this.info.set(`${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
@@ -229,7 +237,8 @@ export class QuickLook implements OnDestroy {
     clearParts(this.model);
     this.model.add(...buildParts(geometry, this.mode(), {
       ...previewStyle, background: this.scene.background as THREE.Color, radius: this.radius,
-      edges: () => (this.edges ??= new THREE.EdgesGeometry(geometry, 25)),
+      edges: () => (this.edges ??= new THREE.EdgesGeometry(geometry, creaseDegrees)),
+      silhouette: () => (this.silhouette ??= buildSilhouetteGeometry(geometry)),
     }));
   }
 
@@ -243,6 +252,7 @@ export class QuickLook implements OnDestroy {
     clearParts(this.model);
     this.geometry?.dispose();
     this.edges?.dispose();
+    this.silhouette?.dispose();
     // dispose() frees GPU resources but not the WebGL context itself. Browsers allow ~16 live contexts and then drop the oldest
     // one, which would be the main 3D view (it turned white after many previews), so give the context back explicitly.
     this.renderer?.dispose();

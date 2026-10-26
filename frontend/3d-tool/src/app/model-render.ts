@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { silhouetteEdges, silhouetteParts } from './silhouette';
 
 export type ViewMode = 'solid' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
 
@@ -12,6 +13,8 @@ export interface PartStyle {
   radius: number;
   /** Lazily provides the (expensive) feature-edge geometry for the hidden-line modes. */
   edges: () => THREE.EdgesGeometry;
+  /** Lazily provides the silhouette edges (see silhouette.ts); without it (or with the setting off) no silhouette lines are drawn. */
+  silhouette?: () => THREE.BufferGeometry;
   /** Draw as a barely visible ghost that doesn't hide what is behind it. */
   ghost?: boolean;
 }
@@ -40,6 +43,7 @@ export function buildParts(geometry: THREE.BufferGeometry, mode: ViewMode, style
     dashed.computeLineDistances();
     parts.push(dashed);
   }
+  if (style.silhouette && silhouetteEdges()) parts.push(...silhouetteParts(style.silhouette(), mode, { line: style.line, dashed: style.dashed })); // the contour of smooth walls
   return parts;
 }
 
@@ -71,6 +75,7 @@ function buildGhostParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: 
     dashed.renderOrder = order + 0.001;
     parts.push(dashed);
   }
+  if (style.silhouette && silhouetteEdges()) parts.push(...silhouetteParts(style.silhouette(), mode, { line: style.line, dashed: style.dashed, ghost: { opacity: ghostOpacity * 2, order } }));
   return parts;
 }
 

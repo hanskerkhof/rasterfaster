@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
 import { ViewMode, buildParts, clearParts } from './model-render';
+import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
 import { ZGridMode, nearestZLevel, nextZLevel } from './z-levels';
 
 const selectedColor = 0xf0a040;
@@ -17,6 +18,7 @@ interface OrientedEntry {
   geometry: THREE.BufferGeometry;
   size: THREE.Vector3;
   edges?: THREE.EdgesGeometry;
+  silhouette?: THREE.BufferGeometry;
 }
 
 interface ItemRuntime {
@@ -26,6 +28,7 @@ interface ItemRuntime {
   muted: boolean;
   mode: ViewMode;
   color: number;
+  silhouette: boolean;
 }
 
 interface DragState {
@@ -182,26 +185,27 @@ export class DocumentScene {
     if (!entry) { void this.prepare(item, key); return; }
     let runtime = this.runtimes.get(item.id);
     if (!runtime) {
-      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0 };
+      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, silhouette: false };
       runtime.group.userData['itemId'] = item.id;
       this.group.add(runtime.group);
       this.runtimes.set(item.id, runtime);
     }
     const muted = !!item.muted;
-    if (runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== item.color) {
+    if (runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== item.color || runtime.silhouette !== silhouetteEdges()) {
       clearParts(runtime.group);
       const base = new THREE.Color(selected ? selectedColor : item.color);
       const style = {
         background: this.ctx.background, solid: base.getHex(), line: base.getHex(), wire: base.getHex(),
         dashed: base.clone().multiplyScalar(0.45).getHex(), radius: entry.size.length() / 2,
-        edges: () => (entry.edges ??= new THREE.EdgesGeometry(entry.geometry, 25)),
+        edges: () => (entry.edges ??= new THREE.EdgesGeometry(entry.geometry, creaseDegrees)),
+        silhouette: () => (entry.silhouette ??= buildSilhouetteGeometry(entry.geometry)),
         ghost: muted,
       };
       for (const part of buildParts(entry.geometry, this.mode, style)) {
         part.userData['itemId'] = item.id;
         runtime.group.add(part);
       }
-      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: item.color });
+      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: item.color, silhouette: silhouetteEdges() });
     }
     runtime.group.position.set(...item.position);
   }
@@ -658,7 +662,7 @@ export class DocumentScene {
     this.ctx.store.viewCenter = null;
     for (const [target, type, fn] of this.listeners) target.removeEventListener(type, fn);
     for (const runtime of this.runtimes.values()) clearParts(runtime.group);
-    for (const entry of this.oriented.values()) { entry.geometry.dispose(); entry.edges?.dispose(); }
+    for (const entry of this.oriented.values()) { entry.geometry.dispose(); entry.edges?.dispose(); entry.silhouette?.dispose(); }
     for (const geometry of this.baseGeometries.values()) geometry.dispose();
     this.clearSelectionBoxes();
     this.snapHandles.clear();

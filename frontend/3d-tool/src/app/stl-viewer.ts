@@ -7,6 +7,7 @@ import { DocumentScene } from './document-scene';
 import { DocumentStore, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
+import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
 import { ViewCube } from './view-cube';
 import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels';
 
@@ -133,6 +134,9 @@ function readShowPath() {
             <span class="tick">{{ showPath() ? '✓' : '' }}</span>Show camera path<span class="hint">{{ showPath() ? 'on' : 'off' }}</span>
           </button>
         }
+        <button type="button" role="menuitem" title="Draw the contour of curved walls (cylinders, cones) in the hidden-line views" (click)="toggleSilhouette()">
+          <span class="tick">{{ silhouette() ? '✓' : '' }}</span>Silhouette edges<span class="hint">{{ silhouette() ? 'on' : 'off' }}</span>
+        </button>
         <button type="button" role="menuitem" (click)="togglePivotOnSelection()">
           <span class="tick">{{ pivotOnSelection() ? '✓' : '' }}</span>Rotate around selection<span class="hint">{{ pivotOnSelection() ? 'on' : 'off' }}</span>
         </button>
@@ -231,6 +235,7 @@ export class StlViewer implements OnDestroy {
   private gridKey = '';
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
+  protected readonly silhouette = silhouetteEdges;
   protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
   /** Height grid: fine (2 mm), baseplate (2 mm then 4 mm) or coarse (4 mm). Chosen in the view cube menu's "Grid mode" fly-out. */
   protected readonly zGridMode = signal(readZGridMode());
@@ -897,6 +902,11 @@ export class StlViewer implements OnDestroy {
     this.zGridMode.set(mode);
     try { localStorage.setItem(zGridModeStorageKey, mode); } catch { /* storage unavailable */ }
     this.gridModeOpen.set(false);
+    this.cubeMenu.set(null);
+  }
+
+  protected toggleSilhouette() {
+    setSilhouetteEdges(!silhouetteEdges());
     this.cubeMenu.set(null);
   }
 
