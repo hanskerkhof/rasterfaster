@@ -117,7 +117,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -137,7 +137,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -157,7 +157,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -177,7 +177,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -197,7 +197,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -237,7 +237,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -257,7 +257,7 @@
         1.1102230246251565e-16,
         -5.551115123125783e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -277,7 +277,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -297,7 +297,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -317,7 +317,7 @@
         0.0,
         0.7071067811865475
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     }

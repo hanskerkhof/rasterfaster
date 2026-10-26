@@ -1,0 +1,165 @@
+{
+  "name": "KIOSK-REMOTE",
+  "items": [
+    {
+      "id": "2731e65f-a0ce-49bd-8f98-1c6434fe9b85",
+      "path": "12.15.NERO_BIANCO_REMOTE/12.15.NERO_BIANCO_REMOTE_work v474_DISPLAY 30deg.stl",
+      "name": "12.15.NERO_BIANCO_REMOTE_work v474_DISPLAY 30deg",
+      "color": 7317724,
+      "position": [
+        81.0,
+        60.0,
+        46.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "5952705b-1aae-4237-b619-1aedfd957bfc",
+      "path": "12.15.NERO_BIANCO_REMOTE/12.15.NERO_BIANCO_REMOTE_work v473_TOP 5x4x3.stl",
+      "name": "12.15.NERO_BIANCO_REMOTE_work v473_TOP 5x4x3",
+      "color": 9684093,
+      "position": [
+        76.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": true,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "600c03c2-b744-4455-9072-6493eaa5f282",
+      "path": "12.15.NERO_BIANCO_REMOTE/12.15.NERO_BIANCO_REMOTE_work v473_BOTTOM 5x4x3.stl",
+      "name": "12.15.NERO_BIANCO_REMOTE_work v473_BOTTOM 5x4x3",
+      "color": 16167531,
+      "position": [
+        80.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "420d18d4-c5e1-4411-a2e8-f70c9f7c8be8",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
+      "color": 12745632,
+      "position": [
+        100.0,
+        0.0,
+        36.004999999999995
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "5d4a4b29-6e4a-4fbf-a877-afd4aa8aa1ed",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
+      "color": 9338051,
+      "position": [
+        100.0,
+        0.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "9386a8c9-b997-4653-b6d8-8dbf5c3a764f",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II",
+      "color": 14706278,
+      "position": [
+        240.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7147850b-6c20-4574-90be-6dec808a000c",
+      "path": "BOLTS/BOLT_S9.stl",
+      "name": "BOLT_S9",
+      "color": 7775663,
+      "position": [
+        102.345,
+        2.349,
+        0.0
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "6087c5cd-09c5-4ce7-b731-165e0bd38ce7",
+      "path": "BOLTS/BOLT_S9.stl",
+      "name": "BOLT_S9",
+      "color": 7775663,
+      "position": [
+        122.345,
+        2.349,
+        0.0
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    }
+  ]
+}
