@@ -1,0 +1,307 @@
+{
+  "version": 2,
+  "savedAt": 1793011834.702454,
+  "name": "DADA",
+  "items": [
+    {
+      "id": "0c6d855e-2882-4f1d-bcfa-933e9bdb7611",
+      "path": "___GOOD LUCK WITH THE SHOW/4.1 v154_TOETER.stl",
+      "name": "4.1 v154_TOETER",
+      "color": 7317724,
+      "position": [
+        100.0,
+        -37.0,
+        -2.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5,
+        -0.49999999999999983,
+        -0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "f5cf8fe7-bb1c-4259-b5e1-86c61569e6bf",
+      "path": "___GOOD LUCK WITH THE SHOW/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BOX SMALLER w MOUNT HOLE.stl",
+      "name": "4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BOX SMALLER w MOUNT HOLE",
+      "color": 9684093,
+      "position": [
+        0.0,
+        0.0,
+        34.0
+      ],
+      "rotation": [
+        -0.5000000000000001,
+        -0.5,
+        0.5,
+        0.49999999999999994
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "0660d4d5-282a-4ad9-945c-d1712ec8e8a6",
+      "path": "___GOOD LUCK WITH THE SHOW/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BACKPLATE.stl",
+      "name": "4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BACKPLATE",
+      "color": 16167531,
+      "position": [
+        0.0,
+        5.119999999999997,
+        38.0
+      ],
+      "rotation": [
+        0.4999999999999999,
+        -0.5,
+        -0.49999999999999983,
+        0.5000000000000002
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "57ec6cba-4456-4eb7-99cd-e23b7396563e",
+      "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_SPEAKER ADAPTER.stl",
+      "name": "4.1.BAUKLANK DADA_RF4 v168_SPEAKER ADAPTER",
+      "color": 12745632,
+      "position": [
+        90.0,
+        24.599999999999994,
+        59.0
+      ],
+      "rotation": [
+        -5.551115123125784e-17,
+        -0.7071067811865475,
+        1.1102230246251568e-16,
+        0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "ae8f0957-4acf-47c2-b469-b32d4dd90bc0",
+      "path": "BASEPLATES/8x6_BASEPLATE.stl",
+      "name": "8x6_BASEPLATE",
+      "color": 9338051,
+      "position": [
+        -20.0,
+        -160.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "52d7ca59-60f4-4f07-914d-e75e9f8abfcd",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        100.0,
+        -60.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "c2228d4d-dedf-472f-aa23-4651c225ed7d",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER LEFT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER LEFT 3h",
+      "color": 7775663,
+      "position": [
+        100.0,
+        -160.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e314f559-89a6-4320-9252-783cfcde9495",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        -16.0,
+        -160.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "993c79b0-3682-4b75-a223-56174d422f28",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER LEFT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER LEFT 3h",
+      "color": 7775663,
+      "position": [
+        -16.0,
+        -60.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "552365a9-e4bf-4fd2-93d9-071161bcc70e",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        100.0,
+        -80.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "9f8f36c8-6f54-4542-84bc-3ef756139c34",
+      "path": "MOUNTS/3.3.POTMETER BIG SWITCH/3.3.POTMETER BIG SWITCH_RF3 MNTS PASSIVE v20_POTMETER BIGSWITCH + LED + SCALE - BLIND 3h (1).stl",
+      "name": "3.3.POTMETER BIG SWITCH_RF3 MNTS PASSIVE v20_POTMETER BIGSWITCH + LED + SCALE - BLIND 3h (1)",
+      "color": 12745632,
+      "position": [
+        136.0,
+        -140.0,
+        6.0
+      ],
+      "rotation": [
+        0.5,
+        0.5000000000000001,
+        0.5,
+        0.49999999999999994
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "037b1729-cd91-4000-80c6-ba4723930962",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        100.0,
+        -140.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e7d51780-eeb3-478a-b77a-a773bd8faa0a",
+      "path": "11.25.RENOO_TIMER/11.25.RENOO_TIMER_RF11 - work v199_5.6.AVIATION PLUG_RF5 MNTS v381_AVIATION PLUG + LED.stl",
+      "name": "11.25.RENOO_TIMER_RF11 - work v199_5.6.AVIATION PLUG_RF5 MNTS v381_AVIATION PLUG + LED",
+      "color": 9338051,
+      "position": [
+        -20.0,
+        -140.0,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "ee4cce4c-82bd-495f-a51d-8dd419daf528",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        -16.0,
+        -140.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "1663cc46-13bd-4f9d-9929-cb3ba257329b",
+      "path": "CORNERS/CORNERS_RF6 v215_CORNER RIGHT 3h.stl",
+      "name": "CORNERS_RF6 v215_CORNER RIGHT 3h",
+      "color": 14706278,
+      "position": [
+        -16.0,
+        -80.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}
