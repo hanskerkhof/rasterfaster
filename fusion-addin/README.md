@@ -54,6 +54,19 @@ A design that you opened with **Open Local File** saves next to the file it came
 
 **The hierarchy.** Each save also writes the structure of the design (components, sub-components and the bodies in each) into a small JSON file in a `.meta` folder next to the `.f3d`: `RF14_v6.f3d` gets `.meta/RF14_v6.tree.json`. Every saved file has its own, so each version keeps the hierarchy it had; older versions moved to `VERSIONS` take theirs along (`VERSIONS/.meta/`). `scripts/f3dsearch.py` uses these files: `search` shows where a name sits, and `tree RF14` prints the whole hierarchy. **Open Local File** writes the file too when a design has none, so opening an old design once is enough. If the hierarchy cannot be written the save still succeeds. `.meta` starts with a dot: iCloud Drive probably does not sync it to another Mac (not checked), and Finder hides it (⇧⌘. shows hidden files).
 
+### Reminder when you close a document
+
+When you close a document that has changes without an up-to-date local copy, a question appears with three buttons:
+
+- **Yes**: the close is stopped and the **Save Local Copy dialog** opens, so you can check the file name, the versioning and the VERSIONS option. Press **Save**: the copy is written (progress dialog, hierarchy file, older versions moved) and then the document is closed again. Fusion's own "Unsaved changes" question for the cloud follows as usual.
+- **Cancel in the Save dialog**: the document stays open.
+- **No**: the document closes without a local copy.
+- **Cancel** (in the question): the document stays open.
+
+It asks only when work would be lost: a document that you opened with Open Local File or saved with Save Local Copy and did not change since does not ask (the add-in compares a fingerprint of the design; Fusion's own *modified* flag is always on for such a document); a cloud document that you only looked at does not ask; an empty document does not ask. Turn it off with the checkbox **Remind me to save a local copy when closing** at the bottom of the Save Local Copy dialog.
+
+Other ways a document gets closed (quitting Fusion, for example) are caught by a second, simpler question: **Yes** saves a copy right away with the remembered settings (it never replaces another file), **No** closes. Fusion allows nothing but a message box at that moment, so there is no dialog with settings and no Cancel there.
+
 ### Open Local File
 
 1. Click **Open Local File** and choose an `.f3d` file (the dialog starts in your local folder).

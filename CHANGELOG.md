@@ -2,6 +2,38 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - the "Save as" line of the Save dialog has two rows (0.10.21)
+
+### Fixed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): the "Save as" line was one row and cut off long text (`BILOfi Additional_v4.f3d (latest on disk: v3)   1 o`); it has two rows now, so the note "N older to VERSIONS" is readable.
+- Not possible: a blue default button. Fusion's `Command` offers only the text of the buttons (`okButtonText`, `cancelButtonText`) and their visibility (`isOKButtonVisible`), no style or default-button property; a custom HTML palette would be needed, and would lose the native look. The close flow was confirmed to work in Fusion (the question with Yes / No / Cancel, the Save dialog, closing again afterwards).
+
+## 2026-10-27 - the close reminder cancels the close, shows the real Save dialog and closes again (0.10.20)
+
+### Changed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): the command log (0.10.19) showed that closing a document runs the command `CloseDocumentCommand`, and `ui.commandStarting` can cancel a command (`isCanceled`). Now, when that command starts for a document with changes without an up-to-date local copy, a question appears with three buttons: **Yes** cancels the close and, a moment later (a custom event, `rasterfaster_localf3d_open_dialog`), opens the real **Save Local Copy dialog** for the document, where the settings can be checked in peace; when the copy has been written the document is closed again (`CloseDocumentCommand` is executed once more; this time the copy is up to date, so there is no question and Fusion's own "Unsaved changes" dialog follows as usual); **Cancel** in the Save dialog leaves the document open; **No** lets Fusion close it (and the `documentClosing` hook does not ask again within a minute); **Cancel** in the question keeps the document open. This gives a working Cancel, which the `documentClosing` event could not (it can only cancel a save). The `documentClosing` hook stays for the other ways a document is closed (quitting Fusion, say), with the old question: Yes saves at once with the remembered settings. Nothing waits for input in a handler. Not seen in Fusion yet: whether the Save dialog opens after the cancelled close, and that the document is closed again afterwards.
+
+## 2026-10-27 - the close reminder no longer waits for a dialog (0.10.19)
+
+### Fixed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): 0.10.18 opened the Save Local Copy dialog from the `documentClosing` handler and waited in a loop until it was finished. During that event Fusion ignores clicks and keys in any window other than a message box (every click beeped, Escape did nothing), so the add-in waited for ever and Fusion had to be force-quit. The waiting loop, the hidden "closing" state and the changes in the Save dialog for it are removed. The reminder is back to a question (a message box, which does work inside the event): Yes saves at once with the remembered settings of the Save dialog, never over another file; the question now shows the file name, the folder and how many older files will move to VERSIONS, and says to press No and use Save Local Copy first when the name or options must change. Nothing in the add-in waits for input in a handler any more; the only wait left is the fixed 1.5 s of the "Saved" notice.
+
+### Added
+- **Tool**: a diagnostic, off by default: with `"log_commands": true` in `localf3d.json` every command that starts is written to `commands.log` next to the add-in (`ui.commandStarting`). `commandStarting` can cancel a command (`isCanceled`), so if closing a document is a command, the add-in could cancel it, show the real Save Local Copy dialog in peace and close the document afterwards, with a working Cancel. The id of that command is what is needed.
+- **Docs** (`fusion-addin/DEVELOPING.md`): the lesson, in a section on events (never wait for input in an event handler: during `documentClosing` only a message box takes input).
+
+## 2026-10-27 - Yes in the close reminder opens the Save Local Copy dialog (0.10.18)
+
+### Changed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`; replaced in 0.10.19, it hung Fusion): *Yes* in the question that appears when a document is closed with changes that have no local copy now opened the **Save Local Copy dialog** (file name, versioning, VERSIONS, reminder) for the closing document, so the settings can be checked; OK saves and then the document closes. Because the document is already closing, the handler starts the command and keeps Fusion's events going (`adsk.doEvents()` in a loop) until the dialog is finished, and the save runs at once (`save_now`: progress dialog, no custom event: the document would be gone by then). Cancel in that dialog closes the document without a copy (the API cannot keep it open). If the dialog does not appear within 3 seconds, the copy is saved at once with the remembered settings, as before. The Save dialog and its preview act on the closing document (`current_design`, `current_document`). Not seen in Fusion yet: whether Fusion lets a command dialog run during `documentClosing`.
+
+## 2026-10-27 - a reminder to save a local copy when a document is closed (0.10.17)
+
+### Added
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): the add-in listens to Fusion's `documentClosing` event (it fires at the very start of a document being closed, probably also for each open document when Fusion is quit). When the closing document has changes without an up-to-date local copy, a question appears: *Save a local copy before it closes?* (Yes: saved now, with the file name, versioning and VERSIONS settings of the Save dialog, but never over another file: a taken name gets the next version; No: it closes). "Changes" are judged by the revision ids of all components (`Component.revisionId`), kept when a document is saved to or opened from a local file: Fusion's own modified flag is true for any document that is not saved in the cloud, so it alone would nag after every save; a cloud document that was never saved locally uses Fusion's modified flag; an empty document never asks. The Save Local Copy dialog has a checkbox **Remind me to save a local copy when closing** (on by default, remembered). Calls checked in Fusion with a probe (adding and removing the handler, the fingerprint, the content check); the question itself has not been seen yet.
+- Limit: there is no *Cancel*. The API lets an add-in cancel only a document **save** (`isOperationCancelled` is "only supported for the documentSaving event"), not a close, so the add-in cannot keep the document open. If the local copy fails, the message says that the document will close without one.
+- Refactor: the save (export, hierarchy file, moving older versions, remembering the file) is one function, `perform_save`, used by the Save dialog and by the close reminder. 31 tool tests (the decision when closing loses work).
+
 ## 2026-10-27 - search by the hierarchy's names, compare versions, the unversioned original moves too (0.10.16)
 
 ### Added

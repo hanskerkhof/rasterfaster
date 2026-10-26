@@ -98,6 +98,12 @@ box.text = 'plain text'
 - Fusion is single-threaded for the API: a long export blocks the user interface until it ends.
 - Units in the API are centimetres, not millimetres.
 
+## Never wait for input inside an event handler
+
+The `documentClosing` event (and other events that Fusion fires in the middle of an operation) runs while Fusion is busy: clicks and keys in other windows are ignored (every click beeps) and only a message box (`ui.messageBox`) takes input. A command dialog started from the handler and awaited with a loop of `adsk.doEvents()` is drawn but cannot be used, and the loop never ends: Fusion has to be force-quit (this happened with version 0.10.18 of this add-in). So in an event handler: ask with a message box if you must ask, do bounded work (a fixed pause is fine), and never `while not finished:`. For anything with fields or a long wait, start it from a custom event or from a command of its own (see "A long job with a progress dialog").
+
+`ui.commandStarting` fires before any command (built-in ones too) and `args.isCanceled = True` cancels it: the way to put your own dialog in front of a built-in action. The command's id is in `args.commandId`; to find it, log the ids (this add-in does with `"log_commands": true` in `localf3d.json`) and do the action once. Closing a document is `CloseDocumentCommand`. The recipe used here: cancel the command, start your own dialog a moment later from a custom event (not from the handler), and when it is done run the built-in command again (`ui.commandDefinitions.itemById('CloseDocumentCommand').execute()`), this time letting it through.
+
 ## A long job with a progress dialog
 
 An export blocks Fusion's main thread, and Fusion draws a dialog from that thread, so a dialog shown right before a long call is not on screen until the call is over (`adsk.doEvents()` did not help). What works:

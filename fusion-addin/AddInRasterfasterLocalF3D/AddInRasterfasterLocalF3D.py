@@ -7,6 +7,8 @@ Three commands in the Utilities tab > Add-Ins panel:
   Open Local File   opens a local .f3d as a new, unsaved document (it is never put in the cloud unless you save it there; when you close it,
                     choose "Don't save")
   Local Folder      chooses the folder (default ~/Documents/FUSION360, remembered in localf3d.json next to this file)
+When a document is closed (or Fusion is quit) that has changes without an up-to-date local copy, the add-in asks whether to save one first
+(it cannot keep the document open: Fusion lets an add-in cancel only a save, not a close); the Save Local Copy dialog has a checkbox to turn that off.
 Assign keyboard shortcuts to them in Fusion (Preferences > General > Keyboard shortcuts, or right-click a command).
 """
 import json
@@ -22,6 +24,8 @@ import adsk.fusion
 
 SAVE_ID, OPEN_ID, FOLDER_ID = 'rasterfaster_localf3d_save', 'rasterfaster_localf3d_open', 'rasterfaster_localf3d_folder'
 PANEL_ID = 'SolidScriptsAddinsPanel'
+OPEN_DIALOG_EVENT = 'rasterfaster_localf3d_open_dialog'  # starts the Save dialog a moment after a close was cancelled
+CLOSE_COMMAND = 'CloseDocumentCommand'  # the id of the command Fusion runs to close a document (found with the command log)
 EXPORT_EVENT = 'rasterfaster_localf3d_export'  # fired a moment after Save is pressed, so that Fusion can draw the progress dialog first
 CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'localf3d.json')
 DEFAULT_FOLDER = os.path.expanduser('~/Documents/FUSION360')
@@ -31,6 +35,10 @@ ui = None
 handlers = []
 # where each document came from, by the token of its root component (a document that was opened from a file saves back to that file)
 sources = {}
+# the state of each document when it was last saved to or opened from a local file (its components' revision ids), to see whether it changed since
+fingerprints = {}
+pending_close = {}  # {'token': ...}: the close of this document was cancelled to save a local copy first; it is closed again when the copy is written
+declined = {}  # token -> when: the user answered No to the reminder, the documentClosing hook does not ask again
 
 
 def settings():
@@ -71,6 +79,21 @@ def active_design():
 
 def token(design):
     return design.rootComponent.entityToken
+
+
+def design_fingerprint(design):
+    """The revision ids of all components joined: changes whenever anything in the design is edited. None when it cannot be read."""
+    try:
+        return '|'.join(c.revisionId for c in design.allComponents)
+    except Exception:
+        return None
+
+
+def design_has_content(design):
+    try:
+        return any(c.bRepBodies.count or c.meshBodies.count for c in design.allComponents)
+    except Exception:
+        return True
 
 
 def clean_name(name):
@@ -190,6 +213,16 @@ def write_sidecar(root_component, f3d_path, document_name):
     return components, bodies
 
 
+def needs_local_copy(known, saved, now, modified, content):
+    """Does closing this document lose work that is not in a local file? `known`: it was opened from / saved to a local file in this session,
+    `saved` / `now`: its fingerprint then and now (None when it cannot be read), `modified`: Fusion's own flag, `content`: it has any body."""
+    if not content:
+        return False  # an empty document: nothing to lose
+    if known and saved is not None and now is not None:
+        return now != saved
+    return bool(modified)
+
+
 def planned_target(directory, name, versioned):
     """(file path, highest version already on disk or None): a versioned save always makes a new file, one version higher."""
     if versioned:
@@ -302,7 +335,7 @@ def start_save(design, target, archive_base=None):
     dialog = ui.createProgressDialog()
     dialog.isCancelButtonShown = False
     dialog.show('Save Local Copy', message, 0, 100, 0)  # minimum = maximum is refused
-    job.update(design=design, target=target, dialog=dialog, archive_base=archive_base)
+    job.update(design=design, target=target, dialog=dialog, archive_base=archive_base, close_token=pending_close.pop('token', None))
     pause(0.1)
 
     def fire():
@@ -312,34 +345,43 @@ def start_save(design, target, archive_base=None):
     threading.Thread(target=fire, daemon=True).start()
 
 
+def perform_save(design, document_name, target, archive_base):
+    """Writes the file, its hierarchy file, moves older versions when asked, and remembers the file. Returns (seconds, megabytes, hierarchy note,
+    how many older files moved)."""
+    started = time.time()
+    export_to(design, target)
+    seconds = time.time() - started
+    size = os.path.getsize(target) / 1e6
+    try:
+        components, bodies = write_sidecar(design.rootComponent, target, document_name)
+        tree_note = f'{components} components, {bodies} bodies in {os.path.basename(sidecar_path(target))}'
+    except Exception:
+        tree_note = ''  # the hierarchy is a bonus: a failure here never fails the save
+    moved = archive_versions(os.path.dirname(target), archive_base, keep=target) if archive_base else 0  # only after the new file is safely written
+    sources[token(design)] = target
+    fingerprints[token(design)] = design_fingerprint(design)
+    save_settings(last_export={'seconds': round(seconds), 'mb': round(size)})
+    app.log(f'Local F3D: saved {target} ({size:.0f} MB, {seconds:.0f} s)')
+    return seconds, size, tree_note, moved
+
+
 def run_job(args):
     """The custom event: write the file, say so in the same dialog, close it, and remember the file."""
-    design, target, dialog, archive_base = job.pop('design'), job.pop('target'), job.pop('dialog'), job.pop('archive_base')
-    name = os.path.basename(target)
-    started = time.time()
+    design, target, dialog, archive_base, close_token = job.pop('design'), job.pop('target'), job.pop('dialog'), job.pop('archive_base'), job.pop('close_token')
     try:
-        export_to(design, target)
-        seconds = time.time() - started
-        size = os.path.getsize(target) / 1e6
-        try:
-            components, bodies = write_sidecar(design.rootComponent, target, app.activeDocument.name)
-            tree_note = f'{components} components, {bodies} bodies in {os.path.basename(sidecar_path(target))}'
-        except Exception:
-            tree_note = ''  # the hierarchy is a bonus: a failure here never fails the save
-        moved = archive_versions(os.path.dirname(target), archive_base, keep=target) if archive_base else 0  # only after the new file is safely written
+        seconds, size, tree_note, moved = perform_save(design, app.activeDocument.name, target, archive_base)
         dialog.progressValue = 100
-        dialog.message = f'Saved {name}\n{size:.0f} MB in {seconds:.0f} s\n{os.path.dirname(target)}'
+        dialog.message = f'Saved {os.path.basename(target)}\n{size:.0f} MB in {seconds:.0f} s\n{os.path.dirname(target)}'
         if tree_note:
             dialog.message += f'\n{tree_note}'
         if moved:
-            dialog.message += f'\nMoved {moved} older version{"s" if moved > 1 else ""} to {ARCHIVE_DIR}'
-        app.log(f'Local F3D: saved {target} ({size:.0f} MB, {seconds:.0f} s)')
+            dialog.message += f'\nMoved {moved} older file{"s" if moved > 1 else ""} to {ARCHIVE_DIR}'
         pause(2.5)
     finally:
         dialog.hide()
-    sources[token(design)] = target
-    save_settings(last_export={'seconds': round(seconds), 'mb': round(size)})
     name_document(app.activeDocument, target)
+    if close_token == token(design):  # the document was waiting to be closed: close it again (the copy is up to date now, so no question this time)
+        ui.commandDefinitions.itemById(CLOSE_COMMAND).execute()
 
 
 def name_document(document, target):
@@ -350,6 +392,22 @@ def name_document(document, target):
             document.name = os.path.splitext(os.path.basename(target))[0]
     except Exception:
         pass
+
+
+def save_now(design, document_name, target, archive_base, notice_seconds=1.5):
+    """Saves at once, with a progress dialog (best effort: the export blocks Fusion), and shows what was done for a moment. Used for a document that
+    is being closed: it is gone as soon as the handler returns, so nothing can wait for a custom event as start_save does."""
+    dialog = ui.createProgressDialog()
+    dialog.isCancelButtonShown = False
+    dialog.show('Save Local Copy', f'Writing {os.path.basename(target)} ...\nFusion does not respond until the file is saved.', 0, 100, 0)
+    adsk.doEvents()
+    try:
+        seconds, size, tree_note, moved = perform_save(design, document_name, target, archive_base)
+        dialog.progressValue = 100
+        dialog.message = f'Saved {os.path.basename(target)}\n{size:.0f} MB in {seconds:.0f} s\n{os.path.dirname(target)}'
+        pause(notice_seconds)
+    finally:
+        dialog.hide()
 
 
 def save_directory(design):
@@ -371,14 +429,17 @@ def on_save_created(args):
     inputs.addStringValueInput('name', 'File name', default)
     inputs.addBoolValueInput('versioned', 'Add version (v<N>)', True, '', versioned)
     # the text is set through .text, which takes it as plain text (the constructor argument is read as HTML: a "&" in a name would break)
-    inputs.addTextBoxCommandInput('preview', 'Save as', '', 1, True).text = preview_text(save_directory(design), default, versioned, archive_setting)
+    inputs.addTextBoxCommandInput('preview', 'Save as', '', 2, True).text = preview_text(save_directory(design), default, versioned, archive_setting)
     inputs.addTextBoxCommandInput('where', 'Folder', '', 1, True).text = save_directory(design)
     archive = inputs.addBoolValueInput('archive', f'Move older versions to {ARCHIVE_DIR}', True, '', archive_setting)
     archive.isEnabled = versioned
+    inputs.addBoolValueInput('remind', 'Remind me to save a local copy when closing', True, '', bool(settings().get('remind', True)))
     inputs.addTextBoxCommandInput('about', 'Add-in', '', 1, True).text = 'Rasterfaster Local F3D v' + addin_version()
     command.okButtonText = 'Save'
     command.inputChanged.add(keep(ChangedHandler(on_save_changed)))
     command.execute.add(keep(Handler(on_save_execute)))
+    command.destroy.add(keep(Handler(lambda _: pending_close.clear())))  # Cancel: the document stays open; a later save must not close anything
+
 
 
 def preview_text(directory, name, versioned, archive):
@@ -404,8 +465,9 @@ def on_save_execute(args):
         if answer != adsk.core.DialogResults.DialogYes:
             return
     archive = bool(inputs.itemById('archive').value)
-    save_settings(versioned=versioned, archive=archive)
-    start_save(design, target, base_name(inputs.itemById('name').value) if versioned and archive else None)
+    save_settings(versioned=versioned, archive=archive, remind=bool(inputs.itemById('remind').value))
+    archive_base = base_name(inputs.itemById('name').value) if versioned and archive else None
+    start_save(design, target, archive_base)
 
 
 def on_open_created(args):
@@ -428,6 +490,7 @@ def on_open_execute(args):
     design = adsk.fusion.Design.cast(document.products.itemByProductType('DesignProductType'))
     if design:
         sources[token(design)] = path
+        fingerprints[token(design)] = design_fingerprint(design)
         try:  # opening gives the whole hierarchy for free: write it when the file has no sidecar yet (or an older one)
             sidecar = sidecar_path(path)
             if not os.path.exists(sidecar) or os.path.getmtime(sidecar) < os.path.getmtime(path):
@@ -447,6 +510,128 @@ def on_folder_execute(args):
     dialog.initialDirectory = folder() if os.path.isdir(folder()) else os.path.expanduser('~/Documents')
     if dialog.showDialog() == adsk.core.DialogResults.DialogOK:
         set_folder(dialog.folder)
+
+
+class ClosingHandler(adsk.core.DocumentEventHandler):
+    """For the documentClosing event: it fires at the very start of a document being closed (also for each open document when Fusion is quit)."""
+
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, args):
+        guarded(on_document_closing, args)
+
+
+def close_plan(design, document):
+    """(file, older files that would move, archive base) for the copy the close reminder saves: the remembered settings of the Save dialog, but never
+    over another file (a taken name gets the next version number)."""
+    known = sources.get(token(design))
+    name = os.path.splitext(os.path.basename(known))[0] if known else clean_name(document.name)
+    directory = save_directory(design)
+    versioned = bool(settings().get('versioned', True))
+    target, _ = planned_target(directory, name, versioned)
+    if os.path.exists(target) and target != known:
+        target, _ = planned_target(directory, name, True)
+        versioned = True
+    archive_base = base_name(name) if versioned and settings().get('archive', False) else None
+    moving = len(movable_files(directory, archive_base, target)) if archive_base else 0
+    return target, moving, archive_base
+
+
+def on_document_closing(args):
+    """Fires at the very start of a document being closed. Nothing may wait for the user's input here other than a message box: during this event
+    Fusion ignores clicks and keys in any other window (a command dialog opened from here cannot be used and the add-in would wait for it forever)."""
+    if not settings().get('remind', True):
+        return
+    document = args.document
+    design = adsk.fusion.Design.cast(document.products.itemByProductType('DesignProductType'))
+    if not design:
+        return
+    key = token(design)
+    if time.time() - declined.get(key, 0) < 60:
+        return  # the question was just answered with No (when the close command started)
+    if not needs_local_copy(key in sources, fingerprints.get(key), design_fingerprint(design), document.isModified, design_has_content(design)):
+        return
+    target, moving, archive_base = close_plan(design, document)
+    plan = f'{os.path.basename(target)}\nin {os.path.dirname(target)}' + (f'\n({moving} older file{"s" if moving > 1 else ""} move to {ARCHIVE_DIR})' if moving else '')
+    answer = ui.messageBox(f'"{document.name}" has changes that are not in a local copy.\n\nSave a local copy before it closes?\n\n'
+                           f'Yes: save {plan}\nNo: close without a local copy\n\n'
+                           '(To change the name or the options, press No and use Save Local Copy before you close.)', 'Local copy',
+                           adsk.core.MessageBoxButtonTypes.YesNoButtonType, adsk.core.MessageBoxIconTypes.QuestionIconType)
+    if answer != adsk.core.DialogResults.DialogYes:
+        return
+    try:
+        save_now(design, document.name, target, archive_base)
+    except Exception:
+        ui.messageBox('The local copy could not be saved, the document will close without one:\n' + traceback.format_exc(limit=2), 'Local copy')
+
+
+def on_close_command(args):
+    """The close of a document is starting: when it has changes without an up-to-date local copy, ask. Yes cancels the close and opens the Save
+    Local Copy dialog (the document is closed again when the copy is written), No lets Fusion close it, Cancel keeps it open."""
+    if not settings().get('remind', True):
+        return
+    document = app.activeDocument
+    design = adsk.fusion.Design.cast(document.products.itemByProductType('DesignProductType'))
+    if not design:
+        return
+    key = token(design)
+    if not needs_local_copy(key in sources, fingerprints.get(key), design_fingerprint(design), document.isModified, design_has_content(design)):
+        return
+    answer = ui.messageBox(f'"{document.name}" has changes that are not in a local copy.\n\nSave a local copy before it closes?\n\n'
+                           'Yes: open the Save Local Copy dialog, then close\nNo: close without a local copy\nCancel: keep the document open', 'Local copy',
+                           adsk.core.MessageBoxButtonTypes.YesNoCancelButtonType, adsk.core.MessageBoxIconTypes.QuestionIconType)
+    if answer == adsk.core.DialogResults.DialogYes:
+        args.isCanceled = True  # stop the close; the dialog opens a moment later, from an event of its own
+        pending_close['token'] = key
+
+        def fire():
+            time.sleep(0.3)
+            app.fireCustomEvent(OPEN_DIALOG_EVENT, '')
+
+        threading.Thread(target=fire, daemon=True).start()
+    elif answer == adsk.core.DialogResults.DialogNo:
+        declined[key] = time.time()
+    else:
+        args.isCanceled = True
+
+
+def open_save_dialog(args):
+    ui.commandDefinitions.itemById(SAVE_ID).execute()
+
+
+class DialogEventHandler(adsk.core.CustomEventHandler):
+    """For the custom event that opens the Save dialog."""
+
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, args):
+        guarded(open_save_dialog, args)
+
+
+class CommandStartingHandler(adsk.core.ApplicationCommandEventHandler):
+    """Before any command starts: the close of a document gets the local-copy question; with "log_commands": true in localf3d.json the id of every
+    command is also written to commands.log next to the add-in (that is how the id of the close command was found)."""
+
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, args):
+        try:
+            if settings().get('log_commands'):
+                with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'commands.log'), 'a') as f:
+                    f.write(f'{datetime.datetime.now().isoformat(timespec="seconds")} {args.commandId}\n')
+        except Exception:
+            pass
+        if args.commandId == CLOSE_COMMAND:
+            guarded(on_close_command, args)
+
+
+closing_handler = None
+command_handler = None
+
+
 
 
 def add_command(command_id, name, tooltip, icon, created):
@@ -472,6 +657,17 @@ def run(context):
         except Exception:
             pass
         app.registerCustomEvent(EXPORT_EVENT).add(keep(JobHandler()))
+        try:
+            app.unregisterCustomEvent(OPEN_DIALOG_EVENT)
+        except Exception:
+            pass
+        app.registerCustomEvent(OPEN_DIALOG_EVENT).add(keep(DialogEventHandler()))
+        global closing_handler
+        closing_handler = ClosingHandler()
+        app.documentClosing.add(closing_handler)
+        global command_handler
+        command_handler = CommandStartingHandler()
+        ui.commandStarting.add(command_handler)
         add_command(SAVE_ID, 'Save Local Copy', 'Export the open design as a local .f3d file (no Fusion cloud)', 'save', on_save_created)
         add_command(OPEN_ID, 'Open Local File', 'Open a local .f3d file as a new, unsaved document', 'open', on_open_created)
         add_command(FOLDER_ID, 'Local Folder', 'Choose the folder for the local .f3d files', 'folder', on_folder_created)
@@ -483,6 +679,15 @@ def run(context):
 def stop(context):
     try:
         app.unregisterCustomEvent(EXPORT_EVENT)
+        app.unregisterCustomEvent(OPEN_DIALOG_EVENT)
+    except Exception:
+        pass
+    try:
+        app.documentClosing.remove(closing_handler)
+    except Exception:
+        pass
+    try:
+        ui.commandStarting.remove(command_handler)
     except Exception:
         pass
     try:

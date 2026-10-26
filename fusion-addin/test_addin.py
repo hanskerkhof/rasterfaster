@@ -8,7 +8,7 @@ for name in ("adsk", "adsk.core", "adsk.fusion"):
     sys.modules[name] = module
 sys.modules["adsk"].core = sys.modules["adsk.core"]
 sys.modules["adsk"].fusion = sys.modules["adsk.fusion"]
-for handler in ("CommandCreatedEventHandler", "CommandEventHandler", "InputChangedEventHandler", "CustomEventHandler"):
+for handler in ("CommandCreatedEventHandler", "CommandEventHandler", "InputChangedEventHandler", "CustomEventHandler", "DocumentEventHandler", "ApplicationCommandEventHandler"):
     setattr(sys.modules["adsk.core"], handler, type(handler, (), {}))
 
 sys.path.insert(0, str(Path(__file__).parent / "AddInRasterfasterLocalF3D"))
@@ -121,3 +121,12 @@ def test_the_first_version_takes_the_unversioned_file_to_versions_too(tmp_path):
     assert addin.planned_target(str(tmp_path), "BILOfix", True)[0].endswith("BILOfix_v2.f3d")
     assert addin.archive_versions(str(tmp_path), "BILOfix", keep=str(tmp_path / "BILOfix_v2.f3d")) == 2   # BILOfix.f3d (taken name gets (2)) and v1
     assert sorted(p.name for p in (tmp_path / "VERSIONS").iterdir() if p.is_file()) == ["BILOfix (2).f3d", "BILOfix.f3d", "BILOfix_v1.f3d"]
+
+
+def test_when_closing_a_document_loses_work_that_is_not_in_a_local_file():
+    needs = addin.needs_local_copy
+    assert needs(False, None, None, False, False) is False and needs(False, None, None, True, False) is False   # an empty document: never
+    assert needs(False, None, "a", True, True) is True and needs(False, None, "a", False, True) is False         # a cloud document: Fusion's own modified flag
+    assert needs(True, "a", "a", True, True) is False                                  # opened from a file and not changed: Fusion says modified, we know better
+    assert needs(True, "a", "b", False, True) is True                                  # changed since the local copy was saved
+    assert needs(True, None, "b", True, True) is True and needs(True, "a", None, False, True) is False          # no fingerprint: back to the modified flag
