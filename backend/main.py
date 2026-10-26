@@ -27,6 +27,7 @@ import appconfig
 import blenderexport
 import versions
 import export3mf
+import library_ops
 import svgexport
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -39,6 +40,7 @@ libraryRoot = _paths["libraryRoot"]
 apiPort = int(os.environ.get("PORT", "8100"))
 frontendDist = _paths["frontendDist"]
 documentsRoot = _paths["documentsRoot"]
+backupRoot = _paths["backupRoot"]  # originals of renamed library files (library_ops.py)
 if appconfig.is_frozen() and not os.environ.get("RF_DOCS"):
     appconfig.seed_documents(documentsRoot, (appconfig.bundle_dir() or Path(".")) / "seed_documents")
 
@@ -75,6 +77,67 @@ def health():
         except OSError:
             pass
     return {"status": "ok", "documents": stamp}
+
+
+class RenameRequest(BaseModel):
+    path: str = Field(max_length=1024)
+    newName: str = Field(max_length=300)
+
+
+@app.post("/api/library/rename")
+def rename_library_entry(body: RenameRequest, dryRun: bool = False) -> dict:
+    """Renames a library file or directory (see library_ops.py): the first rename of a file keeps a copy of the original in the backup folder, the
+    documents that use it follow. `dryRun=true` only reports what would happen."""
+    with documentWriteLock:
+        try:
+            return library_ops.rename(libraryRoot, backupRoot, documentsRoot, body.path, body.newName, dryRun)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+class TrashRequest(BaseModel):
+    path: str = Field(max_length=1024)
+
+
+@app.post("/api/library/trash")
+def move_library_entry_to_trash(body: TrashRequest, dryRun: bool = False) -> dict:
+    """Moves a library file or directory to the Trash (like the Finder); `dryRun=true` reports the documents that use it."""
+    with documentWriteLock:
+        try:
+            return library_ops.move_to_trash(libraryRoot, backupRoot, documentsRoot, body.path, dryRun)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.get("/api/library/trash")
+def list_library_trash() -> list[dict]:
+    return library_ops.list_trash(backupRoot)
+
+
+@app.post("/api/library/trash/{itemId}/put-back")
+def put_back_from_trash(itemId: str, onConflict: Literal["ask", "rename"] = "ask") -> dict:
+    with documentWriteLock:
+        try:
+            return library_ops.put_back(libraryRoot, backupRoot, itemId, onConflict)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.delete("/api/library/trash/{itemId}")
+def delete_from_trash(itemId: str) -> dict:
+    """"Delete Immediately": removes one item from the Trash for good."""
+    with documentWriteLock:
+        try:
+            return {"removed": library_ops.delete_immediately(backupRoot, itemId)}
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.delete("/api/library/trash")
+def empty_library_trash() -> dict:
+    """"Empty Trash": removes everything in the Trash for good."""
+    with documentWriteLock:
+        return {"removed": library_ops.delete_immediately(backupRoot, None)}
 
 
 @app.get("/api/list", response_model=list[LibraryEntry])

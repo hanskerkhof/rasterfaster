@@ -12,10 +12,10 @@ def test_from_source_the_paths_are_the_repo_ones(tmp_path):
 
 
 def test_environment_wins_everywhere(tmp_path):
-    env = {"RF_ROOT": str(tmp_path / "lib"), "RF_DOCS": str(tmp_path / "docs"), "RF_FRONTEND": str(tmp_path / "web")}
+    env = {"RF_ROOT": str(tmp_path / "lib"), "RF_DOCS": str(tmp_path / "docs"), "RF_FRONTEND": str(tmp_path / "web"), "RF_BACKUP": str(tmp_path / "bak")}
     for frozen in (False, True):
         paths = appconfig.resolve_paths(env, tmp_path / "repo", tmp_path / "home", frozen, tmp_path / "bundle")
-        assert paths == {"libraryRoot": (tmp_path / "lib").resolve(), "documentsRoot": (tmp_path / "docs").resolve(), "frontendDist": (tmp_path / "web").resolve()}
+        assert {k: paths[k] for k in ("libraryRoot", "documentsRoot", "frontendDist")} == {"libraryRoot": (tmp_path / "lib").resolve(), "documentsRoot": (tmp_path / "docs").resolve(), "frontendDist": (tmp_path / "web").resolve()}
 
 
 def test_packaged_app_uses_the_bundle_and_application_support(tmp_path):
@@ -95,3 +95,13 @@ def test_pwa_watch_gives_up_when_it_never_opens():
     assert watch.sample(False) == "waiting"
     now[0] = 61
     assert watch.sample(False) == "never"
+
+
+def test_backup_folder_defaults_to_3d_backup_and_can_be_configured(tmp_path):
+    home = tmp_path / "home"
+    assert appconfig.resolve_paths({}, tmp_path / "repo", home)["backupRoot"] == (home / "Documents" / "3D_BACKUP").resolve()
+    assert appconfig.resolve_paths({"RF_BACKUP": str(tmp_path / "elsewhere")}, tmp_path / "repo", home)["backupRoot"] == (tmp_path / "elsewhere").resolve()
+    appconfig.config_file(home).parent.mkdir(parents=True)
+    appconfig.config_file(home).write_text(json.dumps({"backupRoot": str(tmp_path / "from-config")}))
+    assert appconfig.resolve_paths({}, tmp_path / "repo", home)["backupRoot"] == (tmp_path / "from-config").resolve()
+    assert appconfig.resolve_paths({"RF_BACKUP": str(tmp_path / "env")}, tmp_path / "repo", home)["backupRoot"] == (tmp_path / "env").resolve()

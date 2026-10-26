@@ -399,9 +399,14 @@ export class DocumentStore {
   }
 
   private say(message: string) {
+    this.announce(message);
+  }
+
+  /** A short message at the bottom of the view (cleared by itself). */
+  announce(message: string, ms = 4000) {
     this.notice.set(message);
     clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(() => this.notice.set(''), 4000);
+    this.noticeTimer = setTimeout(() => this.notice.set(''), ms);
   }
 
   /** Saves now if there are unsaved changes. */

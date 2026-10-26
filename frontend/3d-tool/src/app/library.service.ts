@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 
 export interface LibraryEntry {
   name: string;
@@ -8,6 +9,37 @@ export interface LibraryEntry {
   modified: number;
   match?: boolean;
   children?: LibraryEntry[];
+}
+
+export interface RenameResult {
+  kind: 'file' | 'directory';
+  from: string;
+  to: string;
+  /** Where the copy of the original went (only for the first rename of a file). */
+  backup: string | null;
+  backedUp: boolean;
+  /** Document files (and versions) whose paths were updated, with the number of parts changed. */
+  documents: Record<string, number>;
+}
+
+export interface TrashResult {
+  kind: 'file' | 'directory';
+  path: string;
+  name: string;
+  /** The Trash item (null for a dry run). */
+  id: string | null;
+  /** Document files (and versions) with parts that use it, and how many parts. */
+  documents: Record<string, number>;
+}
+
+export interface TrashItem {
+  id: string;
+  name: string;
+  originalPath: string;
+  kind: 'file' | 'directory';
+  deletedAt: number;
+  size: number;
+  missing: boolean;
 }
 
 export type SortKey = 'name' | 'date';
@@ -39,6 +71,39 @@ export class LibraryService {
 
   list(path: string) {
     return this.http.get<LibraryEntry[]>('/api/list', { params: { path } });
+  }
+
+  /** Renames a library file or directory; the first rename of a file keeps a copy of the original in the backup folder. */
+  rename(path: string, newName: string) {
+    return this.http.post<RenameResult>('/api/library/rename', { path, newName });
+  }
+
+  /** Moves a file or directory to the Trash (like the Finder); `dryRun` only reports the documents that use it. */
+  trash(path: string, dryRun = false) {
+    return this.http.post<TrashResult>('/api/library/trash', { path }, { params: dryRun ? { dryRun: true } : {} });
+  }
+
+  trashList() {
+    return this.http.get<TrashItem[]>('/api/library/trash');
+  }
+
+  putBack(id: string, onConflict?: 'rename') {
+    return this.http.post<{ id: string; path: string; name: string; kind: string; renamed: boolean }>(`/api/library/trash/${id}/put-back`, {}, { params: onConflict ? { onConflict } : {} });
+  }
+
+  deleteImmediately(id: string) {
+    return this.http.delete<{ removed: number }>(`/api/library/trash/${id}`);
+  }
+
+  emptyTrash() {
+    return this.http.delete<{ removed: number }>('/api/library/trash');
+  }
+
+  /** How many items the Trash holds (shown next to the Trash button). */
+  readonly trashCount = signal(0);
+
+  async refreshTrash() {
+    try { this.trashCount.set((await firstValueFrom(this.trashList())).length); } catch { /* offline: keep the old number */ }
   }
 
   search(q: string) {

@@ -2,6 +2,47 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - the Trash: delete like the Finder (0.8.0)
+
+### Added
+- **BE** (`library_ops.py`, `main.py`, `tests/test_library_ops.py`): `POST /api/library/trash` (`?dryRun=true` reports the documents that use the item), `GET /api/library/trash`, `POST /api/library/trash/{id}/put-back[?onConflict=rename]`, `DELETE /api/library/trash/{id}` (Delete Immediately), `DELETE /api/library/trash` (Empty Trash). Items move to `<backup>/_TRASH/<id>/<name>` with an index entry (original path, kind, time, size and the registry entries of renamed files, which come back with Put Back); Put Back makes missing folders again and answers 409 when the old place is taken (`onConflict=rename` restores as `name (restored).stl`); documents are not rewritten, so their parts work again after Put Back; every step is logged.
+- **FE** (`tree-panel.ts`, `trash-dialog.ts`, `library.service.ts`, `app.ts`, `app.html`, `app.scss`): **Move to Trash** in the row's context menu and on **⌘⌫** (no question unless documents use the item), an **Undo** bar after each move, a **🗑 Trash** button under the file list with the item count, and a Trash dialog (Put Back, Put back as "(restored)", Delete Immediately, Empty Trash with a second question). Tested in the browser on a throwaway library: unused file goes straight to the Trash with Undo, a used file asks first, a directory, Put Back into a taken place, Delete Immediately; 103 backend tests.
+
+## 2026-10-26 - a slow second click renames, like the Finder (0.7.4)
+
+### Added
+- **FE** (`tree-panel.ts`): clicking a row that is already selected (the list had keyboard focus, plain click, more than 500 ms after the previous click on it) starts the rename after 400 ms, unless a double-click, another click or a key press comes first; a double-click still adds the file to the document. For a folder the first click still selects and opens or closes it, a slow second click on its name renames it without toggling it, and its arrow always toggles. Checked in the browser: select-only click does not edit, a slow second click edits (file and folder, the folder stays open), a double-click on a selected file adds it and does not edit.
+
+## 2026-10-26 - the folder stays open after a rename in the filtered list (0.7.3)
+
+### Fixed
+- **FE** (`tree-panel.ts`): with a filter active, a rename refreshed the search results and every refresh forgot which folders were open (and the focused row), so the folder of the renamed file collapsed. The open folders and the focus are now only forgotten when the filter text itself changes; refreshing the results of the same filter keeps them. Checked on a throwaway library with the filter `GOOD`: the folder stayed expanded and listed the new name.
+
+## 2026-10-26 - Enter renames, like the Finder (0.7.2)
+
+### Changed
+- **FE** (`tree-panel.ts`, `quick-look.ts`): Enter on a focused row in the file list starts the rename (file or directory); Enter again without typing, or Esc, cancels; Enter after typing saves. Enter no longer adds the file to the document (⌘↓, the button and a double-click still do). F2 still works. The context menu shows the key as ↵; the quick look footer no longer mentions Enter.
+
+## 2026-10-26 - rename: stale rows no longer fail with "not found" (0.7.1)
+
+### Fixed
+- **FE** (`tree-panel.ts`): renaming a row whose name was out of date failed with "not found". The server side was fine (the same rename as a dry run on the real library succeeds); the list had sent a path that no longer existed. The list was only partly refreshed after a rename (`reload()` re-read the root and the folders opened while browsing, not the folders opened while a filter was active), and the listings below a renamed directory kept the old directory's name. Now `reload()` re-reads every folder that was listed, a rename drops the listings of the old directory name and lists the open folders under their new names, and the filter's open folders follow a rename too.
+- **FE** (`tree-panel.ts`): before the rename field opens, the folder the row is in is listed; if the file is no longer there (renamed or moved outside the tool), the list is refreshed and a note says so. A 404 from the server is handled the same way, instead of leaving an error under the field. Checked by moving a file on disk behind the app's back and pressing F2 on its old row.
+
+## 2026-10-26 - file management phase 1: rename with a first-time backup (0.7.0)
+
+### Added
+- **BE** (`library_ops.py`, `main.py`, `appconfig.py`, `tests/test_library_ops.py`, `tests/test_appconfig.py`): `POST /api/library/rename` (`?dryRun=true`). A first rename of a file copies the original to `<backup>/<library folder name>/<old relative path>` (size verified, never overwrites a backup, a failed backup aborts the rename); a registry in `<backup>/.rasterfaster/registry.json` follows the file, so later renames are not backed up again; directory renames copy nothing; all renames are logged (`log.json`, pending then done/failed). Document items and version snapshots that use the file (or sit below the directory) get the new path, and labels equal to the old file name follow it; a failed document update puts the file back. Name rules: not empty, no leading dot, no `/ \ :`, `.stl` kept, collisions give 409, nothing outside the library. Backup folder: `RF_BACKUP`, `backupRoot` in `config.json`, default `~/Documents/3D_BACKUP`.
+- **FE** (`tree-panel.ts`, `library.service.ts`, `app.ts`, `app.html`, `document.store.ts`): right-click context menu on file list rows with **Rename…** (F2), in-place rename field with the reason shown on errors, the tree keeps open folders and focus, the selection and remembered file follow, open documents reload, and a notice says where the original was kept. Tested in the browser on a throwaway library: file rename (backup in the mirrored hierarchy), second rename (no new backup), collision, directory rename, and the documents' paths and labels.
+
+### Fixed
+- **FE** (`tree-panel.ts`): the tree's output was called `select`, which is also a DOM event name: selecting the text in the rename field fired it and put an event object into the app's selection. It is now `fileSelected`.
+
+## 2026-10-26 - silhouette edges for curved walls, behind a setting (0.6.0)
+
+### Added
+- **FE** (`silhouette.ts`, `model-render.ts`, `document-scene.ts`, `quick-look.ts`, `stl-viewer.ts`, `silhouette.spec.ts`): in the hidden-line views cylinders, cones and tapered feet had no side lines: `EdgesGeometry(geometry, 25)` only draws edges where triangles bend by more than 25 degrees, and the facets of a curved wall bend by about 2.5 degrees. `buildSilhouetteGeometry` collects the smooth edges (0.5 to 25 degrees) with both triangle normals; a vertex shader draws one only while one triangle faces the camera and the other faces away (constant direction for the orthographic camera, per edge for the perspective one). Works for dimmed parts too (faint, in their draw order). The shared crease angle is `creaseDegrees` (25). The feature is isolated in `silhouette.ts` and behind the **Silhouette edges** item of the view cube's right-click menu (default on, stored as `rasterfaster.silhouetteEdges`), so the old look is one click away. Checked on `spacers_RF1 v236_20.stl` in the quick look (rings only with the setting off, rings plus side contour with it on), in the main view, and the menu toggle redraws at once; unit tests for the edge selection (cylinder: one smooth edge per segment, box: none).
+
 ## 2026-10-26 - muted parts hide their own back edges (0.5.3)
 
 ### Changed

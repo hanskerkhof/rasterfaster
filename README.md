@@ -95,15 +95,34 @@ The app polls `/api/health` every 5 s; it carries the newest modification time o
 
 The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The document recovers too: if the app was started while the API was down, the document loads as soon as the API answers; edits made while it was down are saved again (they are never replaced by what is on disk). The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
 
+## Renaming library files and directories (file management, phase 1)
+
+Right-click a row in the file list → **Rename…**, press **Enter** (or F2) on a focused row, or click a row that is already selected, wait a moment and the name becomes editable (a slow second click, like in the Finder; a double-click still adds a file to the document, and a folder's arrow still opens and closes it): the row becomes a text field (a file without its `.stl`, which is added again); Enter again without typing or Esc cancels, Enter after typing saves; a name that is empty, starts with a dot, contains `/ \ :` or already exists is refused with the reason shown under the field. The API is `POST /api/library/rename` (`{path, newName}`, `?dryRun=true` only reports what would happen), implemented in `backend/library_ops.py`.
+
+- **Backup of the original, the first time only:** the first time a *file* is renamed, a copy of the original goes to the backup folder with the same hierarchy: renaming `<library>/1.4.BOLTS & NUTS/old name.stl` keeps `3D_BACKUP/RASTERFASTER/1.4.BOLTS & NUTS/old name.stl` (the folder is named like the library folder). If the copy fails, nothing is renamed. Renaming the same file again (A, B, C) is not backed up again: a registry follows the file (`<backup folder>/.rasterfaster/registry.json`). A backup never overwrites another one (`name (2).stl`).
+- **Directories:** renaming a directory copies nothing; it is only logged.
+- **Documents follow:** every part in `documents/*.json` and in their versions that points at the renamed file (or below the renamed directory) gets the new path; a part label that still equals the old file name becomes the new name (your own labels stay). Open windows reload through the two-window sync.
+- **Log:** every rename is recorded in `<backup folder>/.rasterfaster/log.json` (pending first, then done, or failed).
+- **Backup folder:** default `/Users/hanskerkhof/Documents/3D_BACKUP` (`~/Documents/3D_BACKUP`); change it with `RF_BACKUP` or `backupRoot` in `~/Library/Application Support/Rasterfaster/config.json`.
+- Plan for the next phases (move, batch rename, tags, insight, import, backup browser): `docs/file-management-plan.md`.
+
+### The Trash (delete, like the Finder)
+
+Right-click a row → **Move to Trash**, or **⌘⌫** on a focused row (a file or a directory): no question is asked, the row goes to the Trash and an **Undo** bar (10 seconds) offers to put it back. When documents use it, you are asked first: those parts keep their path and show as missing until the file is put back (documents are not rewritten). The **🗑 Trash** button under the file list (with the number of items) opens the Trash: **Put Back** (a directory comes back whole, missing folders are made again; if something sits in the old place you can put it back as `name (restored).stl`), **Delete Immediately** and **Empty Trash…** (both remove for good, Empty asks once more). The Trash lives in the backup folder as `_TRASH/<id>/<name>` with an index in `.rasterfaster/trash.json` (original place, time, size, the registry entries of renamed files so they stay registered); everything is in the log (`trash-file`, `trash-directory`, `put-back`, `delete-immediately`, `empty-trash`). API: `POST /api/library/trash` (`{path}`, `?dryRun=true` lists the documents that use it), `GET /api/library/trash`, `POST /api/library/trash/{id}/put-back[?onConflict=rename]`, `DELETE /api/library/trash/{id}`, `DELETE /api/library/trash`.
+
 ## Looking at a library file
 
-There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, Enter or a double-click; adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
+There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓ or a double-click (Enter renames, see below); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
 
 ## File list
 
 ⌘B or the icon in the RASTERFASTER header hides and shows the panel (it slides, and the choice is remembered). Drag the right edge of the panel to resize it (double-click resets, ← → with the handle focused); the width is remembered.
 
 The reload button (⟳ next to Sort) re-reads the library from disk: the root and every open folder, and the search when a filter is active. The filter text is remembered across reloads.
+
+## Silhouette edges (hidden-line views)
+
+In *Hidden lines removed* and *Hidden lines dashed* (main view, quick look and dimmed parts) the sharp edges of a part are drawn, plus, since 0.6.0, the **contour of its smooth walls**: a cylinder, a cone or a tapered foot used to show only its top and bottom rings, because an edge was only drawn where two triangles meet at more than 25°. Silhouette edges (`silhouette.ts`) are the smooth edges between 0.5° and 25°, drawn by a small shader only where one of the two triangles faces the camera and the other faces away, so the contour follows the camera (both camera types). Switch it on or off in the view cube's right-click menu (**Silhouette edges**, remembered, default on) to compare; the hidden contour in *Hidden lines dashed* is drawn solid in the dashed colour. Flat parts (boxes) look the same either way. To remove the feature: delete `silhouette.ts` and its spec and the `silhouette` lines in `model-render.ts`, `document-scene.ts`, `quick-look.ts` and `stl-viewer.ts`.
 
 ## Camera
 

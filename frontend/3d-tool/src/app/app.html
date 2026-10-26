@@ -31,8 +31,11 @@
     @if (searching() && !filtered()) {
       <div class="hint">searching…</div>
     } @else {
-      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (select)="open($event)" (add)="addToDocument($event)" />
+      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (renamed)="onRenamed($event)" (trashed)="onTrashed($event)" />
     }
+  </div>
+  <div class="trash-bar">
+    <button type="button" class="trash-button" title="The Trash: put files back or delete them for good" (click)="trashOpen.set(true)">🗑 Trash@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
   </div>
   </div>
 </aside>
@@ -64,6 +67,10 @@
         <button type="button" (click)="store.backToWorkingCopy()">Back to the working copy</button>
       </div>
     }
+    @if (undoTrash(); as undo) {
+      <div class="notice undo" role="status">Moved “{{ undo.name }}” to the Trash <button type="button" (click)="undoMoveToTrash()">Undo</button></div>
+    }
+    @if (trashOpen()) { <app-trash-dialog (close)="trashOpen.set(false)" (changed)="onTrashChanged()" /> }
     @if (store.conflict()) {
       <div class="conflict" role="alert">
         <div><strong>This document was changed in another window.</strong><br />You have unsaved edits here. Which version do you want to keep?</div>

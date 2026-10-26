@@ -1,13 +1,14 @@
 import { Component, DestroyRef, HostListener, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
-import { filter } from 'rxjs';
-import { LibraryEntry, LibraryService, SortKey } from './library.service';
+import { filter, firstValueFrom } from 'rxjs';
+import { LibraryEntry, LibraryService, RenameResult, SortKey, TrashResult } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
 import { DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
+import { TrashDialog } from './trash-dialog';
 import { ApiStatus } from './api-status';
 import { APP_VERSION } from './build-info';
 
@@ -40,13 +41,13 @@ const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-s
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, StlViewer, DocumentPanel, ObjectMenu],
+  imports: [TreePanel, TrashDialog, StlViewer, DocumentPanel, ObjectMenu],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
 })
 export class App {
-  private readonly lib = inject(LibraryService);
+  protected readonly lib = inject(LibraryService);
   protected readonly store = inject(DocumentStore);
 
   protected readonly selected = signal<string | null>(null);
@@ -94,6 +95,7 @@ export class App {
     void this.store.init();
     this.watchForUpdates();
     this.api.start();
+    void this.lib.refreshTrash();
     let wasOffline = false;
     effect(() => {
       const offline = this.api.offline();
@@ -133,6 +135,58 @@ export class App {
   protected setMode(mode: ViewMode) {
     this.mode.set(mode);
     try { localStorage.setItem(viewModeStorageKey, mode); } catch { /* storage unavailable */ }
+  }
+
+  /** A file or directory was renamed: follow it with the selection, refresh the search and let open documents pick up their new paths. */
+  protected async onRenamed(result: RenameResult) {
+    const selected = this.selected();
+    if (selected === result.from) this.selected.set(result.to);
+    else if (selected?.startsWith(result.from + '/')) this.selected.set(result.to + selected.slice(result.from.length));
+    const now = this.selected();
+    if (now !== selected) this.writeLastStl(now);
+    if (this.filterText().trim()) this.onFilter(this.filterText()); // the search results hold the old name
+    await this.store.checkRemote(); // the documents that use it were rewritten on the server (its own message comes first, ours replaces it)
+    const changed = Object.values(result.documents).reduce((sum, n) => sum + n, 0);
+    this.store.announce(result.backedUp ? `Renamed. The original is kept in ${result.backup}` : `Renamed${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}`, 7000);
+  }
+
+  protected readonly trashOpen = signal(false);
+  /** The last Move to Trash, offered for undo for a few seconds (the Finder's "Undo Move to Trash"). */
+  protected readonly undoTrash = signal<{ id: string; name: string } | null>(null);
+  private undoTimer?: ReturnType<typeof setTimeout>;
+
+  /** Something was moved to the Trash: forget it as the selection, refresh the search and offer Undo. */
+  protected onTrashed(result: TrashResult) {
+    const selected = this.selected();
+    if (selected && (selected === result.path || selected.startsWith(result.path + '/'))) { this.selected.set(null); this.writeLastStl(null); }
+    if (this.filterText().trim()) this.onFilter(this.filterText());
+    void this.lib.refreshTrash();
+    if (result.id) {
+      this.undoTrash.set({ id: result.id, name: result.name });
+      clearTimeout(this.undoTimer);
+      this.undoTimer = setTimeout(() => this.undoTrash.set(null), 10000);
+    }
+  }
+
+  protected async undoMoveToTrash() {
+    const undo = this.undoTrash();
+    if (!undo) return;
+    this.undoTrash.set(null);
+    try {
+      await firstValueFrom(this.lib.putBack(undo.id));
+      this.store.announce(`Put back “${undo.name}”`);
+    } catch (error) {
+      this.store.announce((error as { status?: number }).status === 409 ? `“${undo.name}” could not be put back: its place is taken (see the Trash)` : `“${undo.name}” could not be put back (see the Trash)`, 7000);
+    }
+    await this.treePanel()?.reload();
+    if (this.filterText().trim()) this.onFilter(this.filterText());
+    void this.lib.refreshTrash();
+  }
+
+  /** Something was put back from the Trash dialog: the list has to look again. */
+  protected async onTrashChanged() {
+    await this.treePanel()?.reload();
+    if (this.filterText().trim()) this.onFilter(this.filterText());
   }
 
   /** Puts a library file into the document (defaults to the selected one). */

@@ -1,4 +1,4 @@
-"""Where the API finds its files: the library, the saved documents and the built frontend.
+"""Where the API finds its files: the library, the saved documents, the built frontend and the backup folder of renamed files.
 
 From source (`python main.py`) everything is as it always was (the repo's documents/ and frontend/3d-tool/dist, the library under ~/Documents).
 In the packaged macOS app (PyInstaller sets `sys.frozen`) the frontend comes from inside the bundle, and documents and settings live in
@@ -39,6 +39,8 @@ def save_library_root(home: Path, libraryRoot: Path) -> None:
 def resolve_paths(env: Mapping[str, str], repoDir: Path, home: Path, frozen: bool = False, bundleDir: Path | None = None) -> dict[str, Path]:
     """`repoDir` is the repository root (the folder holding backend/, frontend/ and documents/); `bundleDir` the PyInstaller data folder."""
     defaultLibrary = home / "Documents" / "3D" / "RASTERFASTER"
+    configuredBackup = read_config(home).get("backupRoot")
+    backup = env.get("RF_BACKUP") or configuredBackup or str(home / "Documents" / "3D_BACKUP")  # originals of renamed files, see library_ops.py
     if frozen:
         configured = read_config(home).get("libraryRoot")
         library = env.get("RF_ROOT") or configured or str(defaultLibrary)
@@ -48,7 +50,7 @@ def resolve_paths(env: Mapping[str, str], repoDir: Path, home: Path, frozen: boo
         library = env.get("RF_ROOT") or str(defaultLibrary)
         frontend = env.get("RF_FRONTEND") or str(repoDir / "frontend" / "3d-tool" / "dist" / "3d-tool" / "browser")
         documents = env.get("RF_DOCS") or str(repoDir / "documents")
-    return {"libraryRoot": Path(library).resolve(), "frontendDist": Path(frontend).resolve(), "documentsRoot": Path(documents).resolve()}
+    return {"libraryRoot": Path(library).resolve(), "frontendDist": Path(frontend).resolve(), "documentsRoot": Path(documents).resolve(), "backupRoot": Path(backup).resolve()}
 
 
 def seed_documents(documentsRoot: Path, seedDir: Path | None) -> int:
