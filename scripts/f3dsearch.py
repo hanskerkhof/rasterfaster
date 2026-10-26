@@ -36,6 +36,7 @@ tailSize = 4096  # a name never is longer than this: carried over to the next ch
 
 utf16Text = re.compile(rb"(?:[\x20-\x7e]\x00){3,}")
 trailingText = re.compile(rb"(?:[\x20-\x7e]\x00)*[\x20-\x7e]?\Z")
+versionSuffix = re.compile(r"[\s_]+v(\d+)$", re.IGNORECASE)
 guidLike = re.compile(r"^[0-9a-fA-F-]{20,}[$+]?$")
 
 
@@ -222,13 +223,49 @@ def update_index(index: dict, folders: list[Path], report=print) -> dict:
     return index
 
 
-def search(index: dict, words: list[str]) -> list[tuple[str, str, list[str]]]:
+def design_key(name: str) -> tuple[str, int]:
+    """(the design a file belongs to, its version): `RF14_v3`, `RF14 v4` and the cache's `_RF14` are all the design `rf14` (version 3, 4 and 0)."""
+    found = versionSuffix.search(name)
+    base = versionSuffix.sub("", name).strip()
+    return base.lstrip("_ ").lower(), int(found.group(1)) if found else 0
+
+
+def designs(index: dict) -> dict[str, list[tuple[str, dict]]]:
+    """The indexed files grouped per design, newest first (the highest version, then the most recently changed file)."""
+    groups: dict[str, list[tuple[str, dict]]] = {}
+    for key, entry in index["files"].items():
+        groups.setdefault(design_key(entry["name"])[0], []).append((key, entry))
+    for members in groups.values():
+        members.sort(key=lambda m: (design_key(m[1]["name"])[1], m[1]["mtime"]), reverse=True)
+    return groups
+
+
+def search(index: dict, words: list[str], all_versions: bool = False) -> list[tuple[str, str, list[str], str]]:
+    """Per design the newest version that has a matching name: (file name, path, matching names, note). `all_versions` lists every file with a match."""
     wanted = [w.lower() for w in words]
     hits = []
-    for key, entry in index["files"].items():
-        found = [n for n in entry["names"] if all(w in n.lower() for w in wanted)]
-        if found:
-            hits.append((entry["name"], key, found))
+    for members in designs(index).values():
+        matching = []
+        for key, entry in members:
+            found = [n for n in entry["names"] if all(w in n.lower() for w in wanted)]
+            if found:
+                matching.append((key, entry, found))
+        if not matching:
+            continue
+        if all_versions:
+            hits.extend((entry["name"], key, found, "") for key, entry, found in matching)
+            continue
+        key, entry, found = matching[0]
+        notes = []
+        if members[0][0] != key:
+            notes.append(f"the newest version, {members[0][1]['name']}, has no match")
+        older = [e["name"] for k, e, _ in matching[1:]]
+        if older:
+            only_older = {n for _, _, f in matching[1:] for n in f} - set(found)
+            notes.append(f"{len(older)} older version{'s' if len(older) > 1 else ''} with a match hidden: {', '.join(older[:4])}" + (" ..." if len(older) > 4 else ""))
+            if only_older:
+                notes.append(f"{len(only_older)} matching name{'s' if len(only_older) > 1 else ''} only in older versions, e.g. {sorted(only_older, key=str.lower)[0]}")
+        hits.append((entry["name"], key, found, "; ".join(notes)))
     hits.sort(key=lambda h: (-len(h[2]), h[0].lower()))
     return hits
 
@@ -242,7 +279,9 @@ def main(argv=None) -> int:
     finding.add_argument("words", nargs="+")
     finding.add_argument("--limit", type=int, default=15, help="names shown per design (default 15)")
     finding.add_argument("--paths", action="store_true", help="show the file path of each design")
-    commands.add_parser("list", help="show the indexed designs")
+    finding.add_argument("--all-versions", action="store_true", help="list every version of a design (default: only the newest one with a match)")
+    listing = commands.add_parser("list", help="show the indexed designs")
+    listing.add_argument("--all-versions", action="store_true", help="list every file (default: the newest version of each design)")
     args = parser.parse_args(argv)
 
     index = load_index()
@@ -256,19 +295,24 @@ def main(argv=None) -> int:
         if not index["files"]:
             print("The index is empty: run `f3dsearch.py index` first.")
             return 1
-        hits = search(index, args.words)
-        for name, key, found in hits:
+        hits = search(index, args.words, args.all_versions)
+        for name, key, found, note in hits:
             source = "Fusion cache" if "/W.login/" in key else Path(key).parent.name  # the same design can be in the cache and in an export folder
             print(f"{name}  ({len(found)})  [{source}]" + (f"  {key}" if args.paths else ""))
             for n in found[:args.limit]:
                 print(f"    {n}")
             if len(found) > args.limit:
                 print(f"    ... {len(found) - args.limit} more")
+            if note:
+                print(f"    ({note}; --all-versions shows them)")
         if not hits:
             print("nothing found (the index only knows the designs that were indexed; run `index` again after exporting or opening more designs)")
     else:
-        for entry in sorted(index["files"].values(), key=lambda e: e["name"].lower()):
-            print(f"{entry['name']}  {len(entry['names'])} names  {entry['size'] / 1e6:.0f} MB")
+        for members in sorted(designs(index).values(), key=lambda m: m[0][1]["name"].lower()):
+            shown = members if args.all_versions else members[:1]
+            for key, entry in shown:
+                extra = f"  (+{len(members) - 1} older)" if not args.all_versions and len(members) > 1 else ""
+                print(f"{entry['name']}  {len(entry['names'])} names  {entry['size'] / 1e6:.0f} MB{extra}")
     return 0
 
 

@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - f3dsearch shows each design once (0.10.10)
+
+### Changed
+- **Tool** (`scripts/f3dsearch.py`, `scripts/test_f3dsearch.py`): files that are versions or copies of one design are grouped (`RF14_v3`, `RF14 v4`, `RF14` and the Fusion cache's `_RF14` are the design `rf14`; a version is a number, so v10 is newer than v2; without versions the most recently changed file wins). `search` shows, per design, only the newest version that has a match, and a note says how many older versions with a match were hidden, and, when older versions have matching names the shown one lacks (a component that was removed), how many and an example. If the newest version has no match at all, the newest one that has is shown and the note says so. `--all-versions` lists every file; `list` shows the newest version per design with `(+N older)` (also `--all-versions`). Tested on synthetic indexes and on the real files: `RF14_v3` has 7 NERO BIANCO names, and the note shows that `12.15.NERO_BIANCO_REMOTE` exists only in the older RF14 versions.
+- Known limit: a design is grouped by its file name, so the cache's `_RF6 (models o.a` (the name is cut at the dot) is not grouped with the export `RF6 (models o.a. REV ALARM)`.
+
 ## 2026-10-26 - version bump to test removing and adding the Fusion add-in again (0.10.9)
 
 ### Changed

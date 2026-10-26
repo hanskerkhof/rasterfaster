@@ -65,3 +65,47 @@ def test_index_is_incremental_and_search_needs_every_word(tmp_path, monkeypatch)
     (tmp_path / "A.f3d").unlink()
     f3dsearch.update_index(index, [tmp_path], reports.append)
     assert list(index["files"]) == [str(tmp_path / "B.f3d")]  # a file that is gone leaves the index
+
+
+def _entry(name, names, mtime=1):
+    return {"name": name, "size": 1, "mtime": mtime, "names": names}
+
+
+def test_versions_and_copies_of_one_design_are_one_design():
+    assert f3dsearch.design_key("RF14_v3") == ("rf14", 3)
+    assert f3dsearch.design_key("RF14 v12") == ("rf14", 12)
+    assert f3dsearch.design_key("_RF14") == ("rf14", 0)
+    assert f3dsearch.design_key("RF14") == ("rf14", 0)
+    assert f3dsearch.design_key("my_v2_part") == ("my_v2_part", 0)
+
+
+def test_search_shows_the_newest_version_that_has_a_match_and_says_what_is_hidden():
+    index = {"files": {
+        "/x/RF14_v1.f3d": _entry("RF14_v1", ["BALL JOINT", "BOLT A"]),
+        "/x/RF14_v2.f3d": _entry("RF14_v2", ["BALL JOINT", "BOLT A"]),
+        "/x/RF14_v10.f3d": _entry("RF14_v10", ["BALL JOINT"]),          # v10 is newer than v2 (a number, not text)
+        "/x/OTHER.f3d": _entry("OTHER", ["BALL JOINT"]),
+    }}
+    hits = {h[0]: h for h in f3dsearch.search(index, ["ball"])}
+    assert set(hits) == {"RF14_v10", "OTHER"}
+    assert "2 older versions with a match hidden" in hits["RF14_v10"][3] and "RF14_v2" in hits["RF14_v10"][3]
+    assert hits["OTHER"][3] == ""
+    # a component that only older versions have: the newest version with a match is shown and the note says that v10 has none
+    hits = f3dsearch.search(index, ["bolt"])
+    assert [h[0] for h in hits] == ["RF14_v2"] and "newest version, RF14_v10, has no match" in hits[0][3]
+    # with a name that is in v10 and also something only older versions have
+    index["files"]["/x/RF14_v1.f3d"]["names"].append("BALL JOINT 2")
+    note = {h[0]: h[3] for h in f3dsearch.search(index, ["ball"])}["RF14_v10"]
+    assert "1 matching name only in older versions, e.g. BALL JOINT 2" in note
+
+
+def test_all_versions_lists_every_file_with_a_match_and_a_cache_copy_loses_to_the_newer_export():
+    index = {"files": {
+        "/cache/W.login/F/_RF14.guid.f3d": _entry("_RF14", ["BALL JOINT"], mtime=1),
+        "/exports/RF14.f3d": _entry("RF14", ["BALL JOINT"], mtime=2),
+        "/exports/RF14_v1.f3d": _entry("RF14_v1", ["BALL JOINT"], mtime=3),
+    }}
+    assert sorted(h[0] for h in f3dsearch.search(index, ["ball"], all_versions=True)) == ["RF14", "RF14_v1", "_RF14"]
+    assert [h[0] for h in f3dsearch.search(index, ["ball"])] == ["RF14_v1"]
+    groups = f3dsearch.designs(index)
+    assert [e["name"] for _, e in groups["rf14"]] == ["RF14_v1", "RF14", "_RF14"]  # the version first, then the newer file

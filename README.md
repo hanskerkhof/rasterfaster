@@ -59,11 +59,11 @@ Opening big cloud designs in Fusion to find one component takes ages. `scripts/f
 backend/.venv1/bin/pip install -r scripts/requirements-f3dsearch.txt     # once (zstandard)
 backend/.venv1/bin/python scripts/f3dsearch.py index                    # the designs Fusion cached on this Mac (~/Library/Application Support/Autodesk/Autodesk Fusion 360/<id>/W.login/F)
 backend/.venv1/bin/python scripts/f3dsearch.py index ~/Documents/Fusion-exports   # and a folder of exported .f3d files (remembered next time)
-backend/.venv1/bin/python scripts/f3dsearch.py search ESP32 "ALT IV"    # components whose name contains every word, grouped per design
+backend/.venv1/bin/python scripts/f3dsearch.py search ESP32 "ALT IV"    # components whose name contains every word, per design (only its newest version; --all-versions shows all)
 backend/.venv1/bin/python scripts/f3dsearch.py list
 ```
 
-Only designs that are on this Mac can be searched: the cache holds the designs you opened in Fusion; for the others export them (File > Export > Fusion Archive, or Download in the Data Panel) into a folder and index that. The first index reads every file (about 15 s for 6.5 GB), later runs only the new or changed ones; searching is instant. The index is `~/Library/Application Support/Rasterfaster/f3d-index.json`. The names are read as text, not with a real parser of Fusion's format.
+Only designs that are on this Mac can be searched: the cache holds the designs you opened in Fusion; for the others export them (File > Export > Fusion Archive, or Download in the Data Panel) into a folder and index that. The first index reads every file (about 15 s for 6.5 GB), later runs only the new or changed ones; searching is instant. Versions and copies of one design (`RF14_v3`, `RF14 v4`, `RF14`, the cache's `_RF14`) count as one design: a search shows the newest version with a match and says how many older versions are hidden, and when an older one has matching names the newest lacks (a removed component). `search --all-versions` and `list --all-versions` show every file. The index is `~/Library/Application Support/Rasterfaster/f3d-index.json`. The names are read as text, not with a real parser of Fusion's format.
 
 ## Fusion 360 add-in: local .f3d files (AddInRasterfasterLocalF3D)
 
