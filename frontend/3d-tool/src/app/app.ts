@@ -106,6 +106,10 @@ export class App {
       if (wasOffline && !offline) void this.reloadFiles(); // the API is back: refresh what was loaded from it
       wasOffline = offline;
     });
+    effect(() => {
+      // Every time the API answers: if the document never loaded (the API started after the app) or a save failed, recover now.
+      if (this.api.checks() > 0 && (!this.store.docId() || this.store.saveState() === 'error')) void this.store.recover();
+    });
     try {
       const storedFilter = localStorage.getItem(filterStorageKey);
       if (storedFilter) this.onFilter(storedFilter); // restore the filter and its results

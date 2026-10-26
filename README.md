@@ -58,7 +58,7 @@ The production build (served by the API on http://localhost:8100 after `ng build
 
 ## Offline detection and versions
 
-The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
+The app polls `GET /api/health` every 5 s (and when the browser reports a network change). After two failed checks a red **Offline** banner appears at the bottom of the view; when the API answers again it disappears and the file list reloads. The document recovers too: if the app was started while the API was down, the document loads as soon as the API answers; edits made while it was down are saved again (they are never replaced by what is on disk). The installed PWA keeps working with its cached shell while the API is down, but nothing is saved. The version (`package.json`, shown as `vX.Y.Z` in the panel header and on the **Update available** button) is bumped with `npm run bump:version -- X.Y.Z` in `frontend/3d-tool`; that also rewrites `src/app/build-info.ts` and `ngsw-config.json` (`appData.version`). Bump it, add a CHANGELOG entry and rebuild whenever you ship a change you want installed PWAs to pick up.
 
 ## File list
 

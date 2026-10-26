@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - recover the document when the API comes back (0.2.6)
+
+### Fixed
+- **FE** (`document.store.ts` `recover()`, `api-status.ts` `checks`, `app.ts`): when the app was started while the API was down, the file list reloaded once the API came up but the document did not. On every successful API check the app now loads the document if none is loaded, or retries a failed save (unsaved edits are never overwritten by the stored version). Tested in the browser with the API simulated as down: a missing document loaded again, and a rename made while down was saved after reconnecting. Version 0.2.6.
+
 ## 2026-10-25 - Blender camera keeps the app's perspective (0.2.5)
 
 ### Fixed

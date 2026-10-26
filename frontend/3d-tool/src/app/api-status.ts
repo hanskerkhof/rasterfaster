@@ -10,6 +10,8 @@ const failuresBeforeOffline = 2;
 export class ApiStatus {
   /** True once the API has been unreachable for a few seconds. */
   readonly offline = signal(false);
+  /** Bumped on every successful check, so the app can react to "the API is there" (also when it was never shown as offline). */
+  readonly checks = signal(0);
   private failures = 0;
   private started = false;
 
@@ -30,5 +32,6 @@ export class ApiStatus {
     } catch { /* unreachable */ }
     this.failures = ok ? 0 : this.failures + 1;
     this.offline.set(this.failures >= failuresBeforeOffline);
+    if (ok) this.checks.update(n => n + 1);
   }
 }

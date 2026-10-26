@@ -170,6 +170,24 @@ export class DocumentStore {
     }
   }
 
+  private recovering = false;
+
+  /**
+   * Called when the API answers again: loads the document if the first load failed (the API was down when the app started), or retries
+   * a save that failed; unsaved edits are never replaced by what is on disk.
+   */
+  async recover() {
+    if (this.recovering) return;
+    this.recovering = true;
+    try {
+      if (!this.docId()) await this.init();
+      else if (this.dirty) await this.flush();
+      else await this.refreshList();
+    } catch { /* the next successful check tries again */ } finally {
+      this.recovering = false;
+    }
+  }
+
   private takeLegacyDocument(): RfDocument | null {
     try {
       const parsed = JSON.parse(localStorage.getItem(legacyStorageKey) ?? 'null');
