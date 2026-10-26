@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - Shift+↓ on a part that sits a hair above a level (0.10.1)
+
+### Fixed
+- **FE** (`z-levels.ts`, `z-levels.spec.ts`): Shift+↑/↓ (and PageUp/PageDown) jump to the next Z level, but a part at 38.005 mm (an imported part a few thousandths off the grid) was "one step" from level 38, a move of 0.005 mm that rounds to nothing, so Shift+↓ seemed dead while Shift+⌥+↓ (1 mm) worked. A height within 0.02 mm of a level now counts as on it, so the step goes to the next level (38.005 down is 34, up is 42).
+
+## 2026-10-26 - organise the library: drag and drop, New Folder, Duplicate (0.10.0)
+
+### Added
+- **BE** (`library_ops.py`, `main.py`, `tests/test_library_ops.py`): `POST /api/library/move {paths, targetDir}` (`?dryRun=true`) moves files and directories into one directory with the same rules as rename (a file's first move is backed up, the registry follows, documents and versions are rewritten, a bad or colliding item stops the whole batch, a folder cannot go into itself); `POST /api/library/new-folder {parent, name}`; `POST /api/library/duplicate {path}` (`name copy.stl`, `name copy 2.stl`..., not in the registry); `POST /api/library/reveal {path}` (`open -R`, macOS only). Rename and move now share one code path (`relocate`); the log gets `move-file`, `move-directory`, `new-folder`, `duplicate-file`.
+- **FE** (`tree-panel.ts`, `library.service.ts`, `app.ts`, `app.html`): drag the selection onto a folder (highlighted; a closed folder opens after 0.7 s) or onto a file (its folder) or the empty area (the library root) to move it; the documents follow and a message says what changed. The context menu gets **New Folder** (also on the empty area; the new folder opens in rename mode), **Duplicate**, **Reveal in Finder** and **Copy Path**, with separators. Tested in the browser on a throwaway library: drag onto a folder (original backed up, file moved), Duplicate, drop on the root, New Folder from the empty area.
+- Not built yet from phase 2b: a **Move to…** folder picker (drag and drop covers moving for now).
+
 ## 2026-10-26 - add several files at once (0.9.1)
 
 ### Added

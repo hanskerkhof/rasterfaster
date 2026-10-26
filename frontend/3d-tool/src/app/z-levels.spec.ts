@@ -53,3 +53,12 @@ describe('z levels', () => {
     });
   });
 });
+
+describe('a height a hair off a level', () => {
+  it('still steps to the next level in both directions', () => {
+    expect(nextZLevel(38.005, -1, 'baseplate')).toBe(34);
+    expect(nextZLevel(38.005, 1, 'baseplate')).toBe(42);
+    expect(nextZLevel(37.995, -1, 'baseplate')).toBe(34);
+    expect(nextZLevel(37.995, 1, 'baseplate')).toBe(42);
+  });
+});

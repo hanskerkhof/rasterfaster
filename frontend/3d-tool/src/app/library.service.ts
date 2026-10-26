@@ -22,6 +22,12 @@ export interface RenameResult {
   documents: Record<string, number>;
 }
 
+export interface MoveBatchResult {
+  dryRun: boolean;
+  results: RenameResult[];
+  failed: { path: string; error: string }[];
+}
+
 export interface TrashResult {
   kind: 'file' | 'directory';
   path: string;
@@ -85,6 +91,25 @@ export class LibraryService {
   /** Renames a library file or directory; the first rename of a file keeps a copy of the original in the backup folder. */
   rename(path: string, newName: string) {
     return this.http.post<RenameResult>('/api/library/rename', { path, newName });
+  }
+
+  /** Moves files and directories into the library directory `targetDir` ('' is the library root); the documents follow. */
+  move(paths: string[], targetDir: string) {
+    return this.http.post<MoveBatchResult>('/api/library/move', { paths, targetDir });
+  }
+
+  newFolder(parent: string, name: string) {
+    return this.http.post<{ path: string }>('/api/library/new-folder', { parent, name });
+  }
+
+  /** Copies a file next to itself as `name copy.stl`. */
+  duplicate(path: string) {
+    return this.http.post<{ from: string; path: string }>('/api/library/duplicate', { path });
+  }
+
+  /** Shows the item in the Finder of the Mac that runs the API. */
+  reveal(path: string) {
+    return this.http.post<{ path: string; absolute: string }>('/api/library/reveal', { path });
   }
 
   /** Moves a file or directory to the Trash (like the Finder); `dryRun` only reports the documents that use it. */

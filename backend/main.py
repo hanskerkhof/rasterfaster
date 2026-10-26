@@ -124,6 +124,58 @@ def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False)
             raise HTTPException(status_code=error.status, detail=str(error))
 
 
+class MoveRequest(BaseModel):
+    paths: list[str] = Field(max_length=2000)
+    targetDir: str = Field(max_length=1024)
+
+
+@app.post("/api/library/move")
+def move_library_entries(body: MoveRequest, dryRun: bool = False) -> dict:
+    """Moves files and directories into one library directory (the first move of a file keeps a copy of the original in the backup folder, the
+    documents follow). `dryRun=true` only reports what would happen."""
+    with documentWriteLock:
+        try:
+            return library_ops.move_batch(libraryRoot, backupRoot, documentsRoot, body.paths, body.targetDir, dryRun)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+class NewFolderRequest(BaseModel):
+    parent: str = Field(max_length=1024)
+    name: str = Field(max_length=300)
+
+
+@app.post("/api/library/new-folder")
+def new_library_folder(body: NewFolderRequest) -> dict:
+    with documentWriteLock:
+        try:
+            return library_ops.make_folder(libraryRoot, backupRoot, body.parent, body.name)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.post("/api/library/duplicate")
+def duplicate_library_file(body: TrashRequest) -> dict:
+    with documentWriteLock:
+        try:
+            return library_ops.duplicate(libraryRoot, backupRoot, body.path)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.post("/api/library/reveal")
+def reveal_library_entry(body: TrashRequest) -> dict:
+    """Shows a library item in the Finder (`open -R`); only works on the Mac that runs the API."""
+    try:
+        target = library_ops.inside_library(libraryRoot, body.path)
+    except library_ops.LibraryError as error:
+        raise HTTPException(status_code=error.status, detail=str(error))
+    if sys.platform != "darwin":
+        raise HTTPException(status_code=501, detail="Reveal in Finder only works on macOS")
+    subprocess.run(["open", "-R", str(target)], check=False)
+    return {"path": body.path, "absolute": str(target)}
+
+
 @app.get("/api/library/trash")
 def list_library_trash() -> list[dict]:
     return library_ops.list_trash(backupRoot)

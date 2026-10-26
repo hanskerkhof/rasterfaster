@@ -1,4 +1,4 @@
-"""Changing the STL library (file management): rename and the Trash now, moves in a later phase.
+"""Changing the STL library (file management): rename, move, new folder, duplicate and the Trash.
 
 Rules (see docs/file-management-plan.md):
 - the first time a *file* is renamed, a copy of the original goes to `<backupRoot>/<library folder name>/<old relative path>`; later renames of
@@ -149,12 +149,27 @@ def rename(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: s
     if isFile and source.suffix.lower() != ".stl":
         raise LibraryError("only .stl files and directories can be renamed here")
     name = clean_name(newName, isFile)
-    target = source.with_name(name)
+    if name == source.name:
+        raise LibraryError("that is already the name")
+    return relocate(libraryRoot, backupRoot, documentsRoot, relative, source.with_name(name), "rename", dryRun)
+
+
+def inside_library(libraryRoot: Path, relative: str, mustExist: bool = True) -> Path:
+    source = (libraryRoot / relative).resolve()
+    if not relative or source == libraryRoot or libraryRoot not in source.parents:
+        raise LibraryError("this is not inside the library", 403)
+    if mustExist and not source.exists():
+        raise LibraryError("not found", 404)
+    return source
+
+
+def relocate(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: str, target: Path, verb: str, dryRun: bool = False) -> dict:
+    """Puts the library item `relative` at `target` (a rename or a move: the same rules). `verb` is "rename" or "move" (for the log)."""
+    source = (libraryRoot / relative).resolve()
+    isFile = source.is_file()
     newRelative = target.relative_to(libraryRoot).as_posix()
     result = {"kind": "file" if isFile else "directory", "from": relative, "to": newRelative, "dryRun": dryRun,
               "backup": None, "backedUp": False, "documents": {}}
-    if name == source.name:
-        raise LibraryError("that is already the name")
     sameFile = target.exists() and source.samefile(target)  # a change of case only: the same file on a case-insensitive disk
     if target.exists() and not sameFile:
         raise LibraryError("something with that name already exists here", 409)
@@ -170,7 +185,7 @@ def rename(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: s
 
     logFile = state_dir(backupRoot) / "log.json"
     log = read_json(logFile, [])
-    entry = {"time": time.time(), "kind": f"rename-{result['kind']}", "from": relative, "to": newRelative, "backup": result["backup"], "status": "pending"}
+    entry = {"time": time.time(), "kind": f"{verb}-{result['kind']}", "from": relative, "to": newRelative, "backup": result["backup"], "status": "pending"}
     log.append(entry)
     atomic_write_json(logFile, log)
     try:
@@ -178,7 +193,7 @@ def rename(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: s
             backup.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, backup)
             if backup.stat().st_size != source.stat().st_size:
-                raise LibraryError("the backup copy is incomplete, nothing was renamed", 500)
+                raise LibraryError("the backup copy is incomplete, nothing was moved", 500)
             result["backedUp"] = True
         os.rename(source, target)
         try:
@@ -198,10 +213,86 @@ def rename(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: s
         entry["status"] = "failed"
         entry["error"] = str(error)
         atomic_write_json(logFile, log)
-        raise LibraryError(f"the rename failed and was undone: {error}", 500)
+        raise LibraryError(f"the {verb} failed and was undone: {error}", 500)
     entry.update(status="done", documentsUpdated=sum(result["documents"].values()))
     atomic_write_json(logFile, log)
     return result
+
+
+
+def move(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: str, targetDir: str, dryRun: bool = False) -> dict:
+    """Moves a file or directory into the library directory `targetDir` ("" is the library root), keeping its name."""
+    source = inside_library(libraryRoot, relative)
+    if source.is_file() and source.suffix.lower() != ".stl":
+        raise LibraryError("only .stl files and directories can be moved here")
+    folder = libraryRoot if not targetDir.strip("/") else inside_library(libraryRoot, targetDir.strip("/"))
+    if not folder.is_dir():
+        raise LibraryError("the target is not a directory")
+    if source.is_dir() and (folder == source or source in folder.parents):
+        raise LibraryError("a folder cannot be moved into itself")
+    if folder == source.parent:
+        raise LibraryError("it is already in that folder")
+    return relocate(libraryRoot, backupRoot, documentsRoot, relative, folder / source.name, "move", dryRun)
+
+
+def move_batch(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, paths: list[str], targetDir: str, dryRun: bool = False) -> dict:
+    """Moves several items into one directory. Everything is checked first (also against each other: two items with the same name would
+    collide); a bad item stops the batch before anything moves. Returns {results, failed}."""
+    chosen = collapse_nested(paths)
+    if not chosen:
+        raise LibraryError("nothing is selected")
+    checked = [move(libraryRoot, backupRoot, documentsRoot, path, targetDir, dryRun=True) for path in chosen]
+    names = [Path(item["to"]).name.lower() for item in checked]
+    if len(set(names)) != len(names):
+        raise LibraryError("two of the items have the same name", 409)
+    if dryRun:
+        documents: dict[str, int] = {}
+        for item in checked:
+            for file, count in item["documents"].items():
+                documents[file] = documents.get(file, 0) + count
+        return {"dryRun": True, "results": checked, "failed": [], "documents": documents}
+    results, failed = [], []
+    for path in chosen:
+        try:
+            results.append(move(libraryRoot, backupRoot, documentsRoot, path, targetDir))
+        except LibraryError as error:
+            failed.append({"path": path, "error": str(error)})
+    return {"dryRun": False, "results": results, "failed": failed}
+
+
+def make_folder(libraryRoot: Path, backupRoot: Path, parent: str, name: str) -> dict:
+    """Creates a new directory `name` inside `parent` ("" is the library root); returns its library path."""
+    folder = libraryRoot if not parent.strip("/") else inside_library(libraryRoot, parent.strip("/"))
+    if not folder.is_dir():
+        raise LibraryError("the parent is not a directory")
+    clean = clean_name(name, False)
+    target = folder / clean
+    if target.exists():
+        raise LibraryError("something with that name already exists here", 409)
+    target.mkdir()
+    relative = target.relative_to(libraryRoot).as_posix()
+    log = read_json(state_dir(backupRoot) / "log.json", [])
+    log.append({"time": time.time(), "kind": "new-folder", "from": None, "to": relative, "status": "done"})
+    atomic_write_json(state_dir(backupRoot) / "log.json", log)
+    return {"path": relative}
+
+
+def duplicate(libraryRoot: Path, backupRoot: Path, relative: str) -> dict:
+    """Copies a file next to itself as `name copy.stl`, `name copy 2.stl`... The copy is a new file: it is not in the registry."""
+    source = inside_library(libraryRoot, relative)
+    if not source.is_file() or source.suffix.lower() != ".stl":
+        raise LibraryError("only .stl files can be duplicated")
+    target = source.with_name(f"{source.stem} copy.stl")
+    number = 2
+    while target.exists():
+        target = source.with_name(f"{source.stem} copy {number}.stl")
+        number += 1
+    shutil.copy2(source, target)
+    newRelative = target.relative_to(libraryRoot).as_posix()
+    log = read_json(state_dir(backupRoot) / "log.json", [])
+    log.append({"time": time.time(), "kind": "duplicate-file", "from": relative, "to": newRelative, "status": "done"})
+    atomic_write_json(state_dir(backupRoot) / "log.json", log)
+    return {"from": relative, "path": newRelative}
 
 
 # --- the Trash -------------------------------------------------------------------------------------------------------------------

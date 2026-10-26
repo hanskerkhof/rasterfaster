@@ -116,7 +116,7 @@ Right-click a row → **Move to Trash**, or **⌘⌫** on a focused row (a file 
 
 ## Looking at a library file
 
-There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
+There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below; drag the selection onto a folder to move it, and the right-click menu also has New Folder, Duplicate, Reveal in Finder and Copy Path); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
 
 ## File list
 

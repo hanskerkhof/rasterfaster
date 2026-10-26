@@ -23,7 +23,8 @@ const ladders: Record<ZGridMode, { step: number; phase: number }> = {
   baseplate: { step: 4, phase: 2 }, // 6 mm baseplate = 2 mm + one 4 mm step
   coarse: { step: 4, phase: 0 },
 };
-const epsilon = 1e-6;
+/** A height this close to a level counts as being on it (an imported part can sit at 38.005): a step must not be smaller than the Z field shows. */
+const epsilon = 0.02;
 
 /** The level (ground, or phase + k·step) closest to `z`. */
 export function nearestZLevel(z: number, mode: ZGridMode): number {

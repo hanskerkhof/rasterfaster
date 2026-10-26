@@ -11,7 +11,7 @@ The file list (the library tree on the left) is becoming a **file and directory 
 | 1 | Rename files and directories, first-time backup, documents follow | built (0.7.x) |
 | 3a | Trash: Move to Trash, Undo bar, Put Back, Delete Immediately, Empty Trash | built (0.8.0) |
 | 2a | Multi-select in the tree, Trash for the whole selection | built (0.9.0) |
-| 2b | New folder, Move to… (drag and drop), Duplicate, Reveal in Finder, Copy path | **next** |
+| 2b | New folder, Move (drag and drop), Duplicate, Reveal in Finder, Copy path | built (0.10.0); the "Move to…" picker is still open |
 | 3b | History view of the log with Undo | planned |
 | 4 | Batch rename (preview), batch move/delete | planned |
 | 5 | Tags and metadata | planned |

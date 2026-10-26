@@ -1,7 +1,7 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, RenameResult, TrashBatchResult } from './library.service';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from './library.service';
 import { QuickLook } from './quick-look';
 import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
 
@@ -30,9 +30,11 @@ interface Row {
         </div>
       </div>
     }
-    <div class="tree" tabindex="0" (keydown)="onKey($event)" (mousedown)="onTreeMouseDown($event)">
+    <div class="tree" [class.drop-root]="dropTarget() === ''" tabindex="0" (keydown)="onKey($event)" (mousedown)="onTreeMouseDown($event)" (contextmenu)="onEmptyContextMenu($event)"
+         (dragover)="onDragOver($event, null)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event, null)">
       @for (r of rows(); track r.entry.path) {
-        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)"
+        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)" [class.drop]="dropTarget() === r.entry.path"
+             draggable="true" (dragstart)="onDragStart($event, r)" (dragend)="endDrag()" (dragover)="onDragOver($event, r)" (drop)="onDrop($event, r)"
              [class.sel]="r.entry.type === 'file' && r.entry.path === selected()"
              [style.padding-left.px]="6 + r.depth * 14" (click)="onClick(r, $event)" (dblclick)="onDoubleClick(r)" (contextmenu)="onContextMenu($event, r)">
           <span class="caret">{{ r.entry.type === 'dir' ? (r.open ? '▾' : '▸') : '' }}</span>
@@ -66,9 +68,20 @@ interface Row {
     @if (menu(); as m) {
       <div class="menu-backdrop" (mousedown)="menu.set(null)" (contextmenu)="$event.preventDefault(); menu.set(null)"></div>
       <div class="menu" role="menu" [style.left.px]="m.x" [style.top.px]="m.y">
-        <button type="button" role="menuitem" [disabled]="!m.files.length" (click)="addFromMenu(m.files)">{{ m.files.length > 1 ? 'Add ' + m.files.length + ' Files to Document' : 'Add to Document' }}<span class="key">⌘↓</span></button>
-        <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="startRename(m.paths[0])">Rename…<span class="key">↵</span></button>
-        <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
+        @if (m.paths.length) {
+          <button type="button" role="menuitem" [disabled]="!m.files.length" (click)="addFromMenu(m.files)">{{ m.files.length > 1 ? 'Add ' + m.files.length + ' Files to Document' : 'Add to Document' }}<span class="key">⌘↓</span></button>
+          <div class="sep"></div>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="startRename(m.paths[0])">Rename…<span class="key">↵</span></button>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || !m.files.length" (click)="duplicateFile(m.paths[0])">Duplicate</button>
+        }
+        <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="newFolder(m.paths[0] ?? null)">New Folder</button>
+        @if (m.paths.length) {
+          <div class="sep"></div>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="revealInFinder(m.paths[0])">Reveal in Finder</button>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="copyPath(m.paths[0])">Copy Path</button>
+          <div class="sep"></div>
+          <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
+        }
       </div>
     }
     @if (quickLook() && focusedFile(); as file) {
@@ -107,6 +120,9 @@ interface Row {
     .menu button { display: flex; justify-content: space-between; gap: 16px; width: 100%; padding: 4px 8px; background: transparent; color: inherit; border: 0; border-radius: 4px; font: inherit; text-align: left; cursor: pointer; }
     .menu button:hover { background: #2f6fed; color: #fff; }
     .menu .key { opacity: .5; }
+    .menu .sep { height: 1px; margin: 4px 2px; background: rgba(255,255,255,.12); }
+    .row.drop { background: #2f6fed; color: #fff; }
+    .tree.drop-root { box-shadow: inset 0 0 0 2px #2f6fed; }
     mark { background: #e3b341; color: #111; border-radius: 2px; }
   `,
 })
@@ -130,6 +146,8 @@ export class TreePanel {
   readonly renamed = output<RenameResult>();
   /** One or more files or directories were moved to the Trash (the tree already dropped them). */
   readonly trashed = output<TrashBatchResult>();
+  /** Files or directories were moved into another folder (the tree already follows; the app updates what refers to them). */
+  readonly moved = output<MoveBatchResult>();
 
   protected readonly focused = signal<string | null>(null);
   /** The context menu (right-click on a row), and the row being renamed in place. */
@@ -482,11 +500,136 @@ export class TreePanel {
 
   protected onContextMenu(ev: MouseEvent, r: Row) {
     ev.preventDefault();
+    ev.stopPropagation();
     this.focused.set(r.entry.path);
     if (!this.selection().has(r.entry.path)) this.selectOnly(r.entry.path); // right-click inside a selection keeps it (the Finder)
     const selectedFiles = this.pickedFiles();
     const files = selectedFiles.length > 1 ? selectedFiles : r.entry.type === 'file' ? [r.entry.path] : []; // folders cannot be added
     this.menu.set({ x: Math.min(ev.clientX, innerWidth - 220), y: Math.min(ev.clientY, innerHeight - 100), paths: this.targets(), files });
+  }
+
+  /** Right-click on the empty area under the rows: only New Folder (in the library root). */
+  protected onEmptyContextMenu(ev: MouseEvent) {
+    ev.preventDefault();
+    this.menu.set({ x: Math.min(ev.clientX, innerWidth - 220), y: Math.min(ev.clientY, innerHeight - 100), paths: [], files: [] });
+  }
+
+  /** Makes a folder inside `path` (or next to it when it is a file; in the library root without a path) and opens it for naming. */
+  protected async newFolder(path: string | null) {
+    this.menu.set(null);
+    const row = path === null ? null : this.rows().find(r => r.entry.path === path);
+    const parent = path === null ? '' : row?.entry.type === 'dir' ? path : path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    for (let number = 1; number < 50; number++) {
+      try {
+        const made = await firstValueFrom(this.lib.newFolder(parent, number === 1 ? 'untitled folder' : `untitled folder ${number}`));
+        if (parent) { this.load(parent); this.flippedBrowse.update(s => (this.rows().some(r => r.entry.path === parent && r.open) ? s : new Set([...s, parent]))); }
+        await this.reload();
+        this.focused.set(made.path);
+        this.selectOnly(made.path);
+        await this.startRename(made.path);
+        return;
+      } catch (error) {
+        if ((error as { status?: number }).status !== 409) { this.note('Could not make a folder'); return; }
+      }
+    }
+  }
+
+  protected async duplicateFile(path: string) {
+    this.menu.set(null);
+    try {
+      const made = await firstValueFrom(this.lib.duplicate(path));
+      await this.reload();
+      this.focused.set(made.path);
+      this.selectOnly(made.path);
+      this.focusTree();
+    } catch (error) {
+      const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+      this.note(typeof detail === 'string' ? `Could not duplicate it: ${detail}` : 'Could not duplicate it');
+    }
+  }
+
+  protected async revealInFinder(path: string) {
+    this.menu.set(null);
+    try { await firstValueFrom(this.lib.reveal(path)); } catch { this.note('Reveal in Finder only works on the Mac that runs the API'); }
+  }
+
+  protected async copyPath(path: string) {
+    this.menu.set(null);
+    try { await navigator.clipboard.writeText(path); this.note('Path copied'); } catch { this.note('Could not copy the path'); }
+  }
+
+  // --- drag and drop: move the selection into a folder ----------------------------------------------------------------------------
+
+  /** The folder under the pointer while dragging ('' is the library root), and what is being dragged. */
+  protected readonly dropTarget = signal<string | null>(null);
+  private dragPaths: string[] = [];
+  private hoverTimer?: ReturnType<typeof setTimeout>;
+
+  protected onDragStart(ev: DragEvent, r: Row) {
+    if (this.renaming()) { ev.preventDefault(); return; }
+    if (!this.selection().has(r.entry.path)) { this.focused.set(r.entry.path); this.selectOnly(r.entry.path); }
+    this.dragPaths = actedOn(this.visiblePaths(), this.selection());
+    ev.dataTransfer?.setData('text/plain', this.dragPaths.join('\n'));
+    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = 'move';
+  }
+
+  protected endDrag() {
+    this.dragPaths = [];
+    this.dropTarget.set(null);
+    clearTimeout(this.hoverTimer);
+  }
+
+  /** The folder a drop on this row lands in: the folder itself, the folder of a file, or the root. */
+  private dropFolder(r: Row | null): string {
+    if (!r) return '';
+    return r.entry.type === 'dir' ? r.entry.path : r.parentPath ?? '';
+  }
+
+  private canDrop(folder: string): boolean {
+    if (!this.dragPaths.length) return false;
+    return this.dragPaths.every(p => {
+      const parent = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
+      return parent !== folder && folder !== p && !folder.startsWith(p + '/');
+    });
+  }
+
+  protected onDragOver(ev: DragEvent, r: Row | null) {
+    const folder = this.dropFolder(r);
+    if (!this.canDrop(folder)) { this.dropTarget.set(null); return; }
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (this.dropTarget() !== folder) {
+      this.dropTarget.set(folder);
+      clearTimeout(this.hoverTimer);
+      if (r?.entry.type === 'dir' && !r.open) this.hoverTimer = setTimeout(() => this.setOpen(r.entry, true), 700); // hover opens a closed folder
+    }
+  }
+
+  protected onDragLeave(ev: DragEvent) {
+    if (!(ev.currentTarget as HTMLElement).contains(ev.relatedTarget as Node | null)) this.dropTarget.set(null);
+  }
+
+  protected async onDrop(ev: DragEvent, r: Row | null) {
+    const folder = this.dropFolder(r);
+    const paths = this.dragPaths;
+    if (!this.canDrop(folder)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.endDrag();
+    try {
+      const result = await firstValueFrom(this.lib.move(paths, folder));
+      for (const item of result.results) this.followRename(item);
+      if (folder) this.flippedBrowse.update(s => (this.rows().some(row => row.entry.path === folder && row.open) ? s : new Set([...s, folder])));
+      this.closeQuickLook();
+      await this.reload();
+      if (result.failed.length) this.note(`${result.failed.length} of ${paths.length} could not be moved: ${result.failed[0].error}`);
+      this.focusTree();
+      this.moved.emit(result);
+    } catch (error) {
+      const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+      if ((error as { status?: number }).status === 404) await this.reload();
+      this.note(typeof detail === 'string' ? `Could not move it: ${detail}` : 'Could not move it');
+    }
   }
 
   /** Turns the row into a text field with the name (a file without its .stl) selected. */

@@ -340,3 +340,66 @@ def test_api_trash_batch_and_put_everything_back(client, world):
     assert (world["library"] / "TOP.stl").is_file() and (world["library"] / "1.4.BOLTS & NUTS" / "other.stl").is_file()
     assert client.post("/api/library/trash-batch", json={"paths": []}).status_code == 422
     assert client.post("/api/library/trash-batch", params={"dryRun": True}, json={"paths": ["TOP.stl"]}).json()["documents"] == {"d1.json": 1}
+
+
+# --- move, new folder, duplicate ---------------------------------------------------------------------------------------------------
+
+def move(world, paths, target, dry=False):
+    return library_ops.move_batch(world["library"], world["backup"], world["documents"], paths, target, dry)
+
+
+def test_moving_a_file_backs_it_up_once_and_the_documents_follow(world):
+    (world["library"] / "Sub").mkdir()
+    result = move(world, ["TOP.stl"], "Sub")
+    assert (world["library"] / "Sub" / "TOP.stl").read_bytes() == b"top" and not (world["library"] / "TOP.stl").exists()
+    assert (world["backup"] / "RASTERFASTER" / "TOP.stl").read_bytes() == b"top" and result["results"][0]["backedUp"] is True
+    assert "Sub/TOP.stl" in [i["path"] for i in doc(world)["items"]]
+    move(world, ["Sub/TOP.stl"], "")  # back to the root: not backed up again
+    assert (world["library"] / "TOP.stl").is_file() and not (world["backup"] / "RASTERFASTER" / "TOP (2).stl").exists()
+
+
+def test_moving_a_directory_rewrites_the_paths_below_it(world):
+    (world["library"] / "Sub").mkdir()
+    move(world, ["1.4.BOLTS & NUTS"], "Sub")
+    assert (world["library"] / "Sub" / "1.4.BOLTS & NUTS" / "other.stl").is_file()
+    assert "Sub/1.4.BOLTS & NUTS/other.stl" in [i["path"] for i in doc(world)["items"]]
+
+
+def test_move_refuses_into_itself_same_folder_collisions_and_outside(world):
+    (world["library"] / "Sub").mkdir()
+    (world["library"] / "Sub" / "TOP.stl").write_bytes(b"x")
+    for paths, target, status in [(["1.4.BOLTS & NUTS"], "1.4.BOLTS & NUTS", 422), (["TOP.stl"], "", 422), (["TOP.stl"], "Sub", 409),
+                                  (["TOP.stl"], "../x", 403), (["gone.stl"], "Sub", 404), (["notes.txt"], "Sub", 422)]:
+        with pytest.raises(library_ops.LibraryError) as error:
+            move(world, paths, target)
+        assert error.value.status == status
+    assert (world["library"] / "TOP.stl").read_bytes() == b"top"
+
+
+def test_a_batch_with_one_bad_item_moves_nothing_and_dry_run_moves_nothing(world):
+    (world["library"] / "Sub").mkdir()
+    with pytest.raises(library_ops.LibraryError):
+        move(world, ["TOP.stl", "gone.stl"], "Sub")
+    dry = move(world, ["TOP.stl", "1.4.BOLTS & NUTS/other.stl"], "Sub", dry=True)
+    assert dry["dryRun"] and (world["library"] / "TOP.stl").is_file() and not any((world["library"] / "Sub").iterdir())
+    done = move(world, ["TOP.stl", "1.4.BOLTS & NUTS/other.stl"], "Sub")
+    assert len(done["results"]) == 2 and not done["failed"]
+
+
+def test_new_folder_and_duplicate(world):
+    made = library_ops.make_folder(world["library"], world["backup"], "1.4.BOLTS & NUTS", "New")
+    assert made["path"] == "1.4.BOLTS & NUTS/New" and (world["library"] / made["path"]).is_dir()
+    with pytest.raises(library_ops.LibraryError):
+        library_ops.make_folder(world["library"], world["backup"], "", "TOP.stl")
+    first = library_ops.duplicate(world["library"], world["backup"], "TOP.stl")
+    second = library_ops.duplicate(world["library"], world["backup"], "TOP.stl")
+    assert first["path"] == "TOP copy.stl" and second["path"] == "TOP copy 2.stl"
+    assert (world["library"] / "TOP copy.stl").read_bytes() == b"top" and not (world["backup"] / "RASTERFASTER").exists()
+
+
+def test_api_move_new_folder_duplicate_reveal(client, world):
+    assert client.post("/api/library/new-folder", json={"parent": "", "name": "Sub"}).json() == {"path": "Sub"}
+    assert client.post("/api/library/move", json={"paths": ["TOP.stl"], "targetDir": "Sub"}).status_code == 200
+    assert client.post("/api/library/duplicate", json={"path": "Sub/TOP.stl"}).json()["path"] == "Sub/TOP copy.stl"
+    assert client.post("/api/library/move", json={"paths": ["gone.stl"], "targetDir": "Sub"}).status_code == 404
+    assert client.post("/api/library/reveal", json={"path": "../x"}).status_code == 403

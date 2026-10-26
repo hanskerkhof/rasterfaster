@@ -2,7 +2,7 @@ import { Component, DestroyRef, HostListener, computed, effect, inject, signal, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, RenameResult, SortKey, TrashBatchResult } from './library.service';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
 import { DocumentStore } from './document.store';
@@ -148,6 +148,22 @@ export class App {
     await this.store.checkRemote(); // the documents that use it were rewritten on the server (its own message comes first, ours replaces it)
     const changed = Object.values(result.documents).reduce((sum, n) => sum + n, 0);
     this.store.announce(result.backedUp ? `Renamed. The original is kept in ${result.backup}` : `Renamed${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}`, 7000);
+  }
+
+  /** Files or directories were moved into another folder: follow them with the selection and let open documents pick up the new paths. */
+  protected async onMoved(result: MoveBatchResult) {
+    const selected = this.selected();
+    let now = selected;
+    for (const item of result.results) {
+      if (now === item.from) now = item.to;
+      else if (now?.startsWith(item.from + '/')) now = item.to + now.slice(item.from.length);
+    }
+    if (now !== selected) { this.selected.set(now); this.writeLastStl(now); }
+    if (this.filterText().trim()) this.onFilter(this.filterText());
+    await this.store.checkRemote();
+    const changed = result.results.reduce((sum, r) => sum + Object.values(r.documents).reduce((a, n) => a + n, 0), 0);
+    const backups = result.results.filter(r => r.backedUp).length;
+    this.store.announce(`Moved ${result.results.length} item${result.results.length === 1 ? '' : 's'}${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}${backups ? `; ${backups} original${backups === 1 ? '' : 's'} kept in the backup folder` : ''}`, 7000);
   }
 
   protected readonly trashOpen = signal(false);
