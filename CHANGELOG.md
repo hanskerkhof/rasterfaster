@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - V from the object list, V shown in the part menu (0.10.2)
+
+### Fixed
+- **FE** (`document-panel.ts`): V (dim / show normally) and the other stage shortcuts did nothing after a click in the object list in the right panel, because its rows could not take keyboard focus. The list is now focusable; the stage's own key handler (on an ancestor of the panel) does the rest.
+
+### Changed
+- **FE** (`object-menu.ts`): the Dim / Show normally item in the part menu shows its key, **V**, at the right edge like the other shortcuts.
+
 ## 2026-10-26 - Shift+↓ on a part that sits a hair above a level (0.10.1)
 
 ### Fixed

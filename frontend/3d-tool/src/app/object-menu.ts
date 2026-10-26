@@ -22,7 +22,7 @@ import { baseThicknessMm } from './z-levels';
         <div class="sep"></div>
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
-          <span class="hint">{{ allMuted() ? 'V' : 'barely visible, ignores clicks · V' }}</span>
+          <span class="hint">{{ allMuted() ? '' : 'barely visible, ignores clicks' }}</span><span class="hint key">V</span>
         </button>
         <button type="button" role="menuitem" (click)="toggleCentered()">
           <span class="icon">{{ allCentered() ? '✓' : '⌖' }}</span>Center on grid
@@ -63,6 +63,7 @@ import { baseThicknessMm } from './z-levels';
     button:disabled { opacity: .4; cursor: default; }
     .icon { width: 1em; text-align: center; }
     .hint { margin-left: auto; opacity: .5; font-size: 11px; }
+    .hint + .hint { margin-left: 10px; min-width: 14px; text-align: right; opacity: .75; }
   `,
 })
 export class ObjectMenu {

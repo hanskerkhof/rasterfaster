@@ -51,7 +51,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       </div>
     }
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
-    <div class="list">
+    <div class="list" tabindex="0"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
         <div class="item" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu">
           <span class="dot" [style.background]="hex(item)"></span>
@@ -101,7 +101,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     button { padding: 3px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .35; cursor: default; }
-    .list { overflow: auto; min-height: 40px; max-height: 220px; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; }
+    .list { overflow: auto; min-height: 40px; max-height: 220px; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
     .item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: default; user-select: none; }
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
