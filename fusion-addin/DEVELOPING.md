@@ -98,6 +98,16 @@ box.text = 'plain text'
 - Fusion is single-threaded for the API: a long export blocks the user interface until it ends.
 - Units in the API are centimetres, not millimetres.
 
+## A long job with a progress dialog
+
+An export blocks Fusion's main thread, and Fusion draws a dialog from that thread, so a dialog shown right before a long call is not on screen until the call is over (`adsk.doEvents()` did not help). What works:
+
+1. In the click handler show the dialog (`ui.createProgressDialog()`, `show(title, message, 0, 100, 0)`; minimum = maximum is refused) and return.
+2. Start a thread that waits a moment (0.4 s) and calls `app.fireCustomEvent('my_event', '')`. That is the one API call you may make from another thread.
+3. The handler of that custom event (`adsk.core.CustomEventHandler`, registered with `app.registerCustomEvent('my_event').add(handler)`) runs on Fusion's main thread, after Fusion has drawn the dialog: do the long job there.
+4. Update the dialog (`message`, `progressValue`) when it is done, wait a moment with a loop of `adsk.doEvents()` and `time.sleep(0.05)`, and `hide()` it. While the job runs the bar and text cannot change.
+5. Unregister the event in `stop()` (`app.unregisterCustomEvent`).
+
 ## Finding your way in the API
 
 - The **Fusion MCP server**, if it is connected to Claude Code, can search the API reference (`apiDocumentation` with a name pattern) and run a short Python script in the open design. It refuses to run a script while a command dialog is open.

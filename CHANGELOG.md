@@ -2,6 +2,41 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - search by the hierarchy's names, compare versions, the unversioned original moves too (0.10.16)
+
+### Added
+- **Tool** (`scripts/f3dsearch.py`): a design that has a hierarchy file is searched by its component and body names only (clean: no sketch names, expressions or other strings of the binary); designs without one are searched as before; `search --raw` always includes every string of the `.f3d`. `list` marks designs with a hierarchy.
+- **Tool** (`scripts/f3dsearch.py`): `diff DESIGN` compares the two newest versions that have a hierarchy file, `diff FROM TO` two named files (`diff RF14_v6 RF14_v7`): components and bodies **added**, **removed** and **moved** (the same name, now in another component), with the totals; `--limit N` lines per section. Tested on synthetic trees (added, removed, moved, no difference) and the command on two and on one version.
+
+### Fixed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): with *Move older versions to VERSIONS* ticked, the first versioned save of a design (`BILOfix_v1.f3d`) now also moves the unversioned original (`BILOfix.f3d`, and its hierarchy file) into VERSIONS; before, the file without a version stayed and the folder held two files of one design. The "Save as" line counts it. A design whose name only starts the same (`BILOfix Additional`) is left alone, and a name that is taken in VERSIONS gets ` (2)`.
+- `diff` says that a version that was moved to VERSIONS is only indexed when that folder is given to `index`.
+
+## 2026-10-27 - the hierarchy of every saved design, as a sidecar in .meta (0.10.15)
+
+### Added
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): Save Local Copy writes the hierarchy of the design (components, sub-components and the bodies in each; mesh bodies marked) as `.meta/<file name>.tree.json` next to the `.f3d` (`RF14_v6.f3d` has `.meta/RF14_v6.tree.json`): one sidecar per saved file, so every version has its own; when an older version moves to VERSIONS its sidecar moves to `VERSIONS/.meta/`. The notice says how many components and bodies it holds. **Open Local File** writes the sidecar too when the file has none (or an older one): opening gives the whole tree for free. A failure writing the sidecar never fails the save. The tree comes from Fusion's API (`component.occurrences`, `bRepBodies`, `meshBodies`), so it is the real structure.
+- **Tool** (`scripts/f3dsearch.py`): `index` reads the sidecars (a change of only the sidecar does not make it read the big `.f3d` again); `search` prints where a name is (`NERO   in 14.2.NERO_BIANCO_CONTROL (+1 more places)`); new `tree DESIGN [--bodies] [--depth N] [--limit N]` prints the hierarchy as a tree, taken from the newest version that has a sidecar, and says how to get one when none has. 26 tool tests (the tree walk on fake components, the sidecar and its move, places, search output, the tree command).
+- Existing files have no sidecar until they are saved again with the add-in or opened with Open Local File. `.meta` starts with a dot: iCloud Drive probably does not sync such folders to another Mac (not checked); `META_DIR` in the add-in and `metaDirName` in `f3dsearch.py` are the places to change.
+
+## 2026-10-27 - move older versions to a VERSIONS folder (0.10.14)
+
+### Added
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): the Save Local Copy dialog has a checkbox **Move older versions to VERSIONS** (at the bottom, remembered, only enabled with *Add version*). When the new `<name>_v<N>.f3d` has been written, the other versions of that design in the folder (`<name>_v<N>.f3d` and `<name> v<N>.f3d`; from 0.10.16 also the unversioned `<name>.f3d`) move into `<folder>/VERSIONS/` (nothing there is overwritten: a taken name gets ` (2)`); the move happens only after the new file is safely on disk and the notice says how many moved. The version number counts the files in VERSIONS too, so numbering never restarts; the "Save as" line says how many older versions will move; a design opened from VERSIONS saves next to that folder.
+- **Tool** (`scripts/f3dsearch.py`): `index` skips a subfolder called `VERSIONS` and forgets what was in it, so searches only see the latest versions. To search the old versions give that folder itself: `f3dsearch.py index ~/Documents/FUSION360/VERSIONS` (it is not remembered: the next plain `index` drops it again). Tests for the move, the numbering and the skipped folder (21 tool tests).
+
+## 2026-10-26 - the progress dialog opens as soon as you press Save (0.10.13)
+
+### Fixed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): the progress dialog only appeared when the file was already written, because the export started inside the click handler before Fusion had drawn the dialog (`adsk.doEvents` was not enough). Now the handler shows the dialog and returns; a short thread waits 0.4 s and fires a custom event (`app.fireCustomEvent`, the one API call that may be made from another thread), and the export runs in that event's handler, on Fusion's main thread. Checked in Fusion with a probe: an event fired from a thread after 0.4 s was handled on the main thread. The dialog during a real save has not been seen yet. The event is registered in `run` and removed in `stop`.
+- **Docs** (`fusion-addin/DEVELOPING.md`): a section on the trick (show a dialog, then start a long job from a custom event).
+
+## 2026-10-26 - no OK to click after a save; the document gets the file's name (0.10.12)
+
+### Changed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): after Save Local Copy the progress dialog turns into a notice ("Saved RF14_v4.f3d, 283 MB in 5 s, folder"), stays for 2.5 s and closes by itself, instead of a message box with an OK button; the line is also written to Fusion's Text Commands window (`app.log`). The API has no toast class (the only notification setting is for Autodesk 360), so the progress dialog is used as one.
+- **Tool**: a document that is not saved in the cloud (opened with Open Local File) gets the name of its file as its Fusion document name, on opening and after each Save Local Copy (`RF14_v3` becomes `RF14_v4` in the tab). Fusion only lets an add-in set the name of a document that has never been saved in the cloud, so a document that lives in the cloud keeps its cloud name (its save dialog above still counts up in the add-in: the default name follows the last file saved). Not yet seen in Fusion.
+
 ## 2026-10-26 - Save Local Copy shows a dialog while it writes (0.10.11)
 
 ### Changed

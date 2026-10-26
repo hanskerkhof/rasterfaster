@@ -1,3 +1,4 @@
+import json
 import struct
 import sys
 import zipfile
@@ -109,3 +110,134 @@ def test_all_versions_lists_every_file_with_a_match_and_a_cache_copy_loses_to_th
     assert [h[0] for h in f3dsearch.search(index, ["ball"])] == ["RF14_v1"]
     groups = f3dsearch.designs(index)
     assert [e["name"] for _, e in groups["rf14"]] == ["RF14_v1", "RF14", "_RF14"]  # the version first, then the newer file
+
+
+def test_a_versions_folder_is_skipped_unless_it_is_given_itself(tmp_path):
+    make_f3d(tmp_path / "RF14_v4.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["LATEST PART"], zstd=False)
+    (tmp_path / "VERSIONS").mkdir()
+    make_f3d(tmp_path / "VERSIONS" / "RF14_v1.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["OLD PART"], zstd=False)
+    (tmp_path / "other").mkdir()
+    make_f3d(tmp_path / "other" / "X.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["X PART"], zstd=False)
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    assert sorted(Path(k).name for k in index["files"]) == ["RF14_v4.f3d", "X.f3d"]       # VERSIONS is not searched
+    index = f3dsearch.update_index(index, [tmp_path, tmp_path / "VERSIONS"], lambda message: None)
+    assert sorted(Path(k).name for k in index["files"]) == ["RF14_v1.f3d", "RF14_v4.f3d", "X.f3d"]  # asked for explicitly: it is
+    index = f3dsearch.update_index(index, [tmp_path], lambda message: None)
+    assert sorted(Path(k).name for k in index["files"]) == ["RF14_v4.f3d", "X.f3d"]       # and forgotten again when it is not asked for
+
+
+TREE = {"name": "(root)", "component": "(root)", "bodies": ["NUT PLATE", "[mesh] SCAN"], "children": [
+    {"name": "14.2.NERO_BIANCO_CONTROL:1", "component": "14.2.NERO_BIANCO_CONTROL", "bodies": ["BUTTON", "NERO"], "children": [
+        {"name": "letters:1", "component": "letters", "bodies": ["NERO", "NERO (1)"], "children": []}]},
+    {"name": "BLACK HOLE SUN:1", "component": "BLACK HOLE SUN", "bodies": ["TOP"], "children": []}]}
+
+
+def _sidecar(directory, stem, tree=TREE):
+    (directory / ".meta").mkdir(exist_ok=True)
+    (directory / ".meta" / (stem + ".tree.json")).write_text(json.dumps({"version": 1, "components": 3, "bodies": 7, "savedAt": "2026-10-27T10:00:00", "tree": tree}))
+
+
+def test_places_say_where_every_name_sits():
+    places = f3dsearch.places_in(TREE)
+    assert places["NUT PLATE"] == ["(root)"] and places["SCAN"] == ["(root)"]           # a mesh body without its prefix
+    assert places["letters"] == ["14.2.NERO_BIANCO_CONTROL"] and places["BLACK HOLE SUN"] == ["(root)"]
+    assert places["NERO"] == ["14.2.NERO_BIANCO_CONTROL", "14.2.NERO_BIANCO_CONTROL › letters"]
+
+
+def test_the_index_reads_the_sidecar_and_notices_when_only_it_changes(tmp_path):
+    make_f3d(tmp_path / "RF14_v6.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO", "BUTTON"], zstd=False)
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    entry = next(iter(index["files"].values()))
+    assert entry["places"] == {} and entry["treeMtime"] is None                          # no sidecar yet
+    _sidecar(tmp_path, "RF14_v6")
+    reports: list[str] = []
+    f3dsearch.update_index(index, [tmp_path], reports.append)
+    assert reports == ["hierarchy of RF14_v6: read"] and entry["places"]["BUTTON"] == ["14.2.NERO_BIANCO_CONTROL"]   # the .f3d itself was not read again
+    (tmp_path / ".meta" / "RF14_v6.tree.json").unlink()
+    f3dsearch.update_index(index, [tmp_path], reports.append)
+    assert reports[-1] == "hierarchy of RF14_v6: removed" and entry["places"] == {}
+
+
+def test_search_prints_where_a_name_is(tmp_path, capsys, monkeypatch):
+    make_f3d(tmp_path / "RF14_v6.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO", "BUTTON"], zstd=False)
+    _sidecar(tmp_path, "RF14_v6")
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    monkeypatch.setattr(f3dsearch, "load_index", lambda: index)
+    f3dsearch.main(["search", "nero"])
+    out = capsys.readouterr().out
+    assert "NERO   in 14.2.NERO_BIANCO_CONTROL (+1 more places)" in out
+
+
+def test_tree_command_prints_the_hierarchy(tmp_path, capsys, monkeypatch):
+    make_f3d(tmp_path / "RF14_v6.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO"], zstd=False)
+    make_f3d(tmp_path / "RF14_v7.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO"], zstd=False)   # newer, but without a hierarchy
+    _sidecar(tmp_path, "RF14_v6")
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    monkeypatch.setattr(f3dsearch, "load_index", lambda: index)
+    assert f3dsearch.main(["tree", "RF14"]) == 0
+    out = capsys.readouterr().out
+    assert "RF14_v6" in out and "(root)   [2 bodies]" in out                               # the newest design with a hierarchy file is used
+    assert "├─ ▸ 14.2.NERO_BIANCO_CONTROL   [2 bodies, 1 sub-components]" in out and "│  └─ ▸ letters   [2 bodies]" in out and "└─ ▸ BLACK HOLE SUN" in out
+    assert "· BUTTON" not in out                                                           # bodies only with --bodies
+    f3dsearch.main(["tree", "RF14", "--bodies", "--depth", "1", "--limit", "1"])
+    out = capsys.readouterr().out
+    assert "· NUT PLATE" in out and "... 1 more bodies" in out and "letters" not in out
+    assert f3dsearch.main(["tree", "nothing here"]) == 1
+
+
+def test_a_design_without_any_hierarchy_says_how_to_get_one(tmp_path, capsys, monkeypatch):
+    make_f3d(tmp_path / "RF14_v6.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO"], zstd=False)
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    monkeypatch.setattr(f3dsearch, "load_index", lambda: index)
+    assert f3dsearch.main(["tree", "RF14_v6"]) == 1
+    assert "No hierarchy is stored for RF14_v6" in capsys.readouterr().out
+
+
+def test_a_design_with_a_hierarchy_is_searched_by_its_component_and_body_names_only(tmp_path):
+    make_f3d(tmp_path / "RF14_v6.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["NERO", "( 13 / 2 ) * 1 mm NERO", "BUTTON"], zstd=False)
+    make_f3d(tmp_path / "OLD_v1.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["( 13 / 2 ) * 1 mm NERO"], zstd=False)   # no hierarchy file: every string counts
+    _sidecar(tmp_path, "RF14_v6")
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    found = {h[0]: h[2] for h in f3dsearch.search(index, ["nero"])}
+    assert found["RF14_v6"] == ["14.2.NERO_BIANCO_CONTROL", "NERO", "NERO (1)"]             # from the hierarchy: not the expression
+    assert found["OLD_v1"] == ["( 13 / 2 ) * 1 mm NERO"]
+    raw = {h[0]: h[2] for h in f3dsearch.search(index, ["nero"], raw=True)}
+    assert "( 13 / 2 ) * 1 mm NERO" in raw["RF14_v6"]
+
+
+def _node(name, bodies=(), children=()):
+    return {"name": name + ":1", "component": name, "bodies": list(bodies), "children": list(children)}
+
+
+def test_compare_trees_finds_added_removed_and_moved():
+    before = {"name": "(root)", "component": "(root)", "bodies": ["PLATE", "OLD PART"], "children": [
+        _node("CONTROL", ["BUTTON", "NERO"], [_node("letters", ["NERO", "NERO (1)"])]), _node("SUN", ["TOP"])]}
+    after = {"name": "(root)", "component": "(root)", "bodies": ["PLATE", "BUTTON"], "children": [        # BUTTON moved to the root, OLD PART gone
+        _node("CONTROL", ["NERO", "NEW"], [_node("letters", ["NERO", "NERO (1)", "NERO (2)"])]), _node("SUN", ["TOP"]), _node("DISPLAY", ["LCD"])]}
+    changes = f3dsearch.compare_trees(before, after)
+    assert [(k, n) for k, _, n in changes["added"]] == [("component", "DISPLAY"), ("body", "LCD"), ("body", "NERO (2)"), ("body", "NEW")]
+    assert [n for _, _, n in changes["removed"]] == ["OLD PART"]
+    assert changes["moved"] == [("body", "BUTTON", "CONTROL", "(root)")]
+    assert f3dsearch.compare_trees(before, before) == {"added": [], "removed": [], "moved": []}
+
+
+def test_diff_command_compares_two_versions_by_name_or_the_two_newest(tmp_path, capsys, monkeypatch):
+    older = {"name": "(root)", "component": "(root)", "bodies": ["PLATE"], "children": [_node("CONTROL", ["BUTTON", "OLD"])]}
+    newer = {"name": "(root)", "component": "(root)", "bodies": ["PLATE"], "children": [_node("CONTROL", ["BUTTON", "NEW"])]}
+    for stem, tree, mtime in (("RF14_v5", older, 1), ("RF14_v6", newer, 2), ("RF14_v7", newer, 3)):
+        make_f3d(tmp_path / f"{stem}.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["X"], zstd=False)
+        _sidecar(tmp_path, stem, tree)
+    make_f3d(tmp_path / "LONELY.f3d", "FusionAssetName[Active]/Design1/BulkStream.dat", ["X"], zstd=False)
+    index = f3dsearch.update_index({"files": {}}, [tmp_path], lambda message: None)
+    for key, entry in index["files"].items():                                              # the files were written within one second
+        entry["mtime"] = {"RF14_v5": 1, "RF14_v6": 2, "RF14_v7": 3}.get(entry["name"], 0)
+    monkeypatch.setattr(f3dsearch, "load_index", lambda: index)
+    assert f3dsearch.main(["diff", "RF14_v5", "RF14_v6"]) == 0
+    out = capsys.readouterr().out
+    assert "RF14_v5 → RF14_v6" in out and "+ added (1)" in out and "· NEW   in CONTROL" in out and "- removed (1)" in out and "· OLD   in CONTROL" in out
+    assert f3dsearch.main(["diff", "RF14"]) == 0                                           # the two newest with a hierarchy: v6 -> v7
+    out = capsys.readouterr().out
+    assert "RF14_v6 → RF14_v7" in out and "no difference" in out
+    assert f3dsearch.main(["diff", "RF14_v6", "NOPE"]) == 1 and "Not indexed: NOPE" in capsys.readouterr().out
+    assert f3dsearch.main(["diff", "LONELY"]) == 1 and "needs two" in capsys.readouterr().out
+    assert f3dsearch.main(["diff", "a", "b", "c"]) == 1

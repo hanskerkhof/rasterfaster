@@ -45,11 +45,14 @@ In **Scripts and Add-Ins**, switch the add-in off, select it and click the unlin
    - **Add version (v&lt;N&gt;)**: on by default, and remembered. The file is called `<name>_v<N>.f3d`, where N is one more than the highest version of that name already in the folder, so every save is a new file and nothing is overwritten. `RF14_v2` and `RF14 v4` both count as versions of `RF14`. With it off, the file is `<name>.f3d`, and an existing file is replaced after you confirm.
    - **Save as**: the exact file name that will be written, updated as you type, with the latest version already on disk.
    - **Folder**: where it goes.
-3. Click **Save**. A dialog shows the file name and how long the last save took while Fusion writes the file (the bar stays empty and Fusion does not respond meanwhile); when it is done a message shows the file, its folder, the size and the time.
+   - **Move older versions to VERSIONS** (at the bottom, only with *Add version*; remembered): after the new file is written, the earlier versions of that design (`<name>_v<N>.f3d`) move into a `VERSIONS` folder next to it, so the main folder holds only the latest version of each design. Nothing in `VERSIONS` is overwritten, and the version numbers keep counting up (the files in `VERSIONS` are counted too). The unversioned original (`<name>.f3d`, from before versions were used) moves too, so the first versioned save of `BILOfix.f3d` does not leave two `BILOfix` files; its hierarchy file goes with it. A design whose name only starts the same stays where it is.
+3. Click **Save**. A dialog shows the file name and how long the last save took while Fusion writes the file (the bar stays empty and Fusion does not respond meanwhile); when it is done the same dialog shows the file, its folder, the size and the time for a moment and closes by itself (no OK to click; the line is also in Fusion's Text Commands window).
 
 A big design takes a while to export, and Fusion cannot be used meanwhile. The file is written to a hidden temporary file first and then moved into place, so a failed export never damages the file that is already there.
 
-A design that you opened with **Open Local File** saves next to the file it came from, and uses its name as the default.
+A design that you opened with **Open Local File** saves next to the file it came from, and uses its name as the default. That document is also renamed to the file's name (`RF14_v3`, then `RF14_v4` after a versioned save), which shows in its tab. Fusion only allows that for a document that has never been saved in the cloud: a document that lives in the cloud keeps its cloud name.
+
+**The hierarchy.** Each save also writes the structure of the design (components, sub-components and the bodies in each) into a small JSON file in a `.meta` folder next to the `.f3d`: `RF14_v6.f3d` gets `.meta/RF14_v6.tree.json`. Every saved file has its own, so each version keeps the hierarchy it had; older versions moved to `VERSIONS` take theirs along (`VERSIONS/.meta/`). `scripts/f3dsearch.py` uses these files: `search` shows where a name sits, and `tree RF14` prints the whole hierarchy. **Open Local File** writes the file too when a design has none, so opening an old design once is enough. If the hierarchy cannot be written the save still succeeds. `.meta` starts with a dot: iCloud Drive probably does not sync it to another Mac (not checked), and Finder hides it (⇧⌘. shows hidden files).
 
 ### Open Local File
 
@@ -91,4 +94,5 @@ See [DEVELOPING.md](DEVELOPING.md): how scripts and add-ins work in Fusion, the 
 - `AddInRasterfasterLocalF3D/AddInRasterfasterLocalF3D.manifest`: what Fusion reads to list it (the three names must match).
 - `DEVELOPING.md`: notes on writing Fusion scripts and add-ins in Python.
 - `make_icons.py`: draws the command icons into `AddInRasterfasterLocalF3D/resources/` (Pillow).
+- `.meta/` (in your local folder, not in the repo): one `<file>.tree.json` per saved file.
 - `test_addin.py`: tests of the naming and version logic (Fusion's own modules replaced by stand-ins). Run: `cd backend && .venv1/bin/python -m pytest ../fusion-addin/test_addin.py`.
