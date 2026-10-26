@@ -21,5 +21,14 @@ export function syncVersionMetadata(appRoot, log = console.log) {
   ngsw.appData = { version };
   fs.writeFileSync(ngswPath, JSON.stringify(ngsw, null, 2) + '\n', 'utf8');
   log(`ngsw-config.json appData.version: ${version}`);
+
+  // the Fusion add-in (../../fusion-addin) carries the app's version too: Fusion shows it in the Version column of Scripts and Add-Ins
+  const manifestPath = path.join(appRoot, '..', '..', 'fusion-addin', 'AddInRasterfasterLocalF3D', 'AddInRasterfasterLocalF3D.manifest');
+  if (fs.existsSync(manifestPath)) {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    manifest.version = version;
+    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    log(`Fusion add-in manifest version: ${version}`);
+  }
   return { version, buildDate };
 }

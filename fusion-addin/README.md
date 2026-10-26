@@ -10,7 +10,7 @@ It adds three commands to the **Add-Ins** panel of the **Utilities** tab:
 | **Open Local File** | Opens a local `.f3d` as a new, unsaved document. |
 | **Local Folder** | Chooses the folder for the local files (default `~/Documents/FUSION360`). |
 
-Tested with Fusion 2704.1.53 on macOS. Mac only (the manifest says `mac`).
+The add-in's version is the Rasterfaster app's version (`npm run bump:version -- X.Y.Z` in `frontend/3d-tool` updates the manifest too); Fusion shows it in the Version column of Scripts and Add-Ins, and the Save Local Copy dialog shows it on its last line. Tested with Fusion 2704.1.53 on macOS. Mac only (the manifest says `mac`).
 
 ## Install
 
@@ -23,7 +23,7 @@ You do this once. The add-in stays where it is in this repository, and Fusion ru
 5. Go to the **Add-Ins** tab, select **AddInRasterfasterLocalF3D** and switch it **on** (or press **Run**).
 6. Optional: tick **Run on Startup** so the commands are there every time you start Fusion.
 
-The three commands now show in the **ADD-INS** panel of the **UTILITIES** tab.
+The three commands now show in the **ADD-INS** panel of the **UTILITIES** tab, as buttons with icons next to the **Scripts and Add-Ins** button (or in its dropdown if the toolbar is narrow).
 
 Do not also copy the folder into Fusion's own AddIns folder (`~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns`): Fusion would list the add-in twice.
 
@@ -74,15 +74,21 @@ Click **Local Folder** and pick a folder. The choice is stored in `localf3d.json
 
 | What you see | What to do |
 |---|---|
-| The commands are not in the ADD-INS panel | Check in **Scripts and Add-Ins** that the add-in is switched on. Press **S** in the Design workspace to search for "Local". |
+| The commands are not in the ADD-INS panel | Check in **Scripts and Add-Ins** that the add-in is switched on, and look in the **Utilities** tab, in the **Add-Ins** dropdown. (Press **S** in the Design workspace and type "Local": the commands show up in that search too.) |
 | The add-in is listed twice | One entry was added from the repository and another from Fusion's AddIns folder. Remove the copy in the AddIns folder, or remove one entry with the unlink icon. |
 | A message box says the add-in failed to start | Copy the text and send it to whoever maintains the add-in; the first lines show which line failed. |
 | Cannot stop the add-in | A dialog of the add-in is open: click **Cancel** first. |
 | The dialog is the old one after an update | Switch the add-in off and on again; if that does not help, quit and restart Fusion. |
 | Fusion says "not responding" during a save | It is exporting a big design. Wait; it comes back when the file is written. |
 
+## Writing your own
+
+See [DEVELOPING.md](DEVELOPING.md): how scripts and add-ins work in Fusion, the events and handler classes, dialogs, exporting and importing, and how to test.
+
 ## Files
 
 - `AddInRasterfasterLocalF3D/AddInRasterfasterLocalF3D.py`: the add-in.
 - `AddInRasterfasterLocalF3D/AddInRasterfasterLocalF3D.manifest`: what Fusion reads to list it (the three names must match).
+- `DEVELOPING.md`: notes on writing Fusion scripts and add-ins in Python.
+- `make_icons.py`: draws the command icons into `AddInRasterfasterLocalF3D/resources/` (Pillow).
 - `test_addin.py`: tests of the naming and version logic (Fusion's own modules replaced by stand-ins). Run: `cd backend && .venv1/bin/python -m pytest ../fusion-addin/test_addin.py`.

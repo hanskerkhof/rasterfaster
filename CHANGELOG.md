@@ -2,6 +2,27 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - version bump to test removing and adding the Fusion add-in again (0.10.9)
+
+### Changed
+- **Tool**: version 0.10.9, to see whether removing the add-in from Scripts and Add-Ins (unlink icon) and adding it again with + shows the new version in the Version column without restarting Fusion. No other change.
+
+## 2026-10-26 - version bump to test the Fusion add-in reload (0.10.8)
+
+### Changed
+- **Tool**: version 0.10.8, to see whether switching the add-in off and on in Fusion's Scripts and Add-Ins reloads the manifest (the Version column and the Save Local Copy dialog's "Add-in" line). No other change. Result of the first test with 0.10.7: Fusion showed the new version only after a restart of Fusion. With 0.10.8: switching the add-in off and on did not update the Version column.
+
+## 2026-10-26 - the Fusion add-in has the app's version (0.10.7)
+
+### Added
+- **Tool** (`frontend/3d-tool/scripts/version-metadata.mjs`, `fusion-addin/AddInRasterfasterLocalF3D/`): the add-in's manifest `version` follows the Rasterfaster app's: `npm run bump:version -- X.Y.Z` writes it next to `package.json`, `build-info.ts` and the service worker's `appData`, so Fusion's Scripts and Add-Ins list shows the same number. The Save Local Copy dialog shows the version on an "Add-in" line (a quick way to see that Fusion loaded the latest file).
+
+## 2026-10-26 - icons for the Fusion add-in commands (0.10.7)
+
+### Added
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/resources/`, `fusion-addin/make_icons.py`): icons for Save Local Copy, Open Local File and Local Folder. Fusion only draws a promoted command as a button in the toolbar when it has an icon; without one the commands stayed hidden in the Add-Ins dropdown (and the dropdown has no "Pin to Toolbar" menu). The PNGs (16, 32, 64 px and @2x) are drawn by `make_icons.py` (Pillow). Fusion's acceptance of the icon folders was checked with a throwaway command; the buttons themselves have not been looked at in Fusion yet.
+- **Docs** (`fusion-addin/README.md`, `fusion-addin/DEVELOPING.md`): a command needs an icon to show as a toolbar button; with the icons (and after a restart of Fusion) the commands are also found by the S command search.
+
 ## 2026-10-26 - versions in Save Local Copy (0.10.6)
 
 ### Added

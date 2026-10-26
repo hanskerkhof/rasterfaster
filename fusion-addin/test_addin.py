@@ -50,3 +50,9 @@ def test_the_preview_text(tmp_path):
     assert "latest on disk: v3" in addin.describe(*addin.planned_target(str(tmp_path), "RF14", True))
     assert "no version on disk" in addin.describe(*addin.planned_target(str(tmp_path), "NEW", True))
     assert "replaces" in addin.describe(*addin.planned_target(str(tmp_path), "RF14_v3", False))
+
+
+def test_the_add_in_version_is_the_one_in_the_manifest():
+    import json
+    manifest = json.loads((Path(__file__).parent / "AddInRasterfasterLocalF3D" / "AddInRasterfasterLocalF3D.manifest").read_text())
+    assert addin.addin_version() == manifest["version"] != ""

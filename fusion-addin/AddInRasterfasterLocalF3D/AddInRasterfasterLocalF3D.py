@@ -44,6 +44,15 @@ def save_settings(**changes):
         json.dump(values, f)
 
 
+def addin_version():
+    """The version in the manifest (the same as the Rasterfaster app's: `npm run bump:version` keeps them equal)."""
+    try:
+        with open(os.path.splitext(os.path.abspath(__file__))[0] + '.manifest') as f:
+            return json.load(f).get('version', '')
+    except (OSError, ValueError):
+        return ''
+
+
 def folder():
     return settings().get('folder') or DEFAULT_FOLDER
 
@@ -183,6 +192,7 @@ def on_save_created(args):
     # the text is set through .text, which takes it as plain text (the constructor argument is read as HTML: a "&" in a name would break)
     inputs.addTextBoxCommandInput('preview', 'Save as', '', 1, True).text = describe(*planned_target(save_directory(design), default, versioned))
     inputs.addTextBoxCommandInput('where', 'Folder', '', 1, True).text = save_directory(design)
+    inputs.addTextBoxCommandInput('about', 'Add-in', '', 1, True).text = 'Rasterfaster Local F3D v' + addin_version()
     command.okButtonText = 'Save'
     command.inputChanged.add(keep(ChangedHandler(on_save_changed)))
     command.execute.add(keep(Handler(on_save_execute)))
@@ -243,12 +253,13 @@ def on_folder_execute(args):
         set_folder(dialog.folder)
 
 
-def add_command(command_id, name, tooltip, created):
+def add_command(command_id, name, tooltip, icon, created):
     definitions = ui.commandDefinitions
     existing = definitions.itemById(command_id)
     if existing:
         existing.deleteMe()
-    definition = definitions.addButtonDefinition(command_id, name, tooltip)
+    # the icons make Fusion show the command as a button in the toolbar (a promoted command without an icon stays in the dropdown)
+    definition = definitions.addButtonDefinition(command_id, name, tooltip, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resources', icon))
     definition.commandCreated.add(keep(CreatedHandler(created)))
     control = ui.allToolbarPanels.itemById(PANEL_ID).controls.addCommand(definition)
     control.isPromoted = True
@@ -260,9 +271,9 @@ def run(context):
     try:
         app = adsk.core.Application.get()
         ui = app.userInterface
-        add_command(SAVE_ID, 'Save Local Copy', 'Export the open design as a local .f3d file (no Fusion cloud)', on_save_created)
-        add_command(OPEN_ID, 'Open Local File', 'Open a local .f3d file as a new, unsaved document', on_open_created)
-        add_command(FOLDER_ID, 'Local Folder', 'Choose the folder for the local .f3d files', on_folder_created)
+        add_command(SAVE_ID, 'Save Local Copy', 'Export the open design as a local .f3d file (no Fusion cloud)', 'save', on_save_created)
+        add_command(OPEN_ID, 'Open Local File', 'Open a local .f3d file as a new, unsaved document', 'open', on_open_created)
+        add_command(FOLDER_ID, 'Local Folder', 'Choose the folder for the local .f3d files', 'folder', on_folder_created)
     except Exception:
         if ui:
             ui.messageBox('Local .f3d failed to start:\n' + traceback.format_exc())
