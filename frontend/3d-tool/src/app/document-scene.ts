@@ -654,6 +654,10 @@ export class DocumentScene {
       const selected = store.selectedItems();
       if (selected.length) store.setMuted(selected.map(i => i.id), !selected.every(i => i.muted));
     }
+    else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'm') { // M: Move to… (the same as the menu item; needs another part to move onto)
+      const selected = store.selectedItems();
+      if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
+    }
     else if (!command && !e.altKey && ['x', 'y', 'z'].includes(e.key.toLowerCase())) this.rotateSelected(e.key.toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -this.ctx.rotationStep() : this.ctx.rotationStep());
     else if (e.key === 'ArrowUp') (e.shiftKey ? moveZ(1) : move(0, stepY, 0)); // Shift = height, like Shift+drag
     else if (e.key === 'ArrowDown') (e.shiftKey ? moveZ(-1) : move(0, -stepY, 0));

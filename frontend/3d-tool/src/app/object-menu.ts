@@ -34,7 +34,7 @@ import { baseThicknessMm } from './z-levels';
         </button>
         <button type="button" role="menuitem" [disabled]="!hasOthers()" (click)="moveTo()">
           <span class="icon">⇥</span>Move to…
-          <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span>
+          <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span><span class="hint key">M</span>
         </button>
         <button type="button" role="menuitem" [disabled]="lowestAt(0)" (click)="moveToHeight(0)">
           <span class="icon">⤓</span>Move to ground

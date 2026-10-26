@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-26 - M for Move to… (0.10.3)
+
+### Added
+- **FE** (`document-scene.ts`, `object-menu.ts`, `document-panel.ts`): **M** starts Move to… for the selected parts (a corner onto a corner of another part), like the part menu item, which now shows the key. It does nothing when there is no other part to move onto. Works on the stage and from the object list.
+
 ## 2026-10-26 - V from the object list, V shown in the part menu (0.10.2)
 
 ### Fixed
