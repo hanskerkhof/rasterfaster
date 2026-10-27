@@ -728,6 +728,11 @@ export class DocumentStore {
     this.contextMenu.set({ x, y, ids: [...this.selectedIds()] });
   }
 
+  /** Right-click on empty canvas: a menu without parts (`ids` is empty). */
+  openCanvasMenu(x: number, y: number) {
+    this.contextMenu.set({ x, y, ids: [] });
+  }
+
   removeSelected() {
     const ids = new Set(this.selectedIds());
     if (!ids.size) return;

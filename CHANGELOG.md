@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - Canvas context menu with Paste; adding a part focuses the canvas (0.10.35)
+
+### Added
+- **FE** (`document-scene.ts`, `document.store.ts`, `object-menu.ts`): right-clicking an empty spot in the document canvas opens a menu with **Paste ⌘V** (disabled, "nothing copied", when the clipboard is empty). `DocumentStore.openCanvasMenu` opens the existing object menu with no parts.
+
+### Changed
+- **FE** (`document-scene.ts`): after a part is added (⌘↓ or **Add to document**), the file list loses the keyboard focus and the canvas gets it, so the arrow keys move the new part at once.
+
 ## 2026-10-27 - Find in browser puts the file in the middle of the list (0.10.34)
 
 ### Changed

@@ -430,6 +430,9 @@ export class DocumentScene {
       created.push({ path, name: path.split('/').pop()!.replace(/\.stl$/i, ''), position: [x, 0, 0], rotation: [0, 0, 0, 1] });
     }
     store.addParts(created);
+    // The keyboard goes from the file list to the canvas (its container is the focusable element; the stage host is not), so the new parts can be moved at once.
+    (document.activeElement as HTMLElement | null)?.blur();
+    this.ctx.canvas.parentElement?.focus({ preventScroll: true });
   }
 
   /**
@@ -529,9 +532,9 @@ export class DocumentScene {
     if (!this.active) return;
     // A solid part under the cursor wins; otherwise a dimmed one (so a ghost can always be brought back from the 3D view).
     const id = this.pickItem(e as PointerEvent)?.id ?? this.pickMuted(e);
-    if (!id) return;
     e.preventDefault();
-    this.ctx.store.openContextMenu(e.clientX, e.clientY, id);
+    if (!id) this.ctx.store.openCanvasMenu(e.clientX, e.clientY);
+    else this.ctx.store.openContextMenu(e.clientX, e.clientY, id);
   }
 
   private onPointerDown(e: PointerEvent) {

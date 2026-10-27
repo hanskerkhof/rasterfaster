@@ -9,6 +9,11 @@ import { baseThicknessMm } from './z-levels';
     @if (store.contextMenu(); as menu) {
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
       <div class="menu" role="menu" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)">
+        @if (!menu.ids.length) {
+          <button type="button" role="menuitem" [disabled]="!store.clipboard()" (click)="paste()">
+            <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? '⌘V' : 'nothing copied' }}</span>
+          </button>
+        } @else {
         <div class="title">{{ title() }}</div>
         <button type="button" role="menuitem" (click)="copy(false)">
           <span class="icon">⧉</span>Copy<span class="hint">⌘C</span>
@@ -53,6 +58,7 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
           <span class="hint">{{ allNoExport() ? 'on: not in 3MF / SVG, own BOM section' : 'mock part: leave out of the exports' }}</span>
         </button>
+        }
       </div>
     }
   `,
