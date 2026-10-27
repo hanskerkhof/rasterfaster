@@ -6,7 +6,7 @@
   "description": {
     "": "Save a design as a local .f3d file and open local .f3d files, without the Fusion cloud."
   },
-  "version": "0.10.21",
+  "version": "0.10.22",
   "runOnStartup": false,
   "supportedOS": "mac",
   "editEnabled": true

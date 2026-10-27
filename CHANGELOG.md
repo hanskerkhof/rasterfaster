@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - the close question stays a message box (0.10.22)
+
+### Changed
+- **Tool** (`fusion-addin/AddInRasterfasterLocalF3D/`): a custom dialog for the close question, with the buttons **Don't Save | Cancel | Save** in Fusion's order (a Fusion palette: a web page in a floating window), was tried and **dropped**: in Fusion 2704 the page loaded and exchanged its first message with the add-in, but the dialog did not work well in use. The close question is the message box again, as in 0.10.21: **Cancel | No | Yes** (the order and the labels of `ui.messageBox` cannot be changed), with the same flow: Yes cancels the close, opens the Save Local Copy dialog and closes the document again afterwards, No lets Fusion close it, Cancel keeps it open. Nothing else changed; the palette code, its page and its tests are removed.
+
 ## 2026-10-27 - the "Save as" line of the Save dialog has two rows (0.10.21)
 
 ### Fixed

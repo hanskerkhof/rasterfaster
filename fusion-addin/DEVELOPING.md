@@ -114,6 +114,10 @@ An export blocks Fusion's main thread, and Fusion draws a dialog from that threa
 4. Update the dialog (`message`, `progressValue`) when it is done, wait a moment with a loop of `adsk.doEvents()` and `time.sleep(0.05)`, and `hide()` it. While the job runs the bar and text cannot change.
 5. Unregister the event in `stop()` (`app.unregisterCustomEvent`).
 
+## What did not work: a palette for the close question
+
+A palette (a web page in a floating window: `ui.palettes.add`, messages with `adsk.fusionSendData` / `palette.incomingFromHTML` / `sendInfoToHTML`) was tried for the question "Save a local copy before closing?", to get the buttons Don't Save | Cancel | Save in the order of Fusion's own dialog (`ui.messageBox` always shows Cancel | No | Yes). In Fusion 2704 the page loaded and the first message (`ready`) arrived and was answered, but the dialog was not usable in practice and was dropped (version 0.10.22). If it is tried again: show it only when the close has been cancelled, give it Fusion's own close button as a way out, and log every message it sends (`app.log`) to see whether clicks arrive.
+
 ## Finding your way in the API
 
 - The **Fusion MCP server**, if it is connected to Claude Code, can search the API reference (`apiDocumentation` with a name pattern) and run a short Python script in the open design. It refuses to run a script while a command dialog is open.
