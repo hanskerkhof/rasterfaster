@@ -35,7 +35,7 @@
     @if (searching() && !filtered()) {
       <div class="hint">searching…</div>
     } @else {
-      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" (showAll)="onFilter('')" />
+      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [find]="findRequest()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" (showAll)="onFilter('')" (openTrash)="trashOpen.set(true)" />
     }
   </div>
   <div class="trash-bar">

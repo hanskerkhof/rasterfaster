@@ -11,6 +11,12 @@ export function rangeBetween(rows: readonly string[], anchor: string | null, tar
   return rows.slice(Math.min(from, to), Math.max(from, to) + 1);
 }
 
+/** Like `rangeBetween`, but the clicked `target` comes last (the document list shows the *last* selected item's numbers). */
+export function rangeEndingAt(rows: readonly string[], anchor: string | null, target: string): string[] {
+  const range = rangeBetween(rows, anchor, target);
+  return range.length ? [...range.filter(row => row !== target), target] : [];
+}
+
 /** A ⌘-click: `path` in or out of the selection. */
 export function toggled(selection: ReadonlySet<string>, path: string): Set<string> {
   const next = new Set(selection);

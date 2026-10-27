@@ -20,6 +20,10 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? store.clipboard()!.items.length + ' part' + (store.clipboard()!.items.length === 1 ? '' : 's') + ' · ⌘V' : 'nothing copied' }}</span>
         </button>
         <div class="sep"></div>
+        <button type="button" role="menuitem" (click)="findInBrowser()">
+          <span class="icon">⌕</span>Find in browser
+          <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
+        </button>
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
           <span class="hint">{{ allMuted() ? '' : 'barely visible, ignores clicks' }}</span><span class="hint key">V</span>
@@ -112,6 +116,12 @@ export class ObjectMenu {
 
   protected toggleNoExport() {
     this.store.setNoExport(this.items().map(i => i.id), !this.allNoExport());
+    this.close();
+  }
+
+  /** Shows the parts' files in the file list: opens their folders, selects them and scrolls to the first. */
+  protected findInBrowser() {
+    this.store.findInBrowser(this.items().map(i => i.id));
     this.close();
   }
 

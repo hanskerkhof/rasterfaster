@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, firstValueFrom } from 'rxjs';
@@ -67,6 +67,13 @@ export class App {
   protected readonly sortAscending = this.lib.sortAscending;
   /** Set once on startup so the tree expands to the restored file; later selections don't re-trigger it. */
   protected readonly revealPath = signal<string | null>(null);
+  /** "Find in browser" (part menu) on its way to the file list; a filter is cleared first, the file may not match it. */
+  protected readonly findRequest = signal<{ paths: string[]; seq: number } | null>(null);
+  /** The distinct library paths the document's parts use (a string, so that moving a part does not count as a change). */
+  private readonly partPathsKey = computed(() => [...new Set(this.store.doc().items.map(item => item.path))].join('\n'));
+  /** Bumped whenever the library changes under the document (rename, move, trash, put back): the missing files are looked up again. */
+  private readonly libraryTick = signal(0);
+  private missingTimer?: ReturnType<typeof setTimeout>;
   private readonly viewer = viewChild.required(StlViewer);
   private readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
@@ -120,6 +127,22 @@ export class App {
       // Every time the API answers: if the document never loaded (the API started after the app) or a save failed, recover now.
       if (this.api.checks() > 0 && (!this.store.docId() || this.store.saveState() === 'error')) void this.store.recover();
     });
+    effect(() => { // which parts use a file that is not in the library (the parts list marks them)
+      const key = this.partPathsKey();
+      this.lib.trashCount(); this.libraryTick();
+      untracked(() => this.scheduleMissingCheck(key ? key.split('\n') : []));
+    });
+    effect(() => {
+      const request = this.store.browserRequest();
+      if (!request) return;
+      untracked(() => {
+        const show = () => {
+          this.findRequest.set(request);
+          if (request.paths.length === 1) this.open(request.paths[0]); // the file is the selected one of the browser, like after a click
+        };
+        if (this.filterText().trim()) { this.onFilter(''); setTimeout(show, 200); } else show(); // the list resets with the filter: ask after that
+      });
+    });
     try {
       const storedFilter = localStorage.getItem(filterStorageKey);
       if (storedFilter) this.onFilter(storedFilter); // restore the filter and its results
@@ -146,6 +169,7 @@ export class App {
 
   /** A file or directory was renamed: follow it with the selection, refresh the search and let open documents pick up their new paths. */
   protected async onRenamed(result: RenameResult) {
+    this.libraryTick.update(n => n + 1);
     const selected = this.selected();
     if (selected === result.from) this.selected.set(result.to);
     else if (selected?.startsWith(result.from + '/')) this.selected.set(result.to + selected.slice(result.from.length));
@@ -159,6 +183,7 @@ export class App {
 
   /** Files or directories were moved into another folder: follow them with the selection and let open documents pick up the new paths. */
   protected async onMoved(result: MoveBatchResult) {
+    this.libraryTick.update(n => n + 1);
     const selected = this.selected();
     let now = selected;
     for (const item of result.results) {
@@ -180,6 +205,7 @@ export class App {
 
   /** Items were moved to the Trash: forget them as the selection, refresh the search and offer Undo for the whole batch. */
   protected onTrashed(result: TrashBatchResult) {
+    this.libraryTick.update(n => n + 1);
     const selected = this.selected();
     if (selected && result.results.some(r => selected === r.path || selected.startsWith(r.path + '/'))) { this.selected.set(null); this.writeLastStl(null); }
     if (this.filterText().trim()) this.onFilter(this.filterText());
@@ -210,6 +236,7 @@ export class App {
 
   /** Something was put back from the Trash dialog: the list has to look again. */
   protected async onTrashChanged() {
+    this.libraryTick.update(n => n + 1); // Put Back, Delete Immediately, Empty Trash: the missing files change
     await this.treePanel()?.reload();
     if (this.filterText().trim()) this.onFilter(this.filterText());
   }
@@ -396,6 +423,22 @@ export class App {
     const had = this.filterText().trim() !== '';
     this.onFilter('');
     if (had) setTimeout(() => this.treePanel()?.focusTree(), 50);
+  }
+
+  private scheduleMissingCheck(paths: string[]) {
+    clearTimeout(this.missingTimer);
+    if (!paths.length) { this.store.missingPaths.set(new Set()); return; }
+    this.missingTimer = setTimeout(async () => {
+      try {
+        this.store.missingPaths.set(new Set(await this.lib.missing(paths)));
+        if (this.store.missingPaths().size) void this.lib.refreshTrash(); // so that the marker can say that a file is in the Trash
+      } catch {
+        try { // no such endpoint (an API older than this front end): the files that are in the Trash are still known
+          await this.lib.refreshTrash();
+          this.store.missingPaths.set(new Set(paths.filter(path => this.lib.trashedFrom(path))));
+        } catch { /* offline: keep what is shown */ }
+      }
+    }, 300);
   }
 
   protected open(path: string) {

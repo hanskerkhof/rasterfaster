@@ -149,8 +149,25 @@ export class LibraryService {
   /** How many items the Trash holds (shown next to the Trash button). */
   readonly trashCount = signal(0);
 
+  /** What is in the Trash now (kept with the count): to say where a missing file went. */
+  readonly trashItems = signal<TrashItem[]>([]);
+
   async refreshTrash() {
-    try { this.trashCount.set((await firstValueFrom(this.trashList())).length); } catch { /* offline: keep the old number */ }
+    try {
+      const items = await firstValueFrom(this.trashList());
+      this.trashItems.set(items);
+      this.trashCount.set(items.length);
+    } catch { /* offline: keep the old numbers */ }
+  }
+
+  /** The Trash item that holds this library path (the file itself, or a folder above it), or null. */
+  trashedFrom(path: string): TrashItem | null {
+    return this.trashItems().find(item => item.originalPath === path || path.startsWith(item.originalPath + '/')) ?? null;
+  }
+
+  /** Which of these library paths are not files in the library (in the Trash, renamed or deleted outside the app). */
+  async missing(paths: string[]): Promise<string[]> {
+    return (await firstValueFrom(this.http.post<{ missing: string[] }>('/api/library/missing', { paths }))).missing;
   }
 
   /** Files and folders whose name contains the terms of `q` (see filter-terms.ts): any of them, or every one with `mode` 'all'. */

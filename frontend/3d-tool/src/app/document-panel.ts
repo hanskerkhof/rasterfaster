@@ -1,6 +1,8 @@
+import { LibraryService } from './library.service';
 import { Component, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
+import { rangeEndingAt } from './tree-selection';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
 @Component({
@@ -53,9 +55,10 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
     <div class="list" tabindex="0"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
-        <div class="item" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu">
+        <div class="item" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
+          @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
@@ -65,7 +68,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       }
     </div>
     @if (store.selectedIds().length > 1) {
-      <div class="multi">{{ store.selectedIds().length }} selected · drag, arrows and rotate keys move/turn them together · ⌘-click to add or remove</div>
+      <div class="multi">{{ store.selectedIds().length }} selected · drag, arrows and rotate keys move/turn them together · ⌘-click to add or remove · ⇧-click for a range</div>
     }
     @if (store.selected(); as item) {
       <div class="pos">
@@ -107,6 +110,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     .item.muted .label { opacity: .45; font-style: italic; }
     .item.sel { background: #d9822b; color: #fff; }
     .badge { opacity: .7; font-size: 11px; }
+    .badge.warn { opacity: 1; color: #f0b232; }
     .dot { flex: none; width: 10px; height: 10px; border-radius: 2px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; }
@@ -120,6 +124,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
 })
 export class DocumentPanel {
   protected readonly store = inject(DocumentStore);
+  private readonly lib = inject(LibraryService);
   /** Double-click on a list item: the viewer should centre on it. */
   readonly centerItem = output<string>();
   /** The 3D view's camera (see StlViewer.viewParam): the Blender export puts its camera there. */
@@ -241,12 +246,32 @@ export class DocumentPanel {
     this.store.openContextMenu(event.clientX, event.clientY, id);
   }
 
+  /** The tooltip of the warning sign: the file the part uses is not in the library; in the Trash (and where), or just gone. */
+  protected missingTip(path: string) {
+    const item = this.lib.trashedFrom(path);
+    return item
+      ? `The file is in the Trash${item.kind === 'directory' ? ` (in the folder “${item.name}”)` : ''}: open the Trash and Put Back, and this part works again. ${path}`
+      : `The file is not in the library (moved or deleted outside the app?): ${path}`;
+  }
+
   protected isSelected(id: string) {
     return this.store.selectedIds().includes(id);
   }
 
-  /** ⌘/Ctrl-click adds or removes the item from the selection; a plain click selects only it. */
+  /** Where a Shift-click starts: the item that was last clicked without Shift (or the one shown in the position fields). */
+  private anchorId: string | null = null;
+
+  /**
+   * Like the file list (and the Finder): a plain click selects only the item, ⌘/Ctrl-click adds or removes it, Shift-click selects the range
+   * from the anchor to the clicked item (⌘⇧ adds the range to what is selected). Shift-click does not move the anchor.
+   */
   protected onItemClick(event: MouseEvent, id: string) {
+    if (event.shiftKey) {
+      const ids = this.store.doc().items.map(item => item.id);
+      this.store.selectMany(rangeEndingAt(ids, this.anchorId ?? this.store.selectedId(), id), event.metaKey || event.ctrlKey);
+      return;
+    }
+    this.anchorId = id;
     if (event.metaKey || event.ctrlKey) this.store.toggleSelect(id);
     else this.store.select(id);
   }

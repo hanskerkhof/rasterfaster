@@ -207,3 +207,37 @@ describe('Center on grid (X, Y and Z)', () => {
     });
   });
 });
+
+
+describe('Find in browser (the request for the file list)', () => {
+  let store: DocumentStore;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+  });
+
+  it('asks for the file of each part once, in document order, and every request counts', () => {
+    const a = store.addItem({ ...part(), path: 'Folder/a.stl' });
+    const b = store.addItem({ ...part(), path: 'Other/b.stl' });
+    const again = store.addItem({ ...part(), path: 'Folder/a.stl' });  // the same file twice
+    expect(store.browserRequest()).toBeNull();
+    store.findInBrowser([again.id, b.id]);
+    expect(store.browserRequest()).toEqual({ paths: ['Other/b.stl', 'Folder/a.stl'], seq: 1 });
+    store.findInBrowser([a.id, again.id]);
+    expect(store.browserRequest()).toEqual({ paths: ['Folder/a.stl'], seq: 2 });         // asking again for the same file is a new request
+    store.findInBrowser([]);
+    expect(store.browserRequest()?.seq).toBe(2);                                         // nothing to find: no request
+  });
+
+  it('selectMany keeps the last id as the shown one and can add to the selection', () => {
+    const [x, y, z] = [store.addItem(part()), store.addItem(part()), store.addItem(part())];
+    store.select(x.id);
+    store.selectMany([y.id, z.id]);
+    expect(store.selectedIds()).toEqual([y.id, z.id]);
+    expect(store.selectedId()).toBe(z.id);
+    store.selectMany([x.id, y.id], true);
+    expect(store.selectedIds()).toEqual([z.id, x.id, y.id]);                              // added ones last, no duplicates
+  });
+});

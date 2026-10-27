@@ -534,6 +534,23 @@ export class DocumentStore {
     this.selectedIds.set(id ? [id] : []);
   }
 
+  /** Library paths of document parts whose file is not in the library (trashed, renamed or deleted elsewhere); the app keeps it up to date. */
+  readonly missingPaths = signal<ReadonlySet<string>>(new Set());
+
+  /** "Find in browser" in the part menu: the library paths of the parts, for the file list to show and select. `seq` makes a repeated request count. */
+  readonly browserRequest = signal<{ paths: string[]; seq: number } | null>(null);
+
+  findInBrowser(ids: readonly string[]) {
+    const wanted = new Set(ids);
+    const paths = [...new Set(this.doc().items.filter(i => wanted.has(i.id)).map(i => i.path))];
+    if (paths.length) this.browserRequest.set({ paths, seq: (this.browserRequest()?.seq ?? 0) + 1 });
+  }
+
+  /** Shift-click in the document list: select these items, the last of them is the one whose numbers are shown; `add` (⌘⇧) keeps what is selected. */
+  selectMany(ids: readonly string[], add = false) {
+    this.selectedIds.set(add ? [...this.selectedIds().filter(id => !ids.includes(id)), ...ids] : [...ids]);
+  }
+
   /** ⌘-click: add the item to the selection, or take it out when it is already selected. */
   toggleSelect(id: string) {
     this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]));

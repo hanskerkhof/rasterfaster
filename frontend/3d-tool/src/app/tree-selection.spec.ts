@@ -1,4 +1,4 @@
-import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
+import { actedOn, pruned, rangeBetween, rangeEndingAt, toggled } from './tree-selection';
 
 const rows = ['a', 'a/one.stl', 'a/two.stl', 'ab', 'ab/x.stl', 'b.stl', 'c.stl'];
 
@@ -31,5 +31,14 @@ describe('tree selection', () => {
 
   it('pruning drops what is no longer visible', () => {
     expect([...pruned(['a', 'b.stl'], new Set(['a', 'gone.stl', 'b.stl']))]).toEqual(['a', 'b.stl']);
+  });
+
+  it('a range that ends at the target keeps the target last, whichever way it goes', () => {
+    expect(rangeEndingAt(rows, 'a/one.stl', 'ab')).toEqual(['a/one.stl', 'a/two.stl', 'ab']);
+    expect(rangeEndingAt(rows, 'ab', 'a/one.stl')).toEqual(['a/two.stl', 'ab', 'a/one.stl']);
+    expect(rangeEndingAt(rows, 'b.stl', 'b.stl')).toEqual(['b.stl']);
+    expect(rangeEndingAt(rows, null, 'c.stl')).toEqual(['c.stl']);          // no anchor: just the target
+    expect(rangeEndingAt(rows, 'gone', 'c.stl')).toEqual(['c.stl']);        // an anchor that is not in the list
+    expect(rangeEndingAt(rows, 'a', 'not-a-row')).toEqual([]);
   });
 });

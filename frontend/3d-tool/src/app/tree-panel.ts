@@ -21,7 +21,11 @@ interface Row {
   selector: 'app-tree-panel',
   imports: [DatePipe, NgTemplateOutlet, QuickLook],
   template: `
-    @if (listNotice()) { <div class="list-notice" role="status">{{ listNotice() }}</div> }
+    @if (listNotice()) {
+      <div class="list-notice" role="status">{{ listNotice() }}
+        @if (listNoticeAction()) { <button type="button" class="notice-action" (click)="openTrash.emit()">Open Trash</button> }
+      </div>
+    }
     @if (pendingTrash(); as pending) {
       <div class="list-notice confirm" role="alert">
         {{ pending.what }} used by {{ pending.parts }} part{{ pending.parts === 1 ? '' : 's' }} in {{ pending.documents }} document file{{ pending.documents === 1 ? '' : 's' }}: they show as missing until you put {{ pending.paths.length === 1 ? 'it' : 'them' }} back from the Trash.
@@ -93,6 +97,8 @@ interface Row {
   styles: `
     :host { display: block; height: 100%; }
     .tree { height: 100%; overflow: auto; padding: 4px 0; outline: none; }
+    /* room to scroll past the last row (as in a code editor): a file near the end of a long list (Find in browser) can be scrolled up to the middle */
+    .tree::after { content: ''; display: block; height: 50%; }
     .row { display: flex; gap: 4px; padding-right: 8px; line-height: 20px; cursor: default; white-space: nowrap; }
     .row:hover { background: rgba(255,255,255,.06); }
     .dir .label { font-weight: 600; }
@@ -113,6 +119,8 @@ interface Row {
     .list-notice.confirm .buttons { display: flex; gap: 4px; margin-top: 4px; }
     .list-notice.confirm button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
     .list-notice.confirm button:hover { background: #2f6fed; color: #fff; }
+    .list-notice .notice-action { margin-left: 8px; padding: 1px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
+    .list-notice .notice-action:hover { background: #2f6fed; color: #fff; }
     .editing { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; overflow: visible; }
     .rename { flex: 1; min-width: 0; font: inherit; line-height: 18px; padding: 0 4px; color: #fff; background: #1b1d22; border: 1px solid #2f6fed; border-radius: 3px; outline: none; }
     .ext { flex: none; opacity: .6; }
@@ -138,6 +146,8 @@ export class TreePanel {
   readonly selected = input<string | null>(null);
   /** A file path to expand the tree to and focus (used to restore the last opened file). */
   readonly reveal = input<string | null>(null);
+  /** "Find in browser": open the folders above these files, select them, scroll to the first (`seq` makes the same request count again). */
+  readonly find = input<{ paths: string[]; seq: number } | null>(null);
   /** A file was selected (clicked or arrowed to). Not called `select`: that is also a DOM event name, and selecting text in the rename field would fire it. */
   readonly fileSelected = output<string>();
   /** Double-click or ⌘↓ on a file: put it into the document. */
@@ -152,12 +162,16 @@ export class TreePanel {
   readonly moved = output<MoveBatchResult>();
   /** The list is filtered and a new folder would not show (it matches nothing): the app should clear the filter. */
   readonly showAll = output<void>();
+  /** The notice's "Open Trash" button: the app opens the Trash dialog. */
+  readonly openTrash = output<void>();
 
   protected readonly focused = signal<string | null>(null);
   /** The context menu (right-click on a row), and the row being renamed in place. */
   protected readonly menu = signal<{ x: number; y: number; paths: string[]; files: string[] } | null>(null);
   /** A short note shown above the list (the list was out of date and has been refreshed). */
   protected readonly listNotice = signal('');
+  /** The notice has a button that opens the Trash (the missing file is in it). */
+  protected readonly listNoticeAction = signal(false);
   /** A Trash move that waits for a yes because documents use the item. */
   protected readonly pendingTrash = signal<{ paths: string[]; what: string; parts: number; documents: number } | null>(null);
   protected readonly renaming = signal<{ path: string; value: string; error: string; busy: boolean } | null>(null);
@@ -189,6 +203,8 @@ export class TreePanel {
   /** The selected paths that must survive the switch from the filtered list to the whole list (until their rows show up, at most 4 s). */
   private keepAfterClear: ReadonlySet<string> | null = null;
   private keepTimer?: ReturnType<typeof setTimeout>;
+  /** The path to scroll to the middle of the list the next time its row is there (Find in browser). */
+  private centreOn: string | null = null;
 
   private readonly visiblePaths = computed(() => this.rows().map(r => r.entry.path));
 
@@ -262,6 +278,29 @@ export class TreePanel {
         this.selection.update(s => (s.size ? pruned(visible, s) : s));
       });
     });
+    // "Find in browser" from the part menu: open the folders above the files, select them, focus the first (the focus effect below scrolls to it).
+    effect(() => {
+      const request = this.find();
+      if (!request?.paths.length) return;
+      untracked(() => {
+        const folders = new Set<string>();
+        for (const path of request.paths) {
+          const parts = path.split('/');
+          for (let i = 1; i < parts.length; i++) folders.add(parts.slice(0, i).join('/'));
+        }
+        for (const folder of folders) this.load(folder);
+        this.flippedBrowse.update(s => new Set([...s, ...folders]));
+        this.centreOn = request.paths[0];
+        this.focused.set(request.paths[0]);
+        this.selection.set(new Set(request.paths));
+        this.anchor = request.paths[0];
+        this.holdSelection(request.paths);
+        this.closeQuickLook();
+        setTimeout(() => this.scrollToFocused()); // the focus may not change (already on that file): scroll anyway; else the effect does it when the row appears
+        setTimeout(() => this.focusTree(), 60); // the selected rows are blue while the list has the keyboard focus
+        void this.explainMissing(request.paths); // a file that is not in the library (any more) cannot be shown: say why
+      });
+    });
     // Expand every ancestor folder of the revealed file and focus it.
     effect(() => {
       const path = this.reveal();
@@ -272,10 +311,11 @@ export class TreePanel {
       this.focused.set(path);
       this.selectOnly(path);
     });
-    // Keep the focused row in view.
+    // Keep the focused row in view. A file that was asked for ("Find in browser") is put in the middle of the list, once its row exists (its
+    // folders may still be loading), so that it is not left at the very bottom edge with nothing below it to look at.
     effect(() => {
       this.focused(); this.rows();
-      setTimeout(() => this.host.nativeElement.querySelector('.row.focus')?.scrollIntoView({ block: 'nearest' }));
+      setTimeout(() => this.scrollToFocused());
     });
   }
 
@@ -308,12 +348,52 @@ export class TreePanel {
     }
     for (const folder of open) this.load(folder);
     this.flippedBrowse.update(flipped => new Set([...flipped, ...open]));
+    this.holdSelection(paths);
+  }
+
+  /** Says which of these files are not in the library, and when they are in the Trash where and how to get them back. */
+  private async explainMissing(paths: string[]) {
+    try {
+      let missing: string[];
+      try {
+        missing = await this.lib.missing(paths);
+      } catch { // an API that is older than this front end has no such endpoint: what the list shows has to do
+        missing = paths.filter(path => !this.visiblePaths().includes(path));
+      }
+      if (!missing.length) return;
+      await this.lib.refreshTrash();
+      const items = missing.map(path => this.lib.trashedFrom(path));
+      const inTrash = items.filter(item => item !== null).length;
+      const name = (path: string) => `“${path.split('/').pop()}”`;
+      let message: string;
+      if (missing.length === 1) {
+        const item = items[0];
+        message = item ? `${name(missing[0])} is in the Trash${item.kind === 'directory' ? `, inside “${item.name}”` : ''}: put it back to find it here.` : `${name(missing[0])} is not in the library (moved or deleted outside the app?).`;
+      } else {
+        message = inTrash === missing.length ? `${missing.length} files are in the Trash: put them back to find them here.`
+          : `${missing.length} files are not in the library${inTrash ? ` (${inTrash} of them in the Trash)` : ''}.`;
+      }
+      this.note(message, inTrash > 0);
+    } catch { /* offline: no explanation */ }
+  }
+
+  /** The rows of these paths appear only once their folders are open and listed: until then (at most 4 s) the selection is not pruned. */
+  private holdSelection(paths: string[]) {
     this.keepAfterClear = new Set(paths);
     clearTimeout(this.keepTimer);
     this.keepTimer = setTimeout(() => {
       this.keepAfterClear = null;
       this.selection.update(s => (s.size ? pruned(this.visiblePaths(), s) : s));
     }, 4000);
+  }
+
+  /** Scrolls the focused row into view (to the middle of the list when it was asked for by Find in browser and its row exists). */
+  private scrollToFocused() {
+    const row = this.host.nativeElement.querySelector('.row.focus');
+    if (!row) return;
+    const centre = this.centreOn !== null && this.centreOn === this.focused();
+    row.scrollIntoView({ block: centre ? 'center' : 'nearest' });
+    if (centre) this.centreOn = null;
   }
 
   private load(path: string) {
@@ -342,6 +422,7 @@ export class TreePanel {
         if (path) this.cache.update(m => { const next = new Map(m); next.delete(path); return next; });
       }
     }));
+    if (this.listNoticeAction()) { this.listNotice.set(''); this.listNoticeAction.set(false); } // "it is in the Trash": the Trash has just changed, the list was re-read
   }
 
   private childrenOf(e: LibraryEntry) {
@@ -552,10 +633,13 @@ export class TreePanel {
   }
 
   /** A note above the list for a few seconds. */
-  private note(message: string) {
+  private note(message: string, withTrashButton = false) {
     this.listNotice.set(message);
-    setTimeout(() => this.listNotice.set(''), 6000);
+    this.listNoticeAction.set(withTrashButton);
+    clearTimeout(this.noticeTimer);
+    this.noticeTimer = setTimeout(() => { this.listNotice.set(''); this.listNoticeAction.set(false); }, withTrashButton ? 12000 : 6000);
   }
+  private noticeTimer?: ReturnType<typeof setTimeout>;
 
   // --- context menu and rename -----------------------------------------------------------------------------------------------
 

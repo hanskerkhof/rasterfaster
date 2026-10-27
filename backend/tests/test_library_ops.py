@@ -407,3 +407,13 @@ def test_api_move_new_folder_duplicate_reveal(client, world):
 
 def test_api_library_root_is_where_the_library_is(client, world):
     assert client.get("/api/library/root").json() == {"root": str(world["library"])}
+
+
+def test_api_library_missing_lists_the_paths_that_are_not_files_in_the_library(client, world):
+    paths = ["TOP.stl", "1.4.BOLTS & NUTS/other.stl", "gone.stl", "1.4.BOLTS & NUTS", "../outside.stl", "TOP.stl"]
+    result = client.post("/api/library/missing", json={"paths": paths}).json()
+    assert result == {"missing": ["gone.stl", "1.4.BOLTS & NUTS", "../outside.stl"]}   # a folder is not a file, a path outside the library is missing, no duplicates
+    trashed = client.post("/api/library/trash", json={"path": "TOP.stl"})
+    assert trashed.status_code == 200
+    assert client.post("/api/library/missing", json={"paths": ["TOP.stl"]}).json() == {"missing": ["TOP.stl"]}   # in the Trash it is gone from the library
+    assert client.post("/api/library/missing", json={"paths": []}).json() == {"missing": []}

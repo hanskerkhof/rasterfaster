@@ -125,6 +125,25 @@ def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False)
             raise HTTPException(status_code=error.status, detail=str(error))
 
 
+class PathsRequest(BaseModel):
+    paths: list[str] = Field(max_length=5000)
+
+
+@app.post("/api/library/missing")
+def library_missing(body: PathsRequest) -> dict:
+    """Which of these library paths are not files in the library (moved to the Trash, renamed or deleted outside the app, or outside the library):
+    the parts list marks the document parts that use them."""
+    missing = []
+    for path in dict.fromkeys(body.paths):
+        try:
+            found = library_ops.inside_library(libraryRoot, path).is_file()
+        except library_ops.LibraryError:
+            found = False
+        if not found:
+            missing.append(path)
+    return {"missing": missing}
+
+
 @app.get("/api/library/root")
 def library_root() -> dict:
     """Where the STL library is on this machine (the file list builds full paths for Copy Path from it)."""
