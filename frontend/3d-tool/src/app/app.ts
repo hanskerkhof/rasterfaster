@@ -14,6 +14,7 @@ import { APP_VERSION } from './build-info';
 
 const lastStlStorageKey = 'rasterfaster.lastStl';
 const filterStorageKey = 'rasterfaster.filter';
+const filterModeStorageKey = 'rasterfaster.filterMode';
 /** Width of the file panel on the left, remembered per browser. */
 const panelWidthStorageKey = 'rasterfaster.panelWidth';
 const defaultPanelWidthPx = 360;
@@ -39,6 +40,10 @@ function loadPanelWidth(): number {
 const viewModeStorageKey = 'rasterfaster.viewMode';
 const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-shown'];
 
+function readFilterMode(): 'any' | 'all' {
+  try { return localStorage.getItem(filterModeStorageKey) === 'all' ? 'all' : 'any'; } catch { return 'any'; }
+}
+
 @Component({
   selector: 'app-root',
   imports: [TreePanel, TrashDialog, StlViewer, DocumentPanel, ObjectMenu],
@@ -54,6 +59,8 @@ export class App {
   protected readonly mode = signal<ViewMode>(this.readViewMode());
   protected readonly error = signal('');
   protected readonly filterText = signal('');
+  /** Several terms in the filter: a name matches when it has any of them ('any') or all of them ('all'). */
+  protected readonly matchMode = signal<'any' | 'all'>(readFilterMode());
   protected readonly filtered = signal<LibraryEntry[] | null>(null);
   protected readonly searching = signal(false);
   protected readonly sortKey = this.lib.sortKey;
@@ -236,6 +243,11 @@ export class App {
     try { path ? localStorage.setItem(lastStlStorageKey, path) : localStorage.removeItem(lastStlStorageKey); } catch { /* storage unavailable */ }
   }
 
+  /** The header button: a new folder at the top level of the library (the filter is cleared first when one is active: the new folder would not match it). */
+  protected newTopLevelFolder() {
+    void this.treePanel()?.newFolderAtRoot();
+  }
+
   protected setSort(key: SortKey) {
     this.lib.setSort(key);
   }
@@ -249,8 +261,16 @@ export class App {
     this.filterTimer = setTimeout(() => this.runSearch(text), 200);
   }
 
+  protected toggleMatchMode() {
+    const next = this.matchMode() === 'any' ? 'all' : 'any';
+    this.matchMode.set(next);
+    try { localStorage.setItem(filterModeStorageKey, next); } catch { /* the choice just is not remembered */ }
+    const text = this.filterText();
+    if (text.trim()) { this.searching.set(true); this.runSearch(text); }
+  }
+
   private runSearch(text: string) {
-    this.lib.search(text.trim()).subscribe({
+    this.lib.search(text.trim(), this.matchMode()).subscribe({
       next: flat => {
         if (this.filterText() !== text) return; // stale response
         this.filtered.set(this.lib.nest(flat));

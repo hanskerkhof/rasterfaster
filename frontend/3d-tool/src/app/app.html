@@ -12,8 +12,9 @@
   </header>
   <div class="controls">
     <div class="filter">
-      <input type="text" placeholder="Filter files and folders…" [value]="filterText()"
+      <input type="text" placeholder="Filter files and folders…" [value]="filterText()" title="Several words: a name matches any of them or all of them (the button on the right). &quot;two words&quot; in quotes is one term, -word leaves out names that contain it."
              (input)="onFilter($any($event.target).value)" (keydown.escape)="clearFilter()" />
+      <button class="mode" type="button" [class.on]="matchMode() === 'all'" [title]="matchMode() === 'any' ? 'Several words: a name matches any of them. Click: all of them' : 'Several words: a name must contain all of them. Click: any of them'" (click)="toggleMatchMode()">{{ matchMode() }}</button>
       @if (filterText()) {
         <button class="clear" type="button" aria-label="Clear filter" (click)="clearFilter()">✕</button>
       }
@@ -22,6 +23,9 @@
       Sort
       <button [class.on]="sortKey() === 'name'" (click)="setSort('name')">Name {{ sortKey() === 'name' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
       <button [class.on]="sortKey() === 'date'" (click)="setSort('date')">Date {{ sortKey() === 'date' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
+      <button class="reload" type="button" title="New folder at the top level" aria-label="New folder at the top level" (click)="newTopLevelFolder()">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
+      </button>
       <button class="reload" type="button" title="Reload the file list" aria-label="Reload the file list" [class.spin]="reloading()" [disabled]="reloading()" (click)="reloadFiles()">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>
       </button>
@@ -31,7 +35,7 @@
     @if (searching() && !filtered()) {
       <div class="hint">searching…</div>
     } @else {
-      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" />
+      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" (showAll)="clearFilter()" />
     }
   </div>
   <div class="trash-bar">

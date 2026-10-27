@@ -403,3 +403,7 @@ def test_api_move_new_folder_duplicate_reveal(client, world):
     assert client.post("/api/library/duplicate", json={"path": "Sub/TOP.stl"}).json()["path"] == "Sub/TOP copy.stl"
     assert client.post("/api/library/move", json={"paths": ["gone.stl"], "targetDir": "Sub"}).status_code == 404
     assert client.post("/api/library/reveal", json={"path": "../x"}).status_code == 403
+
+
+def test_api_library_root_is_where_the_library_is(client, world):
+    assert client.get("/api/library/root").json() == {"root": str(world["library"])}

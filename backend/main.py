@@ -1,7 +1,7 @@
 """Read-only file API for the RASTERFASTER library.
 
     GET /api/list?path=<relative dir>   -> [{name, path, type: 'dir'|'file'}]
-    GET /api/search?q=<text>            -> matching dirs/.stl files plus their ancestor dirs
+    GET /api/search?q=<text>&mode=any|all -> matching dirs/.stl files plus their ancestor dirs (several terms: any / all; "phrase"; -exclude)
     GET /api/file?path=<relative file>  -> raw .stl bytes
     GET/POST /api/documents, GET/PUT/DELETE /api/documents/{id}   -> assembly documents (JSON files)
     GET /...                            -> the built Angular app (a PWA), when frontend/3d-tool/dist exists (override: RF_FRONTEND)
@@ -28,6 +28,7 @@ import blenderexport
 import versions
 import export3mf
 import library_ops
+import searchterms
 import svgexport
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, Response
@@ -122,6 +123,12 @@ def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False)
             return library_ops.trash_batch(libraryRoot, backupRoot, documentsRoot, body.paths, dryRun)
         except library_ops.LibraryError as error:
             raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.get("/api/library/root")
+def library_root() -> dict:
+    """Where the STL library is on this machine (the file list builds full paths for Copy Path from it)."""
+    return {"root": str(libraryRoot)}
 
 
 class MoveRequest(BaseModel):
@@ -240,9 +247,10 @@ def make_entry(path: Path, match: bool) -> LibraryEntry:
 
 
 @app.get("/api/search", response_model=list[LibraryEntry])
-def search(q: str) -> list[LibraryEntry]:
-    needle = q.strip().lower()
-    if not needle:
+def search(q: str, mode: Literal["any", "all"] = "any") -> list[LibraryEntry]:
+    """Files and folders whose name contains the terms of `q` (see searchterms.py): any of them, or with `mode=all` every one."""
+    include, exclude = searchterms.parse_query(q)
+    if not include:
         return []
     found: dict[str, LibraryEntry] = {}
     matchCount = 0
@@ -250,7 +258,7 @@ def search(q: str) -> list[LibraryEntry]:
         dirNames[:] = [name for name in dirNames if not name.startswith(".")]
         names = dirNames + [name for name in fileNames if name.lower().endswith(".stl") and not name.startswith(".")]
         for name in names:
-            if needle not in name.lower():
+            if not searchterms.name_matches(name, include, exclude, mode):
                 continue
             path = Path(directory) / name
             found[path.relative_to(libraryRoot).as_posix()] = make_entry(path, True)

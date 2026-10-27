@@ -93,6 +93,14 @@ export class LibraryService {
     return this.http.post<RenameResult>('/api/library/rename', { path, newName });
   }
 
+  private rootCache?: Promise<string>;
+
+  /** The full path of the library folder on the machine that runs the API (cached), for Copy Path. */
+  rootPath(): Promise<string> {
+    this.rootCache ??= firstValueFrom(this.http.get<{ root: string }>('/api/library/root')).then(r => r.root, error => { this.rootCache = undefined; throw error; });
+    return this.rootCache;
+  }
+
   /** Moves files and directories into the library directory `targetDir` ('' is the library root); the documents follow. */
   move(paths: string[], targetDir: string) {
     return this.http.post<MoveBatchResult>('/api/library/move', { paths, targetDir });
@@ -145,8 +153,9 @@ export class LibraryService {
     try { this.trashCount.set((await firstValueFrom(this.trashList())).length); } catch { /* offline: keep the old number */ }
   }
 
-  search(q: string) {
-    return this.http.get<LibraryEntry[]>('/api/search', { params: { q } });
+  /** Files and folders whose name contains the terms of `q` (see filter-terms.ts): any of them, or every one with `mode` 'all'. */
+  search(q: string, mode: 'any' | 'all' = 'any') {
+    return this.http.get<LibraryEntry[]>('/api/search', { params: { q, mode } });
   }
 
   fileUrl(path: string) {

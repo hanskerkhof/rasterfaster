@@ -1,6 +1,7 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { highlightParts } from './filter-terms';
 import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from './library.service';
 import { QuickLook } from './quick-look';
 import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
@@ -78,7 +79,8 @@ interface Row {
         @if (m.paths.length) {
           <div class="sep"></div>
           <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="revealInFinder(m.paths[0])">Reveal in Finder</button>
-          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="copyPath(m.paths[0])">Copy Path</button>
+          <button type="button" role="menuitem" (click)="copyPaths(m.paths, true)">{{ m.paths.length > 1 ? 'Copy Paths' : 'Copy Path' }}</button>
+          <button type="button" role="menuitem" (click)="copyPaths(m.paths, false)">{{ m.paths.length > 1 ? 'Copy Relative Paths' : 'Copy Relative Path' }}</button>
           <div class="sep"></div>
           <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
         }
@@ -148,6 +150,8 @@ export class TreePanel {
   readonly trashed = output<TrashBatchResult>();
   /** Files or directories were moved into another folder (the tree already follows; the app updates what refers to them). */
   readonly moved = output<MoveBatchResult>();
+  /** The list is filtered and a new folder would not show (it matches nothing): the app should clear the filter. */
+  readonly showAll = output<void>();
 
   protected readonly focused = signal<string | null>(null);
   /** The context menu (right-click on a row), and the row being renamed in place. */
@@ -514,6 +518,11 @@ export class TreePanel {
     this.menu.set({ x: Math.min(ev.clientX, innerWidth - 220), y: Math.min(ev.clientY, innerHeight - 100), paths: [], files: [] });
   }
 
+  /** Makes a folder at the top level of the library (the header button). */
+  async newFolderAtRoot() {
+    await this.newFolder(null);
+  }
+
   /** Makes a folder inside `path` (or next to it when it is a file; in the library root without a path) and opens it for naming. */
   protected async newFolder(path: string | null) {
     this.menu.set(null);
@@ -522,14 +531,24 @@ export class TreePanel {
     for (let number = 1; number < 50; number++) {
       try {
         const made = await firstValueFrom(this.lib.newFolder(parent, number === 1 ? 'untitled folder' : `untitled folder ${number}`));
-        if (parent) { this.load(parent); this.flippedBrowse.update(s => (this.rows().some(r => r.entry.path === parent && r.open) ? s : new Set([...s, parent]))); }
+        if (this.filter().trim()) { // the new folder matches no filter: show the whole list again, as the Finder shows the new folder in its window
+          this.showAll.emit();
+          await new Promise(resolve => setTimeout(resolve, 150)); // the app clears the filter and the tree resets its open folders and focus
+        }
+        const ancestors = made.path.split('/').slice(0, -1).map((_, i, parts) => parts.slice(0, i + 1).join('/'));
+        for (const folder of ancestors) this.load(folder);
+        this.flippedBrowse.update(s => new Set([...s, ...ancestors])); // every folder above it opens
         await this.reload();
         this.focused.set(made.path);
         this.selectOnly(made.path);
         await this.startRename(made.path);
         return;
       } catch (error) {
-        if ((error as { status?: number }).status !== 409) { this.note('Could not make a folder'); return; }
+        if ((error as { status?: number }).status !== 409) {
+          const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+          this.note(typeof detail === 'string' ? `Could not make a folder: ${detail}` : 'Could not make a folder');
+          return;
+        }
       }
     }
   }
@@ -553,9 +572,16 @@ export class TreePanel {
     try { await firstValueFrom(this.lib.reveal(path)); } catch { this.note('Reveal in Finder only works on the Mac that runs the API'); }
   }
 
-  protected async copyPath(path: string) {
+  /** Puts the path of the items on the clipboard as text: the full path on this machine, or the path inside the library; one per line for several. */
+  protected async copyPaths(paths: string[], absolute: boolean) {
     this.menu.set(null);
-    try { await navigator.clipboard.writeText(path); this.note('Path copied'); } catch { this.note('Could not copy the path'); }
+    try {
+      const root = absolute ? await this.lib.rootPath() : '';
+      await navigator.clipboard.writeText(paths.map(path => (absolute ? `${root}/${path}` : path)).join('\n'));
+      this.note(paths.length > 1 ? `${paths.length} paths copied` : 'Path copied');
+    } catch {
+      this.note('Could not copy the path');
+    }
   }
 
   // --- drag and drop: move the selection into a folder ----------------------------------------------------------------------------
@@ -718,17 +744,6 @@ export class TreePanel {
   }
 
   protected parts(text: string) {
-    const f = this.filter().trim().toLowerCase();
-    if (!f) return [{ text, hit: false }];
-    const out: { text: string; hit: boolean }[] = [];
-    const lower = text.toLowerCase();
-    let i = 0;
-    for (let at = lower.indexOf(f); at >= 0; at = lower.indexOf(f, i)) {
-      if (at > i) out.push({ text: text.slice(i, at), hit: false });
-      out.push({ text: text.slice(at, at + f.length), hit: true });
-      i = at + f.length;
-    }
-    if (i < text.length) out.push({ text: text.slice(i), hit: false });
-    return out;
+    return highlightParts(text, this.filter());
   }
 }

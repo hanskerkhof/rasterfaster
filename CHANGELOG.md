@@ -2,6 +2,24 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - filter on several words (0.10.25)
+
+### Added
+- **BE** (`searchterms.py`, `main.py`, `tests/test_searchterms.py`), **FE** (`filter-terms.ts`, `filter-terms.spec.ts`, `app.ts`, `app.html`, `app.scss`, `tree-panel.ts`, `library.service.ts`): the filter takes **several terms**. Before, the whole text was one substring (`PANEL S2` found only names with exactly "panel s2"). Now spaces separate terms and a file or folder name matches when it contains **any** of them (so `PANEL S2` finds `BOLT FEET S2.stl`, `USB-C PANEL MOUNT_RF2 v636_WS2812B ...` and `... Amperemeter Panel.stl`); the **any / all** button in the filter box switches to *all terms* (remembered in the browser); `"two words"` in quotes is one term; `-word` leaves out names that contain it (`-"a phrase"` too); a lone `-` while typing counts for nothing, and a query with only exclusions finds nothing. `GET /api/search?q=...&mode=any|all` (default any; another value is a 422). Every term that counts is highlighted in the list (overlapping ones as one). No regex checkbox: these four rules cover the use, and a regex could be added later as `/pattern/`. The backend and frontend share the rules by copy (`searchterms.py` / `filter-terms.ts`), each with tests (5 backend, 4 frontend); tested in the browser on a throwaway library with the three example names: any, all, exclusion, phrase, lone minus. **The installed app needs a rebuild: the search is in the backend.**
+
+## 2026-10-27 - Copy Path copies the full path (0.10.24)
+
+### Changed
+- **FE** (`tree-panel.ts`, `library.service.ts`), **BE** (`main.py`, `tests/test_library_ops.py`): the file and folder context menu has **Copy Path**, which puts the **full path on this machine** as text on the clipboard (`/Users/you/Documents/3D/RASTERFASTER/Folder/a.stl`), and **Copy Relative Path** (the path inside the library, `Folder/a.stl`). Before, Copy Path copied only the relative path, and only for one item. With several items selected the menu says Copy Paths / Copy Relative Paths and puts one path per line on the clipboard; a notice says "Path copied" / "N paths copied". The full path is the library folder plus the path: new endpoint `GET /api/library/root` (`{"root": ...}`, read once and kept by the file list). Tested in the browser on a throwaway library with the text that the menu writes captured: a file, the relative variant, a folder, and two selected items. **The installed app needs a rebuild: the new endpoint is part of the backend.**
+
+## 2026-10-27 - a top-level folder from the header, and New Folder while a filter is active (0.10.23)
+
+### Added
+- **FE** (`app.html`, `app.ts`, `app.scss`, `tree-panel.ts`): a button in the header row of the file list (folder with a plus, next to the reload button) makes a **new folder at the top level** of the library and opens it for naming; before, a top-level folder could only be made from the context menu on the empty area under the rows, which is hard to hit when the list is long (the menu on a folder or file makes one inside / next to it).
+
+### Fixed
+- **FE** (`tree-panel.ts`, `app.html`): **New Folder with a filter active** made the folder but it did not show: the rows are the search results then and "untitled folder" matches nothing. Now the filter is cleared first (the tree emits `showAll`, the app clears the filter), like the Finder shows the new folder in its window; every folder above the new one opens, the new folder is focused and in rename mode. A failure shows the server's message ("Could not make a folder: ...") instead of a bare note. Tested in the browser on a throwaway library: the header button, and a folder made from the menu of `Folder` while the filter was `s`.
+
 ## 2026-10-27 - the close question stays a message box (0.10.22)
 
 ### Changed

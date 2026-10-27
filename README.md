@@ -143,11 +143,13 @@ Right-click a row → **Move to Trash**, or **⌘⌫** on a focused row (a file 
 
 ## Looking at a library file
 
-There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below; drag the selection onto a folder to move it, and the right-click menu also has New Folder, Duplicate, Reveal in Finder and Copy Path); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
+There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below; drag the selection onto a folder to move it, and the right-click menu also has New Folder, Duplicate, Reveal in Finder, Copy Path and Copy Relative Path; the folder button in the header row makes a new folder at the top level, and a new folder made while a filter is active clears the filter so that it shows); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
 
 ## File list
 
 ⌘B or the icon in the RASTERFASTER header hides and shows the panel (it slides, and the choice is remembered). Drag the right edge of the panel to resize it (double-click resets, ← → with the handle focused); the width is remembered.
+
+**The filter box** takes several words: `PANEL S2` shows the files and folders whose name contains **any** of them (case does not matter; every word is highlighted in the list). The small **any / all** button inside the box switches to **all**: a name must then contain every word (remembered). `"PANEL MOUNT"` in quotes is one term (a phrase), and `-copy` leaves out names that contain it (`panel -glue`, `-"old part"`). A lone `-` while you type counts for nothing. The search looks at the name of each file and folder (not the whole path).
 
 The reload button (⟳ next to Sort) re-reads the library from disk: the root and every open folder, and the search when a filter is active. The filter text is remembered across reloads.
 

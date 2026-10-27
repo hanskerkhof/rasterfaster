@@ -27,8 +27,11 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .info { position: absolute; bottom: 8px; left: 12px; opacity: .6; pointer-events: none; }
 .controls { padding: 8px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #000; }
 .filter { position: relative; }
-.filter input { box-sizing: border-box; width: 100%; padding: 6px 28px 6px 8px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; }
+.filter input { box-sizing: border-box; width: 100%; padding: 6px 64px 6px 8px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; }
 .filter input:focus { outline: 1px solid #2f6fed; }
+.mode { position: absolute; right: 28px; top: 50%; transform: translateY(-50%); height: 18px; padding: 0 7px; border: 0; border-radius: 9px; background: rgba(255,255,255,.12); color: inherit; font: inherit; font-size: 11px; opacity: .75; cursor: pointer; }
+.mode:hover { opacity: 1; }
+.mode.on { background: #2f6fed; color: #fff; opacity: 1; }
 .clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; opacity: .6; cursor: pointer; }
 .clear:hover { opacity: 1; background: rgba(255,255,255,.12); }
 .sort { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .9; }
@@ -43,6 +46,8 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .banner button { padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
 .banner button:hover { background: #2f6fed; color: #fff; }
 .sort .reload { display: inline-flex; align-items: center; justify-content: center; padding: 3px 7px; margin-left: auto; }
+/* two icon buttons at the right end of the row: only the first pushes itself away from the sort buttons */
+.sort .reload + .reload { margin-left: 4px; }
 .sort .reload.spin svg { animation: reload-spin .8s linear infinite; }
 @keyframes reload-spin { to { transform: rotate(360deg); } }
 app-object-menu { display: contents; } /* only fixed-position overlays: must not become a grid row of its own */
