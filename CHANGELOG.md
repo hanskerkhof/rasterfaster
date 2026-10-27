@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - Center on grid centres Z as well (0.10.26)
+
+### Changed
+- **FE** (`document.store.ts`, `document-scene.ts`, `object-menu.ts`, `document.store.spec.ts`): **Center on grid** now centres a part on the grid in **all three axes**. X and Y as before (the centre of the part in the middle of the nearest 20 × 20 cell); Z, which was left alone, now puts the part's **centre** on the nearest height level of the current Grid mode (`cellCenteredPosition(position, size, zMode)`; the store gets the mode from the scene like `sizeOf`). A bolt on its side gets its axis on a level (a 15.3 mm bolt in Baseplate mode: its centre on level 6, so z = -1.65); a standing bolt (44 mm, centre 22) stays at z = 0. A centered part keeps its Z centre when it is moved: rotating it centres it again (its size changes), ⇧↑ / ⇧↓ (when every selected part is centered) and ⇧-drag step the *centre* from level to level, instead of the lowest point, so they no longer fight the centring; Alt (1 mm steps) leaves the centre; horizontal moves still hop from cell middle to cell middle and leave Z. Move to ground / Move to base are explicit and still set the height. Pasting a centered part centres it too. The menu hint says "… and Z level". Tested: unit tests for the new position (upright and lying bolt, the three grid modes, centring twice changes nothing, one undo step) and in the browser on a throwaway library with the real BOLT_S8: upright (2.345, 2.349, 0), lying (2.345, -12, -1.651), ⇧↑ twice (z 2.349, 6.349: the centre at 10 and 14), back down (-1.651), ← (x -17.655, still centred).
+
 ## 2026-10-27 - filter on several words (0.10.25)
 
 ### Added

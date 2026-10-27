@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
-import { DocItem, DocumentStore } from './document.store';
+import { DocItem, DocumentStore, Vec3, cellCenteredPosition } from './document.store';
 
 const part = (position: [number, number, number] = [0, 0, 0]): Omit<DocItem, 'id'> => ({
   path: 'a.stl', name: 'a', color: 0xff0000, position, rotation: [0, 0, 0, 1],
@@ -156,5 +156,54 @@ describe('DocumentStore.addParts', () => {
     store.undo(); // one step takes all three away
     expect(store.doc().items.length).toBe(before);
     expect(store.addParts([])).toEqual([]);
+  });
+});
+
+
+describe('Center on grid (X, Y and Z)', () => {
+  const upright: Vec3 = [15.31, 15.301, 44];    // BOLT_S8 standing up
+  const lying: Vec3 = [44, 15.31, 15.301];      // the same bolt on its side
+
+  it('centres X and Y on a 20 mm cell as before, and Z only when a Z grid mode is given', () => {
+    expect(cellCenteredPosition([0, 0, 0], upright)).toEqual([2.345, 2.35, 0]);               // no Z mode: z untouched
+    expect(cellCenteredPosition([0, 0, 3], upright)).toEqual([2.345, 2.35, 3]);
+  });
+
+  it('puts the centre of the box on the nearest Z level of the grid mode', () => {
+    // baseplate levels 0, 2, 6, 10 ...: the 44 mm bolt's centre (22) already is a level, the lying bolt's centre (7.65) goes to 6
+    expect(cellCenteredPosition([0, 0, 0], upright, 'baseplate')[2]).toBe(0);
+    expect(cellCenteredPosition([0, 0, 0], lying, 'baseplate')[2]).toBe(-1.65);               // 6 - 15.301 / 2 = -1.65
+    expect(cellCenteredPosition([0, 0, 0], lying, 'fine')[2]).toBeCloseTo(0.35, 2);           // levels every 2 mm: the centre 7.65 goes to 8, 8 - 7.65 = 0.35
+    expect(cellCenteredPosition([0, 0, 0], lying, 'coarse')[2]).toBeCloseTo(0.35, 2);         // levels every 4 mm: 8 as well
+  });
+
+  it('is stable: centring a centred part changes nothing', () => {
+    const once = cellCenteredPosition([13, 41, 5], lying, 'baseplate');
+    expect(cellCenteredPosition(once, lying, 'baseplate')).toEqual(once);
+  });
+
+  describe('in the store', () => {
+    let store: DocumentStore;
+
+    beforeEach(() => {
+      localStorage.clear();
+      TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+      store = TestBed.inject(DocumentStore);
+      store.sizeOf = () => lying;
+      store.zMode = () => 'baseplate';
+    });
+
+    it('setCentered centres all three axes in one undo step and remembers it', () => {
+      const { id } = store.addItem(part([0, 0, 0]));
+      store.setCentered([id], true);
+      const item = store.doc().items[0];
+      expect(item.centered).toBe(true);
+      expect(item.position[0]).toBe(8);                                                       // the 44 mm length centres at x = 30 (a cell middle)
+      expect(item.position[1]).toBeCloseTo(2.345, 2);                                         // the 15.31 mm width centres at y = 10
+      expect(item.position[2]).toBe(-1.65);
+      store.undo();
+      expect(store.doc().items[0].position).toEqual([0, 0, 0]);
+      expect(store.doc().items[0].centered).toBeFalsy();
+    });
   });
 });

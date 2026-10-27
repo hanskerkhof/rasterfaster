@@ -114,6 +114,7 @@ export class DocumentScene {
     this.on(ctx.canvas, 'pointermove', e => this.onPointerMove(e as PointerEvent));
     this.on(ctx.canvas, 'pointerup', e => this.onPointerUp(e as PointerEvent));
     ctx.store.sizeOf = item => this.sizeOfItem(item);
+    ctx.store.zMode = () => ctx.zGridMode();
     ctx.store.viewCenter = ctx.viewCenter;
     this.on(ctx.canvas, 'contextmenu', e => this.onContextMenu(e as MouseEvent));
     this.on(ctx.host, 'keydown', e => this.onKey(e as KeyboardEvent));
@@ -455,7 +456,7 @@ export class DocumentScene {
         rotation: t.next,
         position: clampToWorkArea(
           t.item.centered
-            ? cellCenteredPosition([t.center.x - t.size.x / 2, t.center.y - t.size.y / 2, t.center.z - t.size.z / 2 + (oldLow - newLow)], t.size.toArray() as Vec3)
+            ? cellCenteredPosition([t.center.x - t.size.x / 2, t.center.y - t.size.y / 2, t.center.z - t.size.z / 2 + (oldLow - newLow)], t.size.toArray() as Vec3, this.ctx.zGridMode())
             : [snap(t.center.x - t.size.x / 2, snapStepMm.x), snap(t.center.y - t.size.y / 2, snapStepMm.y), t.center.z - t.size.z / 2 + (oldLow - newLow)],
           t.size.toArray() as Vec3,
         ),
@@ -588,7 +589,9 @@ export class DocumentScene {
     const rawX = point.x - drag.grabOffset.x, rawY = point.y - drag.grabOffset.y;
     let delta: Vec3;
     // Height snaps to the z levels of the current grid mode; Alt gives 1 mm steps.
-    if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, 1) : nearestZLevel(point.z - drag.grabOffset.z, this.ctx.zGridMode())) - start[2]];
+    if (drag.vertical && !fine && grabbed?.centered && grabbedSize) { // a centered part moves by its centre: the centre hops from level to level
+      delta = [0, 0, nearestZLevel(point.z - drag.grabOffset.z + grabbedSize[2] / 2, this.ctx.zGridMode()) - grabbedSize[2] / 2 - start[2]];
+    } else if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, 1) : nearestZLevel(point.z - drag.grabOffset.z, this.ctx.zGridMode())) - start[2]];
     else if (grabbed?.centered && grabbedSize) {
       const cell = cellCenteredPosition([rawX, rawY, start[2]], grabbedSize); // a centered item hops from cell middle to cell middle
       delta = [cell[0] - start[0], cell[1] - start[1], 0];
@@ -637,7 +640,11 @@ export class DocumentScene {
     const stepX = fine ? 1 : snapStepMm.x, stepY = fine ? 1 : snapStepMm.y;
     // One step up/down the z levels, decided by the lowest selected item (the base); the rest of the selection keeps its offsets.
     const moveZ = (direction: 1 | -1) => {
-      const lowest = Math.min(...store.selectedItems().map(i => i.position[2]));
+      const selected = store.selectedItems();
+      // when every selected part is centered the levels are those of the parts' centres: the lowest centre steps to the next level
+      const sizes = selected.map(i => this.sizeOfItem(i));
+      const byCentre = !fine && selected.length > 0 && selected.every((i, k) => i.centered && sizes[k]);
+      const lowest = byCentre ? Math.min(...selected.map((i, k) => i.position[2] + sizes[k]![2] / 2)) : Math.min(...selected.map(i => i.position[2]));
       if (!Number.isFinite(lowest)) return false;
       return move(0, 0, fine ? direction : nextZLevel(lowest, direction, this.ctx.zGridMode()) - lowest);
     };
@@ -672,6 +679,7 @@ export class DocumentScene {
   dispose() {
     this.finishDrag();
     this.ctx.store.sizeOf = null;
+    this.ctx.store.zMode = null;
     this.ctx.store.viewCenter = null;
     for (const [target, type, fn] of this.listeners) target.removeEventListener(type, fn);
     for (const runtime of this.runtimes.values()) clearParts(runtime.group);

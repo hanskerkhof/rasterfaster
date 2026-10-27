@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { ZGridMode, nearestZLevel } from './z-levels';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ClipboardContent, copyItems, pasteItems } from './clipboard';
@@ -17,14 +18,18 @@ export type Vec3 = [number, number, number];
 export const workArea = { min: [-1000, -1000, -200] as Vec3, max: [1000, 1000, 1000] as Vec3 };
 
 /** Clamps a bounding-box min corner so the whole box (of `size`) stays inside the work area. */
-/** Moves a bounding-box min corner so the footprint centre sits in the middle of the grid cell that holds it (z untouched). */
-export function cellCenteredPosition(position: Vec3, size: Vec3): Vec3 {
+/**
+ * Moves a bounding-box min corner so the centre of the box sits in the middle of the grid cell that holds it in X and Y, and, when the Z grid
+ * mode is given, on the nearest Z level in Z (the box's centre at the level: a bolt lying on its side gets its axis on a level). Without a
+ * Z grid mode z is untouched.
+ */
+export function cellCenteredPosition(position: Vec3, size: Vec3, zMode?: ZGridMode): Vec3 {
   const cell = (centre: number, step: number) => Math.floor(centre / step) * step + step / 2;
   const round = (v: number) => Math.round(v * 1000) / 1000; // STL sizes carry float32 noise
   return [
     round(cell(position[0] + size[0] / 2, snapStepMm.x) - size[0] / 2),
     round(cell(position[1] + size[1] / 2, snapStepMm.y) - size[1] / 2),
-    position[2],
+    zMode ? round(nearestZLevel(position[2] + size[2] / 2, zMode) - size[2] / 2) : position[2],
   ];
 }
 
@@ -546,10 +551,12 @@ export class DocumentStore {
 
   /** Bounding-box size of an item as drawn (after rotation); set by the 3D scene, null while its geometry is loading. */
   sizeOf: ((item: DocItem) => Vec3 | null) | null = null;
+  /** The current Z grid mode, set by the 3D scene; "Center on grid" centres Z on its levels. */
+  zMode: (() => ZGridMode) | null = null;
 
   /**
-   * "Center on grid" for items: on = move each footprint centre to the middle of the nearest grid cell (z unchanged) and keep it
-   * there while the item is dragged, nudged or rotated; off = just stop doing that. One undo step.
+   * "Center on grid" for items: on = move the centre of each part to the middle of the nearest 20 x 20 cell in X and Y and onto the nearest Z
+   * level in Z, and keep it there while the part is dragged, nudged, turned or moved up and down; off = just stop doing that. One undo step.
    */
   setCentered(ids: readonly string[], flag: boolean) {
     const wanted = new Set(ids);
@@ -558,7 +565,7 @@ export class DocumentStore {
       if (!wanted.has(item.id)) continue;
       const change: Partial<Pick<DocItem, 'position' | 'centered'>> = { centered: flag };
       const size = flag ? this.sizeOf?.(item) : null;
-      if (size) change.position = clampToWorkArea(cellCenteredPosition(item.position, size), size);
+      if (size) change.position = clampToWorkArea(cellCenteredPosition(item.position, size, this.zMode?.()), size);
       changes.set(item.id, change);
     }
     this.updateItems(flag ? 'Center on grid' : 'Stop centering', changes);
@@ -607,7 +614,7 @@ export class DocumentStore {
     const round = (v: number) => Math.round(v * 1000) / 1000;
     const created = pasteItems(clip, this.viewCenter?.() ?? null, snapStepMm, (position, item) => {
       const size = this.sizeOf?.({ path: item.path, rotation: item.rotation } as DocItem) ?? undefined; // unknown until its geometry has loaded
-      const placed = item.centered && size ? cellCenteredPosition(position, size) : (position.map(round) as Vec3);
+      const placed = item.centered && size ? cellCenteredPosition(position, size, this.zMode?.()) : (position.map(round) as Vec3);
       return clampToWorkArea(placed, size);
     });
     return this.addItems(created);

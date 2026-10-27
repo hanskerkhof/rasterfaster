@@ -26,7 +26,7 @@ import { baseThicknessMm } from './z-levels';
         </button>
         <button type="button" role="menuitem" (click)="toggleCentered()">
           <span class="icon">{{ allCentered() ? '✓' : '⌖' }}</span>Center on grid
-          <span class="hint">{{ allCentered() ? 'on: stays centered while moving' : 'middle of the nearest 20 × 20 cell' }}</span>
+          <span class="hint">{{ allCentered() ? 'on: stays centered (X, Y, Z) while moving' : 'middle of the nearest 20 × 20 cell and Z level' }}</span>
         </button>
         <button type="button" role="menuitem" (click)="snapToGrid()">
           <span class="icon">⊞</span>Snap to grid…
