@@ -391,8 +391,11 @@ export class App {
     }
   }
 
+  /** The ✕ button and Esc: clears the filter and gives the keyboard focus to the list, so the selected row is blue (active), not grey. */
   protected clearFilter() {
+    const had = this.filterText().trim() !== '';
     this.onFilter('');
+    if (had) setTimeout(() => this.treePanel()?.focusTree(), 50);
   }
 
   protected open(path: string) {

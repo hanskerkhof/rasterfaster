@@ -184,6 +184,11 @@ export class TreePanel {
   private openTimer?: ReturnType<typeof setTimeout>;
   /** The filter text the current search results belong to. */
   private resultsFilter = '';
+  /** The last non-empty filter results, to tell files from folders when the filter is cleared. */
+  private lastResults: LibraryEntry[] | null = null;
+  /** The selected paths that must survive the switch from the filtered list to the whole list (until their rows show up, at most 4 s). */
+  private keepAfterClear: ReadonlySet<string> | null = null;
+  private keepTimer?: ReturnType<typeof setTimeout>;
 
   private readonly visiblePaths = computed(() => this.rows().map(r => r.entry.path));
 
@@ -227,20 +232,35 @@ export class TreePanel {
     this.load('');
     // Filter results change -> different tree: forget flips and focus.
     // A different filter -> a different tree: forget flips and focus. The same filter again (the results were refreshed after a rename, say)
-    // keeps the folders open and the focus where they are.
+    // keeps the folders open and the focus where they are. A filter that is cleared while something is selected keeps the selection and opens
+    // the folders it is in: the list goes back to the whole library with the chosen file (or folder) in view.
     effect(() => {
-      this.results();
+      const results = this.results();
+      if (results) this.lastResults = results;
       const filter = untracked(() => this.filter()).trim().toLowerCase();
       if (filter === this.resultsFilter) return;
+      const cleared = filter === '' && this.resultsFilter !== '';
       this.resultsFilter = filter;
       this.flippedFilter.set(new Set());
+      if (cleared && untracked(() => this.selection().size || this.selected())) {  // the open file counts too: the selection of the list is reset by every change of the filter text
+        untracked(() => this.revealAfterClear());
+        return;
+      }
       this.focused.set(null);
       this.selectOnly(null);
     });
-    // Rows that are gone (reloaded, filtered away) leave the selection.
+    // Rows that are gone (reloaded, filtered away) leave the selection. Not while a selection is being brought back after the filter was
+    // cleared: its rows only appear once their folders are open and listed.
     effect(() => {
       const visible = this.visiblePaths();
-      untracked(() => this.selection.update(s => (s.size ? pruned(visible, s) : s)));
+      untracked(() => {
+        if (this.keepAfterClear) {
+          const shown = new Set(visible);
+          if (![...this.keepAfterClear].every(path => shown.has(path))) return;
+          this.keepAfterClear = null;
+        }
+        this.selection.update(s => (s.size ? pruned(visible, s) : s));
+      });
     });
     // Expand every ancestor folder of the revealed file and focus it.
     effect(() => {
@@ -257,6 +277,43 @@ export class TreePanel {
       this.focused(); this.rows();
       setTimeout(() => this.host.nativeElement.querySelector('.row.focus')?.scrollIntoView({ block: 'nearest' }));
     });
+  }
+
+  private typeInResults(path: string, entries: LibraryEntry[] | null = this.lastResults): 'file' | 'dir' | null {
+    for (const entry of entries ?? []) {
+      if (entry.path === path) return entry.type;
+      if (entry.children?.length && path.startsWith(entry.path + '/')) {
+        const found = this.typeInResults(path, entry.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  /** The filter was cleared with a selection: open the folders above every selected path (and a selected folder itself), keep the selection and the focus. */
+  private revealAfterClear() {
+    const paths = [...this.selection()];
+    const focused = this.focused();
+    if (focused && !paths.includes(focused)) paths.push(focused);
+    const openFile = this.selected();
+    if (openFile && !paths.includes(openFile)) { // the file that is open in the app: when the list lost its own selection, it gets it back
+      paths.push(openFile);
+      if (!this.selection().size) { this.focused.set(openFile); this.selectOnly(openFile); }
+    }
+    const open = new Set<string>();
+    for (const path of paths) {
+      const parts = path.split('/');
+      for (let i = 1; i < parts.length; i++) open.add(parts.slice(0, i).join('/'));
+      if (this.typeInResults(path) === 'dir') open.add(path);
+    }
+    for (const folder of open) this.load(folder);
+    this.flippedBrowse.update(flipped => new Set([...flipped, ...open]));
+    this.keepAfterClear = new Set(paths);
+    clearTimeout(this.keepTimer);
+    this.keepTimer = setTimeout(() => {
+      this.keepAfterClear = null;
+      this.selection.update(s => (s.size ? pruned(this.visiblePaths(), s) : s));
+    }, 4000);
   }
 
   private load(path: string) {
@@ -361,7 +418,7 @@ export class TreePanel {
   }
 
   /** Gives the list keyboard focus (without scrolling), e.g. after the preview was clicked. */
-  protected focusTree() {
+  focusTree() {
     this.host.nativeElement.querySelector<HTMLElement>('.tree')?.focus({ preventScroll: true });
   }
 

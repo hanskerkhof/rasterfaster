@@ -25,6 +25,8 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .overlay { position: absolute; top: 12px; left: 12px; padding: 6px 10px; background: rgba(0,0,0,.6); border-radius: 4px; }
 .overlay.err { color: #ff8a8a; }
 .info { position: absolute; bottom: 8px; left: 12px; opacity: .6; pointer-events: none; }
+/* the selected part(s): same font and baseline as the document line, at the other end; the name comes last so a long name is the part that gets cut */
+.info.right { left: auto; right: 12px; max-width: 48%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .controls { padding: 8px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid #000; }
 .filter { position: relative; }
 .filter input { box-sizing: border-box; width: 100%; padding: 6px 64px 6px 8px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; }

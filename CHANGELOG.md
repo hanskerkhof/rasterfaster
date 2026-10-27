@@ -2,6 +2,21 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-27 - after clearing the filter the selected row is blue (0.10.29)
+
+### Changed
+- **FE** (`app.ts`, `app.html`, `tree-panel.ts`): a selected row is blue only while the list has the keyboard focus (`.tree:focus`) and grey otherwise, and after clearing the filter with the ✕ button or Esc the focus was still on the button or the filter box, so the kept selection looked "pre-selected". Now `clearFilter()` gives the focus to the list (`focusTree()`, public) when there was filter text, so the selected row is blue and the arrow keys and ⏎ act on it at once. Deleting the text by hand still leaves the focus in the filter box (stealing it would break typing a new filter). The New Folder path that clears the filter no longer goes through `clearFilter()` (the new folder's rename field must keep the focus). Checked in the browser that the list is the active element after ✕ and after Esc; the colour itself could not be seen there (the test tab has no window focus, so `:focus` never matches): it follows from the existing rule `.tree:focus .focus { background: #2f6fed }`.
+
+## 2026-10-27 - clearing the filter keeps the selected branch open (0.10.28)
+
+### Changed
+- **FE** (`tree-panel.ts`): clearing the filter used to forget the focus and the selection and show the whole library with its folders collapsed, so the file you had just picked in the filtered list was gone from view. Now, when the filter is cleared (✕, Esc, or by deleting the text) while something is selected, the tree keeps the selection and the focus, opens every folder above the selected paths (and a selected folder itself) and brings the rows into view; the selection is not pruned while the folders it is in are still being listed (`keepAfterClear`, at most 4 s). The file that is open in the app counts too: the list's own selection is reset by every change of the filter text, so when the text is deleted a character at a time, or the filter no longer matches the file, the open file gets its focus and selection back and its branch is opened. A change from one filter text to another still resets the list as before. Tested in the browser on a throwaway library: select a file in the filtered list and clear with ✕; select a folder and clear with Esc; delete the text character by character; a filter without a match and then clear.
+
+## 2026-10-27 - info about the selected part at the bottom right (0.10.27)
+
+### Added
+- **FE** (`stl-viewer.ts`, `document-scene.ts`, `app.html`, `app.scss`): a second info line at the bottom right of the 3D view, in the same font, size, opacity and baseline as the document line at the bottom left (class `info`, `info right`): the size of the selection's box (after rotation, 1 decimal), the volume of the selected parts in cm³ and the name, e.g. `15.3 × 15.3 × 44.0 mm · 2.4 cm³ · BOLT_S8`; with several parts selected `35.3 × 15.3 × 44.0 mm · 4.9 cm³ · 2 selected` (the box of the group, the sum of the volumes). The name comes last and the line is cut with an ellipsis at 48 % of the width, so a long name does not run into the left line; nothing is shown without a selection. It follows the selection, moves, rotations and the part numbers (volume) as they load (`DocumentScene.selectionBounds()`, `selectionInfo`). Tested in the browser on a throwaway library: no selection, one, a part with a very long name, two selected, and the computed font, size, bottom and opacity are the same as the left line.
+
 ## 2026-10-27 - Center on grid centres Z as well (0.10.26)
 
 ### Changed

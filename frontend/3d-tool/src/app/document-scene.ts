@@ -391,6 +391,14 @@ export class DocumentScene {
     return item && entry ? new THREE.Vector3(...item.position).add(entry.size.clone().multiplyScalar(0.5)) : null;
   }
 
+  /** Bounding box of the selected items (after rotation), or null while none is selected or none of their geometry has loaded. */
+  selectionBounds(): THREE.Box3 | null {
+    const boxes = this.ctx.store.selectedItems()
+      .map(item => { const entry = this.entryFor(item); return entry ? new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(entry.size)) : null; })
+      .filter((box): box is THREE.Box3 => box !== null);
+    return boxes.length ? boxes.reduce((all, box) => all.union(box)) : null;
+  }
+
   /** Number of items whose geometry is loaded (to know when a fit-to-view is meaningful). */
   readyCount() {
     return this.ctx.store.doc().items.filter(i => this.entryFor(i)).length;

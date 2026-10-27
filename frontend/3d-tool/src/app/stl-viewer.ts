@@ -200,6 +200,8 @@ export class StlViewer implements OnDestroy {
   protected readonly store = inject(DocumentStore);
   private readonly library = inject(LibraryService);
   readonly info = signal('');
+  /** About the selected part(s), shown at the bottom right: size, volume and the name (or how many are selected); empty without a selection. */
+  readonly selectionInfo = signal('');
   protected readonly axes = ['x', 'y', 'z'] as const;
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
@@ -285,6 +287,11 @@ export class StlViewer implements OnDestroy {
     });
     // Another document was opened: fit the camera to it once its geometry has loaded.
     effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.lastItemCount = 0; }); });
+    // The selection or the numbers of a part changed: the line about the selection at the bottom right follows.
+    effect(() => {
+      this.store.selectedIds(); this.store.doc(); this.store.partStats();
+      if (this.ready()) untracked(() => this.updateSelectionInfo());
+    });
     // Tracks the store and the view mode (read inside reconcile) and redraws the document items.
     effect(() => {
       if (this.ready()) this.documentScene.reconcile(this.mode());
@@ -543,6 +550,18 @@ export class StlViewer implements OnDestroy {
     }
   }
 
+  /** Size of the selection's box, the volume of the parts and a name, e.g. `15.3 × 15.3 × 44.0 mm · 8.1 cm³ · BOLT_S8` (the name last: it is the long part). */
+  private updateSelectionInfo() {
+    const items = this.store.selectedItems();
+    const box = this.documentMode() && items.length ? this.documentScene?.selectionBounds() : null;
+    if (!box) { this.selectionInfo.set(''); return; }
+    const size = box.getSize(new THREE.Vector3());
+    const stats = this.store.partStats();
+    const volume = items.reduce((sum, item) => sum + (stats[item.path]?.volumeCm3 ?? 0), 0);
+    const label = items.length === 1 ? items[0].name : `${items.length} selected`;
+    this.selectionInfo.set(`${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm${volume ? ` · ${volume.toFixed(1)} cm³` : ''} · ${label}`);
+  }
+
   /** Document grid follows the items; the camera fits once the first geometry has arrived. */
   private onDocumentChanged() {
     if (!this.documentMode() || !this.ready()) return;
@@ -550,6 +569,7 @@ export class StlViewer implements OnDestroy {
     const count = this.store.doc().items.length;
     if (count > this.lastItemCount) this.needsDocumentFit = true; // a new object: make sure it is in view
     this.lastItemCount = count;
+    this.updateSelectionInfo();
     this.info.set(count ? `${count} object${count === 1 ? '' : 's'}${bounds ? ` · ${(bounds.max.x - bounds.min.x).toFixed(0)} × ${(bounds.max.y - bounds.min.y).toFixed(0)} × ${(bounds.max.z - bounds.min.z).toFixed(0)} mm` : ''}` : 'Empty document');
     const key = bounds ? `${bounds.min.toArray()}|${bounds.max.toArray()}` : 'empty';
     if (key !== this.gridKey) {
