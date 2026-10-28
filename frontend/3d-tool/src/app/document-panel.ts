@@ -53,8 +53,9 @@ function readGeometry(): PanelGeometry | null {
   },
   template: `
     <div class="header">
+  <span class="status" [class.error]="store.saveState() === 'error'" [title]="statusTitle()"><span class="diamond" [attr.data-state]="versionState()">{{ versionState() === 'none' ? '◇' : '◆' }}</span><i class="dot" [attr.data-state]="store.saveState()"></i>{{ statusLabel() }}</span>
   <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
-  <button type="button" class="fold" [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the panel' : 'Collapse the panel'" (click)="toggleCollapsed()">
+  <button type="button" class="fold" [attr.aria-expanded]="!collapsed()" [title]="(collapsed() ? 'Expand the panel' : 'Collapse the panel') + ' (⌥D)'" (click)="toggleCollapsed()">
         <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           @if (collapsed()) { <path d="M2.5 4.5 6 8l3.5-3.5"/> } @else { <path d="M2.5 7.5 6 4l3.5 3.5"/> }
         </svg>
@@ -83,21 +84,15 @@ function readGeometry(): PanelGeometry | null {
       <input #nameInput class="docname" type="text" maxlength="120" [value]="store.doc().name" aria-label="Document name" title="Click to rename · Enter saves · Esc cancels" [disabled]="store.viewing() !== null"
              (focus)="nameInput.select()" (keydown.enter)="nameInput.blur()" (keydown.escape)="cancelRename(nameInput)" (blur)="commitRename(nameInput)" />
       <button type="button" class="ver" title="Rename this document" aria-label="Rename document" [disabled]="!store.docId() || store.viewing() !== null" (click)="nameInput.focus()">✎</button>
-      <button type="button" class="ver" [title]="versionTitle()" (click)="versionsOpen.set(true)">{{ versionLabel() }}</button>
-    </div>
-    <div class="toolbar">
-      <button type="button" [disabled]="!store.canUndo()" title="Undo (⌘Z)" (click)="store.undo()">↶</button>
-      <button type="button" [disabled]="!store.canRedo()" title="Redo (⇧⌘Z)" (click)="store.redo()">↷</button>
-      <button type="button" [disabled]="!store.selectedIds().length" title="Duplicate (⌘D)" (click)="store.duplicateSelected()">Duplicate</button>
-      <button type="button" [disabled]="!store.selectedIds().length" title="Delete" (click)="store.removeSelected()">Delete</button>
-      <button type="button" [disabled]="!store.doc().items.length" title="Bill of materials" (click)="bomOpen.set(true)">BOM</button>
-      <span class="status" [class.error]="store.saveState() === 'error'" [title]="statusTitle()">{{ statusLabel() }}</span>
+      <button type="button" class="ver" [title]="versionTitle()" (click)="versionsOpen.set(true)"><span class="diamond" [attr.data-state]="versionState()">{{ versionState() === 'none' ? '◇' : '◆' }}</span>{{ versionLabel() }}</button>
     </div>
     <div class="export">
       <span>Export</span>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf()">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): Black PLA parts as placed, studio lighting, and a camera where the 3D view is now" (click)="exportBlender()">Blender</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="SVG of the 3D view as it is now, in the display mode that is selected (solid is a picture, the others are line drawings)" (click)="exportViewSvg()">SVG view</button>
+      <button type="button" [disabled]="!store.doc().items.length" title="Bill of materials" (click)="bomOpen.set(true)">BOM</button>
     </div>
     <div class="export">
       <span>Document file</span>
@@ -162,15 +157,16 @@ function readGeometry(): PanelGeometry | null {
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
     @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
     <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌥D: fold / unfold this panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
     </details>
 
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: 6px; min-height: 0; padding: 0 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
+    :host { display: flex; flex-direction: column; gap: 6px; min-height: min-content; padding: 0 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
             background: rgba(35,38,45,.9); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
     .head { display: flex; gap: 6px; align-items: center; }
     .ver { flex: none; padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
+    .ver .diamond { margin-right: 5px; vertical-align: 1px; }
     .ver:hover { background: #2f6fed; color: #fff; }
     .docname { flex: 1; min-width: 0; width: 100%; box-sizing: border-box; font-weight: 600; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; padding: 3px 4px; font: inherit; }
     .docname:hover, .docname:focus { border-color: rgba(255,255,255,.25); background: #1b1d22; outline: none; }
@@ -178,6 +174,7 @@ function readGeometry(): PanelGeometry | null {
     .picker { display: flex; gap: 4px; }
     .picker select { flex: 1; min-width: 0; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .export { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+    .export button { padding: 3px 6px; } /* Assembly, Blender, SVG and BOM fit in one row */
     .export span { flex: 1 0 100%; opacity: .8; white-space: nowrap; }
     .export-error { color: #ff8a8a; font-size: 11px; }
     .import-ask { padding: 6px 8px; background: #3a3320; border: 1px solid #6b5a20; border-radius: 6px; font-size: 11px; }
@@ -185,12 +182,15 @@ function readGeometry(): PanelGeometry | null {
     .problems { max-height: 160px; overflow-y: auto; margin-top: 6px; padding-top: 4px; border-top: 1px solid #6b5a20; word-break: break-word; }
     .problems div + div { margin-top: 3px; }
     .import-ask .buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-    .status { margin-left: auto; opacity: .6; font-size: 11px; }
+    .status { flex: none; width: 96px; display: flex; align-items: center; gap: 5px; font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; } /* fixed width: the text changing never moves the grip or the fold button */
+    .diamond { flex: none; width: 10px; text-align: center; font-size: 10px; line-height: 1; } /* the version: dark grey outline = none yet, green = the newest version is the working copy, amber = changes since it */
+    .diamond[data-state='none'] { color: #5a5f6b; } .diamond[data-state='saved'] { color: #5bbf73; } .diamond[data-state='edited'] { color: #f0b232; }
+    .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #5bbf73; } .dot[data-state='saving'], .dot[data-state='unsaved'] { background: #f0b232; } .dot[data-state='error'] { background: #ff6b6b; }
     .status.error { color: #ff8a8a; opacity: 1; }
     button { padding: 3px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .35; cursor: default; }
-    .list { flex: 0 1 auto; overflow: auto; min-height: 110px; max-height: 60vh; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
+    .list { flex: 0 1 auto; overflow: auto; min-height: 84px; max-height: 60vh; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
     .item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: default; user-select: none; }
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
@@ -228,7 +228,7 @@ function readGeometry(): PanelGeometry | null {
     .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55; /* the resize corner, drawn like the browser's own */
       background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); }
     .edge.se:hover::after { opacity: 1; }
-    :host(.sized) .list { flex: 1 1 0; min-height: 60px; max-height: none; }
+    :host(.sized) .list { flex: 1 1 0; min-height: 84px; max-height: none; } /* 3 rows at least: with the host's min-content height the panel never gets smaller than its content */
     .hint { opacity: .55; font-size: 11px; line-height: 1.35; }
     .keys { flex: none; } .keys summary { cursor: pointer; opacity: .6; font-size: 11px; user-select: none; } .keys summary:hover { opacity: 1; } .keys[open] .hint { margin-top: 4px; }
   `,
@@ -291,6 +291,15 @@ export class DocumentPanel {
 
   protected readonly collapsed = signal(readCollapsed());
 
+  /** ⌥D folds / unfolds the panel (not while typing in a text field). */
+  @HostListener('document:keydown', ['$event'])
+  protected onFoldKey(event: KeyboardEvent) {
+    if (event.code !== 'KeyD' || !event.altKey || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    if ((event.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable]')) return;
+    event.preventDefault();
+    this.toggleCollapsed();
+  }
+
   protected toggleCollapsed() {
     this.collapsed.update(v => !v);
     try { localStorage.setItem(collapsedStorageKey, String(this.collapsed())); } catch { /* storage unavailable */ }
@@ -315,7 +324,12 @@ export class DocumentPanel {
     const box = host.getBoundingClientRect(), area = parent.getBoundingClientRect();
     const start: PanelGeometry = { left: box.left - area.left, top: box.top - area.top, width: box.width, height: box.height };
     this.geom.set(start);
-    const minWidth = 200, minHeight = 240;
+    // The least height: everything fits and the list shows 3 parts (measured: the host's min-height is its min-content).
+    const keep = host.style.height;
+    host.style.height = '1px';
+    const floor = host.offsetHeight;
+    host.style.height = keep;
+    const minWidth = 200, minHeight = Math.max(160, floor);
     const move = (e: PointerEvent) => {
       const dx = e.clientX - event.clientX, dy = e.clientY - event.clientY;
       let { left, top, width, height } = start;
@@ -356,7 +370,7 @@ export class DocumentPanel {
   /** "v3" (latest saved version), with a dot while the working copy has changes since it; "v–" before the first version. */
   protected versionLabel() {
     const shown = this.store.viewing() ?? this.store.version();
-    return `${shown ? 'v' + shown : 'no version'}${this.store.viewing() === null && this.store.changedSinceVersion() ? ' •' : ''}`;
+    return shown ? 'v' + shown : 'no version';
   }
 
   protected versionTitle() {
@@ -448,6 +462,27 @@ export class DocumentPanel {
     }
   }
 
+  /** The 3D view as it is now, as a vector drawing with hidden lines removed (made in the browser from the depth of the view). */
+  protected async exportViewSvg() {
+    this.exporting.set(true);
+    this.exportError.set('');
+    await new Promise(resolve => setTimeout(resolve, 30)); // let the button show it is busy before the work blocks the page
+    try {
+      const drawing = this.store.viewSvg?.();
+      if (!drawing) throw new Error('nothing to draw yet (the parts are still loading)');
+      const short: Record<string, string> = { solid: 'solid', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' }; // the display mode, in the file name
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([drawing.svg], { type: 'image/svg+xml' }));
+      link.download = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-view-${short[drawing.mode] ?? drawing.mode}.svg`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    } catch (error) {
+      this.exportError.set(`SVG view failed: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.exporting.set(false);
+    }
+  }
+
   protected exportSvg() {
     return this.download('export.svg', 'drawing.svg');
   }
@@ -479,8 +514,17 @@ export class DocumentPanel {
     return { saved: 'Saved', saving: 'Saving…', unsaved: 'Unsaved…', error: 'Not saved' }[this.store.saveState()];
   }
 
+  /** The diamond: no version saved yet / the working copy is the newest version / it has changes since. */
+  protected versionState(): 'none' | 'saved' | 'edited' {
+    if (!this.store.version()) return 'none';
+    return this.store.changedSinceVersion() ? 'edited' : 'saved';
+  }
+
   protected statusTitle() {
-    return this.store.saveState() === 'error' ? 'Saving to the API failed; the next edit retries.' : 'Documents are saved as JSON files in the documents folder of the repo';
+    const saving = this.store.saveState() === 'error' ? 'Saving to the API failed; the next edit retries.' : 'Documents are saved as JSON files in the documents folder of the repo.';
+    const state = this.versionState(), v = this.store.version();
+    const version = state === 'none' ? 'No version saved yet (⌘S saves v1).' : state === 'edited' ? `Changes since v${v} (⌘S saves a new version).` : `Same as the newest version, v${v}.`;
+    return `${version} ${saving}`;
   }
 
   protected open(id: string) {

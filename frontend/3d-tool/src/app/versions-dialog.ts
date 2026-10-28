@@ -41,10 +41,10 @@ import { DocumentStore } from './document.store';
                 <td class="buttons">
                   <button type="button" [disabled]="store.viewing() === v.version" (click)="view(v.version)">{{ store.viewing() === v.version ? 'Viewing' : 'View' }}</button>
                   @if (confirm() === v.version) {
-                    <button type="button" class="danger" (click)="remove(v.version)">Delete v{{ v.version }}</button>
+                    <button type="button" class="danger" [title]="v.version === store.version() ? 'The newest version: the document goes back to the one before it' + (store.versions().length === 1 ? ' (no version)' : '') : ''" (click)="remove(v.version)">Delete v{{ v.version }}</button>
                     <button type="button" (click)="confirm.set(null)">Cancel</button>
                   } @else {
-                    <button type="button" [disabled]="v.version === store.version()" [title]="v.version === store.version() ? 'The newest version stays' : 'Delete this version for good'" (click)="confirm.set(v.version)">Delete</button>
+                    <button type="button" title="Delete this version for good" (click)="confirm.set(v.version)">Delete</button>
                   }
                   <button type="button" [disabled]="v.version === store.version() && !store.changedSinceVersion()" title="Make this the working copy and save it as the newest version" (click)="promote(v.version)">Promote</button>
                 </td>

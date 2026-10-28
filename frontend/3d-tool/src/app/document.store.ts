@@ -373,6 +373,7 @@ export class DocumentStore {
     try {
       await firstValueFrom(this.api.deleteVersion(id, version));
       if (this.viewing() === version) await this.backToWorkingCopy();
+      else this.takeVersionInfo(await firstValueFrom(this.api.get(id))); // the newest may be gone: the diamond follows (previous version, or none)
       await this.refreshVersions();
       this.say(`Deleted v${version}`);
     } catch {
@@ -583,8 +584,6 @@ export class DocumentStore {
 
   /** "Find in browser" in the part menu: the library paths of the parts, for the file list to show and select. `seq` makes a repeated request count. */
   readonly browserRequest = signal<{ paths: string[]; seq: number; ids?: string[] } | null>(null);
-  /** The .stl file the file browser's cursor is on (set by the app), so a part can be pointed at it from the object menu. */
-  readonly browserFile = signal<string | null>(null);
   /** Relink mode: the file browser picks another file for these parts (their ids); null when not relinking. */
   readonly relinkRequest = signal<string[] | null>(null);
   /** In relink mode: also relink every other part of the document that uses the same file. */
@@ -698,6 +697,8 @@ export class DocumentStore {
 
   /** Where the view is looking (X/Y in mm); set by the 3D scene. Pasted parts land here. */
   viewCenter: (() => { x: number; y: number }) | null = null;
+  /** The 3D view as an SVG drawing with hidden lines removed (set by the viewer); null when there is nothing to draw. */
+  viewSvg: (() => { svg: string; mode: string } | null) | null = null;
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;
   /** Binary STL of these parts as placed (set by the 3D scene); null when none of them has geometry (a placeholder, still loading). */
@@ -830,16 +831,6 @@ export class DocumentStore {
     if (!ids.size) return;
     this.mutate('Delete parts', d => ({ ...d, items: d.items.filter(i => !ids.has(i.id)) }));
     this.selectedIds.set([]);
-  }
-
-  /** Copies every selected item one grid cell over and selects the copies. */
-  duplicateSelected() {
-    const copies = this.selectedItems().map<DocItem>(source => ({
-      ...source, id: crypto.randomUUID(), position: [source.position[0] + snapStepMm.x, source.position[1] + snapStepMm.y, source.position[2]], rotation: [...source.rotation],
-    }));
-    if (!copies.length) return;
-    this.mutate('Duplicate parts', d => ({ ...d, items: [...d.items, ...copies] }));
-    this.selectedIds.set(copies.map(c => c.id));
   }
 
   /** Writes the undo step for what changed since the last one (no-op when nothing changed). Only mutate() and endGesture() call this. */

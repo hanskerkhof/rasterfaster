@@ -80,10 +80,16 @@ def quaternion(matrix: np.ndarray) -> list[float]:
     return [v / norm for v in q]
 
 
-def black_pla() -> dict:
-    """Satin black filament: very dark, fairly rough, with a thin glossy coat for the sheen of printed PLA."""
-    return {"name": "Black PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.012, 0.012, 0.014, 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.42},
-            "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}}}
+dimmedAlpha = 0.18  # a dimmed (muted) part: how much of it shows
+
+
+def black_pla(dimmed: bool = False) -> dict:
+    """Satin black filament: very dark, fairly rough, with a thin glossy coat for the sheen of printed PLA. Dimmed parts are translucent."""
+    material = {"name": "Black PLA (dimmed)" if dimmed else "Black PLA", "pbrMetallicRoughness": {"baseColorFactor": [0.012, 0.012, 0.014, dimmedAlpha if dimmed else 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.42},
+                "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}}}
+    if dimmed:
+        material["alphaMode"] = "BLEND"
+    return material
 
 
 def srgb_to_linear(value: float) -> float:
@@ -124,7 +130,7 @@ def node_matrix(placement: export3mf.Placement) -> list[float]:
 
 
 def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = True, colours: bool = False, view: dict | None = None) -> bytes:
-    """Parts get one shared \"Black PLA\" material; with `colours` they keep the colours of the document instead."""
+    """Parts get one shared \"Black PLA\" material; with `colours` they keep the colours of the document instead. Dimmed (muted) parts are translucent."""
     items = document["items"]
     if not items:
         raise ValueError("document has no items")
@@ -141,16 +147,21 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
     nodes, partNodes = [], []
     for item, placement in zip(items, placements):
         colour = (int(item["color"]) & 0xFFFFFF) if colours else -1  # -1: Black PLA
-        if colour not in materialIndex:
-            materialIndex[colour] = len(materials)
-            materials.append(black_pla() if colour < 0 else {"name": f"colour_{colour:06x}", "pbrMetallicRoughness": {
-                "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.6}})
-        key = (item["path"], colour)  # one glTF mesh per library file and colour; parts used several times share it
+        dimmed = bool(item.get("muted"))
+        if (colour, dimmed) not in materialIndex:
+            materialIndex[(colour, dimmed)] = len(materials)
+            if colour < 0:
+                materials.append(black_pla(dimmed))
+            else:
+                materials.append({"name": f"colour_{colour:06x}" + ("_dimmed" if dimmed else ""), "pbrMetallicRoughness": {
+                    "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), dimmedAlpha if dimmed else 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.6},
+                    **({"alphaMode": "BLEND"} if dimmed else {})})
+        key = (item["path"], colour, dimmed)  # one glTF mesh per library file, colour and dimming; parts used several times share it
         if key not in meshIndex:
             meshIndex[key] = len(gltfMeshes)
             position, indices = accessors[item["path"]]
             gltfMeshes.append({"name": item["path"].rsplit("/", 1)[-1], "primitives": [{
-                "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[colour]}]})  # no normals: faces shade flat
+                "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[(colour, dimmed)]}]})  # no normals: faces shade flat
         nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement)})
         partNodes.append(len(nodes) - 1)
 

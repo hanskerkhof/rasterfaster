@@ -110,7 +110,6 @@ export class App {
     void this.store.init();
     effect(() => { if (this.store.relinkRequest()) untracked(() => this.startRelinkMode()); });
     effect(() => { this.store.docId(); untracked(() => this.store.relinkRequest.set(null)); }); // another document: no relink mode
-    effect(() => this.store.browserFile.set(this.treePanel()?.focusedFile() ?? null)); // the object menu can point a part at the file the list's cursor is on
     this.watchForUpdates();
     this.api.start();
     void this.lib.refreshTrash();

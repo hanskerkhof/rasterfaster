@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
 import { ViewMode, buildParts, clearParts } from './model-render';
+import { ViewPart, buildWireGeometry } from './svg-view';
 import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
 import { ZGridMode, nearestZLevel, nextZLevel } from './z-levels';
 
@@ -19,6 +20,7 @@ interface OrientedEntry {
   size: THREE.Vector3;
   edges?: THREE.EdgesGeometry;
   silhouette?: THREE.BufferGeometry;
+  wire?: THREE.BufferGeometry;
 }
 
 interface ItemRuntime {
@@ -536,6 +538,31 @@ export class DocumentScene {
     return item && entry ? new THREE.Vector3(...item.position).add(entry.size.clone().multiplyScalar(0.5)) : null;
   }
 
+  /** Hides the selection outlines and the pick handles (for a picture of the model); returns the function that shows them again. */
+  hideHelpers(): () => void {
+    const was = [this.selectionBoxes.visible, this.snapHandles.visible];
+    this.selectionBoxes.visible = false;
+    this.snapHandles.visible = false;
+    return () => { [this.selectionBoxes.visible, this.snapHandles.visible] = was; };
+  }
+
+  /** What a hidden-lines drawing of the document needs from each visible part (dimmed parts are left out, as they are in the 3D view). */
+  viewParts(withWire = false): ViewPart[] {
+    const parts: ViewPart[] = [];
+    for (const item of this.ctx.store.doc().items) {
+      const entry = this.entryFor(item);
+      if (!entry || item.muted) continue;
+      if (withWire) { // the wireframe drawing needs every triangle edge, not the feature edges
+        parts.push({ geometry: entry.geometry, position: new THREE.Vector3(...item.position), edges: (entry.wire ??= buildWireGeometry(entry.geometry)), wire: entry.wire });
+        continue;
+      }
+      entry.edges ??= new THREE.EdgesGeometry(entry.geometry, creaseDegrees);
+      if (silhouetteEdges()) entry.silhouette ??= buildSilhouetteGeometry(entry.geometry);
+      parts.push({ geometry: entry.geometry, position: new THREE.Vector3(...item.position), edges: entry.edges, silhouette: silhouetteEdges() ? entry.silhouette : undefined });
+    }
+    return parts;
+  }
+
   /** Bounding box of these items (after rotation), or null when none of their geometry has loaded. */
   boundsOf(ids: readonly string[]): THREE.Box3 | null {
     const wanted = new Set(ids);
@@ -833,7 +860,6 @@ export class DocumentScene {
     else if (command && e.key.toLowerCase() === 'c') store.copySelection();
     else if (command && e.key.toLowerCase() === 'x') store.cutSelection();
     else if (command && e.key.toLowerCase() === 'v') store.pasteClipboard();
-    else if (command && e.key.toLowerCase() === 'd') store.duplicateSelected();
     else if (command && e.key.toLowerCase() === 'a') store.selectAll();
     else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z
     else if (e.key === 'ArrowRight') (e.shiftKey ? this.rotateSelected('z', -this.ctx.rotationStep()) : move(stepX, 0, 0));

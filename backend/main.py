@@ -467,12 +467,11 @@ def get_version(documentId: str, number: int) -> dict:
 
 @app.delete("/api/documents/{documentId}/versions/{number}", status_code=204)
 def delete_version(documentId: str, number: int) -> Response:
-    """Removes one saved version. The newest one stays: the working copy is compared with it, and numbers are never handed out twice."""
+    """Removes one saved version, the newest too (the previous one, or "no version", is then the base the working copy is compared with; the
+    next version takes the freed number)."""
     with documentWriteLock:
         read_document(documentId)
         directory = versions.versions_dir(documentsRoot, documentId)
-        if number == versions.latest(directory):
-            raise HTTPException(status_code=409, detail="the newest version cannot be deleted")
         if not versions.delete(directory, number):
             raise HTTPException(status_code=404, detail="version not found")
     return Response(status_code=204)

@@ -42,6 +42,22 @@ def test_parts_are_placed_in_document_coordinates_in_metres_and_y_up():
     assert np.allclose(world.max(axis=0), [0.030, 0.030, 0.0], atol=1e-6)
 
 
+def test_dimmed_parts_get_a_translucent_material():
+    items, stls = items_and_stls()
+    items = [{**items[0], "muted": True}, items[1], {**items[2], "muted": True}]
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False))
+    by_node = {n["name"]: gltf["materials"][gltf["meshes"][n["mesh"]]["primitives"][0]["material"]] for n in gltf["nodes"]}
+    dimmed = by_node[items[0]["name"]]
+    assert dimmed["alphaMode"] == "BLEND" and dimmed["pbrMetallicRoughness"]["baseColorFactor"][3] == blenderexport.dimmedAlpha
+    solid = by_node[items[1]["name"]]
+    assert "alphaMode" not in solid and solid["pbrMetallicRoughness"]["baseColorFactor"][3] == 1.0
+    assert by_node[items[2]["name"]] is not solid and by_node[items[2]["name"]]["alphaMode"] == "BLEND"
+    # with the document's colours a dimmed part gets its own translucent copy of the colour
+    coloured, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False, colours=True))
+    assert any(m["name"].endswith("_dimmed") and m["alphaMode"] == "BLEND" for m in coloured["materials"])
+    assert any(not m["name"].endswith("_dimmed") and "alphaMode" not in m for m in coloured["materials"])
+
+
 def camera_forward(rotation):
     x, y, z, w = rotation
     return -np.array([2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y)])

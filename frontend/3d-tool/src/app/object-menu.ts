@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, HostListener, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DocumentStore, itemColors } from './document.store';
 import { baseThicknessMm } from './z-levels';
 
@@ -8,7 +8,7 @@ import { baseThicknessMm } from './z-levels';
   template: `
     @if (store.contextMenu(); as menu) {
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
-      <div class="menu" role="menu" (mouseover)="onMenuOver($event)" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)">
+      <div #menuEl class="menu" role="menu" (mouseover)="onMenuOver($event)" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)" [style.visibility]="size() ? 'visible' : 'hidden'">
         @if (!menu.ids.length) {
           <button type="button" role="menuitem" [disabled]="!store.clipboard()" (click)="paste()">
             <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? '⌘V' : 'nothing copied' }}</span>
@@ -33,21 +33,9 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⤓</span>Export STL (original)
           <span class="hint">{{ items().length === 1 ? 'own geometry, not rotated or moved' : 'select one part' }}</span>
         </button>
-        <button type="button" role="menuitem" (click)="findInBrowser()">
-          <span class="icon">⌕</span>Find in browser
-          <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
-        </button>
         <button type="button" role="menuitem" (click)="relink()">
           <span class="icon">⇄</span>Relink file…
           <span class="hint">{{ missing() ? 'its file is not in the library: pick another' : 'use another library file' }}</span>
-        </button>
-        <button type="button" role="menuitem" [disabled]="!browserFile()" (click)="useBrowserFile()">
-          <span class="icon">⇄</span>Use selected file
-          <span class="hint">{{ browserFile() ? nameOf(browserFile()!) : 'select an .stl in the file list' }}</span>
-        </button>
-        <button type="button" role="menuitem" (click)="showInAssembly()">
-          <span class="icon">⌖</span>Show in assembly
-          <span class="hint">select and zoom to {{ items().length > 1 ? 'these parts' : 'this part' }}</span>
         </button>
         <button type="button" role="menuitem" class="sub" (mouseenter)="openColors($event)" (click)="openColors($event)">
           <span class="icon">◐</span>Color<span class="hint">▸</span>
@@ -81,6 +69,15 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
           <span class="hint">{{ allNoExport() ? 'on: not in 3MF / SVG, own BOM section' : 'mock part: leave out of the exports' }}</span>
         </button>
+        <div class="sep"></div>
+        <button type="button" role="menuitem" (click)="findInBrowser()">
+          <span class="icon">⌕</span>Find in browser
+          <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
+        </button>
+        <button type="button" role="menuitem" (click)="showInAssembly()">
+          <span class="icon">⌖</span>Show in assembly
+          <span class="hint">select and zoom to {{ items().length > 1 ? 'these parts' : 'this part' }}</span>
+        </button>
         }
       </div>
       @if (colorsAt(); as at) {
@@ -94,10 +91,10 @@ import { baseThicknessMm } from './z-levels';
   `,
   styles: `
     .backdrop { position: fixed; inset: 0; z-index: 30; }
-    .menu { position: fixed; z-index: 31; max-height: calc(100vh - 16px); overflow-y: auto; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
+    .menu { position: fixed; z-index: 31; max-height: calc(100vh - 16px); overflow-y: auto; width: max-content; min-width: 380px; max-width: calc(100vw - 16px); padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
             border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
     .title { padding: 4px 8px 6px; font-size: 11px; opacity: .55; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    button { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
+    button { white-space: nowrap; display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 8px; background: transparent; color: inherit; border: 0; border-radius: 5px; text-align: left; cursor: pointer; font: inherit; }
     .sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.12); }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .4; cursor: default; }
@@ -106,7 +103,7 @@ import { baseThicknessMm } from './z-levels';
     .swatch:hover:not(:disabled) { background-color: inherit; border-color: #fff; }
     .swatch.on { border-color: #fff; box-shadow: inset 0 0 0 2px #2b2f38; }
     .icon { width: 1em; text-align: center; }
-    .hint { margin-left: auto; opacity: .5; font-size: 11px; }
+    .hint { margin-left: auto; opacity: .5; font-size: 11px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; padding-left: 12px; }
     .hint + .hint { margin-left: 10px; min-width: 14px; text-align: right; opacity: .75; }
   `,
 })
@@ -150,14 +147,27 @@ export class ObjectMenu {
     this.close();
   }
 
-  /** Keeps the menu inside the window: it is about 420 px tall and 310 px wide, so it moves up / left near the bottom / right edge. */
+  private readonly menuEl = viewChild<ElementRef<HTMLElement>>('menuEl');
+  /** The menu's real size once it is shown (it differs per selection and grows with new items); until then it is placed but hidden. */
+  private readonly size = signal<{ w: number; h: number } | null>(null);
+
+  constructor() {
+    effect(() => {
+      const open = this.store.contextMenu(), el = this.menuEl();
+      if (!open || !el) { untracked(() => this.size.set(null)); return; }
+      queueMicrotask(() => this.size.set({ w: el.nativeElement.offsetWidth, h: el.nativeElement.offsetHeight }));
+    });
+  }
+
+  /** Keeps the whole menu inside the window: it moves left / up (to the window's edge) when it would reach beyond the right / bottom edge. */
   protected left(x: number) {
-    return Math.max(8, Math.min(x, window.innerWidth - 310 - 8));
+    return Math.max(8, Math.min(x, window.innerWidth - (this.size()?.w ?? 310) - 8));
   }
 
   protected top(y: number) {
-    return Math.max(8, Math.min(y, window.innerHeight - 420 - 8));
+    return Math.max(8, Math.min(y, window.innerHeight - (this.size()?.h ?? 420) - 8));
   }
+
   /** True when the lowest point of the selection already is at `height`. */
   protected lowestAt(height: number) {
     return this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === height;
@@ -206,28 +216,13 @@ export class ObjectMenu {
     return this.items().some(i => this.store.missingPaths().has(i.path));
   }
 
-  protected browserFile() {
-    return this.store.browserFile();
-  }
 
-  protected nameOf(path: string) {
-    return path.split('/').pop()!;
-  }
 
   protected relink() {
     this.store.relinkRequest.set(this.items().map(i => i.id));
     this.close();
   }
 
-  /** Points the parts at the file the file list's cursor is on (all parts that use the same missing file follow, when that file is missing). */
-  protected useBrowserFile() {
-    const file = this.store.browserFile();
-    if (!file) return;
-    const ids = this.items().map(i => i.id);
-    const changed = this.store.relink(ids, file, this.missing());
-    this.store.announce(changed ? `Relinked ${changed} part${changed === 1 ? '' : 's'} to ${this.nameOf(file)}` : 'Those parts already use that file');
-    this.close();
-  }
 
   protected toggleNoExport() {
     this.store.setNoExport(this.items().map(i => i.id), !this.allNoExport());

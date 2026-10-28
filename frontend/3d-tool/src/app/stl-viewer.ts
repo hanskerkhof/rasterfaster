@@ -10,11 +10,13 @@ import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
 import { ReleaseFocus, ViewFocus } from './release-focus';
 import { ViewCube } from './view-cube';
+import { buildImageSvg, buildViewSvg } from './svg-view';
 import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels';
 
 const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
+const groundGridStorageKey = 'rasterfaster.groundGrid';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
 const zGridModeStorageKey = 'rasterfaster.zGridMode';
 const cameraModeStorageKey = 'rasterfaster.cameraMode';
@@ -57,6 +59,10 @@ function readPivotOnSelection() {
   try { return localStorage.getItem(pivotStorageKey) !== 'false'; } catch { return true; } // default on
 }
 
+function readGroundGrid() {
+  try { return localStorage.getItem(groundGridStorageKey) !== 'false'; } catch { return true; } // default on
+}
+
 function readGrid3d() {
   try { return localStorage.getItem(grid3dStorageKey) === 'true'; } catch { return false; }
 }
@@ -93,6 +99,9 @@ function readShowPath() {
     @if (cubeMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
       <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+        <button type="button" role="menuitem" (click)="toggleGroundGrid()">
+          <span class="tick">{{ groundGrid() ? '✓' : '' }}</span>Ground grid<span class="hint">{{ groundGrid() ? 'on' : 'off' }}</span>
+        </button>
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
           <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
         </button>
@@ -240,6 +249,8 @@ export class StlViewer implements OnDestroy {
   private gridKey = '';
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
+  /** Show the grid on the ground (and the 3D lattice with it); the view cube menu switches it. */
+  protected readonly groundGrid = signal(readGroundGrid());
   protected readonly silhouette = silhouetteEdges;
   protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
   /** Height grid: fine (2 mm), baseplate (2 mm then 4 mm) or coarse (4 mm). Chosen in the view cube menu's "Grid mode" fly-out. */
@@ -303,6 +314,7 @@ export class StlViewer implements OnDestroy {
     effect(() => {
       this.grid3d();
       this.zGridMode(); // the 3D grid's levels follow the mode
+      this.groundGrid(); // switching the grid on or off only needs the visibility (rebuildGrid sets it)
       if (this.ready()) untracked(() => this.rebuildGrid());
     });
     // A file came back (or went away): parts that could not be loaded are tried again.
@@ -324,6 +336,7 @@ export class StlViewer implements OnDestroy {
     const el = this.host().nativeElement;
     this.viewFocus.target = el;
     this.store.showInAssembly = ids => this.showInAssembly(ids);
+    this.store.viewSvg = () => this.viewSvg();
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     Object.assign(this.renderer.domElement.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
@@ -742,6 +755,31 @@ export class StlViewer implements OnDestroy {
     };
   }
 
+  /**
+   * An SVG of what the camera shows, in the display mode that is selected: hidden lines removed or dashed and wireframe are vector drawings;
+   * solid is the shaded picture inside an SVG. Answers the drawing with the mode it follows; null while there is nothing to draw.
+   */
+  viewSvg(): { svg: string; mode: ViewMode } | null {
+    const mode = this.mode();
+    if (!this.documentScene.readyCount()) return null;
+    const parts = mode === 'solid' ? [] : this.documentScene.viewParts(mode === 'wireframe'); // the solid picture needs no line geometry
+    this.controls.update(); // the camera as the user sees it now (the orbit controls apply their last move in their update)
+    this.camera.updateProjectionMatrix();
+    const canvas = this.renderer.domElement;
+    const aspect = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
+    const title = this.store.doc().name;
+    if (mode !== 'solid') return { svg: buildViewSvg(this.renderer, this.camera, aspect, parts, { title, mode, grid: this.groundGrid() ? this.grid?.geometry : null }), mode };
+    const showHelpers = this.documentScene.hideHelpers();
+    const grid = this.grid, gridWas = grid?.visible; // the solid picture shows the ground grid when it is on (view cube menu)
+    if (grid) grid.visible = this.groundGrid();
+    try {
+      return { svg: buildImageSvg(this.renderer, this.scene, this.camera, aspect, { title }), mode };
+    } finally {
+      showHelpers();
+      if (grid && gridWas !== undefined) grid.visible = gridWas;
+    }
+  }
+
   /** "Show in assembly": centres the view on these parts and zooms to them. */
   showInAssembly(ids: readonly string[]) {
     const bounds = this.documentScene.boundsOf(ids);
@@ -975,6 +1013,13 @@ export class StlViewer implements OnDestroy {
     this.cubeMenu.set(null);
   }
 
+  protected toggleGroundGrid() {
+    const on = !this.groundGrid();
+    this.groundGrid.set(on);
+    try { localStorage.setItem(groundGridStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.cubeMenu.set(null);
+  }
+
   protected toggleGrid3d() {
     const on = !this.grid3d();
     this.grid3d.set(on);
@@ -1025,6 +1070,7 @@ export class StlViewer implements OnDestroy {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     this.grid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: gridColor, transparent: levels.length > 1, opacity: levels.length > 1 ? 0.7 : 1 }));
+    this.grid.visible = this.groundGrid();
     this.scene.add(this.grid);
   }
 
@@ -1050,6 +1096,7 @@ export class StlViewer implements OnDestroy {
   ngOnDestroy() {
     if (this.viewFocus.target === this.host().nativeElement) this.viewFocus.target = null;
     this.store.showInAssembly = null;
+    this.store.viewSvg = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
     this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);

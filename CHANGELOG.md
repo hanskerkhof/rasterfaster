@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - SVG of the 3D view, ground grid switch, translucent dimmed parts in Blender (0.10.40)
+
+### Added
+- **FE** (`svg-view.ts`, `stl-viewer.ts`, `document-scene.ts`, `document-panel.ts`, `document.store.ts`): **SVG view** (Export row) saves the 3D view as it is now as an SVG, following the selected display mode: **hidden lines removed** and **dashed** (vector; the visible parts of the sharp edges and of the contour lines of smooth walls are found by testing every pixel along an edge against a depth picture of the solids rendered with the same camera, hidden ones dashed grey), **wireframe** (every triangle edge once) and **solid** (the shaded picture embedded in the SVG). The ground grid is included when it is on. File name `<document>-view-<solid|wire|hidden|dashed>.svg`; dimmed parts are left out.
+- **FE** (`stl-viewer.ts`): the view cube menu has **Ground grid** (on / off, remembered; it hides the whole grid, the 3D lattice with it).
+- **BE** (`blenderexport.py`, `tests/test_blenderexport.py`): dimmed (muted) parts are **translucent** in the Blender / glTF export (own material copy, `alphaMode` BLEND, 18 % opaque; with colours: a translucent copy of the part's colour). Checked with a real Blender build.
+- **BE** (`main.py`, `tests/test_api.py`): the newest version can be deleted too (the document goes back to the version before it, or to "no version").
+
+### Changed
+- **FE** (`document-panel.ts`): the Undo, Redo, Delete and Duplicate buttons are gone (⌘Z, ⇧⌘Z, Delete and ⌘C / ⌘V do the same; the ⌘D duplicate is removed); BOM sits in the Export row; the save state moved into the header bar with the version diamond (dark outline: no version, green: same as the newest version, amber: changes since), the same diamond is in the version button; the panel has a minimum height (everything fits, the list shows 3 parts) and folds with ⌥D; the document panel is right aligned in a wider default (240 px).
+- **FE** (`object-menu.ts`): the object menu stays inside the window whatever its size (measured), keeps its hints on one line, has Find in browser and Show in assembly at the bottom behind a divider, and no longer has "Use selected file" (Relink file… covers it).
+
 ## 2026-10-28 - Delete versions, relink suggestions, document panel header and layout (0.10.39)
 
 ### Added
