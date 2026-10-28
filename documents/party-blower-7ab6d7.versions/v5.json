@@ -1,0 +1,487 @@
+{
+  "version": 5,
+  "savedAt": 1793194388.635999,
+  "name": "PARTY-BLOWER",
+  "items": [
+    {
+      "id": "ce5f65cc-3ec9-4cac-a15c-7e1330dc6f22",
+      "path": "MOUNTS/MP3 DY-PLAYERS - 5.16/SV5W MOUNT SCREWS ALT III.stl",
+      "name": "SV5W MOUNT SCREWS ALT III",
+      "color": 16167531,
+      "position": [
+        0.0,
+        20.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "4e7dda92-1587-4841-955f-e709ec45e442",
+      "path": "MOUNTS/2.3 XY-MOS/MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS BOTTOM.stl",
+      "name": "MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS BOTTOM",
+      "color": 12745632,
+      "position": [
+        20.0,
+        20.0,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "20aeff53-6dd9-412e-9627-ce3d1869da7c",
+      "path": "MOUNTS/2.3 XY-MOS/MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS TOP.stl",
+      "name": "MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS TOP",
+      "color": 12745632,
+      "position": [
+        20.0,
+        20.0,
+        30.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "70f8bd20-cee8-48f6-9c48-15b9228c4cb3",
+      "path": "MOUNTS/LM2596 - STEP DOWN BUCK CONVERTER DC-DC/LM25596 SCREWS - RF2.30.stl",
+      "name": "LM25596 SCREWS - RF2.30",
+      "color": 14706278,
+      "position": [
+        20.0,
+        20.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "303e2a3a-5874-40f5-be72-a783c0b5b8d4",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V",
+      "color": 7775663,
+      "position": [
+        111.6,
+        20.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e757b8f5-c0a4-4ba4-b1e4-ca418112285e",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 16767334,
+      "position": [
+        123.251,
+        23.25,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "876c8751-cea3-4a09-8d38-6e202f144ea2",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 16767334,
+      "position": [
+        143.251,
+        123.25,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "f9aab400-91fc-45eb-9ee2-6db10dfb9c65",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
+      "color": 9684093,
+      "position": [
+        20.0,
+        54.2,
+        36.004999999999995
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "a3fd0ed6-f879-4ec7-8031-d3d68d8956f6",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
+      "color": 16167531,
+      "position": [
+        20.0,
+        54.2,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "0c385e4f-01c0-44ef-b85d-a93bc9ee7943",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V",
+      "color": 7775663,
+      "position": [
+        111.6,
+        20.0,
+        38.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7e029ad7-c949-423a-a55b-701b5556a728",
+      "path": "MOUNTS/3.3 WAGO 221/WAGO 221 4x ON SIDE 1x5w - 3.3.stl",
+      "name": "WAGO 221 4x ON SIDE 1x5w - 3.3",
+      "color": 7775663,
+      "position": [
+        20.0,
+        20.0,
+        46.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "5f441e4c-0c05-4eb1-804e-3c34e534caf2",
+      "path": "RF3.1 PARTY_BLOWER/RF3.1 SPEAKER ONKYO PD799A 4ohm 12.5W.stl",
+      "name": "RF3.1 SPEAKER ONKYO PD799A 4ohm 12.5W",
+      "color": 9684093,
+      "position": [
+        22.0,
+        118.0,
+        14.0
+      ],
+      "rotation": [
+        0.5,
+        0.5000000000000002,
+        -0.5,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "3eb70caf-1328-49ac-86ed-473fb1745667",
+      "path": "1.10 BASE/1.10 BASE 8x8x4h 6-CORNERS.stl",
+      "name": "1.10 BASE 8x8x4h 6-CORNERS",
+      "color": 16167531,
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "69386ff2-24c7-4524-87f1-687ee81acf1d",
+      "path": "1.10 BASE/1.10 BASE 8x8x4h 6-CORNERS COVER.stl",
+      "name": "1.10 BASE 8x8x4h 6-CORNERS COVER",
+      "color": 12745632,
+      "position": [
+        -4.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": true,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "21b141a2-0563-4656-ab2b-20fcafbdbd0c",
+      "path": "RF3.1 PARTY_BLOWER/RF3.1 INTERCOM GRILL MOUNT.stl",
+      "name": "RF3.1 INTERCOM GRILL MOUNT",
+      "color": 9684093,
+      "position": [
+        20.0,
+        153.2,
+        8.9
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "1089c76b-9f84-45c0-9afe-f422276539f5",
+      "path": "RF3.1 PARTY_BLOWER/RF3.1 8w MOUNT with SCREWS.stl",
+      "name": "RF3.1 8w MOUNT with SCREWS",
+      "color": 12745632,
+      "position": [
+        0.0,
+        153.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "4466a951-5900-4535-87d9-be336965479e",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/models/rotary-encoders-1.snapshot.1/rotary+encoder_14mm_hole_spc.stl",
+      "name": "rotary+encoder_14mm_hole_spc",
+      "color": 9684093,
+      "position": [
+        100.0,
+        147.0,
+        30.0
+      ],
+      "rotation": [
+        -1.1102230246251565e-16,
+        -0.7071067811865477,
+        -0.7071067811865474,
+        1.942890293094024e-16
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "94e5634e-c430-4a66-9c96-5f522bb23647",
+      "path": "MOUNTS/2.12.TM1637 - I2C-7Segment display/i2c-7segment-1.snapshot.1/TM1637.stp.stl",
+      "name": "TM1637.stp",
+      "color": 9684093,
+      "position": [
+        95.0,
+        151.0,
+        54.0
+      ],
+      "rotation": [
+        5.551115123125783e-17,
+        1.0,
+        -5.5511151231257815e-17,
+        1.232595164407831e-32
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "17a8c3f0-1747-4033-a360-06f212e8bc1b",
+      "path": "RF3.1 PARTY_BLOWER/RF3.1 SPEAKER ENCLOSURE.stl",
+      "name": "RF3.1 SPEAKER ENCLOSURE",
+      "color": 9338051,
+      "position": [
+        1.1,
+        106.2,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "f34e8884-495f-4fa2-9232-4c52601716ed",
+      "path": "MOUNTS/LM2596 - STEP DOWN BUCK CONVERTER DC-DC/models/LM2596 DC-DC StepDown Converter v1.stl",
+      "name": "LM2596 DC-DC StepDown Converter v1",
+      "color": 9684093,
+      "position": [
+        38.5,
+        22.8,
+        7.4
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e25a7d31-47e8-4d54-8bbe-1dbab6fa323b",
+      "path": "SPACERS/spacers_RF1 v236_12.stl",
+      "name": "spacers_RF1 v236_12",
+      "color": 14706278,
+      "position": [
+        83.251,
+        23.25,
+        34.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "83167378-db95-44a8-8e94-013aabc02394",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 14706278,
+      "position": [
+        83.251,
+        23.25,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "472aaa0c-84ef-494a-9573-7a2091d2e974",
+      "path": "SPACERS/spacers_RF1 v236_12.stl",
+      "name": "spacers_RF1 v236_12",
+      "color": 14706278,
+      "position": [
+        23.251,
+        23.25,
+        36.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "1bbd12a5-7d96-4bcc-8bde-3ffb6bb78ac3",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 14706278,
+      "position": [
+        23.251,
+        23.25,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    }
+  ]
+}
