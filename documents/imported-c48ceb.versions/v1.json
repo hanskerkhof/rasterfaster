@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "savedAt": 1792999257.869996,
+  "savedAt": 1793166824.281543,
   "name": "STROZZI",
   "items": [
     {
@@ -334,10 +334,10 @@
         62.0
       ],
       "rotation": [
-        -0.5,
-        0.49999999999999994,
+        -0.4999999999999999,
+        0.4999999999999999,
         0.5000000000000002,
-        -0.5000000000000001
+        -0.5
       ],
       "muted": false,
       "centered": false,
@@ -354,10 +354,10 @@
         42.0
       ],
       "rotation": [
-        -0.5,
-        0.49999999999999994,
+        -0.4999999999999999,
+        0.4999999999999999,
         0.5000000000000002,
-        -0.5000000000000001
+        -0.5
       ],
       "muted": false,
       "centered": false,
@@ -445,8 +445,8 @@
     },
     {
       "id": "354c4bc4-02da-4a9b-ad2a-5f5eb3182302",
-      "path": "1.10 BASE/1.10 BASE 9x8x3h 8CORNERS UNEVEN.stl",
-      "name": "1.10 BASE 9x8x3h 8CORNERS UNEVEN",
+      "path": "1.10 BASE/1.10 BASE 9x8x3h 8-CORNERS UNEVEN.stl",
+      "name": "1.10 BASE 9x8x3h 8-CORNERS UNEVEN",
       "color": 7775663,
       "position": [
         100.0,
@@ -465,8 +465,8 @@
     },
     {
       "id": "95bc71e0-10cd-4b48-b5c5-ddb78e1119d5",
-      "path": "1.10 BASE/1.10 BASE COVER 8x6x3h 8corners UNEVEN.stl",
-      "name": "1.10 BASE COVER 8x6x3h 8corners UNEVEN",
+      "path": "1.10 BASE/1.10 BASE 8x6x3h COVER 8corners UNEVEN.stl",
+      "name": "1.10 BASE 8x6x3h COVER 8corners UNEVEN",
       "color": 16767334,
       "position": [
         100.0,
@@ -769,7 +769,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        280.0,
+        340.0,
         -20.0,
         62.0
       ],
@@ -778,26 +778,6 @@
         -0.6743797232066278,
         -0.21263110997159393,
         0.6743797232066279
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "8842998e-8ea1-4b5f-8484-fe8a7218e7dc",
-      "path": "11.33 GENERIC BOX 12x8/5h - box CONNECTOR.stl",
-      "name": "5h - box CONNECTOR",
-      "color": 16767334,
-      "position": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
       ],
       "muted": false,
       "centered": false,

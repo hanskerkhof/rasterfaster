@@ -2,26 +2,6 @@
   "name": "PARTY-BLOWER",
   "items": [
     {
-      "id": "283fa461-1efa-4417-ae66-a2b547ec6fdf",
-      "path": "3.39 BIRTHDAY ROCK 8x8x3/3.39 BIRTHDAY ROCK 8x8x3 - BASE.stl",
-      "name": "3.39 BIRTHDAY ROCK 8x8x3 - BASE",
-      "color": 7317724,
-      "position": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.7071067811865476,
-        0.7071067811865475
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
       "id": "e895e890-da01-4056-82da-aabcc370b0be",
       "path": "3.39 BIRTHDAY ROCK 8x8x3/3.39 BIRTHDAY ROCK 8x8x3 COVER.stl",
       "name": "3.39 BIRTHDAY ROCK 8x8x3 COVER",
@@ -37,7 +17,7 @@
         -0.7071067811865477,
         0.7071067811865475
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -302,42 +282,62 @@
       "noExport": false
     },
     {
-      "id": "913695c2-2a0f-4fab-9951-3b5cd8961ac6",
-      "path": "BACKUP ALARM/aiyima-speaker-10watt-1.snapshot.39/AIYIMA Speaker 10watt.stl",
-      "name": "AIYIMA Speaker 10watt",
-      "color": 16767334,
+      "id": "5f441e4c-0c05-4eb1-804e-3c34e534caf2",
+      "path": "MODELS/SPEAKERS/SPEAKER ONKYO PD799A 4ohm 12.5W.stl",
+      "name": "SPEAKER ONKYO PD799A 4ohm 12.5W",
+      "color": 9684093,
       "position": [
-        8.0,
-        120.0,
-        10.0
+        22.0,
+        118.0,
+        14.0
       ],
       "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
+        0.5,
+        0.5000000000000002,
+        -0.5,
+        -0.5000000000000001
       ],
       "muted": false,
       "centered": false,
       "noExport": false
     },
     {
-      "id": "cbcfeb7d-8c1f-456e-9bc0-1b46ba006069",
-      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
-      "name": "1.8 - BOLT LONG",
-      "color": 7317724,
+      "id": "3eb70caf-1328-49ac-86ed-473fb1745667",
+      "path": "1.10 BASE/1.10 BASE 8x8x4h 6-CORNERS.stl",
+      "name": "1.10 BASE 8x8x4h 6-CORNERS",
+      "color": 16167531,
       "position": [
-        180.0,
+        0.0,
         0.0,
         0.0
       ],
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        0.7071067811865476,
+        0.7071067811865475
       ],
       "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "69386ff2-24c7-4524-87f1-687ee81acf1d",
+      "path": "1.10 BASE/1.10 BASE 8x8x4h 6-CORNERS COVER.stl",
+      "name": "1.10 BASE 8x8x4h 6-CORNERS COVER",
+      "color": 12745632,
+      "position": [
+        -4.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": true,
       "centered": false,
       "noExport": false
     }

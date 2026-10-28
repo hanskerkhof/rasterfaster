@@ -1,11 +1,11 @@
 {
-  "version": 4,
-  "savedAt": 1793063090.936952,
+  "version": 9,
+  "savedAt": 1793163333.828589,
   "name": "DADA",
   "items": [
     {
       "id": "0c6d855e-2882-4f1d-bcfa-933e9bdb7611",
-      "path": "___GOOD LUCK WITH THE SHOW/4.1 v154_TOETER.stl",
+      "path": "DADA/4.1 v154_TOETER.stl",
       "name": "4.1 v154_TOETER",
       "color": 7317724,
       "position": [
@@ -25,7 +25,7 @@
     },
     {
       "id": "f5cf8fe7-bb1c-4259-b5e1-86c61569e6bf",
-      "path": "___GOOD LUCK WITH THE SHOW/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BOX SMALLER w MOUNT HOLE.stl",
+      "path": "DADA/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BOX SMALLER w MOUNT HOLE.stl",
       "name": "4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BOX SMALLER w MOUNT HOLE",
       "color": 9684093,
       "position": [
@@ -45,7 +45,7 @@
     },
     {
       "id": "0660d4d5-282a-4ad9-945c-d1712ec8e8a6",
-      "path": "___GOOD LUCK WITH THE SHOW/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BACKPLATE.stl",
+      "path": "DADA/4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BACKPLATE.stl",
       "name": "4.1.GOOD LUCK WITH THE SHOW_RF4 v154_BACKPLATE",
       "color": 16167531,
       "position": [

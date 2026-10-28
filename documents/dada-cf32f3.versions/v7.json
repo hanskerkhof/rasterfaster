@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "savedAt": 1793011834.702454,
+  "version": 7,
+  "savedAt": 1793162905.155039,
   "name": "DADA",
   "items": [
     {
@@ -99,7 +99,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -119,7 +119,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -139,7 +139,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -159,7 +159,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -179,7 +179,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -199,7 +199,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -219,7 +219,7 @@
         0.5,
         0.49999999999999994
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -239,7 +239,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -254,12 +254,12 @@
         26.0
       ],
       "rotation": [
-        0.0,
-        0.0,
+        -0.7071067811865475,
         -0.7071067811865476,
-        0.7071067811865475
+        1.1102230246251565e-16,
+        -5.551115123125783e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -279,7 +279,7 @@
         1.0,
         -5.5511151231257815e-17
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -298,6 +298,106 @@
         0.0,
         1.0,
         -5.5511151231257815e-17
+      ],
+      "muted": true,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "594feae1-253c-4a07-9f13-a3355a450841",
+      "path": "11.23.CABLE STRAIN RELIEF/4w - 1 CABLE FLAT 3.6 mm  - 1 230v  LED - 11.23.stl",
+      "name": "4w - 1 CABLE FLAT 3.6 mm  - 1 230v  LED - 11.23",
+      "color": 16767334,
+      "position": [
+        -20.0,
+        -140.0,
+        6.0
+      ],
+      "rotation": [
+        0.0,
+        -0.7071067811865476,
+        0.0,
+        0.7071067811865475
+      ],
+      "muted": true,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "77395ac9-8e55-45c1-aba8-dec226053e9a",
+      "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
+      "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
+      "color": 7317724,
+      "position": [
+        74.0,
+        26.0,
+        60.0
+      ],
+      "rotation": [
+        0.0,
+        -0.7071067811865477,
+        0.0,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "28cea2aa-8c78-430d-96d5-56f08af0fb5d",
+      "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
+      "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
+      "color": 7317724,
+      "position": [
+        74.0,
+        106.0,
+        60.0
+      ],
+      "rotation": [
+        0.0,
+        -0.7071067811865477,
+        0.0,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "3ec664ac-097e-44d9-ad16-b1c04d51cd80",
+      "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
+      "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
+      "color": 7317724,
+      "position": [
+        74.0,
+        106.0,
+        140.0
+      ],
+      "rotation": [
+        0.0,
+        -0.7071067811865477,
+        0.0,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "3f7102ba-d6af-4383-8fc1-f9e3a58a6a6c",
+      "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
+      "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
+      "color": 7317724,
+      "position": [
+        74.0,
+        26.0,
+        140.0
+      ],
+      "rotation": [
+        0.0,
+        -0.7071067811865477,
+        0.0,
+        0.7071067811865475
       ],
       "muted": false,
       "centered": false,

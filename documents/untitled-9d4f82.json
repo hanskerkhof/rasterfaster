@@ -1,0 +1,25 @@
+{
+  "name": "LEKBAK",
+  "items": [
+    {
+      "id": "5a0d9b2b-fe24-4ad7-a1f8-e240db7b2ae8",
+      "path": "LEKBEKER/LEKBEKER_Various models v166_BAKJE VIERKANT NEW.stl",
+      "name": "LEKBEKER_Various models v166_BAKJE VIERKANT NEW",
+      "color": 14706278,
+      "position": [
+        20.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}
