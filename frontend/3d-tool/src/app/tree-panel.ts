@@ -24,6 +24,7 @@ interface Row {
     @if (listNotice()) {
       <div class="list-notice" role="status">{{ listNotice() }}
         @if (listNoticeAction()) { <button type="button" class="notice-action" (click)="openTrash.emit()">Open Trash</button> }
+        @if (noticeRelink(); as ids) { <button type="button" class="notice-action" title="Pick another library file for the part" (click)="relink.emit(ids)">Relink…</button> }
       </div>
     }
     @if (pendingTrash(); as pending) {
@@ -147,7 +148,7 @@ export class TreePanel {
   /** A file path to expand the tree to and focus (used to restore the last opened file). */
   readonly reveal = input<string | null>(null);
   /** "Find in browser": open the folders above these files, select them, scroll to the first (`seq` makes the same request count again). */
-  readonly find = input<{ paths: string[]; seq: number } | null>(null);
+  readonly find = input<{ paths: string[]; seq: number; ids?: string[] } | null>(null);
   /** A file was selected (clicked or arrowed to). Not called `select`: that is also a DOM event name, and selecting text in the rename field would fire it. */
   readonly fileSelected = output<string>();
   /** Double-click or ⌘↓ on a file: put it into the document. */
@@ -164,6 +165,10 @@ export class TreePanel {
   readonly showAll = output<void>();
   /** The notice's "Open Trash" button: the app opens the Trash dialog. */
   readonly openTrash = output<void>();
+  /** The notice's "Relink…" button: the parts (document item ids) that were looked up get another file. */
+  readonly relink = output<string[]>();
+  /** Ids of the document parts the notice is about (for its Relink button); null when the notice has none. */
+  protected readonly noticeRelink = signal<string[] | null>(null);
 
   protected readonly focused = signal<string | null>(null);
   /** The context menu (right-click on a row), and the row being renamed in place. */
@@ -298,7 +303,7 @@ export class TreePanel {
         this.closeQuickLook();
         setTimeout(() => this.scrollToFocused()); // the focus may not change (already on that file): scroll anyway; else the effect does it when the row appears
         setTimeout(() => this.focusTree(), 60); // the selected rows are blue while the list has the keyboard focus
-        void this.explainMissing(request.paths); // a file that is not in the library (any more) cannot be shown: say why
+        void this.explainMissing(request.paths, request.ids); // a file that is not in the library (any more) cannot be shown: say why
       });
     });
     // Expand every ancestor folder of the revealed file and focus it.
@@ -352,7 +357,7 @@ export class TreePanel {
   }
 
   /** Says which of these files are not in the library, and when they are in the Trash where and how to get them back. */
-  private async explainMissing(paths: string[]) {
+  private async explainMissing(paths: string[], ids?: string[]) {
     try {
       let missing: string[];
       try {
@@ -373,7 +378,7 @@ export class TreePanel {
         message = inTrash === missing.length ? `${missing.length} files are in the Trash: put them back to find them here.`
           : `${missing.length} files are not in the library${inTrash ? ` (${inTrash} of them in the Trash)` : ''}.`;
       }
-      this.note(message, inTrash > 0);
+      this.note(message, inTrash > 0, ids?.length ? ids : null);
     } catch { /* offline: no explanation */ }
   }
 
@@ -633,11 +638,12 @@ export class TreePanel {
   }
 
   /** A note above the list for a few seconds. */
-  private note(message: string, withTrashButton = false) {
+  private note(message: string, withTrashButton = false, relinkIds: string[] | null = null) {
     this.listNotice.set(message);
     this.listNoticeAction.set(withTrashButton);
+    this.noticeRelink.set(relinkIds);
     clearTimeout(this.noticeTimer);
-    this.noticeTimer = setTimeout(() => { this.listNotice.set(''); this.listNoticeAction.set(false); }, withTrashButton ? 12000 : 6000);
+    this.noticeTimer = setTimeout(() => { this.listNotice.set(''); this.listNoticeAction.set(false); this.noticeRelink.set(null); }, withTrashButton || relinkIds ? 12000 : 6000);
   }
   private noticeTimer?: ReturnType<typeof setTimeout>;
 

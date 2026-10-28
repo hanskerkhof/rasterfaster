@@ -45,6 +45,8 @@ A part whose file is **not in the library** (you moved its folder to the Trash, 
 
 The **parts list** in the document panel (the panel on the right: document, export, parts list, position) selects like the file list: a click selects one part, **⌘-click** adds or removes a part, **Shift-click** selects everything from the last clicked part to this one (the range keeps its anchor, so a second Shift-click changes the end of the range), **⌘⇧-click** adds that range to what is selected. The 3D view shows the same selection; the part you clicked last is the one whose position is shown.
 
+Relink: a part whose file is missing (⚠) or that only has 3MF geometry gets another library file through **Relink file…** (object menu, the ⇄ button in the parts list, or the notice of Find in browser): the file list switches to relink mode, pre-filtered with the old name, and you pick the file there.
+
 3MF: **Import 3MF…** (document panel) makes a new document from a 3MF of this app or Bambu Studio and links each part to its library file (by path, name, then shape); parts without a library file keep the 3MF's geometry (⚠, stored in `documents/_embedded/`). Right-click a part: **Export STL** (as placed / original), **Show in assembly**. **Shift-drag** on empty space selects by rectangle. The document panel can be moved and resized.
 
 Keyboard: **Space** toggles the fly-around, **⌥1–⌥4** the view modes, **⌘0–⌘6** the view direction (home, top, bottom, front, rear, left, right). The object menu (right-click a part) has **Color ▸**; right-click empty canvas for **Paste**. `scripts/dev_stack.py` starts the API and the dev server together.

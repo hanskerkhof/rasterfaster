@@ -15,6 +15,12 @@
 .panel-resize:hover, .panel-resize.active, .panel-resize:focus-visible { background: #2f6fed; outline: none; }
 .panel header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid #000; }
 .tree { flex: 1; min-height: 0; }
+.relink-bar { padding: 8px 10px; font-size: 12px; background: #1f3358; border-top: 1px solid #2f6fed; border-bottom: 1px solid #2f6fed; display: flex; flex-direction: column; gap: 6px; }
+.relink-bar .dim { opacity: .6; word-break: break-all; } .relink-bar code { font-size: 11px; }
+.relink-bar .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.relink-bar button { padding: 4px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; word-break: break-all; text-align: left; }
+.relink-bar button.primary { background: #2f6fed; color: #fff; } .relink-bar button:disabled { opacity: .5; cursor: default; }
+.relink-bar button:hover:not(:disabled) { background: #3b82ff; color: #fff; }
 main { display: flex; flex-direction: column; min-width: 0; }
 .toolbar { display: flex; align-items: center; gap: 16px; padding: 8px 12px; background: #23262d; border-bottom: 1px solid #000; }
 .modes { display: flex; }

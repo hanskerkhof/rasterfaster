@@ -37,6 +37,14 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⌕</span>Find in browser
           <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
         </button>
+        <button type="button" role="menuitem" (click)="relink()">
+          <span class="icon">⇄</span>Relink file…
+          <span class="hint">{{ missing() ? 'its file is not in the library: pick another' : 'use another library file' }}</span>
+        </button>
+        <button type="button" role="menuitem" [disabled]="!browserFile()" (click)="useBrowserFile()">
+          <span class="icon">⇄</span>Use selected file
+          <span class="hint">{{ browserFile() ? nameOf(browserFile()!) : 'select an .stl in the file list' }}</span>
+        </button>
         <button type="button" role="menuitem" (click)="showInAssembly()">
           <span class="icon">⌖</span>Show in assembly
           <span class="hint">select and zoom to {{ items().length > 1 ? 'these parts' : 'this part' }}</span>
@@ -190,6 +198,34 @@ export class ObjectMenu {
     const ids = this.items().map(i => i.id);
     this.store.selectMany(ids);
     this.store.showInAssembly?.(ids);
+    this.close();
+  }
+
+  /** Some of the parts point at a file that is not in the library. */
+  protected missing() {
+    return this.items().some(i => this.store.missingPaths().has(i.path));
+  }
+
+  protected browserFile() {
+    return this.store.browserFile();
+  }
+
+  protected nameOf(path: string) {
+    return path.split('/').pop()!;
+  }
+
+  protected relink() {
+    this.store.relinkRequest.set(this.items().map(i => i.id));
+    this.close();
+  }
+
+  /** Points the parts at the file the file list's cursor is on (all parts that use the same missing file follow, when that file is missing). */
+  protected useBrowserFile() {
+    const file = this.store.browserFile();
+    if (!file) return;
+    const ids = this.items().map(i => i.id);
+    const changed = this.store.relink(ids, file, this.missing());
+    this.store.announce(changed ? `Relinked ${changed} part${changed === 1 ? '' : 's'} to ${this.nameOf(file)}` : 'Those parts already use that file');
     this.close();
   }
 

@@ -305,6 +305,8 @@ export class StlViewer implements OnDestroy {
       this.zGridMode(); // the 3D grid's levels follow the mode
       if (this.ready()) untracked(() => this.rebuildGrid());
     });
+    // A file came back (or went away): parts that could not be loaded are tried again.
+    effect(() => { this.store.missingPaths(); untracked(() => { if (this.ready()) this.documentScene.retryFailed(); }); });
     // Another document was opened: fit the camera to it once its geometry has loaded.
     effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.lastItemCount = 0; }); });
     // The selection or the numbers of a part changed: the line about the selection at the bottom right follows.

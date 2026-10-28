@@ -69,7 +69,7 @@ export class App {
   /** Set once on startup so the tree expands to the restored file; later selections don't re-trigger it. */
   protected readonly revealPath = signal<string | null>(null);
   /** "Find in browser" (part menu) on its way to the file list; a filter is cleared first, the file may not match it. */
-  protected readonly findRequest = signal<{ paths: string[]; seq: number } | null>(null);
+  protected readonly findRequest = signal<{ paths: string[]; seq: number; ids?: string[] } | null>(null);
   /** The distinct library paths the document's parts use (a string, so that moving a part does not count as a change). */
   private readonly partPathsKey = computed(() => [...new Set(this.store.doc().items.map(item => item.path))].join('\n'));
   /** Bumped whenever the library changes under the document (rename, move, trash, put back): the missing files are looked up again. */
@@ -108,6 +108,9 @@ export class App {
 
   constructor() {
     void this.store.init();
+    effect(() => { if (this.store.relinkRequest()) untracked(() => this.startRelinkMode()); });
+    effect(() => { this.store.docId(); untracked(() => this.store.relinkRequest.set(null)); }); // another document: no relink mode
+    effect(() => this.store.browserFile.set(this.treePanel()?.focusedFile() ?? null)); // the object menu can point a part at the file the list's cursor is on
     this.watchForUpdates();
     this.api.start();
     void this.lib.refreshTrash();
@@ -161,6 +164,57 @@ export class App {
       if (stored && viewModes.includes(stored)) return stored;
     } catch { /* storage unavailable */ }
     return 'solid';
+  }
+
+  /** The file list's notice "Relink…": the parts that were looked up and whose file is missing get a new file. */
+  protected onRelink(ids: string[]) {
+    const missing = this.store.missingPaths();
+    const lost = this.store.doc().items.filter(i => ids.includes(i.id) && missing.has(i.path)).map(i => i.id);
+    this.store.relinkRequest.set(lost.length ? lost : ids);
+  }
+
+  // --- relink mode: the file browser (filter, sort, preview ...) picks another file for some parts -----------------------------
+
+  protected readonly relinkParts = computed(() => {
+    const ids = this.store.relinkRequest();
+    return ids ? this.store.doc().items.filter(i => ids.includes(i.id)) : [];
+  });
+  /** How many parts of the document use the file(s) of the parts being relinked. */
+  protected readonly relinkSharing = computed(() => {
+    const paths = new Set(this.relinkParts().map(i => i.path));
+    return this.store.doc().items.filter(i => paths.has(i.path)).length;
+  });
+  protected readonly relinkFile = computed(() => this.treePanel()?.focusedFile() ?? null);
+
+  private startRelinkMode() {
+    const part = this.relinkParts()[0];
+    if (!part) return;
+    this.store.relinkAll.set(true);
+    if (this.panelHidden()) this.togglePanel();
+    const stem = part.path.startsWith('embedded:') ? part.name : part.path.split('/').pop()!.replace(/\.stl$/i, '');
+    this.onFilter(stem.replace(/[_.-]+/g, ' ').trim()); // the renamed file usually still looks like the old one: start with it (the filter can be changed or cleared)
+    setTimeout(() => this.treePanel()?.focusTree(), 100);
+  }
+
+  /** Points the parts at the chosen file and leaves relink mode. */
+  protected doRelink(path: string | null = this.relinkFile()) {
+    const ids = this.store.relinkRequest();
+    if (!ids || !path) return;
+    const changed = this.store.relink(ids, path, this.store.relinkAll() && this.relinkSharing() > this.relinkParts().length);
+    this.store.announce(changed ? `Relinked ${changed} part${changed === 1 ? '' : 's'} to ${path.split('/').pop()}` : 'Those parts already use that file');
+    this.store.relinkRequest.set(null);
+  }
+
+  protected cancelRelink() {
+    this.store.relinkRequest.set(null);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  protected onRelinkKey(event: KeyboardEvent) {
+    if (!this.store.relinkRequest()) return;
+    const typing = (event.target as HTMLElement | null)?.closest('input, textarea, select');
+    if (event.key === 'Escape' && !typing) { event.preventDefault(); this.cancelRelink(); }
+    else if (event.key === 'Enter' && !typing && this.relinkFile() && (event.target as HTMLElement | null)?.closest('.tree')) { event.preventDefault(); this.doRelink(); }
   }
 
   protected setMode(mode: ViewMode) {
@@ -249,7 +303,7 @@ export class App {
 
   /** Puts several library files next to each other into the document as one undo step. */
   protected addFilesToDocument(paths: string[]) {
-    if (!paths.length) return;
+    if (!paths.length || this.store.relinkRequest()) return;
     this.selected.set(paths[paths.length - 1]);
     this.writeLastStl(paths[paths.length - 1]);
     this.treePanel()?.closeQuickLook();
@@ -259,6 +313,7 @@ export class App {
   /** Puts a library file into the document (defaults to the selected one). */
   protected addToDocument(path: string | null = this.selected()) {
     if (!path) return;
+    if (this.store.relinkRequest()) { this.doRelink(path); return; } // relink mode: double-click / ⌘↓ / the Add button choose the file for the parts instead
     this.selected.set(path);
     this.writeLastStl(path);
     this.treePanel()?.closeQuickLook(); // adding a part (any way) closes the quick look

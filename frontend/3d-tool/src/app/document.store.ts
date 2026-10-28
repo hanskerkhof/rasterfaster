@@ -554,14 +554,20 @@ export class DocumentStore {
   readonly missingPaths = signal<ReadonlySet<string>>(new Set());
 
   /** "Find in browser" in the part menu: the library paths of the parts, for the file list to show and select. `seq` makes a repeated request count. */
-  readonly browserRequest = signal<{ paths: string[]; seq: number } | null>(null);
+  readonly browserRequest = signal<{ paths: string[]; seq: number; ids?: string[] } | null>(null);
+  /** The .stl file the file browser's cursor is on (set by the app), so a part can be pointed at it from the object menu. */
+  readonly browserFile = signal<string | null>(null);
+  /** Relink mode: the file browser picks another file for these parts (their ids); null when not relinking. */
+  readonly relinkRequest = signal<string[] | null>(null);
+  /** In relink mode: also relink every other part of the document that uses the same file. */
+  readonly relinkAll = signal(true);
 
   findInBrowser(ids: readonly string[]) {
     const wanted = new Set(ids);
     const chosen = this.doc().items.filter(i => wanted.has(i.id));
     const paths = [...new Set(chosen.map(i => i.path).filter(p => !p.startsWith('embedded:')))];
     if (!paths.length && chosen.length) this.announce('This part uses the geometry of an imported 3MF: it is not a file in the library (right-click ▸ Export STL saves it).', 6000);
-    if (paths.length) this.browserRequest.set({ paths, seq: (this.browserRequest()?.seq ?? 0) + 1 });
+    if (paths.length) this.browserRequest.set({ paths, seq: (this.browserRequest()?.seq ?? 0) + 1, ids: chosen.map(i => i.id) });
   }
 
   /** Shift-click in the document list: select these items, the last of them is the one whose numbers are shown; `add` (⌘⇧) keeps what is selected. */
@@ -594,6 +600,22 @@ export class DocumentStore {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     return true;
+  }
+
+  /**
+   * Points parts at another library file: the given parts, or with `allSharing` every part of the document that uses the same file as one of them.
+   * A part whose name still was its old file's name follows the new file's name. One undo step. Returns how many parts were changed.
+   */
+  relink(ids: readonly string[], newPath: string, allSharing = false): number {
+    const stem = (path: string) => path.split('/').pop()!.replace(/\.stl$/i, '');
+    const chosen = this.doc().items.filter(i => ids.includes(i.id));
+    const oldPaths = new Set(chosen.map(i => i.path));
+    const targets = new Set((allSharing ? this.doc().items.filter(i => oldPaths.has(i.path)) : chosen).filter(i => i.path !== newPath).map(i => i.id));
+    if (!targets.size) return 0;
+    this.mutate('Relink file', d => ({
+      ...d, items: d.items.map(i => (targets.has(i.id) ? { ...i, path: newPath, name: i.name === stem(i.path) || i.path.startsWith('embedded:') ? stem(newPath) : i.name } : i)),
+    }));
+    return targets.size;
   }
 
   setColor(ids: readonly string[], color: number) {

@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - Relink mode, a missing file no longer blanks the view (0.10.38)
+
+### Added
+- **FE** (`app.ts`, `app.html`, `app.scss`, `document.store.ts`, `object-menu.ts`, `document-panel.ts`, `tree-panel.ts`): **relink mode**: **Relink file…** (object menu), the **⇄** button in the parts list (parts with a missing file or 3MF geometry) and the **Relink…** button of the "is not in the library" notice put the file browser into relink mode: a bar above the list names the parts, the list is pre-filtered with the old file's name, and the chosen file (select + "Use <file>", Enter, double-click, ⌘↓ or the Add button) is assigned; a checkbox relinks every part that uses the same file. Esc / Cancel / another document leave the mode. The object menu also has **Use selected file** (the file the list's cursor is on). `DocumentStore.relink` is one undo step; a part's name follows the new file only when it was the old file's name (test in `document.store.spec.ts`).
+
+### Fixed
+- **FE** (`document-scene.ts`, `stl-viewer.ts`): a part whose file could not be loaded kept the view from being fitted to the document (it waited for every part), so the other parts were drawn but out of sight. Failed parts now count as settled, are not re-requested on every redraw, and are tried again when the set of missing files changes.
+- **FE** (`document-panel.ts`): the parts list scrolls the selected part to its middle (smoothly) only when the selection comes from elsewhere (3D view, rectangle, Show in assembly), not on a click in the list, and has no extra scroll room below the last row.
+
 ## 2026-10-28 - 3MF import, Export STL, selection rectangle, movable document panel (0.10.37)
 
 ### Added

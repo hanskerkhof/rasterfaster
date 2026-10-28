@@ -224,9 +224,9 @@ describe('Find in browser (the request for the file list)', () => {
     const again = store.addItem({ ...part(), path: 'Folder/a.stl' });  // the same file twice
     expect(store.browserRequest()).toBeNull();
     store.findInBrowser([again.id, b.id]);
-    expect(store.browserRequest()).toEqual({ paths: ['Other/b.stl', 'Folder/a.stl'], seq: 1 });
+    expect(store.browserRequest()).toEqual({ paths: ['Other/b.stl', 'Folder/a.stl'], seq: 1, ids: [b.id, again.id] });
     store.findInBrowser([a.id, again.id]);
-    expect(store.browserRequest()).toEqual({ paths: ['Folder/a.stl'], seq: 2 });         // asking again for the same file is a new request
+    expect(store.browserRequest()).toEqual({ paths: ['Folder/a.stl'], seq: 2, ids: [a.id, again.id] });         // asking again for the same file is a new request
     store.findInBrowser([]);
     expect(store.browserRequest()?.seq).toBe(2);                                         // nothing to find: no request
   });
@@ -239,5 +239,19 @@ describe('Find in browser (the request for the file list)', () => {
     expect(store.selectedId()).toBe(z.id);
     store.selectMany([x.id, y.id], true);
     expect(store.selectedIds()).toEqual([z.id, x.id, y.id]);                              // added ones last, no duplicates
+  });
+
+  it('relink points parts at another file: the chosen ones, or all that share the file; the name follows only when it was the file name; one undo step', () => {
+    const one = store.addItem({ ...part(), path: 'old/Atlas.stl', name: 'Atlas' });
+    const two = store.addItem({ ...part(), path: 'old/Atlas.stl', name: 'My own name' });
+    const other = store.addItem({ ...part(), path: 'x/other.stl', name: 'other' });
+    expect(store.relink([one.id], 'new/Atlas_001.stl')).toBe(1);
+    expect(store.doc().items.map(i => [i.path, i.name])).toEqual([['new/Atlas_001.stl', 'Atlas_001'], ['old/Atlas.stl', 'My own name'], ['x/other.stl', 'other']]);
+    expect(store.relink([two.id], 'new/Atlas_001.stl', true)).toBe(1);                      // all that share the old file (the first one moved already)
+    expect(store.doc().items[1]).toMatchObject({ path: 'new/Atlas_001.stl', name: 'My own name' });
+    expect(store.relink([one.id, two.id], 'new/Atlas_001.stl')).toBe(0);                    // nothing to change: no undo step
+    store.undo();
+    expect(store.doc().items[1].path).toBe('old/Atlas.stl');
+    expect(store.doc().items[2].id).toBe(other.id);
   });
 });

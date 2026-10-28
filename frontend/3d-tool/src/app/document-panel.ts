@@ -107,12 +107,13 @@ function readGeometry(): PanelGeometry | null {
       </div>
     }
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
-    <div class="list" tabindex="0"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
+    <div class="list" tabindex="0" (mousedown)="lastListPointer = performance.now()"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
         <div class="item" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
+          @if (store.missingPaths().has(item.path) || item.path.startsWith('embedded:')) { <button type="button" class="relink" title="Relink: pick another library file for this part" (click)="relink($event, item.id)">⇄</button> }
           @if (item.path.startsWith('embedded:')) { <span class="badge warn" title="This geometry comes from an imported 3MF: there is no file for it in the library. Right-click ▸ Export STL (original) saves it as an STL.">⚠</span> }
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
@@ -177,6 +178,8 @@ function readGeometry(): PanelGeometry | null {
     .pos { display: flex; gap: 4px; }
     .pos label { flex: 1; display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
     .pos input { width: 100%; box-sizing: border-box; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; font-weight: 400; }
+    .relink { flex: none; padding: 0 5px; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer; }
+    .relink:hover { background: #2f6fed; color: #fff; }
     .grip { position: absolute; top: 0; left: 0; right: 0; height: 12px; cursor: grab; touch-action: none; }
     .grip::after { content: ''; position: absolute; top: 5px; left: calc(50% - 16px); width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); }
     .grip:hover::after { background: rgba(255,255,255,.5); }
@@ -189,7 +192,6 @@ function readGeometry(): PanelGeometry | null {
     .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55; /* the resize corner, drawn like the browser's own */
       background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); }
     .edge.se:hover::after { opacity: 1; }
-    .list::after { content: ''; display: block; height: min(40vh, 400px); } /* room to scroll past the last row, so the last parts can be centred too */
     :host(.sized) .list { flex: 1 1 0; min-height: 60px; max-height: none; }
     .hint { opacity: .55; font-size: 11px; line-height: 1.35; }
   `,
@@ -201,6 +203,9 @@ export class DocumentPanel {
 
   /** Where the user put the panel and how big they made it (relative to the view); null = the default place and size. Remembered. */
   protected readonly geom = signal<PanelGeometry | null>(readGeometry());
+  /** When the pointer last went down in the parts list (a selection right after it is not scrolled to). */
+  protected lastListPointer = -Infinity;
+  protected readonly performance = performance;
 
   constructor() {
     afterNextRender(() => this.clampToParent());
@@ -209,6 +214,7 @@ export class DocumentPanel {
       const ids = this.store.selectedIds();
       const last = ids[ids.length - 1];
       if (!last) return;
+      if (performance.now() - this.lastListPointer < 400) return; // the selection came from a click in this list: the row is under the pointer already, do not move it
       setTimeout(() => this.element.nativeElement.querySelector<HTMLElement>(`.item[data-id="${CSS.escape(last)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
     });
   }
@@ -220,6 +226,11 @@ export class DocumentPanel {
     const width = Math.min(g.width, parent.clientWidth), height = Math.min(g.height, parent.clientHeight);
     const next = snapPanel({ width, height, left: Math.max(0, Math.min(g.left, parent.clientWidth - width)), top: Math.max(0, Math.min(g.top, parent.clientHeight - height)) }, parent.clientWidth, parent.clientHeight);
     if (next.left !== g.left || next.top !== g.top || next.width !== g.width || next.height !== g.height) this.geom.set(next);
+  }
+
+  protected relink(event: Event, id: string) {
+    event.stopPropagation();
+    this.store.relinkRequest.set([id]);
   }
 
   protected resetGeometry() {

@@ -31,11 +31,24 @@
       </button>
     </div>
   </div>
+  @if (store.relinkRequest()) {
+    <div class="relink-bar" role="status">
+      <div>Relink <b>{{ relinkParts().length === 1 ? relinkParts()[0].name : relinkParts().length + ' parts' }}</b>: choose another file in the list below
+        (filter, sort and ⎵ preview work as usual) <span class="dim">· now <code>{{ relinkParts()[0]?.path }}</code></span></div>
+      @if (relinkSharing() > relinkParts().length) {
+        <label><input type="checkbox" [checked]="store.relinkAll()" (change)="store.relinkAll.set($any($event.target).checked)" /> All {{ relinkSharing() }} parts that use this file</label>
+      }
+      <div class="buttons">
+        <button type="button" class="primary" [disabled]="!relinkFile()" (click)="doRelink()">{{ relinkFile() ? 'Use ' + relinkFile()!.split('/').pop() : 'Select an .stl file' }}</button>
+        <button type="button" (click)="cancelRelink()">Cancel (Esc)</button>
+      </div>
+    </div>
+  }
   <div class="tree">
     @if (searching() && !filtered()) {
       <div class="hint">searching…</div>
     } @else {
-      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [find]="findRequest()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" (showAll)="onFilter('')" (openTrash)="trashOpen.set(true)" />
+      <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [find]="findRequest()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (trashed)="onTrashed($event)" (showAll)="onFilter('')" (relink)="onRelink($event)" (openTrash)="trashOpen.set(true)" />
     }
   </div>
   <div class="trash-bar">
@@ -108,3 +121,4 @@
   </div>
 </main>
 <app-object-menu />
+

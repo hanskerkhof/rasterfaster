@@ -143,6 +143,8 @@ export class DocumentScene {
   private readonly baseLoading = new Map<string, Promise<THREE.BufferGeometry>>();
   private readonly oriented = new Map<string, OrientedEntry>();
   private readonly preparing = new Set<string>();
+  /** Keys of parts whose file could not be loaded (missing in the library): not retried on every redraw, but they count as settled for the fit-to-view. */
+  private readonly failed = new Set<string>();
   private readonly raycaster = new THREE.Raycaster();
   private readonly selectionBoxes = new THREE.Group();
   private readonly snapHandles = new THREE.Group();
@@ -324,7 +326,7 @@ export class DocumentScene {
   private syncItem(item: DocItem, selected: boolean) {
     const key = `${item.path}|${quatKey(item.rotation)}`;
     const entry = this.oriented.get(key);
-    if (!entry) { void this.prepare(item, key); return; }
+    if (!entry) { if (!this.failed.has(key)) void this.prepare(item, key); return; }
     let runtime = this.runtimes.get(item.id);
     if (!runtime) {
       runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, silhouette: false };
@@ -361,6 +363,8 @@ export class DocumentScene {
       this.reconcile(this.mode);
     } catch (err) {
       console.warn(`Could not load ${item.path}`, err);
+      this.failed.add(key);
+      this.ctx.changed(); // the others may all be loaded already: the view can be fitted to them now
     } finally {
       this.preparing.delete(key);
     }
@@ -550,9 +554,16 @@ export class DocumentScene {
     return boxes.length ? boxes.reduce((all, box) => all.union(box)) : null;
   }
 
-  /** Number of items whose geometry is loaded (to know when a fit-to-view is meaningful). */
+  /** Number of items that are settled: their geometry is loaded, or it could not be (to know when a fit-to-view is meaningful). */
   readyCount() {
-    return this.ctx.store.doc().items.filter(i => this.entryFor(i)).length;
+    return this.ctx.store.doc().items.filter(i => this.entryFor(i) || this.failed.has(`${i.path}|${quatKey(i.rotation)}`)).length;
+  }
+
+  /** Tries the parts that failed to load again (their files may be back, e.g. after Put Back from the Trash). */
+  retryFailed() {
+    if (!this.failed.size) return;
+    this.failed.clear();
+    this.reconcile(this.mode);
   }
 
   /** Loads the file and drops it into the first free spot along +X at ground level. */
