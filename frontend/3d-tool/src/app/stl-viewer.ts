@@ -559,6 +559,11 @@ export class StlViewer implements OnDestroy {
     return new STLLoader().parse(buffer);
   }
 
+  /** Reads the STL files of the document's parts again from the library. */
+  reloadDocumentParts() {
+    if (this.ready()) this.documentScene.reloadGeometries();
+  }
+
   /** Adds a library STL to the document (see DocumentScene.addObject). */
   addObject(path: string) {
     return this.documentScene.addObject(path);

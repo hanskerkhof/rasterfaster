@@ -129,7 +129,8 @@ function writeStl(parts: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4
   return buffer;
 }
 
-const snap = (value: number, step: number) => Math.round(value / step) * step;
+const round3 = (value: number) => Math.round(value * 1000) / 1000;
+const snap = (value: number, step: number) => Math.round(Math.round(value / step) * step * 1000) / 1000; // (rounded: 0.1 steps must not leave 10.100000000000001)
 const quatKey = (q: Quat) => q.map(n => n.toFixed(4)).join(',');
 
 /**
@@ -593,6 +594,21 @@ export class DocumentScene {
     this.reconcile(this.mode);
   }
 
+  /**
+   * Throws away every loaded geometry and reads the STL files again (they may have been overwritten on disk). The parts on screen stay
+   * until their new geometry has arrived, so nothing flickers.
+   */
+  reloadGeometries() {
+    for (const entry of this.oriented.values()) { entry.geometry.dispose(); entry.edges?.dispose(); entry.silhouette?.dispose(); }
+    for (const geometry of this.baseGeometries.values()) geometry.dispose();
+    this.oriented.clear();
+    this.baseGeometries.clear();
+    this.baseLoading.clear();
+    this.failed.clear();
+    for (const runtime of this.runtimes.values()) runtime.entryKey = ''; // rebuilt from the new geometry
+    this.reconcile(this.mode);
+  }
+
   /** Loads the file and drops it into the first free spot along +X at ground level. */
   addObject(path: string) {
     return this.addObjects([path]);
@@ -787,8 +803,9 @@ export class DocumentScene {
     const point = this.raycaster.ray.intersectPlane(drag.plane, new THREE.Vector3());
     const start = drag.starts.get(drag.id);
     if (!point || !start) return;
-    const fine = e.altKey; // hold Alt for 1 mm steps
-    const step = (axis: 'x' | 'y') => (fine ? 1 : snapStepMm[axis]);
+    const fine = e.altKey; // hold Alt for fine steps (1 mm or 0.1 mm, the toolbar's step mode)
+    const fineStep = this.ctx.store.fineStepMm();
+    const step = (axis: 'x' | 'y') => (fine ? fineStep : snapStepMm[axis]);
     // Snap the grabbed item, then move everything by the same delta so the group keeps its shape.
     const grabbed = this.ctx.store.doc().items.find(i => i.id === drag.id);
     const grabbedSize = grabbed && this.sizeOfItem(grabbed);
@@ -797,7 +814,7 @@ export class DocumentScene {
     // Height snaps to the z levels of the current grid mode; Alt gives 1 mm steps.
     if (drag.vertical && !fine && grabbed?.centered && grabbedSize) { // a centered part moves by its centre: the centre hops from level to level
       delta = [0, 0, nearestZLevel(point.z - drag.grabOffset.z + grabbedSize[2] / 2, this.ctx.zGridMode()) - grabbedSize[2] / 2 - start[2]];
-    } else if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, 1) : nearestZLevel(point.z - drag.grabOffset.z, this.ctx.zGridMode())) - start[2]];
+    } else if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, fineStep) : nearestZLevel(point.z - drag.grabOffset.z, this.ctx.zGridMode())) - start[2]];
     else if (grabbed?.centered && grabbedSize) {
       const cell = cellCenteredPosition([rawX, rawY, start[2]], grabbedSize); // a centered item hops from cell middle to cell middle
       delta = [cell[0] - start[0], cell[1] - start[1], 0];
@@ -835,16 +852,17 @@ export class DocumentScene {
     if (!this.active || ['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return; // typing / choosing, not editing the scene
     const { store } = this.ctx;
     const command = e.metaKey || e.ctrlKey;
-    const fine = e.altKey;
+    const fine = e.altKey; // ⌥: fine steps (1 mm or 0.1 mm, the toolbar's step mode)
+    const fineStep = store.fineStepMm();
     const move = (dx: number, dy: number, dz: number) => {
       const items = store.selectedItems();
       if (!items.length) return false;
       const [cx, cy, cz] = this.clampDelta([dx, dy, dz], this.placed(items));
       const horizontal = cx !== 0 || cy !== 0;
-      store.updateItems('Nudge', new Map(items.map(i => [i.id, { position: this.keepCentered(i, [i.position[0] + cx, i.position[1] + cy, i.position[2] + cz], horizontal) }])));
+      store.updateItems('Nudge', new Map(items.map(i => [i.id, { position: this.keepCentered(i, [round3(i.position[0] + cx), round3(i.position[1] + cy), round3(i.position[2] + cz)], horizontal) }])));
       return true;
     };
-    const stepX = fine ? 1 : snapStepMm.x, stepY = fine ? 1 : snapStepMm.y;
+    const stepX = fine ? fineStep : snapStepMm.x, stepY = fine ? fineStep : snapStepMm.y;
     // One step up/down the z levels, decided by the lowest selected item (the base); the rest of the selection keeps its offsets.
     const moveZ = (direction: 1 | -1) => {
       const selected = store.selectedItems();
@@ -853,7 +871,7 @@ export class DocumentScene {
       const byCentre = !fine && selected.length > 0 && selected.every((i, k) => i.centered && sizes[k]);
       const lowest = byCentre ? Math.min(...selected.map((i, k) => i.position[2] + sizes[k]![2] / 2)) : Math.min(...selected.map(i => i.position[2]));
       if (!Number.isFinite(lowest)) return false;
-      return move(0, 0, fine ? direction : nextZLevel(lowest, direction, this.ctx.zGridMode()) - lowest);
+      return move(0, 0, fine ? direction * fineStep : nextZLevel(lowest, direction, this.ctx.zGridMode()) - lowest);
     };
     let handled = true;
     if (command && e.key.toLowerCase() === 'z') (e.shiftKey ? store.redo() : store.undo());

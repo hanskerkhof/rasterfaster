@@ -9,6 +9,10 @@ import { DocumentApi, DocumentSummary, Import3mfLine, StoredDocument, VersionSum
 /** X/Y snap steps in mm. Height (Z) follows the grid mode, see z-levels.ts. */
 export const snapStepMm = { x: 20, y: 20 } as const;
 
+function readFineStep(): 1 | 0.1 {
+  try { return localStorage.getItem(fineStepStorageKey) === '0.1' ? 0.1 : 1; } catch { return 1; }
+}
+
 export type Vec3 = [number, number, number];
 
 /**
@@ -74,6 +78,7 @@ export interface RfDocument {
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
 const currentIdStorageKey = 'rasterfaster.documentId';
 const clipboardStorageKey = 'rasterfaster.clipboard';
+const fineStepStorageKey = 'rasterfaster.fineStepMm';
 export const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
 const maxHistory = 200;
 /** A gesture open this long never got its end (lost pointer, tab switch): treat it as finished. */
@@ -585,6 +590,15 @@ export class DocumentStore {
   /** "Find in browser" in the part menu: the library paths of the parts, for the file list to show and select. `seq` makes a repeated request count. */
   readonly browserRequest = signal<{ paths: string[]; seq: number; ids?: string[] } | null>(null);
   /** Relink mode: the file browser picks another file for these parts (their ids); null when not relinking. */
+  /** What holding Option does to a move: steps of 1 mm or of 0.1 mm (the toolbar's step mode, remembered). */
+  readonly fineStepMm = signal<1 | 0.1>(readFineStep());
+
+  toggleFineStep() {
+    const next = this.fineStepMm() === 1 ? 0.1 : 1;
+    this.fineStepMm.set(next);
+    try { localStorage.setItem(fineStepStorageKey, String(next)); } catch { /* storage unavailable */ }
+  }
+
   readonly relinkRequest = signal<string[] | null>(null);
   /** In relink mode: also relink every other part of the document that uses the same file. */
   readonly relinkAll = signal(true);

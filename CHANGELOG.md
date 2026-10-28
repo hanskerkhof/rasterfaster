@@ -2,6 +2,19 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - Step mode for Option moves, dimmed parts button, reload also re-reads the document's STLs (0.10.43)
+
+### Added
+- **FE** (`document.store.ts`, `document-scene.ts`, `app.html`, `app.scss`): a green **Move 1 mm ⌥M / Move 0.1 mm ⌥M** step-mode button in the toolbar (click it or press **⌥M** to switch; remembered) decides what holding Option does when moving a part (arrow keys, drag, Shift+↑↓): steps of 1 mm or of 0.1 mm. (⌃ and ⌘ with Option are taken by the Mac and Chrome.) Positions are rounded to 0.001 mm so 0.1 steps leave no float noise.
+- **FE** (`document-panel.ts`): a **◐ N** button above the part list (next to the ⚠ one) when parts are dimmed; clicking it selects them.
+- **FE** (`app.ts`, `app.html`, `app.scss`): the reload button also re-reads the STLs of the document's parts (`DocumentScene.reloadGeometries`), and a spinner overlay covers the file list while it reloads.
+
+### Changed
+- **FE** (`document-panel.ts`): the panel's fold button gives the keyboard focus back (`releaseFocus`).
+
+### Removed
+- **FE** (`app.html`, `app.ts`): the toolbar's **+ Add to document** button (files are added with ⌘↓, the context menu's Add to Document or a double-click).
+
 ## 2026-10-28 - An overwritten STL shows up again, reload spinner for 2 seconds (0.10.42)
 
 ### Fixed

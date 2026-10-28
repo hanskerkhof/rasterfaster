@@ -55,7 +55,7 @@ function readGeometry(): PanelGeometry | null {
     <div class="header">
   <span class="status" [class.error]="store.saveState() === 'error'" [title]="statusTitle()"><span class="diamond" [attr.data-state]="versionState()">{{ versionState() === 'none' ? '◇' : '◆' }}</span><i class="dot" [attr.data-state]="store.saveState()"></i>{{ statusLabel() }}</span>
   <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
-  <button type="button" class="fold" [attr.aria-expanded]="!collapsed()" [title]="(collapsed() ? 'Expand the panel' : 'Collapse the panel') + ' (⌥D)'" (click)="toggleCollapsed()">
+  <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="(collapsed() ? 'Expand the panel' : 'Collapse the panel') + ' (⌥D)'" (click)="toggleCollapsed()">
         <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           @if (collapsed()) { <path d="M2.5 4.5 6 8l3.5-3.5"/> } @else { <path d="M2.5 7.5 6 4l3.5 3.5"/> }
         </svg>
@@ -101,6 +101,9 @@ function readGeometry(): PanelGeometry | null {
       <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />
       <button type="button" title="Make a new document from a 3MF (ours or a Bambu Studio project); the parts are linked to the STL files in the library" (click)="threeMfInput.click()">Import 3MF…</button>
       <input #threeMfInput type="file" accept=".3mf" hidden (change)="import3mf($any($event.target))" />
+      @if (dimmed(); as d) {
+        <button type="button" class="dim-sum" [title]="d.tip" (click)="selectDimmed()">◐ {{ d.ids.length }}</button>
+      }
       @if (warnings(); as w) {
         <button type="button" class="warn-sum" [title]="w.tip" (click)="selectWarnings()">⚠ {{ w.ids.length }}</button>
       }
@@ -195,6 +198,9 @@ function readGeometry(): PanelGeometry | null {
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
     .item.sel { background: #d9822b; color: #fff; }
+    .dim-sum { margin-left: auto; padding: 2px 8px; background: #2b2f38; color: #aeb6c4; border: 1px solid #4a5160; border-radius: 4px; font: inherit; cursor: pointer; }
+    .dim-sum:hover { background: #363b46; }
+    .dim-sum + .warn-sum { margin-left: 6px; }
     .warn-sum { margin-left: auto; padding: 2px 8px; background: #3a3320; color: #f0b232; border: 1px solid #6b5a20; border-radius: 4px; font: inherit; cursor: pointer; }
     .warn-sum:hover { background: #4a4126; }
     .badge { opacity: .7; font-size: 11px; }
@@ -283,6 +289,17 @@ export class DocumentPanel {
     const what = [lost.length ? `${lost.length} with a file that is not in the library` : '', embedded.length ? `${embedded.length} with geometry from an imported 3MF (no library file)` : ''].filter(Boolean).join(', ');
     return { ids, tip: `${ids.length} part${ids.length === 1 ? ' has' : 's have'} a warning: ${what}. Click to select them.` };
   });
+
+  /** The dimmed (muted) parts; null when there are none. */
+  protected readonly dimmed = computed(() => {
+    const ids = this.store.doc().items.filter(i => i.muted).map(i => i.id);
+    return ids.length ? { ids, tip: `${ids.length} dimmed part${ids.length === 1 ? '' : 's'}. Click to select ${ids.length === 1 ? 'it' : 'them'}.` } : null;
+  });
+
+  protected selectDimmed() {
+    const ids = this.dimmed()?.ids;
+    if (ids) this.store.selectMany(ids);
+  }
 
   protected selectWarnings() {
     const ids = this.warnings()?.ids;

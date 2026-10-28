@@ -58,6 +58,9 @@
     } @else {
       <app-tree-panel [results]="filtered()" [reveal]="revealPath()" [find]="findRequest()" [filter]="filterText()" [selected]="selected()" (fileSelected)="open($event)" (add)="addToDocument($event)" (addMany)="addFilesToDocument($event)" (renamed)="onRenamed($event)" (moved)="onMoved($event)" (deleted)="onDeleted($event)" (trashed)="onTrashed($event)" (showAll)="onFilter('')" (relink)="onRelink($event)" (openTrash)="trashOpen.set(true)" />
     }
+    @if (reloading()) {
+      <div class="reloading" role="status" aria-label="Reloading the file list"><span class="spinner"></span></div>
+    }
   </div>
   <div class="trash-bar">
     <button type="button" class="trash-button" title="The Trash: put files back or delete them for good" (click)="trashOpen.set(true)">🗑 Trash@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
@@ -71,12 +74,12 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m14 10 2 2-2 2"/></svg>
       </button>
     }
-    <button class="add" [disabled]="!canAdd()" title="Add the selected file (or all selected files) to the document" (click)="pickedFiles().length > 1 ? addFilesToDocument(pickedFiles()) : addToDocument(treePanel()?.focusedFile() ?? selected())">＋ Add{{ pickedFiles().length > 1 ? ' ' + pickedFiles().length + ' files' : '' }} to document</button>
     <div class="modes">
       @for (m of modes; track m.id; let i = $index) {
         <button releaseFocus [class.on]="mode() === m.id" [title]="m.label + ' (⌥' + (i + 1) + ')'" (click)="setMode(m.id)">{{ m.label }} <kbd>⌥{{ i + 1 }}</kbd></button>
       }
     </div>
+    <button class="step-mode" type="button" releaseFocus [title]="'Moving with Option held steps ' + store.fineStepMm() + ' mm (⌥M or click: ' + (store.fineStepMm() === 1 ? '0.1' : '1') + ' mm)'" (click)="store.toggleFineStep()">Move {{ store.fineStepMm() }} mm <kbd>⌥M</kbd></button>
     @if (updateAvailable()) {
       <button class="update" type="button" title="A newer version of Rasterfaster is ready: click to reload into it" (click)="applyUpdate()">Update available{{ updateVersion() ? ' v' + updateVersion() : '' }} · reload</button>
     }

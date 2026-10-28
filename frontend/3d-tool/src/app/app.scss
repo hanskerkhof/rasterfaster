@@ -14,7 +14,7 @@
 .panel-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 6px; cursor: col-resize; z-index: 3; touch-action: none; }
 .panel-resize:hover, .panel-resize.active, .panel-resize:focus-visible { background: #2f6fed; outline: none; }
 .panel header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; font-weight: 700; letter-spacing: .08em; border-bottom: 1px solid #000; }
-.tree { flex: 1; min-height: 0; }
+.tree { position: relative; flex: 1; min-height: 0; }
 .relink-bar { padding: 8px 10px; font-size: 12px; background: #1f3358; border-top: 1px solid #2f6fed; border-bottom: 1px solid #2f6fed; display: flex; flex-direction: column; gap: 6px; }
 .relink-bar .dim { opacity: .6; word-break: break-all; } .relink-bar code { font-size: 11px; }
 .relink-bar .suggest { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; }
@@ -30,6 +30,9 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; cursor: pointer; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
+.step-mode { padding: 5px 12px; background: #1f6f5c; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.step-mode:hover { background: #26856e; }
+.step-mode kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .65; }
 .modes kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .55; }
 .modes button.on kbd { opacity: .8; }
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
@@ -51,8 +54,6 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .sort button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; }
 .sort button.on { background: #2f6fed; color: #fff; }
 .hint { padding: 6px 12px; opacity: .5; font-style: italic; }
-.add { padding: 5px 12px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; }
-.add:disabled { opacity: .4; cursor: default; }
 .docpanel { position: absolute; top: 202px; right: 12px; width: 240px; max-height: calc(100% - 242px); }
 .banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 12px; z-index: 5;
           background: rgba(35,38,45,.95); border: 1px solid #ffe066; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
@@ -63,6 +64,9 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .sort .reload + .reload { margin-left: 4px; }
 .sort .reload.spin svg { animation: reload-spin .8s linear infinite; }
 @keyframes reload-spin { to { transform: rotate(360deg); } }
+/* dims the file list while it is re-read; clicks are swallowed so nothing is changed in a list that is about to be replaced */
+.tree .reloading { position: absolute; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; background: rgba(35,38,45,.6); }
+.tree .reloading .spinner { width: 28px; height: 28px; border: 3px solid rgba(255,255,255,.2); border-top-color: #6ea0ff; border-radius: 50%; animation: reload-spin .8s linear infinite; }
 app-object-menu { display: contents; } /* only fixed-position overlays: must not become a grid row of its own */
 .update { margin-left: auto; padding: 4px 12px; background: #2f8a4d; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .update:hover { background: #38a35c; }

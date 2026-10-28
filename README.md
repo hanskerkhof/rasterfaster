@@ -59,7 +59,7 @@ Keyboard: **Space** toggles the fly-around, **⌥1–⌥4** the view modes, **�
 
 Copy / paste: ⌘C copies the selected parts, ⌘X cuts them, ⌘V pastes at the view centre (the copied group's lowest corner snaps to the nearest grid intersection, heights and spacing are kept, parts set to Center on grid are re-centered). One paste is one undo step and the pasted parts become the selection. The clipboard holds content only (file, rotation, color, dimmed/centered flags, offsets), never ids, and is kept in local storage, so it survives reloads and works across documents and tabs. The part context menu has Copy / Cut / Paste too.
 
-Keyboard: arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = 1 mm steps, Esc during a drag puts the part back, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
+Keyboard: arrows move X/Y, Shift+↑↓ / PgUp PgDn move Z, Shift+←→ turn about Z, X/Y/Z keys rotate about that axis (Shift = reverse), V dims / shows the selection, Alt = fine steps: 1 mm or 0.1 mm, chosen with the green **Move 1 mm ⌥M / Move 0.1 mm ⌥M** button in the toolbar (click it or press ⌥M to switch, remembered), Esc during a drag puts the part back, ⌘-click centres the view on the clicked point (both modes), ⌘Z/⇧⌘Z undo/redo, ⌘D duplicate, Delete removes.
 
 ## Trackpad / mouse
 
@@ -163,7 +163,7 @@ An STL that is overwritten on disk shows up after a reload: `/api/file` is sent 
 
 ## Looking at a library file
 
-There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with **＋ Add to document**, ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below; drag the selection onto a folder to move it, and the right-click menu also has New Folder, Duplicate, Reveal in Finder, Copy Path and Copy Relative Path; the folder button in the header row makes a new folder at the top level, and a new folder made while a filter is active clears the filter so that it shows); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
+There is one view: the document. Click a file in the tree to select it, press **Space** for a quick look (a floating, resizable preview: drag the bottom-right corner, the size is remembered; switch between Solid, Wireframe, Hidden removed and Hidden dashed, remembered), and add it to the document with ⌘↓, the context menu's **Add to Document** or a double-click (with several files selected, ⌘↓, the button and the menu add all of them at once) (Enter renames, see below; drag the selection onto a folder to move it, and the right-click menu also has New Folder, Duplicate, Reveal in Finder, Copy Path and Copy Relative Path; the folder button in the header row makes a new folder at the top level, and a new folder made while a filter is active clears the filter so that it shows); adding a part (any of these ways) closes the quick look. ↑ ↓ browse files while it is open.
 
 ## File list
 

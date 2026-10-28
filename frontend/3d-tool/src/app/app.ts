@@ -329,7 +329,6 @@ export class App {
 
   /** The selected files of a multi-selection (what ⌘↓ and the Add button put into the document). */
   /** An .stl file is selected in the file browser (the cursor is on a file, not a folder), so it can be added. */
-  protected readonly canAdd = computed(() => !!this.treePanel()?.focusedFile() || this.pickedFiles().length > 0);
   protected readonly pickedFiles = computed(() => this.treePanel()?.pickedFiles() ?? []);
 
   /** Puts several library files next to each other into the document as one undo step. */
@@ -445,6 +444,10 @@ export class App {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);
     }
+    if (event.code === 'KeyM' && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) { // ⌥M: the step of Option moves, 1 mm / 0.1 mm
+      event.preventDefault();
+      this.store.toggleFineStep();
+    }
     if (event.code === 'KeyS' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
       event.preventDefault(); // not the browser's "save page": ⌘S saves a new version of the document
       void this.store.saveVersion();
@@ -500,13 +503,14 @@ export class App {
     try { localStorage.setItem(panelWidthStorageKey, String(this.panelWidthPx())); } catch { /* the width just is not remembered */ }
   }
 
-  /** Reload button: re-read the file list from disk (and redo the search when a filter is active). The spinner shows for at least 2 s, so a quick reload is still visible. */
+  /** Reload button: re-read the file list from disk and the STLs of the document's parts (and redo the search when a filter is active). The spinner shows for at least 2 s, so a quick reload is still visible. */
   protected async reloadFiles() {
     this.reloading.set(true);
     const minimumShown = new Promise(resolve => setTimeout(resolve, 2000));
     try {
       const text = this.filterText();
       if (text.trim()) this.runSearch(text);
+      this.viewer().reloadDocumentParts(); // the parts of the document too: their files may have been overwritten
       await this.treePanel()?.reload();
       await minimumShown;
     } finally {
