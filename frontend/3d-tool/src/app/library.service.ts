@@ -110,6 +110,11 @@ export class LibraryService {
     return this.http.post<{ path: string }>('/api/library/new-folder', { parent, name });
   }
 
+  /** Removes an empty folder (the undo of New Folder). */
+  removeEmptyFolder(path: string) {
+    return this.http.post<{ path: string }>('/api/library/remove-empty-folder', { path });
+  }
+
   /** Copies a file next to itself as `name copy.stl`. */
   duplicate(path: string) {
     return this.http.post<{ from: string; path: string }>('/api/library/duplicate', { path });
@@ -128,6 +133,11 @@ export class LibraryService {
   /** Moves several items to the Trash as one action (a folder and things inside it count as the folder). */
   trashBatch(paths: string[], dryRun = false) {
     return this.http.post<TrashBatchResult>('/api/library/trash-batch', { paths }, { params: dryRun ? { dryRun: true } : {} });
+  }
+
+  /** Deletes several items for good, without the Trash (⌥⌘⌫). A dry run lists them and the documents that use them. */
+  deleteBatch(paths: string[], dryRun = false) {
+    return this.http.post<TrashBatchResult>('/api/library/delete-batch', { paths }, { params: dryRun ? { dryRun: true } : {} });
   }
 
   trashList() {

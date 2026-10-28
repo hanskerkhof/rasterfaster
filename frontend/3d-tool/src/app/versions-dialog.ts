@@ -3,12 +3,13 @@ import { Component, OnInit, inject, output, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 
 /** The versions of the open document (v1, v2, ...): look at an older one (read-only) or promote it to the newest, like Fusion 360. */
+import { closeOnEscape } from './escape-close';
 @Component({
   selector: 'app-versions-dialog',
   imports: [DatePipe],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
-    <section class="dialog" role="dialog" aria-label="Versions" (keydown.escape)="close.emit()">
+    <section class="dialog" role="dialog" aria-label="Versions">
       <header>
         <h2>Versions <small>{{ store.doc().name }}</small></h2>
         <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
@@ -84,6 +85,10 @@ import { DocumentStore } from './document.store';
 export class VersionsDialog implements OnInit {
   protected readonly store = inject(DocumentStore);
   readonly close = output<void>();
+
+  constructor() {
+    closeOnEscape(() => this.close.emit());
+  }
 
   ngOnInit() {
     void this.store.refreshVersions();

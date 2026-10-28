@@ -397,6 +397,30 @@ def test_new_folder_and_duplicate(world):
     assert (world["library"] / "TOP copy.stl").read_bytes() == b"top" and not (world["backup"] / "RASTERFASTER").exists()
 
 
+def test_an_empty_folder_can_be_removed_but_nothing_else(world):
+    made = library_ops.make_folder(world["library"], world["backup"], "", "untitled folder")
+    assert library_ops.remove_empty_folder(world["library"], world["backup"], made["path"]) == {"path": "untitled folder"}
+    assert not (world["library"] / "untitled folder").exists()
+    for path in ("1.4.BOLTS & NUTS", "TOP.stl", "", "../x"):                        # not empty / not a folder / the root / outside the library
+        with pytest.raises(library_ops.LibraryError):
+            library_ops.remove_empty_folder(world["library"], world["backup"], path)
+    assert (world["library"] / "1.4.BOLTS & NUTS" / "other.stl").exists()
+
+
+def test_delete_batch_removes_for_good_and_a_dry_run_changes_nothing(world):
+    args = (world["library"], world["backup"], world["documents"])
+    dry = library_ops.delete_batch(*args, ["TOP.stl", "1.4.BOLTS & NUTS"], dryRun=True)
+    assert dry["dryRun"] and (world["library"] / "TOP.stl").exists() and sum(dry["documents"].values()) >= 1
+    done = library_ops.delete_batch(*args, ["TOP.stl", "1.4.BOLTS & NUTS", "1.4.BOLTS & NUTS/other.stl"])   # the file inside the folder counts with the folder
+    assert [r["path"] for r in done["results"]] == ["TOP.stl", "1.4.BOLTS & NUTS"] and not done["failed"]
+    assert not (world["library"] / "TOP.stl").exists() and not (world["library"] / "1.4.BOLTS & NUTS").exists()
+    assert library_ops.list_trash(world["backup"]) == []                                # nothing went to the Trash
+    with pytest.raises(library_ops.LibraryError):
+        library_ops.delete_batch(*args, ["notes.txt"])                                  # only .stl files and folders
+    with pytest.raises(library_ops.LibraryError):
+        library_ops.delete_batch(*args, ["../x.stl"])
+
+
 def test_api_move_new_folder_duplicate_reveal(client, world):
     assert client.post("/api/library/new-folder", json={"parent": "", "name": "Sub"}).json() == {"path": "Sub"}
     assert client.post("/api/library/move", json={"paths": ["TOP.stl"], "targetDir": "Sub"}).status_code == 200

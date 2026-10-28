@@ -138,6 +138,16 @@ def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False)
             raise HTTPException(status_code=error.status, detail=str(error))
 
 
+@app.post("/api/library/delete-batch")
+def delete_library_entries(body: TrashBatchRequest, dryRun: bool = False) -> dict:
+    """Deletes several library items for good, without the Trash (⌥⌘⌫ in the file list). `dryRun=true` lists them and the documents that use them."""
+    with documentWriteLock:
+        try:
+            return library_ops.delete_batch(libraryRoot, backupRoot, documentsRoot, body.paths, dryRun)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
 class PathsRequest(BaseModel):
     paths: list[str] = Field(max_length=5000)
 
@@ -189,6 +199,16 @@ def new_library_folder(body: NewFolderRequest) -> dict:
     with documentWriteLock:
         try:
             return library_ops.make_folder(libraryRoot, backupRoot, body.parent, body.name)
+        except library_ops.LibraryError as error:
+            raise HTTPException(status_code=error.status, detail=str(error))
+
+
+@app.post("/api/library/remove-empty-folder")
+def remove_empty_library_folder(body: TrashRequest) -> dict:
+    """Removes an empty folder (Esc right after New Folder cancels the new folder)."""
+    with documentWriteLock:
+        try:
+            return library_ops.remove_empty_folder(libraryRoot, backupRoot, body.path)
         except library_ops.LibraryError as error:
             raise HTTPException(status_code=error.status, detail=str(error))
 

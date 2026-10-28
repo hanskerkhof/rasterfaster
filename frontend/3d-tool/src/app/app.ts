@@ -281,6 +281,15 @@ export class App {
   private undoTimer?: ReturnType<typeof setTimeout>;
 
   /** Items were moved to the Trash: forget them as the selection, refresh the search and offer Undo for the whole batch. */
+  /** Items were deleted for good (⌥⌘⌫): what referred to them is looked up again. */
+  protected onDeleted(result: TrashBatchResult) {
+    this.libraryTick.update(n => n + 1);
+    const selected = this.selected();
+    if (selected && result.results.some(r => selected === r.path || selected.startsWith(r.path + '/'))) { this.selected.set(null); this.writeLastStl(null); }
+    if (this.filterText().trim()) this.onFilter(this.filterText());
+    this.store.announce(result.results.length === 1 ? `Deleted “${result.results[0].name}”` : `Deleted ${result.results.length} items`);
+  }
+
   protected onTrashed(result: TrashBatchResult) {
     this.libraryTick.update(n => n + 1);
     const selected = this.selected();

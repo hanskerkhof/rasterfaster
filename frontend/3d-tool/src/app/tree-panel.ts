@@ -3,6 +3,7 @@ import { Component, ElementRef, computed, effect, inject, input, output, signal,
 import { firstValueFrom } from 'rxjs';
 import { highlightParts } from './filter-terms';
 import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from './library.service';
+import { DeleteDialog } from './delete-dialog';
 import { QuickLook } from './quick-look';
 import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
 
@@ -19,13 +20,16 @@ interface Row {
  */
 @Component({
   selector: 'app-tree-panel',
-  imports: [DatePipe, NgTemplateOutlet, QuickLook],
+  imports: [DatePipe, NgTemplateOutlet, QuickLook, DeleteDialog],
   template: `
     @if (listNotice()) {
       <div class="list-notice" role="status">{{ listNotice() }}
         @if (listNoticeAction()) { <button type="button" class="notice-action" (click)="openTrash.emit()">Open Trash</button> }
         @if (noticeRelink(); as ids) { <button type="button" class="notice-action" title="Pick another library file for the part" (click)="relink.emit(ids)">Relink…</button> }
       </div>
+    }
+    @if (pendingDelete(); as pending) {
+      <app-delete-dialog [title]="pending.title" [warning]="pending.warning" (confirm)="confirmDelete()" (cancel)="pendingDelete.set(null)" />
     }
     @if (pendingTrash(); as pending) {
       <div class="list-notice confirm" role="alert">
@@ -159,6 +163,8 @@ export class TreePanel {
   readonly renamed = output<RenameResult>();
   /** One or more files or directories were moved to the Trash (the tree already dropped them). */
   readonly trashed = output<TrashBatchResult>();
+  /** Items were deleted for good (no Trash): the app updates what refers to them. */
+  readonly deleted = output<TrashBatchResult>();
   /** Files or directories were moved into another folder (the tree already follows; the app updates what refers to them). */
   readonly moved = output<MoveBatchResult>();
   /** The list is filtered and a new folder would not show (it matches nothing): the app should clear the filter. */
@@ -178,6 +184,8 @@ export class TreePanel {
   /** The notice has a button that opens the Trash (the missing file is in it). */
   protected readonly listNoticeAction = signal(false);
   /** A Trash move that waits for a yes because documents use the item. */
+  /** ⌥⌘⌫: the question before something is deleted for good (Enter deletes, Esc cancels). */
+  protected readonly pendingDelete = signal<{ paths: string[]; title: string; warning: string } | null>(null);
   protected readonly pendingTrash = signal<{ paths: string[]; what: string; parts: number; documents: number } | null>(null);
   protected readonly renaming = signal<{ path: string; value: string; error: string; busy: boolean } | null>(null);
   /** Space toggles a Finder-style preview of the focused file; it then follows the focus. */
@@ -539,6 +547,10 @@ export class TreePanel {
       }
       return;
     }
+    if (ev.metaKey && ev.altKey && ev.key === 'Backspace' && !ev.ctrlKey) { // ⌥⌘⌫: Delete Immediately, like the Finder (asks first)
+      if (!this.renaming()) { ev.preventDefault(); void this.requestDelete(this.targets()); }
+      return;
+    }
     if (ev.metaKey && ev.key === 'Backspace' && !ev.ctrlKey && !ev.altKey) { // ⌘⌫: Move to Trash, like the Finder
       if (!this.renaming()) { ev.preventDefault(); void this.requestTrash(this.targets()); }
       return;
@@ -607,6 +619,53 @@ export class TreePanel {
       }
     } catch { /* the real call below reports what is wrong */ }
     await this.doTrash(chosen);
+  }
+
+  /** ⌥⌘⌫: asks whether to delete these rows for good, saying what is in them and which documents use them. */
+  protected async requestDelete(paths: string[]) {
+    this.menu.set(null);
+    this.pendingTrash.set(null);
+    const chosen = actedOn(this.visiblePaths(), new Set(paths));
+    if (!chosen.length) return;
+    let warning = '';
+    try {
+      const dry = await firstValueFrom(this.lib.deleteBatch(chosen, true));
+      const parts = Object.entries(dry.documents ?? {}).filter(([file]) => !file.includes('.versions/'));
+      const count = parts.reduce((sum, [, n]) => sum + n, 0);
+      if (count) warning = `${count} part${count === 1 ? '' : 's'} in ${parts.length} document file${parts.length === 1 ? '' : 's'} use${count === 1 ? 's' : ''} it: they will show as missing.`;
+      if (dry.results.some(r => r.kind === 'directory')) warning = `${warning} A folder is deleted with everything in it.`.trim();
+    } catch (error) {
+      const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+      this.note(typeof detail === 'string' ? `Could not delete it: ${detail}` : 'Could not delete it');
+      return;
+    }
+    const first = this.rows().find(r => r.entry.path === chosen[0])?.entry.name ?? chosen[0];
+    this.pendingDelete.set({ paths: chosen, title: chosen.length === 1 ? `Delete “${first}” immediately?` : `Delete ${chosen.length} items immediately?`, warning });
+  }
+
+  protected async confirmDelete() {
+    const pending = this.pendingDelete();
+    this.pendingDelete.set(null);
+    if (!pending) return;
+    const rows = this.rows();
+    const gone = (path: string) => pending.paths.some(p => path === p || path.startsWith(p + '/'));
+    const lastAt = Math.max(...pending.paths.map(p => rows.findIndex(r => r.entry.path === p)));
+    const firstAt = Math.min(...pending.paths.map(p => rows.findIndex(r => r.entry.path === p)).filter(i => i >= 0));
+    const next = rows.slice(lastAt + 1).find(r => !gone(r.entry.path)) ?? [...rows.slice(0, Math.max(firstAt, 0))].reverse().find(r => !gone(r.entry.path));
+    try {
+      const result = await firstValueFrom(this.lib.deleteBatch(pending.paths));
+      this.closeQuickLook();
+      await this.reload();
+      this.focused.set(next?.entry.path ?? null);
+      this.selectOnly(next?.entry.path ?? null);
+      this.focusTree();
+      if (result.failed.length) this.note(`${result.failed.length} of ${pending.paths.length} could not be deleted: ${result.failed[0].error}`);
+      this.deleted.emit(result);
+    } catch (error) {
+      const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+      if ((error as { status?: number }).status === 404) await this.reload();
+      this.note(typeof detail === 'string' ? `Could not delete it: ${detail}` : 'Could not delete it');
+    }
   }
 
   protected async confirmTrash() {
@@ -688,6 +747,7 @@ export class TreePanel {
         await this.reload();
         this.focused.set(made.path);
         this.selectOnly(made.path);
+        this.newFolderPending = made.path; // Esc while it is still being named takes the new folder back
         await this.startRename(made.path);
         return;
       } catch (error) {
@@ -835,18 +895,41 @@ export class TreePanel {
     this.renaming.update(edit => (edit ? { ...edit, value, error: '' } : edit));
   }
 
+  /** The folder that was just made by New Folder and is still being named: Esc there removes it again. */
+  private newFolderPending: string | null = null;
+
   protected onRenameKey(ev: KeyboardEvent) {
     ev.stopPropagation(); // arrows and Space belong to the text field, not to the tree
-    if (ev.key === 'Escape') { ev.preventDefault(); this.cancelRename(); this.focusTree(); }
+    if (ev.key === 'Escape' && this.newFolderPending && this.renaming()?.path === this.newFolderPending && !this.renaming()?.busy) {
+      ev.preventDefault();
+      void this.discardNewFolder();
+    }
+    else if (ev.key === 'Escape') { ev.preventDefault(); this.cancelRename(); this.focusTree(); }
     else if (ev.key === 'Enter') { ev.preventDefault(); void this.commitRename(); }
+  }
+
+  /** Esc right after New Folder: no folder after all (it is empty, so removing it loses nothing). */
+  private async discardNewFolder() {
+    const path = this.newFolderPending;
+    this.newFolderPending = null;
+    this.renaming.set(null);
+    this.focusTree();
+    if (!path) return;
+    try {
+      await firstValueFrom(this.lib.removeEmptyFolder(path));
+    } catch { /* not empty any more, or already gone: it stays */ }
+    this.focused.set(null);
+    await this.reload();
   }
 
   protected cancelRename() {
     if (this.renaming()?.busy) return;
+    this.newFolderPending = null; // clicking away keeps the folder with its name, as the Finder does
     this.renaming.set(null);
   }
 
   private async commitRename() {
+    this.newFolderPending = null;
     const edit = this.renaming();
     if (!edit || edit.busy) return;
     const row = this.rows().find(r => r.entry.path === edit.path);

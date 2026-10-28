@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - Delete Immediately, Esc cancels New Folder, Esc closes dialogs only (0.10.41)
+
+### Added
+- **BE** (`library_ops.py`, `main.py`, `tests/test_library_ops.py`): `POST /api/library/delete-batch?dryRun=` deletes library `.stl` files and folders for good (no Trash; same checks as the Trash move; a dry run lists them and the documents that use them; logged, remembered originals of renamed files are dropped). `POST /api/library/remove-empty-folder` removes an empty folder (refuses anything with content, the library root or anything outside the library).
+- **FE** (`delete-dialog.ts`, `tree-panel.ts`, `library.service.ts`, `app.ts`): **⌥⌘⌫** in the file list deletes the selection immediately after a small modal question (what, how many document parts use it, a folder goes with its content): **Enter** deletes, **Esc** (or a click outside) cancels. ⌘⌫ still moves to the Trash.
+
+### Changed
+- **FE** (`tree-panel.ts`): **Esc right after New Folder** (while the new folder is still being named) removes the new folder again; Enter or clicking away keeps it.
+- **FE** (`escape-close.ts`, `versions-dialog.ts`, `trash-dialog.ts`, `bom-dialog.ts`, `object-menu.ts`): **Esc closes the open dialog or menu and nothing else**: the listener sits on the document in the capture phase, so the 3D view no longer deselects the part (it did when the keyboard focus was outside the dialog).
+
 ## 2026-10-28 - SVG of the 3D view, ground grid switch, translucent dimmed parts in Blender (0.10.40)
 
 ### Added

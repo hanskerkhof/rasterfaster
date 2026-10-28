@@ -277,6 +277,20 @@ def make_folder(libraryRoot: Path, backupRoot: Path, parent: str, name: str) -> 
     return {"path": relative}
 
 
+def remove_empty_folder(libraryRoot: Path, backupRoot: Path, relative: str) -> dict:
+    """Removes a directory that is empty (the undo of "New Folder"); anything with content in it, or the library root, is refused."""
+    folder = inside_library(libraryRoot, relative.strip("/"))
+    if folder == libraryRoot or not folder.is_dir():
+        raise LibraryError("that is not a folder of the library")
+    if any(folder.iterdir()):
+        raise LibraryError("the folder is not empty", 409)
+    folder.rmdir()
+    log = read_json(state_dir(backupRoot) / "log.json", [])
+    log.append({"time": time.time(), "kind": "remove-empty-folder", "from": relative.strip("/"), "to": None, "status": "done"})
+    atomic_write_json(state_dir(backupRoot) / "log.json", log)
+    return {"path": relative.strip("/")}
+
+
 def duplicate(libraryRoot: Path, backupRoot: Path, relative: str) -> dict:
     """Copies a file next to itself as `name copy.stl`, `name copy 2.stl`... The copy is a new file: it is not in the registry."""
     source = inside_library(libraryRoot, relative)
@@ -475,6 +489,49 @@ def collapse_nested(paths: list[str]) -> list[str]:
     """The Finder's rule: when a folder and something inside it are both selected, only the folder is acted on. Also drops duplicates."""
     unique = list(dict.fromkeys(path.strip("/") for path in paths if path.strip("/")))
     return [path for path in unique if not any(other != path and path.startswith(other + "/") for other in unique)]
+
+
+def delete_permanently(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, relative: str) -> dict:
+    """Removes a library file or directory for good (not into the Trash: "Delete Immediately"). The caller has checked it with a dry run."""
+    checked = move_to_trash(libraryRoot, backupRoot, documentsRoot, relative, dryRun=True)  # the same checks: inside the library, exists, .stl or directory
+    source = (libraryRoot / relative).resolve()
+    isFile = source.is_file()
+    size = tree_size(source)
+    entry = {"time": time.time(), "kind": f"delete-{checked['kind']}", "from": relative, "to": None, "status": "pending", "size": size}
+    append_log(backupRoot, entry)
+    if isFile:
+        source.unlink()
+    else:
+        shutil.rmtree(source)
+    registryFile = state_dir(backupRoot) / "registry.json"
+    registry = read_json(registryFile, {})
+    kept = {key: value for key, value in registry.items() if map_library_path(key, relative, relative, not isFile) is None}
+    if len(kept) != len(registry):
+        atomic_write_json(registryFile, kept)  # the remembered originals of renamed files that are gone now
+    finish_log(backupRoot, entry, "done")
+    return {"kind": checked["kind"], "path": relative, "name": checked["name"], "dryRun": False, "id": None, "documents": checked["documents"]}
+
+
+def delete_batch(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, paths: list[str], dryRun: bool = False) -> dict:
+    """Deletes several library items for good (a folder and things inside it count as the folder). Everything is checked first; `dryRun` lists them and the
+    documents that use them. Returns {batchId: None, dryRun, results, failed, documents}."""
+    chosen = collapse_nested(paths)
+    if not chosen:
+        raise LibraryError("nothing is selected")
+    checked = [move_to_trash(libraryRoot, backupRoot, documentsRoot, path, dryRun=True) for path in chosen]
+    documents: dict[str, int] = {}
+    for item in checked:
+        for file, count in item["documents"].items():
+            documents[file] = documents.get(file, 0) + count
+    if dryRun:
+        return {"batchId": None, "dryRun": True, "results": checked, "failed": [], "documents": documents}
+    results, failed = [], []
+    for path in chosen:
+        try:
+            results.append(delete_permanently(libraryRoot, backupRoot, documentsRoot, path))
+        except (LibraryError, OSError) as error:
+            failed.append({"path": path, "error": str(error)})
+    return {"batchId": None, "dryRun": False, "results": results, "failed": failed, "documents": documents}
 
 
 def trash_batch(libraryRoot: Path, backupRoot: Path, documentsRoot: Path, paths: list[str], dryRun: bool = False) -> dict:

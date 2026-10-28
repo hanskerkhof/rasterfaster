@@ -2,13 +2,14 @@ import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, output } from '@angular/core';
 import { BomRow, bomToCsv, buildBom } from './bom';
 import { DocumentStore } from './document.store';
+import { closeOnEscape } from './escape-close';
 
 @Component({
   selector: 'app-bom-dialog',
   imports: [DecimalPipe, NgTemplateOutlet],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
-    <section class="dialog" role="dialog" aria-label="Bill of materials" (keydown.escape)="close.emit()">
+    <section class="dialog" role="dialog" aria-label="Bill of materials" >
       <header>
         <h2>Bill of materials <small>{{ store.doc().name }}</small></h2>
         <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
@@ -76,6 +77,10 @@ import { DocumentStore } from './document.store';
 })
 export class BomDialog {
   protected readonly store = inject(DocumentStore);
+
+  constructor() {
+    closeOnEscape(() => this.close.emit());
+  }
   readonly close = output<void>();
   protected copied = false;
 

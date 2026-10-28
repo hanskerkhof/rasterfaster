@@ -1,5 +1,6 @@
-import { Component, ElementRef, HostListener, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DocumentStore, itemColors } from './document.store';
+import { closeOnEscape } from './escape-close';
 import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */
@@ -152,6 +153,7 @@ export class ObjectMenu {
   private readonly size = signal<{ w: number; h: number } | null>(null);
 
   constructor() {
+    closeOnEscape(() => this.close(), () => !!this.store.contextMenu());
     effect(() => {
       const open = this.store.contextMenu(), el = this.menuEl();
       if (!open || !el) { untracked(() => this.size.set(null)); return; }
@@ -267,8 +269,4 @@ export class ObjectMenu {
     this.store.contextMenu.set(null);
   }
 
-  @HostListener('document:keydown.escape')
-  protected onEscape() {
-    this.close();
-  }
 }

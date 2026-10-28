@@ -4,12 +4,13 @@ import { firstValueFrom } from 'rxjs';
 import { LibraryService, TrashItem } from './library.service';
 
 /** The Trash of the library, like the Finder's: Put Back, Delete Immediately and Empty Trash. */
+import { closeOnEscape } from './escape-close';
 @Component({
   selector: 'app-trash-dialog',
   imports: [DatePipe],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
-    <section class="dialog" role="dialog" aria-label="Trash" (keydown.escape)="close.emit()">
+    <section class="dialog" role="dialog" aria-label="Trash">
       <header>
         <h2>Trash <small>{{ items().length }} item{{ items().length === 1 ? '' : 's' }}</small></h2>
         @if (items().length) {
@@ -70,6 +71,10 @@ import { LibraryService, TrashItem } from './library.service';
 export class TrashDialog implements OnInit {
   protected readonly lib = inject(LibraryService);
   readonly close = output<void>();
+
+  constructor() {
+    closeOnEscape(() => this.close.emit());
+  }
   /** Something was put back (the file list has to look again). */
   readonly changed = output<void>();
   protected readonly items = signal<TrashItem[]>([]);
