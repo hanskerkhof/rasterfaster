@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - Do not export button (0.10.44)
+
+### Added
+- **FE** (`document-panel.ts`): a **⊘ N** button above the part list (next to ◐ and ⚠) when parts are marked Do not export; clicking it selects them. The rows keep their ⊘ icon at the right of the name.
+
+### Changed
+- **FE** (`document-panel.ts`): the Document file buttons and the ◐ ⊘ ⚠ summary buttons each have their own row; the summary row is right-aligned and only shown when there is something to show.
+- **FE** (`document-panel.ts`): the empty-document hint no longer mentions the removed Add button (⌘↓ or double-click).
+
 ## 2026-10-28 - Step mode for Option moves, dimmed parts button, reload also re-reads the document's STLs (0.10.43)
 
 ### Added

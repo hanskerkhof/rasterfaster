@@ -101,13 +101,20 @@ function readGeometry(): PanelGeometry | null {
       <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />
       <button type="button" title="Make a new document from a 3MF (ours or a Bambu Studio project); the parts are linked to the STL files in the library" (click)="threeMfInput.click()">Import 3MF…</button>
       <input #threeMfInput type="file" accept=".3mf" hidden (change)="import3mf($any($event.target))" />
+    </div>
+    @if (dimmed() || notExported() || warnings()) {
+      <div class="sums">
       @if (dimmed(); as d) {
         <button type="button" class="dim-sum" [title]="d.tip" (click)="selectDimmed()">◐ {{ d.ids.length }}</button>
+      }
+      @if (notExported(); as n) {
+        <button type="button" class="dim-sum" [title]="n.tip" (click)="selectNotExported()">⊘ {{ n.ids.length }}</button>
       }
       @if (warnings(); as w) {
         <button type="button" class="warn-sum" [title]="w.tip" (click)="selectWarnings()">⚠ {{ w.ids.length }}</button>
       }
-    </div>
+      </div>
+    }
     @if (pendingImport(); as pending) {
       <div class="import-ask" role="alert">
         A document “{{ pending.existing.name }}” with this id already exists.
@@ -142,7 +149,7 @@ function readGeometry(): PanelGeometry | null {
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
         </div>
       } @empty {
-        <div class="empty">Empty. Select an .stl in the list and press “Add to document” (or double-click it).</div>
+        <div class="empty">Empty. Select an .stl in the list and press ⌘↓ (or double-click it).</div>
       }
     </div>
     @if (store.selectedIds().length > 1) {
@@ -198,10 +205,10 @@ function readGeometry(): PanelGeometry | null {
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
     .item.sel { background: #d9822b; color: #fff; }
-    .dim-sum { margin-left: auto; padding: 2px 8px; background: #2b2f38; color: #aeb6c4; border: 1px solid #4a5160; border-radius: 4px; font: inherit; cursor: pointer; }
+    .sums { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+    .dim-sum { padding: 2px 8px; background: #2b2f38; color: #aeb6c4; border: 1px solid #4a5160; border-radius: 4px; font: inherit; cursor: pointer; }
     .dim-sum:hover { background: #363b46; }
-    .dim-sum + .warn-sum { margin-left: 6px; }
-    .warn-sum { margin-left: auto; padding: 2px 8px; background: #3a3320; color: #f0b232; border: 1px solid #6b5a20; border-radius: 4px; font: inherit; cursor: pointer; }
+    .warn-sum { padding: 2px 8px; background: #3a3320; color: #f0b232; border: 1px solid #6b5a20; border-radius: 4px; font: inherit; cursor: pointer; }
     .warn-sum:hover { background: #4a4126; }
     .badge { opacity: .7; font-size: 11px; }
     .badge.warn { opacity: 1; color: #f0b232; }
@@ -295,6 +302,17 @@ export class DocumentPanel {
     const ids = this.store.doc().items.filter(i => i.muted).map(i => i.id);
     return ids.length ? { ids, tip: `${ids.length} dimmed part${ids.length === 1 ? '' : 's'}. Click to select ${ids.length === 1 ? 'it' : 'them'}.` } : null;
   });
+
+  /** The parts marked Do not export; null when there are none. */
+  protected readonly notExported = computed(() => {
+    const ids = this.store.doc().items.filter(i => i.noExport).map(i => i.id);
+    return ids.length ? { ids, tip: `${ids.length} part${ids.length === 1 ? ' is' : 's are'} marked Do not export (left out of the 3MF and SVG). Click to select ${ids.length === 1 ? 'it' : 'them'}.` } : null;
+  });
+
+  protected selectNotExported() {
+    const ids = this.notExported()?.ids;
+    if (ids) this.store.selectMany(ids);
+  }
 
   protected selectDimmed() {
     const ids = this.dimmed()?.ids;
