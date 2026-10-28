@@ -74,7 +74,7 @@ export interface RfDocument {
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
 const currentIdStorageKey = 'rasterfaster.documentId';
 const clipboardStorageKey = 'rasterfaster.clipboard';
-const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
+export const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
 const maxHistory = 200;
 /** A gesture open this long never got its end (lost pointer, tab switch): treat it as finished. */
 const gestureStaleMs = 30_000;
@@ -466,7 +466,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'muted' | 'centered' | 'noExport'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -562,6 +562,10 @@ export class DocumentStore {
   }
 
   /** Dims or restores items (one undo step). */
+  setColor(ids: readonly string[], color: number) {
+    this.updateItems('Colour parts', new Map(ids.map(id => [id, { color }])));
+  }
+
   setMuted(ids: readonly string[], muted: boolean) {
     this.updateItems(muted ? 'Dim parts' : 'Show parts', new Map(ids.map(id => [id, { muted }])));
   }

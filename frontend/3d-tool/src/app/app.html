@@ -50,10 +50,10 @@
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m14 10 2 2-2 2"/></svg>
       </button>
     }
-    <button class="add" [disabled]="!selected() && !pickedFiles().length" title="Add the selected file (or all selected files) to the document" (click)="pickedFiles().length > 1 ? addFilesToDocument(pickedFiles()) : addToDocument()">＋ Add{{ pickedFiles().length > 1 ? ' ' + pickedFiles().length + ' files' : '' }} to document</button>
+    <button class="add" [disabled]="!canAdd()" title="Add the selected file (or all selected files) to the document" (click)="pickedFiles().length > 1 ? addFilesToDocument(pickedFiles()) : addToDocument(treePanel()?.focusedFile() ?? selected())">＋ Add{{ pickedFiles().length > 1 ? ' ' + pickedFiles().length + ' files' : '' }} to document</button>
     <div class="modes">
-      @for (m of modes; track m.id) {
-        <button [class.on]="mode() === m.id" (click)="setMode(m.id)">{{ m.label }}</button>
+      @for (m of modes; track m.id; let i = $index) {
+        <button releaseFocus [class.on]="mode() === m.id" [title]="m.label + ' (⌥' + (i + 1) + ')'" (click)="setMode(m.id)">{{ m.label }} <kbd>⌥{{ i + 1 }}</kbd></button>
       }
     </div>
     @if (updateAvailable()) {

@@ -8,6 +8,7 @@ import { DocumentStore, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
+import { ReleaseFocus, ViewFocus } from './release-focus';
 import { ViewCube } from './view-cube';
 import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels';
 
@@ -69,6 +70,7 @@ function readShowPath() {
 
 @Component({
   selector: 'app-stl-viewer',
+  imports: [ReleaseFocus],
   template: `
     <div #host class="host" tabindex="0"></div>
     <div class="rotate" aria-label="Rotate object">
@@ -76,17 +78,17 @@ function readShowPath() {
       @for (axis of axes; track axis) {
         <div class="axis">
           <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ rotated()[axis] ? ' ' + (rotated()[axis] > 0 ? '+' : '') + rotated()[axis] + '°' : '' }}</small></span>
-          <button type="button" [title]="'Rotate −' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] < 0" (click)="rotateObject(axis, -rotationStep())">−</button>
-          <button type="button" [title]="'Rotate +' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] > 0" (click)="rotateObject(axis, rotationStep())">+</button>
+          <button type="button" [title]="'Rotate −' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] < 0" releaseFocus (click)="rotateObject(axis, -rotationStep())">−</button>
+          <button type="button" [title]="'Rotate +' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] > 0" releaseFocus (click)="rotateObject(axis, rotationStep())">+</button>
         </div>
       }
       <div class="axis">
         <span class="name">Step</span>
-        <select [value]="rotationStep()" (change)="rotationStep.set(+$any($event.target).value)">
+        <select releaseFocus [value]="rotationStep()" (change)="rotationStep.set(+$any($event.target).value)">
           @for (s of rotationSteps; track s) { <option [value]="s" [selected]="s === rotationStep()">{{ s }}°</option> }
         </select>
       </div>
-      @if (!documentMode()) { <button type="button" class="reset" (click)="resetObjectRotation()">Reset</button> }
+      @if (!documentMode()) { <button type="button" class="reset" releaseFocus (click)="resetObjectRotation()">Reset</button> }
     </div>
     @if (cubeMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
@@ -126,7 +128,7 @@ function readShowPath() {
         </div>
         @if (documentMode()) {
           <button type="button" role="menuitem" (click)="toggleFlight(); cubeMenu.set(null)">
-            <span class="tick">{{ flying() ? '✓' : '' }}</span>Fly-around<span class="hint">{{ flying() ? 'on' : 'off' }}</span>
+            <span class="tick">{{ flying() ? '✓' : '' }}</span>Fly-around<span class="hint">{{ flying() ? 'on' : 'off' }}</span><span class="hint">Space</span>
           </button>
         }
         @if (documentMode()) {
@@ -143,7 +145,7 @@ function readShowPath() {
       </div>
     }
     @if (documentMode()) {
-      <button class="home fly" type="button" [class.on]="flying()" [title]="flying() ? 'Stop the fly-around' : 'Fly-around: slowly circle the assembly'" aria-label="Fly-around" [attr.aria-pressed]="flying()" (click)="toggleFlight()">
+      <button class="home fly" type="button" [class.on]="flying()" [title]="flying() ? 'Stop the fly-around (Space)' : 'Fly-around: slowly circle the assembly (Space)'" aria-label="Fly-around (Space)" aria-keyshortcuts="Space" [attr.aria-pressed]="flying()" releaseFocus (click)="toggleFlight()">
         @if (flying()) {
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
         } @else {
@@ -152,11 +154,11 @@ function readShowPath() {
       </button>
     }
     @if (documentMode() && flying()) {
-      <button class="home fly zoom-reset" type="button" title="Reset the zoom of the fly-around" aria-label="Reset fly-around zoom" (click)="resetFlightZoom()">
+      <button class="home fly zoom-reset" type="button" title="Reset the zoom of the fly-around" aria-label="Reset fly-around zoom" releaseFocus (click)="resetFlightZoom()">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M8.5 11h5"/></svg>
       </button>
     }
-    <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" (click)="goHome()">
+    <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" releaseFocus (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
   styles: `
@@ -198,6 +200,7 @@ export class StlViewer implements OnDestroy {
   /** false: preview one STL; true: show and edit the document's items. */
   readonly documentMode = input(false);
   protected readonly store = inject(DocumentStore);
+  private readonly viewFocus = inject(ViewFocus);
   private readonly library = inject(LibraryService);
   readonly info = signal('');
   /** About the selected part(s), shown at the bottom right: size, volume and the name (or how many are selected); empty without a selection. */
@@ -257,6 +260,23 @@ export class StlViewer implements OnDestroy {
   private flightTime = 0;
   private flightLast = 0;
   private flightAzimuth0 = 0;
+  private stageEl: HTMLElement | null = null;
+  /** Space toggles the fly-around (document mode), unless it belongs to a button, a text field or a menu. */
+  /** ⌘0 … ⌘6 as in Bambu Studio: home (isometric), top, bottom, front, rear, left, right. */
+  private readonly viewKeys = [null, [0, 0, 1], [0, 0, -1], [0, -1, 0], [0, 1, 0], [-1, 0, 0], [1, 0, 0]] as const;
+  private readonly onViewKey = (e: KeyboardEvent) => {
+    const digit = /^Digit([0-6])$/.exec(e.code);
+    if (!digit || !e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+    e.preventDefault();
+    const dir = this.viewKeys[+digit[1]];
+    if (dir) this.snapTo(new THREE.Vector3(...dir)); else this.goHome();
+  };
+  private readonly onFlightKey = (e: KeyboardEvent) => {
+    if (e.key !== ' ' || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !this.documentMode()) return;
+    if ((e.target as HTMLElement | null)?.closest('button, input, textarea, select, [contenteditable], [role=menu]')) return;
+    e.preventDefault();
+    this.toggleFlight();
+  };
   private readonly stopFlight = () => this.flying.set(false);
   private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
@@ -300,6 +320,7 @@ export class StlViewer implements OnDestroy {
 
   private init() {
     const el = this.host().nativeElement;
+    this.viewFocus.target = el;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     Object.assign(this.renderer.domElement.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
@@ -332,6 +353,9 @@ export class StlViewer implements OnDestroy {
     });
     // ⌘-click centres the view on the clicked point. Registered before OrbitControls so it can swallow the click.
     this.renderer.domElement.addEventListener('pointerdown', this.onCentreClick);
+    this.stageEl = (el.closest('.stage') as HTMLElement | null) ?? el;
+    this.stageEl.addEventListener('keydown', this.onFlightKey);
+    this.stageEl.addEventListener('keydown', this.onViewKey);
     this.renderer.domElement.addEventListener('pointerdown', this.stopFlight); // grabbing the view takes over from the fly-around
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -1008,9 +1032,12 @@ export class StlViewer implements OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.viewFocus.target === this.host().nativeElement) this.viewFocus.target = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
     this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);
+    this.stageEl?.removeEventListener('keydown', this.onFlightKey);
+    this.stageEl?.removeEventListener('keydown', this.onViewKey);
     this.renderer?.domElement.removeEventListener('wheel', this.onWheel);
     this.ro?.disconnect();
     this.clearModel();

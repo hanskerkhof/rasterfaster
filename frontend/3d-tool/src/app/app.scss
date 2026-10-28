@@ -21,6 +21,8 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; cursor: pointer; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
+.modes kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .55; }
+.modes button.on kbd { opacity: .8; }
 .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .overlay { position: absolute; top: 12px; left: 12px; padding: 6px 10px; background: rgba(0,0,0,.6); border-radius: 4px; }
 .overlay.err { color: #ff8a8a; }

@@ -183,7 +183,7 @@ export class TreePanel {
     this.quickLook.set(false);
   }
   protected readonly popoverLeft = signal(392);
-  protected readonly focusedFile = computed(() => this.rows().find(r => r.entry.path === this.focused() && r.entry.type === 'file')?.entry.path ?? null);
+  readonly focusedFile = computed(() => this.rows().find(r => r.entry.path === this.focused() && r.entry.type === 'file')?.entry.path ?? null);
   private readonly cache = signal(new Map<string, LibraryEntry[]>());
   private readonly requested = new Set<string>();
   /** Dirs flipped away from their default state (default: open only in filter mode when they hold matches). */

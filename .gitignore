@@ -23,3 +23,6 @@ dist/
 # PyInstaller
 build/
 *.icns
+
+# dev_stack.py logs
+tmp/

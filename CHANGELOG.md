@@ -10,6 +10,21 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 ### Changed
 - **FE** (`document-scene.ts`): after a part is added (⌘↓ or **Add to document**), the file list loses the keyboard focus and the canvas gets it, so the arrow keys move the new part at once.
 
+## 2026-10-28 - Colour flyout, view shortcuts, focus handling, dev stack script (0.10.36)
+
+### Added
+- **FE** (`object-menu.ts`, `document.store.ts`): the object menu has a **Color ▸** row with a flyout of the 8 part colours (`itemColors`, now exported); one undo step ("Colour parts") for the whole selection; `DocumentStore.setColor`.
+- **FE** (`stl-viewer.ts`): **Space** toggles the fly-around (document mode; ignored on buttons, text fields and menus); the key is in the button's tooltip / aria-label and in the cube menu entry.
+- **FE** (`app.ts`, `app.html`, `app.scss`): **⌥1 … ⌥4** choose Solid / Wireframe / Hidden lines removed / Hidden lines dashed; the keys are shown on the buttons.
+- **FE** (`stl-viewer.ts`): **⌘0 … ⌘6** change the view like Bambu Studio: home, top, bottom, front, rear, left, right (the mapping beyond ⌘0 / ⌘1 is from memory, not checked against the Bambu documentation).
+- **FE** (`release-focus.ts`): `releaseFocus` directive (with a `ViewFocus` service): a button (on click) or dropdown (on change) with it gives the keyboard focus to the 3D view, so Space and the arrow keys keep working. Used on Home, fly-around, reset zoom, Rotate −/+, Step, Reset and the view-mode buttons.
+- **Tool** (`scripts/dev_stack.py`): starts the API (:8100) and the Angular dev server (:4200) in one terminal with prefixed logs, restart / stop / mute keys (as in bauklank-micros); logs in `tmp/` (ignored).
+
+### Changed
+- **FE** (`tree-panel.ts`, `app.ts`, `app.html`): **Add to document** is enabled only when a file is selected in the browser (one or several); it adds the file the browser cursor is on.
+- **FE** (`document-scene.ts`): after adding a part (⌘↓ or the button) the keyboard focus goes from the file list to the canvas.
+- **FE** (`document-scene.ts`, `document.store.ts`, `object-menu.ts`): right-clicking empty canvas opens a menu with **Paste ⌘V**.
+
 ## 2026-10-27 - Find in browser puts the file in the middle of the list (0.10.34)
 
 ### Changed

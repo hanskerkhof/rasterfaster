@@ -1,5 +1,5 @@
-import { Component, HostListener, computed, inject } from '@angular/core';
-import { DocumentStore } from './document.store';
+import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { DocumentStore, itemColors } from './document.store';
 import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */
@@ -8,7 +8,7 @@ import { baseThicknessMm } from './z-levels';
   template: `
     @if (store.contextMenu(); as menu) {
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
-      <div class="menu" role="menu" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)">
+      <div class="menu" role="menu" (mouseover)="onMenuOver($event)" [style.left.px]="left(menu.x)" [style.top.px]="top(menu.y)">
         @if (!menu.ids.length) {
           <button type="button" role="menuitem" [disabled]="!store.clipboard()" (click)="paste()">
             <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? '⌘V' : 'nothing copied' }}</span>
@@ -28,6 +28,9 @@ import { baseThicknessMm } from './z-levels';
         <button type="button" role="menuitem" (click)="findInBrowser()">
           <span class="icon">⌕</span>Find in browser
           <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
+        </button>
+        <button type="button" role="menuitem" class="sub" (mouseenter)="openColors($event)" (click)="openColors($event)">
+          <span class="icon">◐</span>Color<span class="hint">▸</span>
         </button>
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
@@ -60,6 +63,13 @@ import { baseThicknessMm } from './z-levels';
         </button>
         }
       </div>
+      @if (colorsAt(); as at) {
+        <div class="flyout" role="menu" aria-label="Color" [style.left.px]="at.x" [style.top.px]="at.y">
+          @for (c of colors; track c) {
+            <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c)" [style.background]="hex(c)" [title]="hex(c)" (click)="setColor(c)"></button>
+          }
+        </div>
+      }
     }
   `,
   styles: `
@@ -71,6 +81,10 @@ import { baseThicknessMm } from './z-levels';
     .sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.12); }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .4; cursor: default; }
+    .flyout { position: fixed; z-index: 32; display: grid; grid-template-columns: repeat(4, 28px); gap: 4px; padding: 6px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 5px; }
+    .swatch:hover:not(:disabled) { background-color: inherit; border-color: #fff; }
+    .swatch.on { border-color: #fff; box-shadow: inset 0 0 0 2px #2b2f38; }
     .icon { width: 1em; text-align: center; }
     .hint { margin-left: auto; opacity: .5; font-size: 11px; }
     .hint + .hint { margin-left: 10px; min-width: 14px; text-align: right; opacity: .75; }
@@ -87,6 +101,34 @@ export class ObjectMenu {
   /** Move to needs at least one part that is not part of the selection to snap onto. */
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
   protected readonly baseMm = baseThicknessMm;
+  protected readonly colors = itemColors;
+  /** Where the colour flyout is shown (fixed, beside the Color row), or null while it is closed. */
+  protected readonly colorsAt = signal<{ x: number; y: number } | null>(null);
+
+  protected hex(c: number) {
+    return '#' + c.toString(16).padStart(6, '0');
+  }
+
+  protected isColor(c: number) {
+    return this.items().length > 0 && this.items().every(i => i.color === c);
+  }
+
+  /** Opens the flyout to the right of the row (to the left when there is no room); it is 4 swatches wide. */
+  protected openColors(event: Event) {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const width = 4 * 28 + 3 * 4 + 14;
+    const x = rect.right + width + 8 <= window.innerWidth ? rect.right + 2 : Math.max(8, rect.left - width - 2);
+    this.colorsAt.set({ x, y: Math.min(rect.top, window.innerHeight - 100) });
+  }
+
+  protected onMenuOver(event: Event) {
+    if (!(event.target as HTMLElement).closest('.sub')) this.colorsAt.set(null);
+  }
+
+  protected setColor(color: number) {
+    this.store.setColor(this.items().map(i => i.id), color);
+    this.close();
+  }
 
   /** Keeps the menu inside the window: it is about 420 px tall and 310 px wide, so it moves up / left near the bottom / right edge. */
   protected left(x: number) {
@@ -159,6 +201,7 @@ export class ObjectMenu {
   }
 
   protected close() {
+    this.colorsAt.set(null);
     this.store.contextMenu.set(null);
   }
 

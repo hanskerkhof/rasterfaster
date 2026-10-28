@@ -5,6 +5,7 @@ import { filter, firstValueFrom } from 'rxjs';
 import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
+import { ReleaseFocus } from './release-focus';
 import { DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
@@ -46,7 +47,7 @@ function readFilterMode(): 'any' | 'all' {
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, StlViewer, DocumentPanel, ObjectMenu],
+  imports: [TreePanel, TrashDialog, StlViewer, DocumentPanel, ObjectMenu, ReleaseFocus],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
@@ -75,7 +76,7 @@ export class App {
   private readonly libraryTick = signal(0);
   private missingTimer?: ReturnType<typeof setTimeout>;
   private readonly viewer = viewChild.required(StlViewer);
-  private readonly treePanel = viewChild(TreePanel);
+  protected readonly treePanel = viewChild(TreePanel);
   protected readonly reloading = signal(false);
   /** Null when there is no service worker (dev server, tests). */
   private readonly swUpdate = inject(SwUpdate, { optional: true });
@@ -242,6 +243,8 @@ export class App {
   }
 
   /** The selected files of a multi-selection (what ⌘↓ and the Add button put into the document). */
+  /** An .stl file is selected in the file browser (the cursor is on a file, not a folder), so it can be added. */
+  protected readonly canAdd = computed(() => !!this.treePanel()?.focusedFile() || this.pickedFiles().length > 0);
   protected readonly pickedFiles = computed(() => this.treePanel()?.pickedFiles() ?? []);
 
   /** Puts several library files next to each other into the document as one undo step. */
@@ -350,6 +353,11 @@ export class App {
     if (event.code === 'KeyB' && event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) {
       event.preventDefault();
       this.togglePanel();
+    }
+    const digit = /^Digit([1-9])$/.exec(event.code); // ⌥1 … ⌥4: the view modes in the order of the buttons (event.code: ⌥ changes the typed character)
+    if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && this.modes[+digit[1] - 1]) {
+      event.preventDefault();
+      this.setMode(this.modes[+digit[1] - 1].id);
     }
     if (event.code === 'KeyS' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
       event.preventDefault(); // not the browser's "save page": ⌘S saves a new version of the document
