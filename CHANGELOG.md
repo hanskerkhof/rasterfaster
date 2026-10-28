@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - An overwritten STL shows up again, reload spinner for 2 seconds (0.10.42)
+
+### Fixed
+- **BE** (`main.py`): `GET /api/file` sends `Cache-Control: no-cache`, so the browser checks the ETag every time instead of reusing a heuristically cached copy of an STL that was overwritten on disk.
+- **FE** (`library.service.ts`, `app.config.ts`): STL loads use fetch's `no-cache` (`provideHttpClient(withFetch())`), so a stale browser copy is never shown.
+
+### Changed
+- **FE** (`app.ts`): the reload button's spinner shows for at least 2 seconds, so a quick reload is still visible.
+
 ## 2026-10-28 - Delete Immediately, Esc cancels New Folder, Esc closes dialogs only (0.10.41)
 
 ### Added

@@ -190,7 +190,8 @@ export class LibraryService {
   }
 
   loadStl(path: string) {
-    return this.http.get(this.fileUrl(path), { responseType: 'arraybuffer' });
+    // revalidate every time (fetch's no-cache): a file overwritten on disk must not come out of the browser's cache
+    return this.http.get(this.fileUrl(path), { responseType: 'arraybuffer', cache: 'no-cache' });
   }
 
   /** Clicking the active key flips direction; a new key starts with its natural direction. */

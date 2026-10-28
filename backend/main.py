@@ -331,7 +331,8 @@ def get_file(path: str) -> FileResponse:
         raise HTTPException(status_code=400, detail="only .stl")
     if not file.is_file():
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(file, media_type="model/stl")
+    # no-cache = always revalidate with the ETag, so a file overwritten on disk shows up at once instead of the browser's heuristic cached copy
+    return FileResponse(file, media_type="model/stl", headers={"Cache-Control": "no-cache"})
 
 
 class DocumentItem(BaseModel):
