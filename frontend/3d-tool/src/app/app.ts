@@ -6,7 +6,7 @@ import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, T
 import { DocumentPanel } from './document-panel';
 import { ObjectMenu } from './object-menu';
 import { ReleaseFocus } from './release-focus';
-import { DocumentStore } from './document.store';
+import { DocItem, DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
 import { TrashDialog } from './trash-dialog';
@@ -186,9 +186,32 @@ export class App {
   });
   protected readonly relinkFile = computed(() => this.treePanel()?.focusedFile() ?? null);
 
+  /** Library files whose names resemble the old file's name, best first (click one to relink at once). */
+  protected readonly relinkSuggestions = signal<{ path: string; name: string; folder: string }[]>([]);
+  private suggestionSeq = 0;
+
+  private async suggestFiles(part: DocItem) {
+    const mine = ++this.suggestionSeq;
+    this.relinkSuggestions.set([]);
+    const stem = part.path.startsWith('embedded:') ? part.name : part.path.split('/').pop()!.replace(/\.stl$/i, '');
+    const words = [...new Set(stem.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 2))];
+    if (!words.length) return;
+    try {
+      const found = (await firstValueFrom(this.lib.search(words.join(' '), 'any'))).filter(e => e.type === 'file' && e.path !== part.path);
+      const score = (name: string) => {
+        const have = new Set(name.toLowerCase().replace(/\.stl$/i, '').split(/[^a-z0-9]+/));
+        const shared = words.filter(w => have.has(w) || [...have].some(h => h.length >= 3 && (h.startsWith(w) || w.startsWith(h)))).length;
+        return shared / words.length + shared / (have.size || 1) * 0.5 + (name.toLowerCase().startsWith(stem.toLowerCase()) ? 1 : 0);
+      };
+      const ranked = found.map(e => ({ e, score: score(e.name) })).sort((a, b) => b.score - a.score).slice(0, 8);
+      if (mine === this.suggestionSeq) this.relinkSuggestions.set(ranked.map(({ e }) => ({ path: e.path, name: e.name, folder: e.path.split('/').slice(0, -1).join(' / ') })));
+    } catch { /* offline: no suggestions */ }
+  }
+
   private startRelinkMode() {
     const part = this.relinkParts()[0];
     if (!part) return;
+    void this.suggestFiles(part);
     this.store.relinkAll.set(true);
     if (this.panelHidden()) this.togglePanel();
     const stem = part.path.startsWith('embedded:') ? part.name : part.path.split('/').pop()!.replace(/\.stl$/i, '');

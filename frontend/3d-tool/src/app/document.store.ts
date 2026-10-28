@@ -366,6 +366,34 @@ export class DocumentStore {
     this.viewing.set(version);
   }
 
+  /** Deletes one saved version (never the newest); when it is the one being looked at, the working copy comes back. */
+  async deleteVersion(version: number) {
+    const id = this.docId();
+    if (!id) return;
+    try {
+      await firstValueFrom(this.api.deleteVersion(id, version));
+      if (this.viewing() === version) await this.backToWorkingCopy();
+      await this.refreshVersions();
+      this.say(`Deleted v${version}`);
+    } catch {
+      this.say(`Could not delete v${version}`);
+    }
+  }
+
+  /** Deletes every saved version except the newest. */
+  async deleteOlderVersions() {
+    const id = this.docId();
+    if (!id) return;
+    try {
+      const left = await firstValueFrom(this.api.deleteOlderVersions(id));
+      if (this.viewing() !== null && !left.some(v => v.version === this.viewing())) await this.backToWorkingCopy();
+      await this.refreshVersions();
+      this.say('Deleted the older versions');
+    } catch {
+      this.say('Could not delete the older versions');
+    }
+  }
+
   /** Leaves the older version and loads the working copy again. */
   async backToWorkingCopy() {
     const id = this.docId();

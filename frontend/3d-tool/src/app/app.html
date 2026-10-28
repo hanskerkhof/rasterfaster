@@ -38,6 +38,14 @@
       @if (relinkSharing() > relinkParts().length) {
         <label><input type="checkbox" [checked]="store.relinkAll()" (change)="store.relinkAll.set($any($event.target).checked)" /> All {{ relinkSharing() }} parts that use this file</label>
       }
+      @if (relinkSuggestions().length) {
+        <div class="suggest">
+          <span class="dim">Similar files in the library:</span>
+          @for (file of relinkSuggestions(); track file.path) {
+            <button type="button" class="sug" [title]="file.path" (click)="doRelink(file.path)"><b>{{ file.name }}</b><small>{{ file.folder }}</small></button>
+          }
+        </div>
+      }
       <div class="buttons">
         <button type="button" class="primary" [disabled]="!relinkFile()" (click)="doRelink()">{{ relinkFile() ? 'Use ' + relinkFile()!.split('/').pop() : 'Select an .stl file' }}</button>
         <button type="button" (click)="cancelRelink()">Cancel (Esc)</button>

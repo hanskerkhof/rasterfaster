@@ -17,6 +17,9 @@
 .tree { flex: 1; min-height: 0; }
 .relink-bar { padding: 8px 10px; font-size: 12px; background: #1f3358; border-top: 1px solid #2f6fed; border-bottom: 1px solid #2f6fed; display: flex; flex-direction: column; gap: 6px; }
 .relink-bar .dim { opacity: .6; word-break: break-all; } .relink-bar code { font-size: 11px; }
+.relink-bar .suggest { display: flex; flex-direction: column; gap: 2px; max-height: 190px; overflow-y: auto; }
+.relink-bar .sug { display: block; width: 100%; }
+.relink-bar .sug b { display: block; font-weight: 600; } .relink-bar .sug small { display: block; opacity: .6; font-size: 10px; word-break: break-all; }
 .relink-bar .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .relink-bar button { padding: 4px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; word-break: break-all; text-align: left; }
 .relink-bar button.primary { background: #2f6fed; color: #fff; } .relink-bar button:disabled { opacity: .5; cursor: default; }

@@ -62,6 +62,16 @@ export class DocumentApi {
     return this.http.get<VersionSummary & { items: DocItem[] }>(`/api/documents/${id}/versions/${version}`);
   }
 
+  /** Removes one saved version (not the newest). */
+  deleteVersion(id: string, version: number) {
+    return this.http.delete<void>(`/api/documents/${id}/versions/${version}`);
+  }
+
+  /** Removes every saved version except the newest; answers the versions that are left. */
+  deleteOlderVersions(id: string) {
+    return this.http.delete<VersionSummary[]>(`/api/documents/${id}/versions`);
+  }
+
   /** Makes an older version the working copy again and saves it as the new latest version. */
   promote(id: string, version: number) {
     return this.http.post<StoredDocument>(`/api/documents/${id}/versions/${version}/promote`, {});

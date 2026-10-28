@@ -1,13 +1,14 @@
 import { LibraryService } from './library.service';
 import { cubeKeepOut } from './view-cube';
 import { ReleaseFocus } from './release-focus';
-import { Component, ElementRef, HostListener, afterNextRender, effect, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
 import { rangeEndingAt } from './tree-selection';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
-interface PanelGeometry { left: number; top: number; width: number; height: number }
+/** `snapRight`: the panel sits against the right edge of the view and stays there when the view gets wider or narrower (e.g. the file panel is collapsed). */
+interface PanelGeometry { left: number; top: number; width: number; height: number; snapRight?: boolean }
 const geometryStorageKey = 'rasterfaster.docPanelGeometry';
 const snapDistance = 24; // px from the right edge of the view at which the panel snaps to it
 const sideGap = 12;
@@ -15,12 +16,19 @@ const sideGap = 12;
 /** Magnets for a moved panel: it snaps to the right edge of the view, and it never covers the view cube (it is put just below it instead). */
 function snapPanel(g: PanelGeometry, parentWidth: number, parentHeight: number): PanelGeometry {
   let { left, top, width, height } = g;
-  if (parentWidth - (left + width) < snapDistance) left = parentWidth - width - sideGap;
+  const snapRight = parentWidth - (left + width) < snapDistance;
+  if (snapRight) left = parentWidth - width - sideGap;
   if (left + width > parentWidth - cubeKeepOut.width && top < cubeKeepOut.bottom) {
     top = cubeKeepOut.bottom;
     height = Math.min(height, Math.max(240, parentHeight - top));
   }
-  return { left: Math.max(0, left), top: Math.max(0, Math.min(top, parentHeight - height)), width, height };
+  return { left: Math.max(0, left), top: Math.max(0, Math.min(top, parentHeight - height)), width, height, snapRight };
+}
+
+const collapsedStorageKey = 'rasterfaster.docPanelCollapsed';
+
+function readCollapsed(): boolean {
+  try { return localStorage.getItem(collapsedStorageKey) === 'true'; } catch { return false; }
 }
 
 function readGeometry(): PanelGeometry | null {
@@ -35,15 +43,28 @@ function readGeometry(): PanelGeometry | null {
   imports: [BomDialog, VersionsDialog, ReleaseFocus],
   host: {
     '[class.sized]': 'geom() !== null',
+    '[class.collapsed]': 'collapsed()',
     '[style.left.px]': 'geom()?.left',
     '[style.top.px]': 'geom()?.top',
     '[style.width.px]': 'geom()?.width',
-    '[style.height.px]': 'geom()?.height',
+    '[style.height.px]': 'collapsed() ? null : geom()?.height',
     '[style.right]': "geom() ? 'auto' : null",
     '[style.max-height]': "geom() ? 'none' : null",
   },
   template: `
-    <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
+    <div class="header">
+  <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
+  <button type="button" class="fold" [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the panel' : 'Collapse the panel'" (click)="toggleCollapsed()">
+        <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          @if (collapsed()) { <path d="M2.5 4.5 6 8l3.5-3.5"/> } @else { <path d="M2.5 7.5 6 4l3.5 3.5"/> }
+        </svg>
+      </button>
+    </div>
+
+    @if (collapsed()) {
+      <div class="mini" (dblclick)="toggleCollapsed()" title="Double-click to expand">{{ store.doc().name }} <small>{{ store.doc().items.length }} parts</small>@if (warnings(); as w) { <span class="mini-warn" [title]="w.tip">⚠ {{ w.ids.length }}</span> }</div>
+    }
+
     <div class="edge w" (pointerdown)="startDrag($event, 'w')"></div>
     <div class="edge e" (pointerdown)="startDrag($event, 'e')"></div>
     <div class="edge s" (pointerdown)="startDrag($event, 's')"></div>
@@ -85,6 +106,9 @@ function readGeometry(): PanelGeometry | null {
       <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />
       <button type="button" title="Make a new document from a 3MF (ours or a Bambu Studio project); the parts are linked to the STL files in the library" (click)="threeMfInput.click()">Import 3MF…</button>
       <input #threeMfInput type="file" accept=".3mf" hidden (change)="import3mf($any($event.target))" />
+      @if (warnings(); as w) {
+        <button type="button" class="warn-sum" [title]="w.tip" (click)="selectWarnings()">⚠ {{ w.ids.length }}</button>
+      }
     </div>
     @if (pendingImport(); as pending) {
       <div class="import-ask" role="alert">
@@ -137,10 +161,13 @@ function readGeometry(): PanelGeometry | null {
     }
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
     @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
-    <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+    <details class="keys"><summary>Keys and mouse</summary>
+        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+    </details>
+
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: 6px; padding: 14px 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
+    :host { display: flex; flex-direction: column; gap: 6px; min-height: 0; padding: 0 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
             background: rgba(35,38,45,.9); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
     .head { display: flex; gap: 6px; align-items: center; }
     .ver { flex: none; padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
@@ -163,11 +190,13 @@ function readGeometry(): PanelGeometry | null {
     button { padding: 3px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .35; cursor: default; }
-    .list { overflow: auto; min-height: 40px; max-height: 220px; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
+    .list { flex: 0 1 auto; overflow: auto; min-height: 110px; max-height: 60vh; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
     .item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: default; user-select: none; }
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
     .item.sel { background: #d9822b; color: #fff; }
+    .warn-sum { margin-left: auto; padding: 2px 8px; background: #3a3320; color: #f0b232; border: 1px solid #6b5a20; border-radius: 4px; font: inherit; cursor: pointer; }
+    .warn-sum:hover { background: #4a4126; }
     .badge { opacity: .7; font-size: 11px; }
     .badge.warn { opacity: 1; color: #f0b232; }
     .dot { flex: none; width: 10px; height: 10px; border-radius: 2px; }
@@ -180,12 +209,19 @@ function readGeometry(): PanelGeometry | null {
     .pos input { width: 100%; box-sizing: border-box; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; font-weight: 400; }
     .relink { flex: none; padding: 0 5px; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer; }
     .relink:hover { background: #2f6fed; color: #fff; }
-    .grip { position: absolute; top: 0; left: 0; right: 0; height: 12px; cursor: grab; touch-action: none; }
-    .grip::after { content: ''; position: absolute; top: 5px; left: calc(50% - 16px); width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); }
+    .header { flex: none; display: flex; align-items: stretch; height: 24px; margin: 0 -8px; padding: 0 4px 0 8px; }
+    .fold { flex: none; width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent; color: inherit; border: 0; border-radius: 4px; opacity: .55; cursor: pointer; }
+    .fold:hover { opacity: 1; }
+    .mini { display: flex; align-items: baseline; gap: 6px; padding: 0 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .mini small { font-weight: 400; opacity: .6; } .mini-warn { color: #f0b232; margin-left: auto; }
+    :host(.collapsed) > *:not(.header):not(.mini):not(.edge) { display: none; }
+    :host(.collapsed) .edge.s, :host(.collapsed) .edge.sw, :host(.collapsed) .edge.se { display: none; }
+    :host(.collapsed) { padding-bottom: 8px; }
+    .grip { flex: 1; position: relative; cursor: grab; touch-action: none; }
+    .grip::after { content: ''; position: absolute; top: 10px; left: calc(50% - 16px); width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); }
     .grip:hover::after { background: rgba(255,255,255,.5); }
     .edge { position: absolute; touch-action: none; z-index: 1; }
-    .edge.w { left: -3px; top: 12px; bottom: 12px; width: 7px; cursor: ew-resize; }
-    .edge.e { right: -3px; top: 12px; bottom: 12px; width: 7px; cursor: ew-resize; }
+    .edge.w { left: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; }
+    .edge.e { right: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; }
     .edge.s { left: 12px; right: 12px; bottom: -3px; height: 7px; cursor: ns-resize; }
     .edge.sw { left: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nesw-resize; }
     .edge.se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
@@ -194,12 +230,14 @@ function readGeometry(): PanelGeometry | null {
     .edge.se:hover::after { opacity: 1; }
     :host(.sized) .list { flex: 1 1 0; min-height: 60px; max-height: none; }
     .hint { opacity: .55; font-size: 11px; line-height: 1.35; }
+    .keys { flex: none; } .keys summary { cursor: pointer; opacity: .6; font-size: 11px; user-select: none; } .keys summary:hover { opacity: 1; } .keys[open] .hint { margin-top: 4px; }
   `,
 })
 export class DocumentPanel {
   protected readonly store = inject(DocumentStore);
   private readonly lib = inject(LibraryService);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly destroyRef = inject(DestroyRef);
 
   /** Where the user put the panel and how big they made it (relative to the view); null = the default place and size. Remembered. */
   protected readonly geom = signal<PanelGeometry | null>(readGeometry());
@@ -208,7 +246,14 @@ export class DocumentPanel {
   protected readonly performance = performance;
 
   constructor() {
-    afterNextRender(() => this.clampToParent());
+    afterNextRender(() => {
+      this.clampToParent();
+      const parent = this.element.nativeElement.parentElement; // the view the panel floats in
+      if (!parent) return;
+      const observer = new ResizeObserver(() => this.clampToParent()); // the view itself changes size without the window doing so (the file panel collapses / opens)
+      observer.observe(parent);
+      this.destroyRef.onDestroy(() => observer.disconnect());
+    });
     // A part was selected (in the 3D view, or by a command): its row scrolls into view in the list (centred in the list, smoothly).
     effect(() => {
       const ids = this.store.selectedIds();
@@ -224,8 +269,31 @@ export class DocumentPanel {
     const g = this.geom(), parent = this.element.nativeElement.offsetParent as HTMLElement | null;
     if (!g || !parent) return;
     const width = Math.min(g.width, parent.clientWidth), height = Math.min(g.height, parent.clientHeight);
-    const next = snapPanel({ width, height, left: Math.max(0, Math.min(g.left, parent.clientWidth - width)), top: Math.max(0, Math.min(g.top, parent.clientHeight - height)) }, parent.clientWidth, parent.clientHeight);
+    const next = snapPanel({ width, height, left: g.snapRight ? parent.clientWidth - width - sideGap : Math.max(0, Math.min(g.left, parent.clientWidth - width)), top: Math.max(0, Math.min(g.top, parent.clientHeight - height)) }, parent.clientWidth, parent.clientHeight);
     if (next.left !== g.left || next.top !== g.top || next.width !== g.width || next.height !== g.height) this.geom.set(next);
+  }
+
+  /** Parts that have a warning in the list (their file is missing, or they use the geometry of an imported 3MF); null when there are none. */
+  protected readonly warnings = computed(() => {
+    const missing = this.store.missingPaths();
+    const items = this.store.doc().items;
+    const lost = items.filter(i => missing.has(i.path)), embedded = items.filter(i => i.path.startsWith('embedded:'));
+    const ids = [...lost, ...embedded].map(i => i.id);
+    if (!ids.length) return null;
+    const what = [lost.length ? `${lost.length} with a file that is not in the library` : '', embedded.length ? `${embedded.length} with geometry from an imported 3MF (no library file)` : ''].filter(Boolean).join(', ');
+    return { ids, tip: `${ids.length} part${ids.length === 1 ? ' has' : 's have'} a warning: ${what}. Click to select them.` };
+  });
+
+  protected selectWarnings() {
+    const ids = this.warnings()?.ids;
+    if (ids) this.store.selectMany(ids);
+  }
+
+  protected readonly collapsed = signal(readCollapsed());
+
+  protected toggleCollapsed() {
+    this.collapsed.update(v => !v);
+    try { localStorage.setItem(collapsedStorageKey, String(this.collapsed())); } catch { /* storage unavailable */ }
   }
 
   protected relink(event: Event, id: string) {
@@ -270,6 +338,7 @@ export class DocumentPanel {
       window.removeEventListener('pointercancel', end);
       const g = this.geom();
       if (mode === 'move' && g) this.geom.set(snapPanel(g, parent.clientWidth, parent.clientHeight)); // the magnets act on release, not while dragging
+      else if (g) this.geom.set({ ...g, snapRight: parent.clientWidth - (g.left + g.width) < snapDistance }); // a resize keeps its place; it stays against the right edge when it was there
       try { localStorage.setItem(geometryStorageKey, JSON.stringify(this.geom())); } catch { /* storage unavailable */ }
     };
     window.addEventListener('pointermove', move);

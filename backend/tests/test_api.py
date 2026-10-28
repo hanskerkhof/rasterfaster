@@ -174,6 +174,22 @@ def test_promote_makes_an_old_version_the_working_copy_and_a_new_latest(client):
     assert client.post(f"{url}/versions/9/promote").status_code == 404
 
 
+def test_old_versions_can_be_deleted_but_the_newest_stays(client):
+    doc = client.post("/api/documents", json={"name": "Prune", "items": [item("one")]}).json()
+    url = f"/api/documents/{doc['id']}"
+    for name in ("two", "three"):
+        client.post(f"{url}/versions")
+        client.put(url, json={"name": "Prune", "items": [item(name)]})
+    client.post(f"{url}/versions")                                  # v1, v2, v3
+    assert client.delete(f"{url}/versions/2").status_code == 204
+    assert [v["version"] for v in client.get(f"{url}/versions").json()] == [3, 1]
+    assert client.delete(f"{url}/versions/2").status_code == 404
+    assert client.delete(f"{url}/versions/3").status_code == 409     # the newest is the base of the working copy
+    assert [v["version"] for v in client.delete(f"{url}/versions").json()] == [3]   # everything but the newest
+    assert client.get(url).json()["version"] == 3
+    assert client.post(f"{url}/versions").json()["created"] is False  # nothing changed: still v3, and numbers are not reused
+
+
 def test_deleting_a_document_deletes_its_versions(client):
     doc = client.post("/api/documents", json={"name": "Gone", "items": []}).json()
     url = f"/api/documents/{doc['id']}"

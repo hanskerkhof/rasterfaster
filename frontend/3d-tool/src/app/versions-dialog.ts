@@ -1,5 +1,5 @@
 import { DatePipe } from '@angular/common';
-import { Component, OnInit, inject, output } from '@angular/core';
+import { Component, OnInit, inject, output, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 
 /** The versions of the open document (v1, v2, ...): look at an older one (read-only) or promote it to the newest, like Fusion 360. */
@@ -19,6 +19,17 @@ import { DocumentStore } from './document.store';
         </button>
         <span class="hint">{{ store.changedSinceVersion() ? 'The working copy has changes since ' + (store.version() ? 'v' + store.version() : 'the start') + '.' : 'No changes since v' + store.version() + '.' }}</span>
       </div>
+      @if (store.versions().length > 1) {
+        <div class="prune">
+          @if (confirm() === 'all') {
+            <span class="ask">Delete v{{ store.versions()[store.versions().length - 1].version }} to v{{ store.versions()[1].version }} for good? Only v{{ store.versions()[0].version }} stays.
+              <button type="button" class="danger" (click)="deleteOlder()">Delete {{ store.versions().length - 1 }} versions</button>
+              <button type="button" (click)="confirm.set(null)">Cancel</button></span>
+          } @else {
+            <button type="button" (click)="confirm.set('all')">Delete all previous versions…</button>
+          }
+        </div>
+      }
       @if (store.versions().length) {
         <table>
           <tbody>
@@ -29,6 +40,12 @@ import { DocumentStore } from './document.store';
                 <td class="n">{{ v.itemCount }} parts</td>
                 <td class="buttons">
                   <button type="button" [disabled]="store.viewing() === v.version" (click)="view(v.version)">{{ store.viewing() === v.version ? 'Viewing' : 'View' }}</button>
+                  @if (confirm() === v.version) {
+                    <button type="button" class="danger" (click)="remove(v.version)">Delete v{{ v.version }}</button>
+                    <button type="button" (click)="confirm.set(null)">Cancel</button>
+                  } @else {
+                    <button type="button" [disabled]="v.version === store.version()" [title]="v.version === store.version() ? 'The newest version stays' : 'Delete this version for good'" (click)="confirm.set(v.version)">Delete</button>
+                  }
                   <button type="button" [disabled]="v.version === store.version() && !store.changedSinceVersion()" title="Make this the working copy and save it as the newest version" (click)="promote(v.version)">Promote</button>
                 </td>
               </tr>
@@ -60,6 +77,7 @@ import { DocumentStore } from './document.store';
     footer { margin-top: 12px; }
     button { padding: 4px 11px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; margin-left: 4px; }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; } button:disabled { opacity: .4; cursor: default; }
+    .prune { margin: 0 0 8px; } .ask { font-size: 12px; } button.danger { background: #8a2f2f; } button.danger:hover:not(:disabled) { background: #b03a3a; }
     .x { padding: 2px 8px; background: transparent; border: 0; }
   `,
 })
@@ -69,6 +87,19 @@ export class VersionsDialog implements OnInit {
 
   ngOnInit() {
     void this.store.refreshVersions();
+  }
+
+  /** What waits for a yes: one version number, or "all" (every version but the newest). */
+  protected readonly confirm = signal<number | 'all' | null>(null);
+
+  protected async remove(version: number) {
+    this.confirm.set(null);
+    await this.store.deleteVersion(version);
+  }
+
+  protected async deleteOlder() {
+    this.confirm.set(null);
+    await this.store.deleteOlderVersions();
   }
 
   protected save() {

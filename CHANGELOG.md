@@ -2,6 +2,17 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-28 - Delete versions, relink suggestions, document panel header and layout (0.10.39)
+
+### Added
+- **BE** (`versions.py`, `main.py`, `tests/test_api.py`): `DELETE /api/documents/{id}/versions/{n}` removes one saved version (404 unknown, 409 for the newest: the working copy is compared with it and numbers are never reused) and `DELETE /api/documents/{id}/versions` removes every version but the newest (answers what is left).
+- **FE** (`versions-dialog.ts`, `document.store.ts`, `document.api.ts`): the Versions dialog has **Delete** per version and **Delete all previous versions…**, both with an inline confirmation; deleting the version being viewed returns to the working copy.
+- **FE** (`app.ts`, `app.html`, `app.scss`): relink mode lists **similar files** from the library (ranked by shared words and prefix), a click relinks at once.
+- **FE** (`document-panel.ts`): a **⚠ n** summary above the list when parts have a warning (missing file, or the geometry of an imported 3MF); click selects them. A header bar (grip + fold chevron) collapses the panel to a bar with the document name, part count and warnings (remembered).
+
+### Changed
+- **FE** (`document-panel.ts`): layout: the key / mouse hints are behind a collapsible "Keys and mouse"; the parts list takes the free height (110 px … 60 % of the window). A panel against the right edge stays there when the view changes size (file panel collapsed or opened; `ResizeObserver`).
+
 ## 2026-10-28 - Relink mode, a missing file no longer blanks the view (0.10.38)
 
 ### Added

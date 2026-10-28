@@ -63,6 +63,15 @@ def save(directory: Path, body: dict, now: float | None = None) -> dict:
     return data
 
 
+def delete(directory: Path, number: int) -> bool:
+    """Removes one version; False when there is no such version."""
+    file = directory / f"v{number}.json"
+    if not file.is_file():
+        return False
+    file.unlink()
+    return True
+
+
 def replace_all(directory: Path, stored: list[dict]) -> None:
     """Makes `stored` (full version dicts) the complete history: used when a document is imported over an existing one."""
     import shutil

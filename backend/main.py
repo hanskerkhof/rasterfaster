@@ -465,6 +465,32 @@ def get_version(documentId: str, number: int) -> dict:
     return {**versions.summary(data), "items": data["items"]}
 
 
+@app.delete("/api/documents/{documentId}/versions/{number}", status_code=204)
+def delete_version(documentId: str, number: int) -> Response:
+    """Removes one saved version. The newest one stays: the working copy is compared with it, and numbers are never handed out twice."""
+    with documentWriteLock:
+        read_document(documentId)
+        directory = versions.versions_dir(documentsRoot, documentId)
+        if number == versions.latest(directory):
+            raise HTTPException(status_code=409, detail="the newest version cannot be deleted")
+        if not versions.delete(directory, number):
+            raise HTTPException(status_code=404, detail="version not found")
+    return Response(status_code=204)
+
+
+@app.delete("/api/documents/{documentId}/versions", response_model=list[VersionSummary])
+def delete_older_versions(documentId: str) -> list[dict]:
+    """Removes every saved version except the newest."""
+    with documentWriteLock:
+        read_document(documentId)
+        directory = versions.versions_dir(documentsRoot, documentId)
+        newest = versions.latest(directory)
+        for number in versions.numbers(directory):
+            if number != newest:
+                versions.delete(directory, number)
+        return versions.listing(directory)
+
+
 @app.post("/api/documents/{documentId}/versions/{number}/promote", response_model=DocumentOut)
 def promote_version(documentId: str, number: int) -> DocumentOut:
     """Makes an older version the working copy again and saves it as a new, latest version (the older versions stay as they are)."""
