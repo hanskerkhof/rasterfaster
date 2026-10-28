@@ -9,6 +9,9 @@ export interface DocumentSummary {
   modified: number;
 }
 
+/** One line of the report that comes with an imported 3MF: how a part was linked to a library file. */
+export interface Import3mfLine { name: string; path: string; matchedBy: string; count: number; note: string }
+
 export interface StoredDocument extends RfDocument {
   id: string;
   modified: number;
@@ -68,6 +71,13 @@ export class DocumentApi {
   importFile(text: string, onConflict?: 'replace' | 'copy') {
     const params = onConflict ? new HttpParams().set('onConflict', onConflict) : undefined;
     return this.http.post<StoredDocument>('/api/documents/import', text, { params, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  /** Makes a new document from a 3MF (the raw bytes): the parts are linked to the library's STL files. */
+  import3mf(data: ArrayBuffer, name: string) {
+    return this.http.post<{ document: StoredDocument; report: Import3mfLine[] }>('/api/documents/import-3mf', data, {
+      params: new HttpParams().set('name', name), headers: { 'Content-Type': 'model/3mf' },
+    });
   }
 
   delete(id: string) {

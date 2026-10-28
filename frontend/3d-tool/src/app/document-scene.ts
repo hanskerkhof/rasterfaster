@@ -82,6 +82,51 @@ function measure(geometry: THREE.BufferGeometry): PartStats {
   return { size: [size.x, size.y, size.z], volumeCm3: Math.abs(volume) / 1000, triangles };
 }
 
+type ScreenRect = { left: number; right: number; top: number; bottom: number };
+
+/** Liang-Barsky: does the segment (x0,y0)-(x1,y1) cross or lie inside the rectangle? */
+export function segmentTouchesRect(x0: number, y0: number, x1: number, y1: number, r: ScreenRect) {
+  let t0 = 0, t1 = 1;
+  const dx = x1 - x0, dy = y1 - y0;
+  for (const [p, q] of [[-dx, x0 - r.left], [dx, r.right - x0], [-dy, y0 - r.top], [dy, r.bottom - y0]] as const) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const t = q / p;
+    if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; }
+  }
+  return true;
+}
+
+/** A triangle (vertex indices into the screen coordinates) touches the rectangle when an edge does, or the rectangle lies inside it. */
+export function triangleTouchesRect(s: Float32Array, a: number, b: number, c: number, r: ScreenRect) {
+  const ax = s[a * 2], ay = s[a * 2 + 1], bx = s[b * 2], by = s[b * 2 + 1], cx = s[c * 2], cy = s[c * 2 + 1];
+  if (segmentTouchesRect(ax, ay, bx, by, r) || segmentTouchesRect(bx, by, cx, cy, r) || segmentTouchesRect(cx, cy, ax, ay, r)) return true;
+  const px = r.left, py = r.top; // all edges miss: the rectangle is either outside or entirely inside the triangle (test one corner)
+  const d1 = (px - bx) * (ay - by) - (ax - bx) * (py - by), d2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy), d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
+  return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0));
+}
+
+/** Binary STL of the geometries, each placed with its matrix. */
+function writeStl(parts: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[]): ArrayBuffer | null {
+  const count = (g: THREE.BufferGeometry) => (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+  const triangles = parts.reduce((n, part) => n + count(part.geometry), 0);
+  if (!triangles) return null;
+  const buffer = new ArrayBuffer(84 + 50 * triangles);
+  const view = new DataView(buffer);
+  view.setUint32(80, triangles, true);
+  let offset = 84;
+  const p = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()], n = new THREE.Vector3(), e = new THREE.Vector3();
+  for (const { geometry, matrix } of parts) {
+    const position = geometry.getAttribute('position'), index = geometry.index;
+    for (let t = 0; t < count(geometry); t++) {
+      for (let k = 0; k < 3; k++) p[k].fromBufferAttribute(position, index ? index.getX(t * 3 + k) : t * 3 + k).applyMatrix4(matrix);
+      n.subVectors(p[1], p[0]).cross(e.subVectors(p[2], p[0])).normalize();
+      for (const v of [n, ...p]) { view.setFloat32(offset, v.x, true); view.setFloat32(offset + 4, v.y, true); view.setFloat32(offset + 8, v.z, true); offset += 12; }
+      offset += 2; // attribute byte count
+    }
+  }
+  return buffer;
+}
+
 const snap = (value: number, step: number) => Math.round(value / step) * step;
 const quatKey = (q: Quat) => q.map(n => n.toFixed(4)).join(',');
 
@@ -104,6 +149,8 @@ export class DocumentScene {
   private hoveredHandle: THREE.Mesh | null = null;
   private drag: DragState | null = null;
   private emptyDown: { x: number; y: number } | null = null;
+  /** Shift-drag on empty space: the dashed selection rectangle (client coordinates) and its overlay element. */
+  private marquee: { x0: number; y0: number; x1: number; y1: number; box: HTMLDivElement } | null = null;
   private readonly listeners: [EventTarget, string, EventListener][] = [];
 
   constructor(private readonly ctx: DocumentSceneContext) {
@@ -116,12 +163,14 @@ export class DocumentScene {
     ctx.store.sizeOf = item => this.sizeOfItem(item);
     ctx.store.zMode = () => ctx.zGridMode();
     ctx.store.viewCenter = ctx.viewCenter;
+    ctx.store.stlOf = (ids, placed) => (placed ? this.stlOf(ids) : this.ownStlOf(ids));
     this.on(ctx.canvas, 'contextmenu', e => this.onContextMenu(e as MouseEvent));
     this.on(ctx.host, 'keydown', e => this.onKey(e as KeyboardEvent));
     // Esc leaves a pick mode wherever the keyboard focus is (after choosing the menu item it is on the page body, not on the stage),
     // and puts a part being dragged back where it was.
     this.on(document, 'keydown', e => {
       if ((e as KeyboardEvent).key !== 'Escape') return;
+      if (this.marquee) { this.endMarquee(); e.preventDefault(); return; }
       if (this.drag) { this.cancelDrag(); e.preventDefault(); return; }
       if (!this.picking()) return;
       ctx.store.cancelPicks();
@@ -129,9 +178,101 @@ export class DocumentScene {
     });
     // A drag that never gets its pointerup must not leave the history gesture open or the drag state stuck:
     // the browser cancelling the pointer aborts it; losing focus or switching tabs keeps what was done so far and ends it.
-    this.on(ctx.canvas, 'pointercancel', () => this.cancelDrag());
+    this.on(ctx.canvas, 'pointercancel', () => { this.endMarquee(); this.cancelDrag(); });
     this.on(window, 'blur', () => this.finishDrag());
     this.on(document, 'visibilitychange', () => { if (document.hidden) this.finishDrag(); });
+  }
+
+  private startMarquee(e: PointerEvent) {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;z-index:20;pointer-events:none;border:1.5px dashed #fff;background:rgba(47,111,237,.14);display:none';
+    document.body.appendChild(box);
+    this.marquee = { x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY, box };
+    this.ctx.canvas.setPointerCapture(e.pointerId);
+  }
+
+  private updateMarquee(e: PointerEvent) {
+    const m = this.marquee!;
+    m.x1 = e.clientX; m.y1 = e.clientY;
+    const small = Math.hypot(m.x1 - m.x0, m.y1 - m.y0) < 4; // a click, not a rectangle yet
+    Object.assign(m.box.style, { display: small ? 'none' : 'block', left: `${Math.min(m.x0, m.x1)}px`, top: `${Math.min(m.y0, m.y1)}px`,
+                                 width: `${Math.abs(m.x1 - m.x0)}px`, height: `${Math.abs(m.y1 - m.y0)}px` });
+  }
+
+  private endMarquee() {
+    this.marquee?.box.remove();
+    this.marquee = null;
+  }
+
+  /** Release: select the parts inside or touched by the rectangle (⌘ held: add to the selection); a plain Shift-click clears the selection. */
+  private finishMarquee(e: PointerEvent) {
+    const m = this.marquee!;
+    this.updateMarquee(e);
+    const rect = { left: Math.min(m.x0, m.x1), right: Math.max(m.x0, m.x1), top: Math.min(m.y0, m.y1), bottom: Math.max(m.y0, m.y1) };
+    this.endMarquee();
+    this.ctx.canvas.releasePointerCapture(e.pointerId);
+    if (rect.right - rect.left < 4 && rect.bottom - rect.top < 4) { if (!e.metaKey) this.ctx.store.select(null); return; }
+    const ids = this.itemsInRect(rect);
+    if (e.metaKey) this.ctx.store.selectMany(ids, true);
+    else this.ctx.store.selectMany(ids);
+  }
+
+  /** Ids of the visible, clickable parts with any triangle inside or crossing the screen rectangle (client coordinates). */
+  private itemsInRect(rect: { left: number; right: number; top: number; bottom: number }): string[] {
+    const bounds = this.ctx.canvas.getBoundingClientRect();
+    const r = { left: rect.left - bounds.left, right: rect.right - bounds.left, top: rect.top - bounds.top, bottom: rect.bottom - bounds.top };
+    const camera = this.ctx.camera;
+    camera.updateMatrixWorld();
+    const viewProjection = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    const full = new THREE.Matrix4();
+    const v = new THREE.Vector4();
+    const hit = new Set<string>();
+    for (const object of this.pickableMeshes()) {
+      const id = object.userData['itemId'] as string;
+      if (hit.has(id)) continue;
+      const mesh = object as THREE.Mesh;
+      const position = mesh.geometry.getAttribute('position');
+      if (!position) continue;
+      object.updateWorldMatrix(true, false);
+      full.multiplyMatrices(viewProjection, object.matrixWorld);
+      const count = position.count;
+      const screen = new Float32Array(count * 2);
+      const usable = new Uint8Array(count); // 0: behind the camera
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < count; i++) {
+        v.set(position.getX(i), position.getY(i), position.getZ(i), 1).applyMatrix4(full);
+        if (v.w <= 1e-6) continue;
+        const x = (v.x / v.w * 0.5 + 0.5) * bounds.width, y = (1 - (v.y / v.w * 0.5 + 0.5)) * bounds.height;
+        screen[i * 2] = x; screen[i * 2 + 1] = y; usable[i] = 1;
+        if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y;
+      }
+      if (maxX < r.left || minX > r.right || maxY < r.top || minY > r.bottom) continue; // the part's outline does not reach the rectangle
+      const index = mesh.geometry.index;
+      const triangles = (index ? index.count : count) / 3;
+      for (let t = 0; t < triangles; t++) {
+        const a = index ? index.getX(t * 3) : t * 3, b = index ? index.getX(t * 3 + 1) : t * 3 + 1, c = index ? index.getX(t * 3 + 2) : t * 3 + 2;
+        if (usable[a] && usable[b] && usable[c] && triangleTouchesRect(screen, a, b, c, r)) { hit.add(id); break; }
+      }
+    }
+    return this.ctx.store.doc().items.filter(i => hit.has(i.id)).map(i => i.id);
+  }
+
+  /** One binary STL (mm, document axes) with the given parts exactly as placed: rotation and position applied. */
+  private stlOf(ids: readonly string[]): ArrayBuffer | null {
+    const wanted = new Set(ids);
+    const parts: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
+    this.group.traverse(o => {
+      if (!(o as THREE.Mesh).isMesh || !wanted.has(o.userData['itemId'])) return;
+      o.updateWorldMatrix(true, false);
+      parts.push({ geometry: (o as THREE.Mesh).geometry, matrix: o.matrixWorld });
+    });
+    return writeStl(parts);
+  }
+
+  /** The geometry of one part as its STL has it (not rotated, not moved); the first of the given parts that has loaded. */
+  private ownStlOf(ids: readonly string[]): ArrayBuffer | null {
+    const item = this.ctx.store.doc().items.find(i => ids.includes(i.id) && this.baseGeometries.has(i.path));
+    return item ? writeStl([{ geometry: this.baseGeometries.get(item.path)!, matrix: new THREE.Matrix4() }]) : null;
   }
 
   /** Aborts the drag in progress: the parts go back to where they were and no undo step is written. */
@@ -391,6 +532,16 @@ export class DocumentScene {
     return item && entry ? new THREE.Vector3(...item.position).add(entry.size.clone().multiplyScalar(0.5)) : null;
   }
 
+  /** Bounding box of these items (after rotation), or null when none of their geometry has loaded. */
+  boundsOf(ids: readonly string[]): THREE.Box3 | null {
+    const wanted = new Set(ids);
+    const boxes = this.ctx.store.doc().items
+      .filter(item => wanted.has(item.id))
+      .map(item => { const entry = this.entryFor(item); return entry ? new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(entry.size)) : null; })
+      .filter((box): box is THREE.Box3 => box !== null);
+    return boxes.length ? boxes.reduce((all, box) => all.union(box)) : null;
+  }
+
   /** Bounding box of the selected items (after rotation), or null while none is selected or none of their geometry has loaded. */
   selectionBounds(): THREE.Box3 | null {
     const boxes = this.ctx.store.selectedItems()
@@ -560,6 +711,11 @@ export class DocumentScene {
       this.ctx.store.toggleSelect(hit.id);
       return;
     }
+    if (!hit && e.shiftKey && e.button === 0) { // Shift-drag on empty space: a dashed rectangle selects the parts it holds or touches
+      e.stopImmediatePropagation();
+      this.startMarquee(e);
+      return;
+    }
     if (!hit) { this.emptyDown = { x: e.clientX, y: e.clientY }; return; } // let OrbitControls orbit
     e.stopImmediatePropagation();
     const { store } = this.ctx;
@@ -582,6 +738,7 @@ export class DocumentScene {
 
   private onPointerMove(e: PointerEvent) {
     if (this.active && this.picking()) this.hoverHandle(this.pickHandle(e));
+    if (this.marquee) { this.updateMarquee(e); return; }
     const drag = this.drag;
     if (!this.active || !drag) return;
     const rect = this.ctx.canvas.getBoundingClientRect();
@@ -624,6 +781,7 @@ export class DocumentScene {
 
   private onPointerUp(e: PointerEvent) {
     if (!this.active) return;
+    if (this.marquee) { this.finishMarquee(e); return; }
     if (this.drag) {
       this.ctx.store.endGesture(); // writes the single undo step (nothing when the part never moved)
       if (!this.drag.moved && this.drag.wasInGroup) this.ctx.store.select(this.drag.id); // plain click inside a multi-selection narrows it, like Finder
@@ -688,10 +846,12 @@ export class DocumentScene {
   }
 
   dispose() {
+    this.endMarquee();
     this.finishDrag();
     this.ctx.store.sizeOf = null;
     this.ctx.store.zMode = null;
     this.ctx.store.viewCenter = null;
+    this.ctx.store.stlOf = null;
     for (const [target, type, fn] of this.listeners) target.removeEventListener(type, fn);
     for (const runtime of this.runtimes.values()) clearParts(runtime.group);
     for (const entry of this.oriented.values()) { entry.geometry.dispose(); entry.edges?.dispose(); entry.silhouette?.dispose(); }

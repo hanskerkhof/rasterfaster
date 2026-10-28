@@ -25,9 +25,21 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⎘</span>Paste<span class="hint">{{ store.clipboard() ? store.clipboard()!.items.length + ' part' + (store.clipboard()!.items.length === 1 ? '' : 's') + ' · ⌘V' : 'nothing copied' }}</span>
         </button>
         <div class="sep"></div>
+        <button type="button" role="menuitem" [disabled]="!canExport()" (click)="exportStl(true)">
+          <span class="icon">⤓</span>Export STL (as placed)
+          <span class="hint">{{ canExport() ? 'rotation and position applied' : 'no geometry (file missing)' }}</span>
+        </button>
+        <button type="button" role="menuitem" [disabled]="!canExport() || items().length !== 1" (click)="exportStl(false)">
+          <span class="icon">⤓</span>Export STL (original)
+          <span class="hint">{{ items().length === 1 ? 'own geometry, not rotated or moved' : 'select one part' }}</span>
+        </button>
         <button type="button" role="menuitem" (click)="findInBrowser()">
           <span class="icon">⌕</span>Find in browser
           <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
+        </button>
+        <button type="button" role="menuitem" (click)="showInAssembly()">
+          <span class="icon">⌖</span>Show in assembly
+          <span class="hint">select and zoom to {{ items().length > 1 ? 'these parts' : 'this part' }}</span>
         </button>
         <button type="button" role="menuitem" class="sub" (mouseenter)="openColors($event)" (click)="openColors($event)">
           <span class="icon">◐</span>Color<span class="hint">▸</span>
@@ -159,6 +171,25 @@ export class ObjectMenu {
 
   protected paste() {
     this.store.pasteClipboard();
+    this.close();
+  }
+
+  /** At least one of the parts has a file (a placeholder has no geometry to save). */
+  protected canExport() {
+    const missing = this.store.missingPaths();
+    return this.items().some(i => !missing.has(i.path));
+  }
+
+  protected exportStl(placed = true) {
+    this.store.exportStl(this.items().map(i => i.id), placed);
+    this.close();
+  }
+
+  /** Selects the parts and zooms the view to them (the right-click already selected them; a menu opened from the list too). */
+  protected showInAssembly() {
+    const ids = this.items().map(i => i.id);
+    this.store.selectMany(ids);
+    this.store.showInAssembly?.(ids);
     this.close();
   }
 

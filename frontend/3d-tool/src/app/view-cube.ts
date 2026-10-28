@@ -2,6 +2,8 @@ import * as THREE from 'three';
 
 const cubeSize = 150; // CSS px
 const cubeMargin = 12;
+/** What the view cube covers at the top right of the view (with its Home / fly-around buttons): floating panels keep out of it. */
+export const cubeKeepOut = { width: cubeSize + cubeMargin + 8, bottom: cubeMargin + 30 + cubeSize + 10 };
 const edgeZone = 0.62; // |coordinate| beyond this on an axis counts as "that side" of the cube
 
 const faceLabels: Record<string, string> = { '0,0,1': 'TOP', '0,0,-1': 'BOTTOM', '0,-1,0': 'FRONT', '0,1,0': 'BACK', '1,0,0': 'RIGHT', '-1,0,0': 'LEFT' };

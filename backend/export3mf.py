@@ -94,10 +94,11 @@ def transform_attribute(placement: Placement) -> str:
     return " ".join(f"{v:.6g}" for v in values)
 
 
-def object_xml(objectId: int, name: str, mesh: Mesh) -> str:
+def object_xml(objectId: int, name: str, mesh: Mesh, path: str = "") -> str:
     vertices = "".join(f'<vertex x="{x:.5f}" y="{y:.5f}" z="{z:.5f}"/>' for x, y, z in mesh.vertices.tolist())
     triangles = "".join(f'<triangle v1="{a}" v2="{b}" v3="{c}"/>' for a, b, c in mesh.triangles.tolist())
-    return (f'<object id="{objectId}" name={quoteattr(name)} type="model"><mesh>'
+    link = f" partnumber={quoteattr(path)}" if path else ""  # the library path: import3mf finds the file again from it
+    return (f'<object id="{objectId}" name={quoteattr(name)}{link} type="model"><mesh>'
             f"<vertices>{vertices}</vertices><triangles>{triangles}</triangles></mesh></object>")
 
 
@@ -112,7 +113,7 @@ def build_3mf(document: dict, load_stl: Callable[[str], bytes], plateSize: float
     names: dict[str, str] = {}
     for item in items:
         names.setdefault(item["path"], item["name"])  # a part used several times is named after its first use
-    resources = "".join(object_xml(objectIds[path], names[path], mesh) for path, mesh in meshes.items())
+    resources = "".join(object_xml(objectIds[path], names[path], mesh, path) for path, mesh in meshes.items())
     build = "".join(
         f'<item objectid="{objectIds[item["path"]]}" transform="{transform_attribute(placement)}" partnumber={quoteattr(item["name"])}/>'
         for item, placement in zip(items, placements)

@@ -3,7 +3,7 @@ import { ZGridMode, nearestZLevel } from './z-levels';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ClipboardContent, copyItems, pasteItems } from './clipboard';
-import { DocumentApi, DocumentSummary, StoredDocument, VersionSummary } from './document.api';
+import { DocumentApi, DocumentSummary, Import3mfLine, StoredDocument, VersionSummary } from './document.api';
 
 /** Grid the document snaps to, in mm. */
 /** X/Y snap steps in mm. Height (Z) follows the grid mode, see z-levels.ts. */
@@ -403,6 +403,22 @@ export class DocumentStore {
     }
   }
 
+  /** Makes a new document from a 3MF file and opens it; returns how the parts were linked to library files. */
+  async import3mf(data: ArrayBuffer, name: string): Promise<Import3mfLine[]> {
+    await this.flush();
+    try {
+      const { document, report } = await firstValueFrom(this.api.import3mf(data, name));
+      await this.refreshList();
+      await this.open(document.id);
+      await this.refreshVersions();
+      this.say(`Imported ${document.name}: ${document.items.length} parts`);
+      return report;
+    } catch (error) {
+      const detail = error instanceof HttpErrorResponse ? error.error?.detail : null;
+      throw new Error(typeof detail === 'string' ? detail : 'import failed');
+    }
+  }
+
   private say(message: string) {
     this.announce(message);
   }
@@ -542,7 +558,9 @@ export class DocumentStore {
 
   findInBrowser(ids: readonly string[]) {
     const wanted = new Set(ids);
-    const paths = [...new Set(this.doc().items.filter(i => wanted.has(i.id)).map(i => i.path))];
+    const chosen = this.doc().items.filter(i => wanted.has(i.id));
+    const paths = [...new Set(chosen.map(i => i.path).filter(p => !p.startsWith('embedded:')))];
+    if (!paths.length && chosen.length) this.announce('This part uses the geometry of an imported 3MF: it is not a file in the library (right-click ▸ Export STL saves it).', 6000);
     if (paths.length) this.browserRequest.set({ paths, seq: (this.browserRequest()?.seq ?? 0) + 1 });
   }
 
@@ -562,6 +580,22 @@ export class DocumentStore {
   }
 
   /** Dims or restores items (one undo step). */
+  /** Saves the parts as one STL file (downloads it): as placed in the document, or with `placed` false the part's own geometry, as the file has it
+   *  (one part: the way to recover a part's STL from an imported 3MF). Returns false when there was no geometry to save. */
+  exportStl(ids: readonly string[], placed = true): boolean {
+    const data = this.stlOf?.(ids, placed);
+    if (!data) return false;
+    const items = this.doc().items.filter(i => ids.includes(i.id));
+    const base = items.length === 1 ? items[0].name : `${this.doc().name} (${items.length} parts)`;
+    const url = URL.createObjectURL(new Blob([data], { type: 'model/stl' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = base.replace(/[\\/:*?"<>|]+/g, '_') + '.stl';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+
   setColor(ids: readonly string[], color: number) {
     this.updateItems('Colour parts', new Map(ids.map(id => [id, { color }])));
   }
@@ -614,6 +648,10 @@ export class DocumentStore {
 
   /** Where the view is looking (X/Y in mm); set by the 3D scene. Pasted parts land here. */
   viewCenter: (() => { x: number; y: number }) | null = null;
+  /** Selects these parts and zooms the 3D view to them (set by the viewer). */
+  showInAssembly: ((ids: readonly string[]) => void) | null = null;
+  /** Binary STL of these parts as placed (set by the 3D scene); null when none of them has geometry (a placeholder, still loading). */
+  stlOf: ((ids: readonly string[], placed: boolean) => ArrayBuffer | null) | null = null;
 
   copySelection(): boolean {
     const content = copyItems(this.selectedItems());

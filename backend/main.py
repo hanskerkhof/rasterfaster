@@ -27,10 +27,12 @@ import appconfig
 import blenderexport
 import versions
 import export3mf
+import import3mf
 import library_ops
 import searchterms
 import svgexport
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -61,6 +63,17 @@ def resolve_inside_root(relativePath: str) -> Path:
     if absolutePath != libraryRoot and libraryRoot not in absolutePath.parents:
         raise HTTPException(status_code=403, detail="forbidden")
     return absolutePath
+
+
+embeddedPattern = re.compile(r"^embedded:([0-9a-f]{40})\.stl$")
+
+
+def resolve_part(path: str) -> Path:
+    """The STL of a document part: a library file, or geometry kept from an imported 3MF (`embedded:<sha1>.stl`, stored next to the documents)."""
+    found = embeddedPattern.match(path)
+    if found:
+        return documentsRoot / "_embedded" / f"{found.group(1)}.stl"
+    return resolve_inside_root(path)
 
 
 def natural_key(name: str) -> list:
@@ -136,7 +149,7 @@ def library_missing(body: PathsRequest) -> dict:
     missing = []
     for path in dict.fromkeys(body.paths):
         try:
-            found = library_ops.inside_library(libraryRoot, path).is_file()
+            found = resolve_part(path).is_file() if embeddedPattern.match(path) else library_ops.inside_library(libraryRoot, path).is_file()
         except library_ops.LibraryError:
             found = False
         if not found:
@@ -293,7 +306,7 @@ def search(q: str, mode: Literal["any", "all"] = "any") -> list[LibraryEntry]:
 
 @app.get("/api/file")
 def get_file(path: str) -> FileResponse:
-    file = resolve_inside_root(path)
+    file = resolve_part(path)
     if file.suffix.lower() != ".stl":
         raise HTTPException(status_code=400, detail="only .stl")
     if not file.is_file():
@@ -523,6 +536,42 @@ def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "c
         return read_document(documentId)
 
 
+class Import3mfReportLine(BaseModel):
+    name: str
+    path: str
+    matchedBy: str  # path | name | name-shape | name-ambiguous | shape | none (placeholder) | skipped
+    count: int
+    note: str = ""
+
+
+class Import3mfOut(BaseModel):
+    document: DocumentOut
+    report: list[Import3mfReportLine]
+
+
+@app.post("/api/documents/import-3mf", response_model=Import3mfOut, status_code=201)
+async def import_document_3mf(request: Request, name: str | None = None, plate: int | None = None) -> Import3mfOut:
+    """A new document from a 3MF (the raw file as the body): our own export or a Bambu Studio project. The parts are linked to the library's STL
+    files (see import3mf.py); what has no file becomes a placeholder part. `plate` imports only that Bambu plate."""
+    data = await request.body()
+    if not data:
+        raise HTTPException(status_code=422, detail="empty file")
+    try:
+        result = await run_in_threadpool(lambda: import3mf.import_3mf(data, import3mf.index_library(libraryRoot), plate))
+    except import3mf.ThreeMfError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    if result.embedded:
+        folder = documentsRoot / "_embedded"
+        folder.mkdir(parents=True, exist_ok=True)
+        for path, stl in result.embedded.items():
+            target = folder / path.split(":", 1)[1]
+            if not target.exists():
+                target.write_bytes(stl)
+    title = f"{((name or result.name).strip() or '3MF')[:100]} (imported)"
+    document = write_document(new_document_id(title), DocumentBody(name=title, items=[DocumentItem(**item) for item in result.items[:2000]]))
+    return Import3mfOut(document=document, report=[Import3mfReportLine(**line) for line in result.report])
+
+
 @app.get("/api/documents/{documentId}/export.3mf")
 def export_document_3mf(documentId: str, bed: float = 256.0) -> Response:
     """3MF of the assembly for Bambu Studio: the parts exactly as assembled, centred on a plate of `bed` mm."""
@@ -549,7 +598,7 @@ def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
     missing = []
     for path in dict.fromkeys(item.path for item in document.items):
         try:
-            stlBytes[path] = resolve_inside_root(path).read_bytes()
+            stlBytes[path] = resolve_part(path).read_bytes()
         except (OSError, HTTPException):
             missing.append(path)
     if missing:

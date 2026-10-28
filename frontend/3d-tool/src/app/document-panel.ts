@@ -1,16 +1,56 @@
 import { LibraryService } from './library.service';
-import { Component, inject, input, output, signal } from '@angular/core';
+import { cubeKeepOut } from './view-cube';
+import { ReleaseFocus } from './release-focus';
+import { Component, ElementRef, HostListener, afterNextRender, effect, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
 import { rangeEndingAt } from './tree-selection';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
+interface PanelGeometry { left: number; top: number; width: number; height: number }
+const geometryStorageKey = 'rasterfaster.docPanelGeometry';
+const snapDistance = 24; // px from the right edge of the view at which the panel snaps to it
+const sideGap = 12;
+
+/** Magnets for a moved panel: it snaps to the right edge of the view, and it never covers the view cube (it is put just below it instead). */
+function snapPanel(g: PanelGeometry, parentWidth: number, parentHeight: number): PanelGeometry {
+  let { left, top, width, height } = g;
+  if (parentWidth - (left + width) < snapDistance) left = parentWidth - width - sideGap;
+  if (left + width > parentWidth - cubeKeepOut.width && top < cubeKeepOut.bottom) {
+    top = cubeKeepOut.bottom;
+    height = Math.min(height, Math.max(240, parentHeight - top));
+  }
+  return { left: Math.max(0, left), top: Math.max(0, Math.min(top, parentHeight - height)), width, height };
+}
+
+function readGeometry(): PanelGeometry | null {
+  try {
+    const g = JSON.parse(localStorage.getItem(geometryStorageKey) ?? 'null');
+    return g && [g.left, g.top, g.width, g.height].every(Number.isFinite) ? g : null;
+  } catch { return null; }
+}
+
 @Component({
   selector: 'app-document-panel',
-  imports: [BomDialog, VersionsDialog],
+  imports: [BomDialog, VersionsDialog, ReleaseFocus],
+  host: {
+    '[class.sized]': 'geom() !== null',
+    '[style.left.px]': 'geom()?.left',
+    '[style.top.px]': 'geom()?.top',
+    '[style.width.px]': 'geom()?.width',
+    '[style.height.px]': 'geom()?.height',
+    '[style.right]': "geom() ? 'auto' : null",
+    '[style.max-height]': "geom() ? 'none' : null",
+  },
   template: `
+    <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
+    <div class="edge w" (pointerdown)="startDrag($event, 'w')"></div>
+    <div class="edge e" (pointerdown)="startDrag($event, 'e')"></div>
+    <div class="edge s" (pointerdown)="startDrag($event, 's')"></div>
+    <div class="edge sw" (pointerdown)="startDrag($event, 'sw')"></div>
+    <div class="edge se" (pointerdown)="startDrag($event, 'se')"></div>
     <div class="picker">
-      <select aria-label="Open document" (change)="open($any($event.target).value)">
+      <select releaseFocus aria-label="Open document" (change)="open($any($event.target).value)">
         @for (d of store.documents(); track d.id) {
           <option [value]="d.id" [selected]="d.id === store.docId()">{{ d.name }} ({{ d.itemCount }})</option>
         }
@@ -19,7 +59,9 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       <button type="button" title="Delete this document" [disabled]="!store.docId()" (click)="deleteDocument()">🗑</button>
     </div>
     <div class="head">
-      <input class="docname" type="text" [value]="store.doc().name" aria-label="Document name" [disabled]="store.viewing() !== null" (change)="store.rename($any($event.target).value)" />
+      <input #nameInput class="docname" type="text" maxlength="120" [value]="store.doc().name" aria-label="Document name" title="Click to rename · Enter saves · Esc cancels" [disabled]="store.viewing() !== null"
+             (focus)="nameInput.select()" (keydown.enter)="nameInput.blur()" (keydown.escape)="cancelRename(nameInput)" (blur)="commitRename(nameInput)" />
+      <button type="button" class="ver" title="Rename this document" aria-label="Rename document" [disabled]="!store.docId() || store.viewing() !== null" (click)="nameInput.focus()">✎</button>
       <button type="button" class="ver" [title]="versionTitle()" (click)="versionsOpen.set(true)">{{ versionLabel() }}</button>
     </div>
     <div class="toolbar">
@@ -41,6 +83,8 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
       <button type="button" [disabled]="!store.docId() || exporting()" title="Save this document, with all its versions, as a file you can keep (⤓)" (click)="exportDocumentFile()">Save file</button>
       <button type="button" title="Restore a document from a saved file (with its versions)" (click)="fileInput.click()">Open file…</button>
       <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />
+      <button type="button" title="Make a new document from a 3MF (ours or a Bambu Studio project); the parts are linked to the STL files in the library" (click)="threeMfInput.click()">Import 3MF…</button>
+      <input #threeMfInput type="file" accept=".3mf" hidden (change)="import3mf($any($event.target))" />
     </div>
     @if (pendingImport(); as pending) {
       <div class="import-ask" role="alert">
@@ -52,13 +96,24 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
         </div>
       </div>
     }
+    @if (importReport(); as report) {
+      <div class="import-ask report" role="status">
+        <div class="buttons"><button type="button" (click)="importReport.set(null)">OK</button> <span>{{ report.summary }}</span></div>
+        @if (report.problems.length) {
+          <div class="problems">
+            @for (line of report.problems; track $index) { <div>⚠ {{ line }}</div> }
+          </div>
+        }
+      </div>
+    }
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
     <div class="list" tabindex="0"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
-        <div class="item" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range">
+        <div class="item" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
+          @if (item.path.startsWith('embedded:')) { <span class="badge warn" title="This geometry comes from an imported 3MF: there is no file for it in the library. Right-click ▸ Export STL (original) saves it as an STL.">⚠</span> }
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
@@ -81,10 +136,10 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     }
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
     @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
-    <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+    <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: 6px; padding: 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
+    :host { display: flex; flex-direction: column; gap: 6px; padding: 14px 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
             background: rgba(35,38,45,.9); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
     .head { display: flex; gap: 6px; align-items: center; }
     .ver { flex: none; padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
@@ -98,6 +153,9 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     .export span { flex: 1 0 100%; opacity: .8; white-space: nowrap; }
     .export-error { color: #ff8a8a; font-size: 11px; }
     .import-ask { padding: 6px 8px; background: #3a3320; border: 1px solid #6b5a20; border-radius: 6px; font-size: 11px; }
+    .import-ask.report { flex: none; } .import-ask .buttons { align-items: center; }
+    .problems { max-height: 160px; overflow-y: auto; margin-top: 6px; padding-top: 4px; border-top: 1px solid #6b5a20; word-break: break-word; }
+    .problems div + div { margin-top: 3px; }
     .import-ask .buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
     .status { margin-left: auto; opacity: .6; font-size: 11px; }
     .status.error { color: #ff8a8a; opacity: 1; }
@@ -119,12 +177,95 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
     .pos { display: flex; gap: 4px; }
     .pos label { flex: 1; display: flex; flex-direction: column; gap: 2px; font-weight: 700; }
     .pos input { width: 100%; box-sizing: border-box; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; font-weight: 400; }
+    .grip { position: absolute; top: 0; left: 0; right: 0; height: 12px; cursor: grab; touch-action: none; }
+    .grip::after { content: ''; position: absolute; top: 5px; left: calc(50% - 16px); width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); }
+    .grip:hover::after { background: rgba(255,255,255,.5); }
+    .edge { position: absolute; touch-action: none; z-index: 1; }
+    .edge.w { left: -3px; top: 12px; bottom: 12px; width: 7px; cursor: ew-resize; }
+    .edge.e { right: -3px; top: 12px; bottom: 12px; width: 7px; cursor: ew-resize; }
+    .edge.s { left: 12px; right: 12px; bottom: -3px; height: 7px; cursor: ns-resize; }
+    .edge.sw { left: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nesw-resize; }
+    .edge.se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+    .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55; /* the resize corner, drawn like the browser's own */
+      background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); }
+    .edge.se:hover::after { opacity: 1; }
+    .list::after { content: ''; display: block; height: min(40vh, 400px); } /* room to scroll past the last row, so the last parts can be centred too */
+    :host(.sized) .list { flex: 1 1 0; min-height: 60px; max-height: none; }
     .hint { opacity: .55; font-size: 11px; line-height: 1.35; }
   `,
 })
 export class DocumentPanel {
   protected readonly store = inject(DocumentStore);
   private readonly lib = inject(LibraryService);
+  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /** Where the user put the panel and how big they made it (relative to the view); null = the default place and size. Remembered. */
+  protected readonly geom = signal<PanelGeometry | null>(readGeometry());
+
+  constructor() {
+    afterNextRender(() => this.clampToParent());
+    // A part was selected (in the 3D view, or by a command): its row scrolls into view in the list (centred in the list, smoothly).
+    effect(() => {
+      const ids = this.store.selectedIds();
+      const last = ids[ids.length - 1];
+      if (!last) return;
+      setTimeout(() => this.element.nativeElement.querySelector<HTMLElement>(`.item[data-id="${CSS.escape(last)}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    });
+  }
+
+  @HostListener('window:resize')
+  protected clampToParent() {
+    const g = this.geom(), parent = this.element.nativeElement.offsetParent as HTMLElement | null;
+    if (!g || !parent) return;
+    const width = Math.min(g.width, parent.clientWidth), height = Math.min(g.height, parent.clientHeight);
+    const next = snapPanel({ width, height, left: Math.max(0, Math.min(g.left, parent.clientWidth - width)), top: Math.max(0, Math.min(g.top, parent.clientHeight - height)) }, parent.clientWidth, parent.clientHeight);
+    if (next.left !== g.left || next.top !== g.top || next.width !== g.width || next.height !== g.height) this.geom.set(next);
+  }
+
+  protected resetGeometry() {
+    this.geom.set(null);
+    try { localStorage.removeItem(geometryStorageKey); } catch { /* storage unavailable */ }
+  }
+
+  /** Moves (the grip) or resizes (an edge or corner) the panel with the pointer; the result is remembered. */
+  protected startDrag(event: PointerEvent, mode: 'move' | 'w' | 'e' | 's' | 'sw' | 'se') {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const host = this.element.nativeElement, parent = host.offsetParent as HTMLElement | null;
+    if (!parent) return;
+    const box = host.getBoundingClientRect(), area = parent.getBoundingClientRect();
+    const start: PanelGeometry = { left: box.left - area.left, top: box.top - area.top, width: box.width, height: box.height };
+    this.geom.set(start);
+    const minWidth = 200, minHeight = 240;
+    const move = (e: PointerEvent) => {
+      const dx = e.clientX - event.clientX, dy = e.clientY - event.clientY;
+      let { left, top, width, height } = start;
+      if (mode === 'move') {
+        left = Math.max(0, Math.min(start.left + dx, parent.clientWidth - width));
+        top = Math.max(0, Math.min(start.top + dy, parent.clientHeight - height));
+      } else {
+        if (mode.includes('w')) { width = Math.max(minWidth, Math.min(start.width - dx, start.left + start.width)); left = start.left + start.width - width; }
+        if (mode.includes('e')) {
+          const reach = start.top < cubeKeepOut.bottom ? parent.clientWidth - cubeKeepOut.width : parent.clientWidth; // above the cube's bottom the panel may not grow under it
+          width = Math.max(minWidth, Math.min(start.width + dx, reach - start.left));
+        }
+        if (mode.includes('s')) height = Math.max(minHeight, Math.min(start.height + dy, parent.clientHeight - start.top));
+      }
+      this.geom.set({ left, top, width, height });
+    };
+    const end = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', end);
+      window.removeEventListener('pointercancel', end);
+      const g = this.geom();
+      if (mode === 'move' && g) this.geom.set(snapPanel(g, parent.clientWidth, parent.clientHeight)); // the magnets act on release, not while dragging
+      try { localStorage.setItem(geometryStorageKey, JSON.stringify(this.geom())); } catch { /* storage unavailable */ }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
+  }
+
   /** Double-click on a list item: the viewer should centre on it. */
   readonly centerItem = output<string>();
   /** The 3D view's camera (see StlViewer.viewParam): the Blender export puts its camera there. */
@@ -176,6 +317,44 @@ export class DocumentPanel {
     } catch (error) {
       this.exportError.set(`Import failed: ${error instanceof Error ? error.message : error}`);
     }
+  }
+
+  /** How the last imported 3MF was linked to the library; the unclear parts are listed. */
+  protected readonly importReport = signal<{ summary: string; problems: string[] } | null>(null);
+
+  protected async import3mf(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.exportError.set('');
+    this.importReport.set(null);
+    try {
+      const report = await this.store.import3mf(await file.arrayBuffer(), file.name.replace(/\.3mf$/i, ''));
+      const total = report.filter(l => l.matchedBy !== 'skipped').reduce((n, l) => n + l.count, 0);
+      const linked = report.filter(l => ['path', 'name', 'name-shape', 'name-ambiguous', 'shape'].includes(l.matchedBy)).reduce((n, l) => n + l.count, 0);
+      const embedded = report.filter(l => l.matchedBy === 'embedded').reduce((n, l) => n + l.count, 0);
+      const problems = report.flatMap(l =>
+        l.matchedBy === 'name-ambiguous' ? [`${l.name}: the same file is in several folders; took ${l.path}`]
+        : l.matchedBy === 'skipped' ? [`${l.name}: ${l.note}`] : []);
+      this.importReport.set({
+        summary: `Imported ${total} parts: ${linked} linked to a library file` + (embedded ? `, ${embedded} use the 3MF's own geometry (not in the library; right-click ▸ Export STL saves one)` : '') + '.',
+        problems,
+      });
+    } catch (error) {
+      this.exportError.set(`Import failed: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  /** Saves the typed name (trimmed); an empty name puts the old one back. */
+  protected commitRename(input: HTMLInputElement) {
+    const name = input.value.trim();
+    if (!name) input.value = this.store.doc().name;
+    else if (name !== this.store.doc().name) this.store.rename(name);
+  }
+
+  protected cancelRename(input: HTMLInputElement) {
+    input.value = this.store.doc().name;
+    input.blur();
   }
 
   protected async finishImport(choice: 'replace' | 'copy') {

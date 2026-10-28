@@ -321,6 +321,7 @@ export class StlViewer implements OnDestroy {
   private init() {
     const el = this.host().nativeElement;
     this.viewFocus.target = el;
+    this.store.showInAssembly = ids => this.showInAssembly(ids);
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     Object.assign(this.renderer.domElement.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
@@ -610,10 +611,14 @@ export class StlViewer implements OnDestroy {
 
   /** Re-centres the camera on the document without changing the viewing direction. */
   private fitDocument() {
-    const bounds = this.documentScene.bounds() ?? new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(12 * gridCellMm, 8 * gridCellMm, 40));
+    this.fitBounds(this.documentScene.bounds() ?? new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(12 * gridCellMm, 8 * gridCellMm, 40)));
+  }
+
+  /** Centres the view on the box and zooms so it fills the view; the viewing direction stays. */
+  private fitBounds(bounds: THREE.Box3, keepRadius = false) {
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
-    this.radius = Math.max(size.length() / 2, 60);
+    if (!keepRadius) this.radius = Math.max(size.length() / 2, 60); // zooming to a part keeps the document's, so the rest still lies inside the clipping range
     const offset = this.camera.position.clone().sub(this.controls.target);
     const direction = offset.lengthSq() > 1e-6 ? offset.normalize() : this.homeDirection.clone(); // no view yet: start isometric
     const zoom = this.fitZoom(size, direction);
@@ -733,6 +738,15 @@ export class StlViewer implements OnDestroy {
       offset: this.camera.position.clone().sub(this.controls.target),
       from: this.controls.target.clone(), to: point.clone(), start: performance.now(),
     };
+  }
+
+  /** "Show in assembly": centres the view on these parts and zooms to them. */
+  showInAssembly(ids: readonly string[]) {
+    const bounds = this.documentScene.boundsOf(ids);
+    if (!bounds) return;
+    this.flying.set(false);
+    this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
+    this.fitBounds(bounds, true);
   }
 
   /** Centres the view on a document item (double-click in the document list). */
@@ -1033,6 +1047,7 @@ export class StlViewer implements OnDestroy {
 
   ngOnDestroy() {
     if (this.viewFocus.target === this.host().nativeElement) this.viewFocus.target = null;
+    this.store.showInAssembly = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
     this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);

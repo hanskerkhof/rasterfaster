@@ -2,13 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
-## 2026-10-27 - Canvas context menu with Paste; adding a part focuses the canvas (0.10.35)
+## 2026-10-28 - 3MF import, Export STL, selection rectangle, movable document panel (0.10.37)
 
 ### Added
-- **FE** (`document-scene.ts`, `document.store.ts`, `object-menu.ts`): right-clicking an empty spot in the document canvas opens a menu with **Paste ⌘V** (disabled, "nothing copied", when the clipboard is empty). `DocumentStore.openCanvasMenu` opens the existing object menu with no parts.
+- **BE** (`import3mf.py`, `main.py`, `export3mf.py`, `tests/test_import3mf.py`, `tests/test_export3mf.py`): `POST /api/documents/import-3mf?name=&plate=` (the raw 3MF as the body) makes a new document "<name> (imported)" from a 3MF made by this app or by Bambu Studio (objects with `p:path` components, `Metadata/model_settings.config`). Each object is linked to a library file by: the library path our exports now carry (`partnumber` of the object), then its name / `source_file` as a file name (several folders: decided by the mesh shape), then the mesh shape (the size of a binary STL gives its triangle count, so only files of that size are read). Position (the rotated bounding box's corner, back on the 20 mm grid), rotation (from the transform) are recovered; scaled or mirrored parts (Bambu primitives, modifiers) are skipped and reported. Parts with no library file keep the 3MF's own geometry as `embedded:<sha1>.stl` in `documents/_embedded/` (never in the library): shown in the document, exported with it, `GET /api/file` and `/api/library/missing` know the scheme (`resolve_part`).
+- **FE** (`document-panel.ts`, `document.api.ts`, `document.store.ts`): **Import 3MF…** button with a report (how many parts were linked, ambiguous names, skipped parts, parts that use the 3MF's own geometry); those parts get a ⚠ in the parts list; Find in browser says they are not library files.
+- **FE** (`object-menu.ts`, `document-scene.ts`, `document.store.ts`): object menu: **Export STL (as placed)** (rotation and position applied; several parts: one file) and **Export STL (original)** (one part's own geometry, to recover a file from a 3MF), **Show in assembly** (selects and zooms to the parts; `stl-viewer.ts` `showInAssembly`).
+- **FE** (`document-scene.ts`, `marquee.spec.ts`): **Shift-drag on empty space** draws a dashed rectangle; on release the parts inside or touched by it (any triangle, on screen) are selected (⌘ adds; Esc cancels).
+- **FE** (`document-panel.ts`, `view-cube.ts`): the document panel can be moved (grip bar) and resized (edges, corners; resize corner drawn), remembered; on release it snaps to the right edge and never covers the view cube (double-click the grip: default place). The list scrolls the selected part to its middle, smoothly; the picker returns the keyboard focus to the view (so ⌘C in one document, ⌘V in another works).
+- **FE** (`document-panel.ts`): the document name can be renamed with the ✎ button or by clicking it (Enter saves, Esc cancels, an empty name is ignored).
 
 ### Changed
-- **FE** (`document-scene.ts`): after a part is added (⌘↓ or **Add to document**), the file list loses the keyboard focus and the canvas gets it, so the arrow keys move the new part at once.
+- **FE** (`document-panel.ts`): the Import report scrolls inside its own box.
 
 ## 2026-10-28 - Colour flyout, view shortcuts, focus handling, dev stack script (0.10.36)
 
@@ -24,6 +29,14 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 - **FE** (`tree-panel.ts`, `app.ts`, `app.html`): **Add to document** is enabled only when a file is selected in the browser (one or several); it adds the file the browser cursor is on.
 - **FE** (`document-scene.ts`): after adding a part (⌘↓ or the button) the keyboard focus goes from the file list to the canvas.
 - **FE** (`document-scene.ts`, `document.store.ts`, `object-menu.ts`): right-clicking empty canvas opens a menu with **Paste ⌘V**.
+
+## 2026-10-27 - Canvas context menu with Paste; adding a part focuses the canvas (0.10.35)
+
+### Added
+- **FE** (`document-scene.ts`, `document.store.ts`, `object-menu.ts`): right-clicking an empty spot in the document canvas opens a menu with **Paste ⌘V** (disabled, "nothing copied", when the clipboard is empty). `DocumentStore.openCanvasMenu` opens the existing object menu with no parts.
+
+### Changed
+- **FE** (`document-scene.ts`): after a part is added (⌘↓ or **Add to document**), the file list loses the keyboard focus and the canvas gets it, so the arrow keys move the new part at once.
 
 ## 2026-10-27 - Find in browser puts the file in the middle of the list (0.10.34)
 
