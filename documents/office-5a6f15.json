@@ -1,0 +1,105 @@
+{
+  "name": "office-desk",
+  "items": [
+    {
+      "id": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e",
+      "path": "office-desk.stl",
+      "name": "office-desk",
+      "color": 7317724,
+      "position": [
+        -880.0,
+        -900.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "b51be9c5-df91-4517-989c-7e598d54d432",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE COVER.stl",
+      "name": "15.1 KIOSK REMOTE COVER",
+      "color": 9684093,
+      "position": [
+        -248.1,
+        -240.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7b4369d7-3644-421f-a98e-cda60dc43a4e",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
+      "name": "15.1 KIOSK REMOTE FRONT",
+      "color": 16167531,
+      "position": [
+        -124.0,
+        -240.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "6e0fb7e1-9552-467c-b329-e37563566be9",
+      "path": "15.1 KIOSK REMOTE/rotary+encoder_14mm_hole_spc.stl",
+      "name": "rotary+encoder_14mm_hole_spc",
+      "color": 12745632,
+      "position": [
+        -118.7,
+        -154.6,
+        650.4
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "bbccd9c8-4638-475a-9f9d-d23552fc3976",
+      "path": "15.1 KIOSK REMOTE/TM1637.stp.stl",
+      "name": "TM1637.stp",
+      "color": 14706278,
+      "position": [
+        -120.0,
+        -223.1,
+        655.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}

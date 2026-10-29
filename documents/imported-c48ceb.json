@@ -408,7 +408,7 @@
       "color": 16167531,
       "position": [
         100.0,
-        -60.0,
+        -180.0,
         22.0
       ],
       "rotation": [
@@ -1216,6 +1216,46 @@
         5.5511151231257815e-17,
         1.0,
         -5.551115123125781e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7714df30-5da3-49cc-a3db-e2e7a5ab6bbf",
+      "path": "MOUNTS/3.20.POWER SWITCH 230V/POWER SWITCH w LIGHT + 1x CABLE FLAT 3.6 mm.stl",
+      "name": "POWER SWITCH w LIGHT + 1x CABLE FLAT 3.6 mm",
+      "color": 16167531,
+      "position": [
+        100.0,
+        -60.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "daed045d-5fa4-4b52-8f01-ea115a85220d",
+      "path": "MOUNTS/3.20.POWER SWITCH 230V/Rocker Switch_Green.stp.stl",
+      "name": "Rocker Switch_Green.stp",
+      "color": 12745632,
+      "position": [
+        92.4,
+        -39.6,
+        25.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
       ],
       "muted": false,
       "centered": false,
