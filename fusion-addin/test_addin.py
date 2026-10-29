@@ -24,54 +24,36 @@ def test_base_name_drops_the_version_in_both_spellings():
     assert addin.base_name("a/b:c") == "a-b-c"
 
 
-def test_a_versioned_save_is_one_above_the_highest_on_disk(tmp_path):
-    for name in ["RF14_v1.f3d", "RF14_v2.f3d", "RF14 v7.f3d", "RF14.f3d", "RF140_v9.f3d", "RF14_v3.f3d.bak", ".RF14_v99.saving.f3d", "OTHER_v50.f3d"]:
-        (tmp_path / name).write_bytes(b"x")
-    target, highest = addin.planned_target(str(tmp_path), "RF14_v2", True)
-    assert Path(target).name == "RF14_v8.f3d" and highest == 7
+def test_a_versioned_save_uses_fusions_version_number(tmp_path):
+    assert Path(addin.planned_target(str(tmp_path), "RF14_v2", True, 5)).name == "RF14_v5.f3d"
+    assert Path(addin.planned_target(str(tmp_path), "RF14 v4", True, 12)).name == "RF14_v12.f3d"
 
 
-def test_first_version_and_missing_folder(tmp_path):
-    target, highest = addin.planned_target(str(tmp_path), "RF14", True)
-    assert Path(target).name == "RF14_v1.f3d" and highest == 0
-    target, highest = addin.planned_target(str(tmp_path / "nope"), "RF14", True)
-    assert Path(target).name == "RF14_v1.f3d"
+def test_without_a_fusion_version_or_versioning_the_name_is_used_as_it_is(tmp_path):
+    assert Path(addin.planned_target(str(tmp_path), "RF14 v4", True, None)).name == "RF14.f3d"   # never saved in the cloud: no number
+    assert Path(addin.planned_target(str(tmp_path), "RF14 v4", False, 7)).name == "RF14.f3d"
+    assert Path(addin.planned_target(str(tmp_path), "RF14_v2", False, 7)).name == "RF14_v2.f3d"
 
 
-def test_without_versioning_the_name_is_used_as_it_is(tmp_path):
-    target, highest = addin.planned_target(str(tmp_path), "RF14 v4", False)
-    assert Path(target).name == "RF14.f3d" and highest is None
-    target, _ = addin.planned_target(str(tmp_path), "RF14_v2", False)
-    assert Path(target).name == "RF14_v2.f3d"
+def test_the_fusion_version_of_a_document():
+    def document(data_file):
+        return types.SimpleNamespace(dataFile=data_file)
+    assert addin.fusion_version(document(types.SimpleNamespace(versionNumber=5))) == 5
+    assert addin.fusion_version(document(None)) is None
+    assert addin.fusion_version(types.SimpleNamespace()) is None
 
 
 def test_the_preview_text(tmp_path):
+    target = addin.planned_target(str(tmp_path), "RF14", True, 3)
+    assert addin.describe(target, versioned=True, number=3) == "RF14_v3.f3d"
     (tmp_path / "RF14_v3.f3d").write_bytes(b"x")
-    assert "latest on disk: v3" in addin.describe(*addin.planned_target(str(tmp_path), "RF14", True))
-    assert "no version on disk" in addin.describe(*addin.planned_target(str(tmp_path), "NEW", True))
-    assert "replaces" in addin.describe(*addin.planned_target(str(tmp_path), "RF14_v3", False))
-
-
-def test_the_add_in_version_is_the_one_in_the_manifest():
-    import json
-    manifest = json.loads((Path(__file__).parent / "AddInRasterfasterLocalF3D" / "AddInRasterfasterLocalF3D.manifest").read_text())
-    assert addin.addin_version() == manifest["version"] != ""
+    assert "replaces" in addin.describe(target, versioned=True, number=3)
+    assert "not saved in the cloud" in addin.describe(addin.planned_target(str(tmp_path), "NEW", True, None), versioned=True, number=None)
 
 
 def _touch(path, size=1):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"x" * size)
-
-
-def test_version_numbers_never_restart_after_older_versions_moved_to_versions(tmp_path):
-    for name in ["RF14_v4.f3d", "RF14_v5.f3d"]:
-        _touch(tmp_path / name)
-    for name in ["RF14_v1.f3d", "RF14 v2.f3d", "RF14_v3.f3d"]:
-        _touch(tmp_path / "VERSIONS" / name)
-    target, highest = addin.planned_target(str(tmp_path), "RF14", True)
-    assert Path(target).name == "RF14_v6.f3d" and highest == 5
-    _touch(tmp_path / "VERSIONS" / "RF14_v9.f3d")
-    assert addin.planned_target(str(tmp_path), "RF14", True)[1] == 9  # only the VERSIONS folder has v9
 
 
 def test_older_versions_move_but_the_new_file_and_other_designs_stay(tmp_path):
@@ -100,8 +82,9 @@ def test_a_design_opened_from_versions_saves_next_to_that_folder(tmp_path):
 def test_the_preview_says_how_many_older_versions_will_move(tmp_path):
     for n in (1, 2, 3):
         _touch(tmp_path / f"RF14_v{n}.f3d")
-    assert "3 older to VERSIONS" in addin.describe(*addin.planned_target(str(tmp_path), "RF14", True), moving=3)
-    assert "older" not in addin.describe(*addin.planned_target(str(tmp_path), "RF14", True))
+    target = addin.planned_target(str(tmp_path), "RF14", True, 4)
+    assert "3 older to VERSIONS" in addin.describe(target, moving=3, versioned=True, number=4)
+    assert "older" not in addin.describe(target, versioned=True, number=4)
 
 
 def test_the_first_version_takes_the_unversioned_file_to_versions_too(tmp_path):
@@ -115,10 +98,10 @@ def test_the_first_version_takes_the_unversioned_file_to_versions_too(tmp_path):
     assert [p.name for p in (tmp_path / "VERSIONS").iterdir() if p.is_file()] == ["BILOfix.f3d"]
     assert [p.name for p in (tmp_path / "VERSIONS" / ".meta").iterdir()] == ["BILOfix.tree.json"]   # its hierarchy file went with it
     assert sorted(p.name for p in tmp_path.iterdir() if p.is_file()) == ["BILOfix Additional.f3d", "BILOfix_v1.f3d"]
-    # the preview counts it, and the next version number is unaffected by an unversioned file in VERSIONS
+    # the preview counts it
     _touch(tmp_path / "BILOfix.f3d")
     assert len(addin.movable_files(str(tmp_path), "BILOfix", str(tmp_path / "BILOfix_v1.f3d"))) == 1
-    assert addin.planned_target(str(tmp_path), "BILOfix", True)[0].endswith("BILOfix_v2.f3d")
+    _touch(tmp_path / "BILOfix_v2.f3d")
     assert addin.archive_versions(str(tmp_path), "BILOfix", keep=str(tmp_path / "BILOfix_v2.f3d")) == 2   # BILOfix.f3d (taken name gets (2)) and v1
     assert sorted(p.name for p in (tmp_path / "VERSIONS").iterdir() if p.is_file()) == ["BILOfix (2).f3d", "BILOfix.f3d", "BILOfix_v1.f3d"]
 

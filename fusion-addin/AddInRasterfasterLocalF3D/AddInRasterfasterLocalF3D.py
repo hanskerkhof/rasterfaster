@@ -3,7 +3,7 @@
 Three commands in the Utilities tab > Add-Ins panel:
   Save Local Copy   exports the open design as <name>.f3d into the local folder (written to a hidden temporary file first and then moved
                     over the old copy, so a failed export never damages the file that is there). With "Add version" ticked the file is
-                    called <name>_v<N>.f3d, where N is one more than the highest version of that name already in the folder
+                    called <name>_v<N>.f3d, where N is the version number Fusion gives the document (the v5 in its tab)
   Open Local File   opens a local .f3d as a new, unsaved document (it is never put in the cloud unless you save it there; when you close it,
                     choose "Don't save")
   Local Folder      chooses the folder (default ~/Documents/FUSION360, remembered in localf3d.json next to this file)
@@ -124,12 +124,6 @@ def version_files(directory, base):
     return sorted((int(m.group(1)), os.path.join(directory, n)) for m, n in ((pattern.match(n), n) for n in names) if m)
 
 
-def versions_on_disk(directory, base):
-    """The version numbers of the design, in the folder and in its VERSIONS folder (a moved version still counts: the numbers never restart)."""
-    found = version_files(directory, base) + version_files(os.path.join(directory, ARCHIVE_DIR), base)
-    return sorted(number for number, _ in found)
-
-
 def movable_files(directory, base, keep=None):
     """The files that "Move older versions" moves: the unversioned `<base>.f3d` (the original, from before versions were used) and the
     `<base>_v<N>.f3d` / `<base> v<N>.f3d` files, in the folder; never the file `keep` (the one just saved)."""
@@ -198,11 +192,11 @@ def tree_counts(node):
     return components, bodies
 
 
-def write_sidecar(root_component, f3d_path, document_name):
+def write_sidecar(root_component, f3d_path, document_name, version=None):
     """Writes the hierarchy next to the .f3d file (a hidden temporary file first, then moved into place). Returns (components, bodies)."""
     tree = component_tree(root_component, '(root)')
     components, bodies = tree_counts(tree)
-    payload = {'version': 1, 'document': document_name, 'file': os.path.basename(f3d_path), 'savedAt': datetime.datetime.now().isoformat(timespec='seconds'),
+    payload = {'version': 1, 'document': document_name, 'fusionVersion': version, 'file': os.path.basename(f3d_path), 'savedAt': datetime.datetime.now().isoformat(timespec='seconds'),
                'components': components, 'bodies': bodies, 'tree': tree}
     target = sidecar_path(f3d_path)
     os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -223,24 +217,31 @@ def needs_local_copy(known, saved, now, modified, content):
     return bool(modified)
 
 
-def planned_target(directory, name, versioned):
-    """(file path, highest version already on disk or None): a versioned save always makes a new file, one version higher."""
-    if versioned:
-        base = base_name(name)
-        found = versions_on_disk(directory, base)
-        highest = found[-1] if found else 0
-        return os.path.join(directory, f'{base}_v{highest + 1}.f3d'), highest
-    return os.path.join(directory, clean_name(name) + '.f3d'), None
+def fusion_version(document):
+    """Fusion's own version number of a document (the v5 in its tab); None for a document that was never saved in the cloud."""
+    try:
+        data_file = document.dataFile
+        return int(data_file.versionNumber) if data_file else None
+    except Exception:
+        return None
 
 
-def describe(target, highest, moving=0):
+def planned_target(directory, name, versioned, number=None):
+    """The file to write: `<name>_v<N>.f3d` with N Fusion's version number of the document. Without versioning, or for a document that has no
+    version number (never saved in the cloud), it is `<name>.f3d`. An existing file with that name is replaced."""
+    if versioned and number:
+        return os.path.join(directory, f'{base_name(name)}_v{number}.f3d')
+    return os.path.join(directory, clean_name(name) + '.f3d')
+
+
+def describe(target, moving=0, versioned=False, number=None):
     text = os.path.basename(target)
-    if highest is not None:
-        text += f'   (latest on disk: v{highest})' if highest else '   (no version on disk yet)'
-        if moving:
-            text += f'   {moving} older to {ARCHIVE_DIR}'
+    if versioned and not number:
+        text += '   (no Fusion version yet: not saved in the cloud)'
     elif os.path.exists(target):
         text += '   (replaces the file on disk)'
+    if moving:
+        text += f'   {moving} older to {ARCHIVE_DIR}'
     return text
 
 
@@ -345,7 +346,7 @@ def start_save(design, target, archive_base=None):
     threading.Thread(target=fire, daemon=True).start()
 
 
-def perform_save(design, document_name, target, archive_base):
+def perform_save(design, document_name, target, archive_base, version=None):
     """Writes the file, its hierarchy file, moves older versions when asked, and remembers the file. Returns (seconds, megabytes, hierarchy note,
     how many older files moved)."""
     started = time.time()
@@ -353,7 +354,7 @@ def perform_save(design, document_name, target, archive_base):
     seconds = time.time() - started
     size = os.path.getsize(target) / 1e6
     try:
-        components, bodies = write_sidecar(design.rootComponent, target, document_name)
+        components, bodies = write_sidecar(design.rootComponent, target, document_name, version)
         tree_note = f'{components} components, {bodies} bodies in {os.path.basename(sidecar_path(target))}'
     except Exception:
         tree_note = ''  # the hierarchy is a bonus: a failure here never fails the save
@@ -369,7 +370,7 @@ def run_job(args):
     """The custom event: write the file, say so in the same dialog, close it, and remember the file."""
     design, target, dialog, archive_base, close_token = job.pop('design'), job.pop('target'), job.pop('dialog'), job.pop('archive_base'), job.pop('close_token')
     try:
-        seconds, size, tree_note, moved = perform_save(design, app.activeDocument.name, target, archive_base)
+        seconds, size, tree_note, moved = perform_save(design, app.activeDocument.name, target, archive_base, fusion_version(app.activeDocument))
         dialog.progressValue = 100
         dialog.message = f'Saved {os.path.basename(target)}\n{size:.0f} MB in {seconds:.0f} s\n{os.path.dirname(target)}'
         if tree_note:
@@ -394,7 +395,7 @@ def name_document(document, target):
         pass
 
 
-def save_now(design, document_name, target, archive_base, notice_seconds=1.5):
+def save_now(design, document_name, target, archive_base, version=None, notice_seconds=1.5):
     """Saves at once, with a progress dialog (best effort: the export blocks Fusion), and shows what was done for a moment. Used for a document that
     is being closed: it is gone as soon as the handler returns, so nothing can wait for a custom event as start_save does."""
     dialog = ui.createProgressDialog()
@@ -402,7 +403,7 @@ def save_now(design, document_name, target, archive_base, notice_seconds=1.5):
     dialog.show('Save Local Copy', f'Writing {os.path.basename(target)} ...\nFusion does not respond until the file is saved.', 0, 100, 0)
     adsk.doEvents()
     try:
-        seconds, size, tree_note, moved = perform_save(design, document_name, target, archive_base)
+        seconds, size, tree_note, moved = perform_save(design, document_name, target, archive_base, version)
         dialog.progressValue = 100
         dialog.message = f'Saved {os.path.basename(target)}\n{size:.0f} MB in {seconds:.0f} s\n{os.path.dirname(target)}'
         pause(notice_seconds)
@@ -429,7 +430,7 @@ def on_save_created(args):
     inputs.addStringValueInput('name', 'File name', default)
     inputs.addBoolValueInput('versioned', 'Add version (v<N>)', True, '', versioned)
     # the text is set through .text, which takes it as plain text (the constructor argument is read as HTML: a "&" in a name would break)
-    inputs.addTextBoxCommandInput('preview', 'Save as', '', 2, True).text = preview_text(save_directory(design), default, versioned, archive_setting)
+    inputs.addTextBoxCommandInput('preview', 'Save as', '', 2, True).text = preview_text(save_directory(design), default, versioned, archive_setting, fusion_version(app.activeDocument))
     inputs.addTextBoxCommandInput('where', 'Folder', '', 1, True).text = save_directory(design)
     archive = inputs.addBoolValueInput('archive', f'Move older versions to {ARCHIVE_DIR}', True, '', archive_setting)
     archive.isEnabled = versioned
@@ -442,31 +443,32 @@ def on_save_created(args):
 
 
 
-def preview_text(directory, name, versioned, archive):
-    target, highest = planned_target(directory, name, versioned)
-    moving = len(movable_files(directory, base_name(name), target)) if versioned and archive else 0
-    return describe(target, highest, moving)
+def preview_text(directory, name, versioned, archive, number):
+    target = planned_target(directory, name, versioned, number)
+    moving = len(movable_files(directory, base_name(name), target)) if versioned and number and archive else 0
+    return describe(target, moving, versioned, number)
 
 
 def on_save_changed(args):
     inputs = args.inputs
     versioned = inputs.itemById('versioned').value
     inputs.itemById('archive').isEnabled = versioned  # moving older versions only makes sense with versions
-    inputs.itemById('preview').text = preview_text(save_directory(active_design()), inputs.itemById('name').value, versioned, inputs.itemById('archive').value)
+    inputs.itemById('preview').text = preview_text(save_directory(active_design()), inputs.itemById('name').value, versioned, inputs.itemById('archive').value, fusion_version(app.activeDocument))
 
 
 def on_save_execute(args):
     design = active_design()
     inputs = args.command.commandInputs
     versioned = inputs.itemById('versioned').value
-    target, highest = planned_target(save_directory(design), inputs.itemById('name').value, versioned)
-    if not versioned and os.path.exists(target) and target != sources.get(token(design)):
+    number = fusion_version(app.activeDocument)
+    target = planned_target(save_directory(design), inputs.itemById('name').value, versioned, number)
+    if os.path.exists(target) and target != sources.get(token(design)):
         answer = ui.messageBox(f'{os.path.basename(target)} already exists in that folder. Replace it?', 'Save Local Copy', adsk.core.MessageBoxButtonTypes.YesNoButtonType, adsk.core.MessageBoxIconTypes.WarningIconType)
         if answer != adsk.core.DialogResults.DialogYes:
             return
     archive = bool(inputs.itemById('archive').value)
     save_settings(versioned=versioned, archive=archive, remind=bool(inputs.itemById('remind').value))
-    archive_base = base_name(inputs.itemById('name').value) if versioned and archive else None
+    archive_base = base_name(inputs.itemById('name').value) if versioned and number and archive else None
     start_save(design, target, archive_base)
 
 
@@ -523,17 +525,15 @@ class ClosingHandler(adsk.core.DocumentEventHandler):
 
 
 def close_plan(design, document):
-    """(file, older files that would move, archive base) for the copy the close reminder saves: the remembered settings of the Save dialog, but never
-    over another file (a taken name gets the next version number)."""
+    """(file, older files that would move, archive base) for the copy the close reminder saves: the remembered settings of the Save dialog.
+    The file may already exist (a copy of the same Fusion version): it is replaced, and the question says so."""
     known = sources.get(token(design))
     name = os.path.splitext(os.path.basename(known))[0] if known else clean_name(document.name)
     directory = save_directory(design)
     versioned = bool(settings().get('versioned', True))
-    target, _ = planned_target(directory, name, versioned)
-    if os.path.exists(target) and target != known:
-        target, _ = planned_target(directory, name, True)
-        versioned = True
-    archive_base = base_name(name) if versioned and settings().get('archive', False) else None
+    number = fusion_version(document)
+    target = planned_target(directory, name, versioned, number)
+    archive_base = base_name(name) if versioned and number and settings().get('archive', False) else None
     moving = len(movable_files(directory, archive_base, target)) if archive_base else 0
     return target, moving, archive_base
 
@@ -553,7 +553,7 @@ def on_document_closing(args):
     if not needs_local_copy(key in sources, fingerprints.get(key), design_fingerprint(design), document.isModified, design_has_content(design)):
         return
     target, moving, archive_base = close_plan(design, document)
-    plan = f'{os.path.basename(target)}\nin {os.path.dirname(target)}' + (f'\n({moving} older file{"s" if moving > 1 else ""} move to {ARCHIVE_DIR})' if moving else '')
+    plan = f'{os.path.basename(target)}\nin {os.path.dirname(target)}' + (f'\n({moving} older file{"s" if moving > 1 else ""} move to {ARCHIVE_DIR})' if moving else '') + ('\n(replaces the file on disk)' if os.path.exists(target) else '')
     answer = ui.messageBox(f'"{document.name}" has changes that are not in a local copy.\n\nSave a local copy before it closes?\n\n'
                            f'Yes: save {plan}\nNo: close without a local copy\n\n'
                            '(To change the name or the options, press No and use Save Local Copy before you close.)', 'Local copy',
@@ -561,7 +561,7 @@ def on_document_closing(args):
     if answer != adsk.core.DialogResults.DialogYes:
         return
     try:
-        save_now(design, document.name, target, archive_base)
+        save_now(design, document.name, target, archive_base, fusion_version(document))
     except Exception:
         ui.messageBox('The local copy could not be saved, the document will close without one:\n' + traceback.format_exc(limit=2), 'Local copy')
 

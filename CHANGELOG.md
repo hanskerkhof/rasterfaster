@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-29 - Local copies are named with Fusion's version number (0.10.46)
+
+### Changed
+- **Fusion add-in**: *Add version* names the file `<name>_v<N>.f3d` with N the document's own Fusion version number (`dataFile.versionNumber`) instead of the add-in's own counter. A file with that name is replaced (the Save dialog says so); a document never saved in the cloud has no number and is saved as `<name>.f3d`.
+- **Fusion add-in**: the hierarchy file (`.meta/*.tree.json`) has a new `fusionVersion` field.
+
 ## 2026-10-29 - The Color flyout stays open on the way to it (0.10.45)
 
 ### Fixed
