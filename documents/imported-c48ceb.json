@@ -167,8 +167,8 @@
       "name": "HW-059 AMP",
       "color": 16167531,
       "position": [
-        100.0,
-        40.0,
+        96.1,
+        39.8,
         28.0
       ],
       "rotation": [
@@ -316,46 +316,6 @@
         0.7071067811865476,
         5.551115123125784e-17,
         0.7071067811865476
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "1edb047f-c827-4e61-9163-4344e59f6551",
-      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d.stl",
-      "name": "3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d",
-      "color": 14706278,
-      "position": [
-        100.0,
-        -60.0,
-        62.0
-      ],
-      "rotation": [
-        -0.4999999999999999,
-        0.4999999999999999,
-        0.5000000000000002,
-        -0.5
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "b2f946ba-0d38-46a8-9d60-13a5dc99c5c9",
-      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d.stl",
-      "name": "3.5.SPEAKER TERMINAL 2p_RF3 MNTS PASSIVE v39_FRONT BLIND 4d",
-      "color": 14706278,
-      "position": [
-        100.0,
-        -60.0,
-        42.0
-      ],
-      "rotation": [
-        -0.4999999999999999,
-        0.4999999999999999,
-        0.5000000000000002,
-        -0.5
       ],
       "muted": false,
       "centered": false,
@@ -1256,6 +1216,46 @@
         0.0,
         0.7071067811865475,
         -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "6dc81e10-3794-42c6-92c4-939d844136a6",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -60.0,
+        42.0
+      ],
+      "rotation": [
+        0.5,
+        -0.5000000000000002,
+        -0.5000000000000001,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "431127b4-872a-43d9-96b7-1149c6ad0cdd",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -60.0,
+        62.0
+      ],
+      "rotation": [
+        0.5,
+        -0.5000000000000002,
+        -0.5000000000000001,
+        0.5
       ],
       "muted": false,
       "centered": false,

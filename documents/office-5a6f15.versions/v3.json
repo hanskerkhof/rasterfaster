@@ -1,0 +1,187 @@
+{
+  "version": 3,
+  "savedAt": 1793296536.159489,
+  "name": "office-desk",
+  "items": [
+    {
+      "id": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e",
+      "path": "office-desk.stl",
+      "name": "office-desk",
+      "color": 7317724,
+      "position": [
+        -880.0,
+        -900.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "b51be9c5-df91-4517-989c-7e598d54d432",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE COVER.stl",
+      "name": "15.1 KIOSK REMOTE COVER",
+      "color": 9684093,
+      "position": [
+        -248.1,
+        -240.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7b4369d7-3644-421f-a98e-cda60dc43a4e",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
+      "name": "15.1 KIOSK REMOTE FRONT",
+      "color": 16167531,
+      "position": [
+        -124.0,
+        -240.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "6e0fb7e1-9552-467c-b329-e37563566be9",
+      "path": "15.1 KIOSK REMOTE/rotary+encoder_14mm_hole_spc.stl",
+      "name": "rotary+encoder_14mm_hole_spc",
+      "color": 12745632,
+      "position": [
+        -118.7,
+        -154.6,
+        650.4
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "bbccd9c8-4638-475a-9f9d-d23552fc3976",
+      "path": "15.1 KIOSK REMOTE/TM1637.stp.stl",
+      "name": "TM1637.stp",
+      "color": 14706278,
+      "position": [
+        -120.0,
+        -223.1,
+        655.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "57a7615d-3d0a-484e-8255-1e4c89c6ee46",
+      "path": "office_chair_repaired_mm.stl",
+      "name": "office_chair_repaired_mm",
+      "color": 7775663,
+      "position": [
+        -220.0,
+        -740.0,
+        0.0
+      ],
+      "rotation": [
+        -0.7010573846499778,
+        0.09229595564125725,
+        0.09229595564125728,
+        -0.701057384649978
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "a65ecadb-e4e7-48f7-b537-6e583669ecff",
+      "path": "office-dell_optiplex_micro_7010.stl",
+      "name": "office-dell_optiplex_micro_7010",
+      "color": 7775663,
+      "position": [
+        -860.0,
+        -160.0,
+        698.0
+      ],
+      "rotation": [
+        -0.7071067811865475,
+        -1.1102230246251565e-16,
+        -0.7071067811865476,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "4026dc66-eb47-4680-a864-df05b9c3749c",
+      "path": "office-uperfect_monitor.stl",
+      "name": "office-uperfect_monitor",
+      "color": 16767334,
+      "position": [
+        -720.0,
+        -740.0,
+        701.995
+      ],
+      "rotation": [
+        0.405579787672639,
+        0.4055797876726387,
+        0.5792279653395691,
+        0.5792279653395694
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+      "path": "office-optiplex_3060_micro.stl",
+      "name": "office-optiplex_3060_micro",
+      "color": 7317724,
+      "position": [
+        -855.0,
+        -159.5,
+        746.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5000000000000001,
+        0.4999999999999999,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}

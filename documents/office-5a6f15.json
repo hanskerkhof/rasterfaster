@@ -100,6 +100,86 @@
       "muted": false,
       "centered": false,
       "noExport": false
+    },
+    {
+      "id": "57a7615d-3d0a-484e-8255-1e4c89c6ee46",
+      "path": "office_chair_repaired_mm.stl",
+      "name": "office_chair_repaired_mm",
+      "color": 7775663,
+      "position": [
+        -220.0,
+        -740.0,
+        0.0
+      ],
+      "rotation": [
+        -0.7010573846499778,
+        0.09229595564125725,
+        0.09229595564125728,
+        -0.701057384649978
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "a65ecadb-e4e7-48f7-b537-6e583669ecff",
+      "path": "office-dell_optiplex_micro_7010.stl",
+      "name": "office-dell_optiplex_micro_7010",
+      "color": 7775663,
+      "position": [
+        -860.0,
+        -160.0,
+        698.0
+      ],
+      "rotation": [
+        -0.7071067811865475,
+        -1.1102230246251565e-16,
+        -0.7071067811865476,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "4026dc66-eb47-4680-a864-df05b9c3749c",
+      "path": "office-uperfect_monitor.stl",
+      "name": "office-uperfect_monitor",
+      "color": 16767334,
+      "position": [
+        -720.0,
+        -740.0,
+        701.995
+      ],
+      "rotation": [
+        0.405579787672639,
+        0.4055797876726387,
+        0.5792279653395691,
+        0.5792279653395694
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+      "path": "office-optiplex_3060_micro.stl",
+      "name": "office-optiplex_3060_micro",
+      "color": 7775663,
+      "position": [
+        -855.0,
+        -159.5,
+        746.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5000000000000001,
+        0.4999999999999999,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
     }
   ]
 }
