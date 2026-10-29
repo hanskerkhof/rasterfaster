@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-29 - The Color flyout stays open on the way to it (0.10.45)
+
+### Fixed
+- **FE** (`object-menu.ts`): the Color flyout of the object menu closed as soon as the pointer left the Color row, so the swatches were hard to reach. It now closes 350 ms after the pointer has left the row (and not at all while the pointer is on the flyout).
+
 ## 2026-10-28 - Do not export button (0.10.44)
 
 ### Added

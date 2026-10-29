@@ -82,7 +82,7 @@ import { baseThicknessMm } from './z-levels';
         }
       </div>
       @if (colorsAt(); as at) {
-        <div class="flyout" role="menu" aria-label="Color" [style.left.px]="at.x" [style.top.px]="at.y">
+        <div class="flyout" role="menu" aria-label="Color" (mouseenter)="keepColors()" [style.left.px]="at.x" [style.top.px]="at.y">
           @for (c of colors; track c) {
             <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c)" [style.background]="hex(c)" [title]="hex(c)" (click)="setColor(c)"></button>
           }
@@ -139,8 +139,17 @@ export class ObjectMenu {
     this.colorsAt.set({ x, y: Math.min(rect.top, window.innerHeight - 100) });
   }
 
+  /** Leaving the Color row (on the way to the flyout, across the menu's edge or another row) closes the flyout only after a moment, so it can be reached. */
+  private closeColorsTimer?: ReturnType<typeof setTimeout>;
+
   protected onMenuOver(event: Event) {
-    if (!(event.target as HTMLElement).closest('.sub')) this.colorsAt.set(null);
+    if ((event.target as HTMLElement).closest('.sub')) { this.keepColors(); return; }
+    if (this.colorsAt() && this.closeColorsTimer === undefined) this.closeColorsTimer = setTimeout(() => { this.closeColorsTimer = undefined; this.colorsAt.set(null); }, 350);
+  }
+
+  protected keepColors() {
+    clearTimeout(this.closeColorsTimer);
+    this.closeColorsTimer = undefined;
   }
 
   protected setColor(color: number) {
@@ -265,6 +274,7 @@ export class ObjectMenu {
   }
 
   protected close() {
+    this.keepColors();
     this.colorsAt.set(null);
     this.store.contextMenu.set(null);
   }
