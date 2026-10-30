@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-30 - A click on the canvas no longer moves the view (0.10.47)
+
+### Fixed
+- **FE** (`stl-viewer.ts`): with *Rotate around selection* on, pressing on empty space in the document view made the view glide to centre the selection, which was confusing on a plain click. The glide now starts only once the pointer has been dragged a few pixels; a click leaves the view alone.
+
 ## 2026-10-29 - Local copies are named with Fusion's version number (0.10.46)
 
 ### Changed

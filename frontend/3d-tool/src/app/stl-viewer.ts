@@ -702,7 +702,7 @@ export class StlViewer implements OnDestroy {
   /** ⌘-click: look at the clicked surface point (or, over empty space, the point on the plane through the current target). */
   private readonly onCentreClick = (e: PointerEvent) => {
     if (!e.metaKey) { // a plain left press that reached here starts a view rotation (nothing else claimed it)
-      if (e.button === 0) this.startPivot();
+      if (e.button === 0) this.pivotOnDrag(e); // only a drag turns the view; a plain click must not move it
       return;
     }
     if (e.button !== 0) return;
@@ -723,6 +723,18 @@ export class StlViewer implements OnDestroy {
     }
     if (point) this.panTo(point);
   };
+
+  /** Starts the pivot glide once the pointer has moved a few pixels with the button down (a click leaves the view alone). */
+  private pivotOnDrag(down: PointerEvent) {
+    const move = (e: PointerEvent) => {
+      if (Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < 4) return;
+      cleanup();
+      this.startPivot();
+    };
+    const cleanup = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', cleanup); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', cleanup);
+  }
 
   /** A view rotation is starting: with a selection, make its centre the pivot (the view glides so it is centred). */
   private startPivot() {
