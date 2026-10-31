@@ -682,7 +682,8 @@ export class TreePanel {
     const next = rows.slice(lastAt + 1).find(r => !gone(r.entry.path)) ?? [...rows.slice(0, Math.max(firstAt, 0))].reverse().find(r => !gone(r.entry.path)); // the row that takes its place
     try {
       const result = await firstValueFrom(this.lib.trashBatch(paths));
-      this.closeQuickLook();
+      const keepPreview = this.quickLook() && next?.entry.type === 'file'; // the preview moves on to the file that takes its place
+      if (!keepPreview) this.closeQuickLook();
       await this.reload();
       this.focused.set(next?.entry.path ?? null);
       this.selectOnly(next?.entry.path ?? null);

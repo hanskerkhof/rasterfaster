@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-10-31 - The preview stays open after Move to Trash (0.10.48)
+
+### Changed
+- **FE** (`tree-panel.ts`): when the file preview is open and a file is moved to the Trash, the preview now stays open on the file that takes its place instead of closing. It still closes when the next row is a folder or nothing is left, and after *Delete immediately*.
+
 ## 2026-10-30 - A click on the canvas no longer moves the view (0.10.47)
 
 ### Fixed
