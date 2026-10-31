@@ -1,0 +1,1267 @@
+{
+  "version": 8,
+  "savedAt": 1793321195.288856,
+  "name": "STROZZI",
+  "items": [
+    {
+      "id": "7adcaef4-a129-43ec-afdc-e563888c99fd",
+      "path": "MOUNTS/11.16.HW-059 THUMB WHEEL VOLUME AMP/11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I.stl",
+      "name": "11.16.HW-059 AMP_RF11 - work v166_MOUNT ALT I",
+      "color": 16767334,
+      "position": [
+        100.0,
+        20.0,
+        22.0
+      ],
+      "rotation": [
+        -1.6653345369377348e-16,
+        0.0,
+        5.5511151231257815e-17,
+        -1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "c3fc2fa2-b65e-4ed1-85e3-38b61caa847c",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
+      "color": 16767334,
+      "position": [
+        214.2,
+        51.108000000000004,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -2.220446049250313e-16
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e62cf025-06ff-4d22-b714-c50e796819f9",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
+      "color": 7317724,
+      "position": [
+        158.98,
+        0.0,
+        24.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "363b3dfb-5b85-4531-be31-d14167f78208",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
+      "color": 9684093,
+      "position": [
+        160.0,
+        0.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "f4e0a952-ef58-47e6-98c4-7d3330b130a1",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player) VERTICAL/models/serial mp3 player.stp.stl",
+      "name": "serial mp3 player.stp",
+      "color": 16167531,
+      "position": [
+        173.0,
+        24.0,
+        26.0
+      ],
+      "rotation": [
+        -5.551115123125784e-17,
+        0.7071067811865476,
+        5.551115123125784e-17,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "9a6289c5-1a8a-4bfd-a269-4fb0daa86a3a",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V",
+      "color": 7317724,
+      "position": [
+        140.0,
+        -60.0,
+        50.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": true
+    },
+    {
+      "id": "c2cc52e8-05ab-4309-8cec-45b7472a5ef6",
+      "path": "MOUNTS/LM2596 - STEP DOWN BUCK CONVERTER DC-DC/LM25596 SCREWS - RF2.30.stl",
+      "name": "LM25596 SCREWS - RF2.30",
+      "color": 9684093,
+      "position": [
+        160.0,
+        -60.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.6653345369377348e-16,
+        -1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "054d7a3d-167c-4968-a245-8be8094986d1",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 12745632,
+      "position": [
+        143.251,
+        -36.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": true
+    },
+    {
+      "id": "817a5681-f7ae-4c2a-ad8b-ed192156140f",
+      "path": "MOUNTS/11.16.HW-059 THUMB WHEEL VOLUME AMP/HW-059 AMP.stl",
+      "name": "HW-059 AMP",
+      "color": 16167531,
+      "position": [
+        96.1,
+        39.8,
+        28.0
+      ],
+      "rotation": [
+        -1.6653345369377348e-16,
+        0.0,
+        5.5511151231257815e-17,
+        -1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "ee0b83ce-b85d-45de-a742-0d27ce8973bd",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/models/rotary-encoders-1.snapshot.1/rotary+encoder_14mm_hole_spc.stl",
+      "name": "rotary+encoder_14mm_hole_spc",
+      "color": 12745632,
+      "position": [
+        267.0,
+        9.0,
+        22.0
+      ],
+      "rotation": [
+        -0.5000000000000002,
+        0.4999999999999999,
+        -0.5000000000000001,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "f3b2d411-facf-4481-b831-d4524adb88ab",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/11.14.KY-040 ROTARY ENCODER_RF11 - work v131_MOUNT BLIND TO THE SIDE.stl",
+      "name": "11.14.KY-040 ROTARY ENCODER_RF11 - work v131_MOUNT BLIND TO THE SIDE",
+      "color": 9338051,
+      "position": [
+        274.0,
+        -20.0,
+        22.0
+      ],
+      "rotation": [
+        -0.5000000000000001,
+        0.5,
+        -0.5000000000000001,
+        0.4999999999999999
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "b84dee81-ec98-49da-96d3-34f7df18e05b",
+      "path": "MOUNTS/2.12.TM1637 - I2C-7Segment display/i2c-7segment-1.snapshot.1/TM1637.stp.stl",
+      "name": "TM1637.stp",
+      "color": 14706278,
+      "position": [
+        270.0,
+        -2.0,
+        50.0
+      ],
+      "rotation": [
+        0.7071067811865476,
+        0.7071067811865475,
+        1.1102230246251565e-16,
+        -5.551115123125785e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "e8102d2c-c4eb-426f-b6b9-cad975649576",
+      "path": "MOUNTS/2.12.TM1637 - I2C-7Segment display/2.12.4w MOUNT with SCREWS.stl",
+      "name": "2.12.4w MOUNT with SCREWS",
+      "color": 7317724,
+      "position": [
+        272.82,
+        -20.0,
+        42.0
+      ],
+      "rotation": [
+        -0.5,
+        -0.5,
+        -0.5000000000000003,
+        -0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7efbc696-9cd2-418b-b114-4d7b2e976134",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
+      "color": 7317724,
+      "position": [
+        180.0,
+        0.0,
+        24.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "dffda44f-44af-4f9b-8e13-862156a0cbbf",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
+      "color": 9684093,
+      "position": [
+        181.02,
+        0.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "b4bf1f84-3712-491c-80da-2c9cd2131abb",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player) VERTICAL/models/serial mp3 player.stp.stl",
+      "name": "serial mp3 player.stp",
+      "color": 16167531,
+      "position": [
+        194.02,
+        24.0,
+        24.0
+      ],
+      "rotation": [
+        -5.551115123125784e-17,
+        0.7071067811865476,
+        5.551115123125784e-17,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "0eb0b01c-8538-4a2b-939d-7ebb4c24b7ed",
+      "path": "MOUNTS/3.6.AVIATION PLUG/3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED.stl",
+      "name": "3.6.AVIATION PLUG_RF3 MNTS PASSIVE v106_4w - AVIATION PLUG + LED",
+      "color": 7317724,
+      "position": [
+        100.0,
+        20.0,
+        42.0
+      ],
+      "rotation": [
+        -0.5000000000000002,
+        0.5,
+        0.49999999999999994,
+        -0.5000000000000001
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "47f9524d-6696-4074-9ec7-100b13f6705b",
+      "path": "SPACERS/spacers_RF1 v236_28.stl",
+      "name": "spacers_RF1 v236_28",
+      "color": 12745632,
+      "position": [
+        243.251,
+        -56.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": true
+    },
+    {
+      "id": "53d3750a-f099-4f87-852f-223208128beb",
+      "path": "MOUNTS/DC JACK PANEL MOUNT 12mm - def/5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1).stl",
+      "name": "5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1)",
+      "color": 16167531,
+      "position": [
+        100.0,
+        -180.0,
+        22.0
+      ],
+      "rotation": [
+        -0.5,
+        -0.4999999999999998,
+        -0.5000000000000004,
+        -0.49999999999999983
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
+      "color": 7775663,
+      "position": [
+        214.2,
+        51.108000000000004,
+        54.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "354c4bc4-02da-4a9b-ad2a-5f5eb3182302",
+      "path": "1.10 BASE/1.10 BASE 9x8x3h 8-CORNERS UNEVEN.stl",
+      "name": "1.10 BASE 9x8x3h 8-CORNERS UNEVEN",
+      "color": 7775663,
+      "position": [
+        100.0,
+        -60.0,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "95bc71e0-10cd-4b48-b5c5-ddb78e1119d5",
+      "path": "1.10 BASE/1.10 BASE 8x6x3h COVER 8corners UNEVEN.stl",
+      "name": "1.10 BASE 8x6x3h COVER 8corners UNEVEN",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -64.0,
+        14.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": true,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "2d92b43a-e0fa-48b0-9e53-785a28c3bd14",
+      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
+      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
+      "color": 7317724,
+      "position": [
+        120.502,
+        -39.499,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "807ef342-5ea3-4376-bbf4-fce78a23dec2",
+      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
+      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
+      "color": 7317724,
+      "position": [
+        240.502,
+        -39.499,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "8c9a4ff4-d8b4-4e83-ac71-b0da4dd51d6f",
+      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
+      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
+      "color": 7317724,
+      "position": [
+        120.502,
+        60.501,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "44657d37-e24a-4da4-96b9-d847bc177e24",
+      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
+      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
+      "color": 7317724,
+      "position": [
+        240.502,
+        60.501,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "89d20ccd-9e74-4a7b-9664-8ae4c7b3621c",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        182.345,
+        82.349,
+        16.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "662716d9-499a-475f-8587-c12a0ee83f8b",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        162.345,
+        82.349,
+        16.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4eb5819b-5ce7-4515-88ab-f8f222ffec00",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        162.345,
+        -57.651,
+        17.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4c9b4acf-bd11-4748-8025-d0ef793ab16e",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        222.345,
+        -57.651,
+        17.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "51619d10-5ab4-4fd7-9e98-d0f51824a3c8",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        302.401,
+        -97.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "2a7003c4-a7cb-4d52-811c-427d83f30551",
+      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
+      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
+      "color": 16767334,
+      "position": [
+        222.345,
+        82.349,
+        18.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "8dd5f5ef-fe41-43f7-ae7e-41d55d498c2f",
+      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
+      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
+      "color": 16767334,
+      "position": [
+        242.345,
+        82.349,
+        18.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "7d06a6e5-7e1a-43ad-8eee-35afb1b75b97",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        182.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "2b82f975-4ea6-4af4-9607-ad8ec2f02e0c",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        162.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "9bd2d876-7aa9-4d55-a2f9-073a186030ea",
+      "path": "BOLTS/BOLT_S8.stl",
+      "name": "BOLT_S8",
+      "color": 9684093,
+      "position": [
+        142.345,
+        -37.651,
+        16.0
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": true
+    },
+    {
+      "id": "7c8ddc1a-bd42-40be-a92f-376bfc5a1bd1",
+      "path": "BOLTS/BOLT_S8.stl",
+      "name": "BOLT_S8",
+      "color": 9684093,
+      "position": [
+        242.345,
+        -57.651,
+        16.0
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": true
+    },
+    {
+      "id": "a0ea4117-ffb9-4989-b98c-29b35c8e1967",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        302.401,
+        -77.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "8e0dbc3b-42a9-4dcb-82a5-9f026427c42e",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        302.401,
+        -57.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "843524d2-aa4f-4e96-90e3-a7faa71ea6ef",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        302.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "912f101f-5f0d-45ab-a4e7-327ab9468b70",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        -97.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "ccba2a1f-de46-4e07-9500-f5c76d82a108",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        -77.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "3f08e4b3-def5-4393-925f-c0726d09ecbd",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        -57.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "8fe4d497-a717-4fbf-b290-a128d207a004",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "1ab1e227-8295-4058-994e-5d4b06e8be3d",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "423f655a-55f8-4d87-a500-23e2729e56a0",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        322.401,
+        2.401,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "e936618e-352b-49d6-a914-198dc7d5e3af",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        -97.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "c4e6208a-8768-4ec9-bdd5-56c885f39ba3",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        -77.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "1ec65be4-4afe-442a-b2c1-36856dc44ed5",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        -57.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4cc50df0-5f99-4ab3-9505-a637593a3828",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "52205768-4f50-48c2-a5d1-4465dd6cb0ff",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "8cc71337-111e-4f33-b890-40afa42541fa",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        342.401,
+        2.401,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "122153b5-a35b-4158-89e8-9174788ee204",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        -97.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "a1dc66c9-151f-4dbc-bed0-c3a902475993",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        -77.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "e63e7f2b-ffa4-427e-b5ab-00db9fdb1d83",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        -57.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "53af65b0-375e-4f7a-8499-6f6fd9dd2928",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "67b55410-4ed4-4017-854a-0b5f245de833",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4ed2e14b-a561-4ee5-8404-df4207c56902",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        362.401,
+        2.401,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "dd36621a-6f25-4f29-ae80-31f9c9ac2fe5",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        319.995,
+        -120.001,
+        0.0
+      ],
+      "rotation": [
+        5.5511151231257815e-17,
+        5.5511151231257815e-17,
+        1.0,
+        -5.551115123125781e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7714df30-5da3-49cc-a3db-e2e7a5ab6bbf",
+      "path": "MOUNTS/3.20.POWER SWITCH 230V/POWER SWITCH w LIGHT + 1x CABLE FLAT 3.6 mm.stl",
+      "name": "POWER SWITCH w LIGHT + 1x CABLE FLAT 3.6 mm",
+      "color": 16167531,
+      "position": [
+        100.0,
+        -60.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "daed045d-5fa4-4b52-8f01-ea115a85220d",
+      "path": "MOUNTS/3.20.POWER SWITCH 230V/Rocker Switch_Green.stp.stl",
+      "name": "Rocker Switch_Green.stp",
+      "color": 12745632,
+      "position": [
+        92.4,
+        -39.6,
+        25.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865475,
+        -0.7071067811865477
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "6dc81e10-3794-42c6-92c4-939d844136a6",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -60.0,
+        42.0
+      ],
+      "rotation": [
+        0.5,
+        -0.5000000000000002,
+        -0.5000000000000001,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "431127b4-872a-43d9-96b7-1149c6ad0cdd",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5.stl",
+      "name": "3.5.SPEAKER TERMINAL 2p_4w  BLIND SCREWS - RF3.5",
+      "color": 16767334,
+      "position": [
+        100.0,
+        -60.0,
+        62.0
+      ],
+      "rotation": [
+        0.5,
+        -0.5000000000000002,
+        -0.5000000000000001,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}

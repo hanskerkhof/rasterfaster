@@ -49,7 +49,7 @@
       "position": [
         158.98,
         0.0,
-        22.0
+        24.0
       ],
       "rotation": [
         0.0,
@@ -89,7 +89,7 @@
       "position": [
         173.0,
         24.0,
-        24.0
+        26.0
       ],
       "rotation": [
         -5.551115123125784e-17,
@@ -117,7 +117,7 @@
         -1.0,
         -5.5511151231257815e-17
       ],
-      "muted": true,
+      "muted": false,
       "centered": false,
       "noExport": true
     },
@@ -157,7 +157,7 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": true,
       "noExport": true
     },
@@ -269,7 +269,7 @@
       "position": [
         180.0,
         0.0,
-        22.0
+        24.0
       ],
       "rotation": [
         0.0,
@@ -357,29 +357,9 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": true,
       "noExport": true
-    },
-    {
-      "id": "53d3750a-f099-4f87-852f-223208128beb",
-      "path": "MOUNTS/DC JACK PANEL MOUNT 12mm - def/5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1).stl",
-      "name": "5.0.DC JACK PANEL MOUNT 12mm_RF5 MNTS v378_DC w SWITCH BLIND JACK PANEL MOUNT 12mm 2x (1 (1)",
-      "color": 16167531,
-      "position": [
-        100.0,
-        -180.0,
-        22.0
-      ],
-      "rotation": [
-        -0.5,
-        -0.4999999999999998,
-        -0.5000000000000004,
-        -0.49999999999999983
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
     },
     {
       "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
@@ -417,7 +397,7 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": false,
       "noExport": false
     },
@@ -529,7 +509,7 @@
       "position": [
         182.345,
         82.349,
-        14.0
+        16.0
       ],
       "rotation": [
         -5.551115123125783e-17,
@@ -549,7 +529,7 @@
       "position": [
         162.345,
         82.349,
-        14.0
+        16.0
       ],
       "rotation": [
         -5.551115123125783e-17,
@@ -669,7 +649,7 @@
       "position": [
         182.345,
         2.349,
-        13.997
+        15.997
       ],
       "rotation": [
         -5.551115123125783e-17,
@@ -689,7 +669,7 @@
       "position": [
         162.345,
         2.349,
-        13.997
+        15.997
       ],
       "rotation": [
         -5.551115123125783e-17,
@@ -717,7 +697,7 @@
         0.0,
         -5.5511151231257815e-17
       ],
-      "muted": true,
+      "muted": false,
       "centered": true,
       "noExport": true
     },
@@ -737,7 +717,7 @@
         0.0,
         -5.5511151231257815e-17
       ],
-      "muted": true,
+      "muted": false,
       "centered": true,
       "noExport": true
     },
