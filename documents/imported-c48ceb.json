@@ -1240,6 +1240,26 @@
       "muted": false,
       "centered": false,
       "noExport": false
+    },
+    {
+      "id": "d11abe70-14c8-4c9b-a714-cd5c60834b34",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 - COVER 6x2 FLAT.stl",
+      "name": "5.25 - COVER 6x2 FLAT",
+      "color": 7775663,
+      "position": [
+        140.0,
+        -60.0,
+        54.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
     }
   ]
 }
