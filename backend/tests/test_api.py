@@ -110,6 +110,12 @@ def test_document_item_centered_roundtrip(client):
     assert [i["centered"] for i in client.get(f"/api/documents/{created['id']}").json()["items"]] == [True, False]
 
 
+def test_document_item_origin_roundtrip(client):
+    created = client.post("/api/documents", json={"name": "o", "items": [{**sample_item(), "origin": [1.5, 2, -3]}, sample_item("plain")]}).json()
+    items = client.get(f"/api/documents/{created['id']}").json()["items"]
+    assert items[0]["origin"] == [1.5, 2, -3] and items[1].get("origin") is None
+
+
 def test_health(client):
     first = client.get("/api/health").json()
     assert first["status"] == "ok" and first["documents"] == 0

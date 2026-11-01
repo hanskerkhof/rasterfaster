@@ -541,6 +541,17 @@ export class DocumentScene {
       return points;
     };
 
+    const originIds = new Set(store.originPick() ?? []);
+    if (originIds.size) { // "Set origin": the 8 corners and the middle of the box of every picked part
+      for (const item of store.doc().items) {
+        const size = originIds.has(item.id) ? this.sizeOfItem(item) : null;
+        if (!size) continue;
+        const centre: Vec3 = [item.position[0] + size[0] / 2, item.position[1] + size[1] / 2, item.position[2] + size[2] / 2];
+        for (const point of [...corners(item.position, size), centre]) addHandle(point, { kind: 'origin', point });
+      }
+      return;
+    }
+
     const snapIds = new Set(store.snapPick() ?? []);
     if (snapIds.size) {
       for (const item of store.doc().items) {
@@ -592,7 +603,7 @@ export class DocumentScene {
 
   /** True while "Snap to grid…" or "Move to…" is waiting for clicks. */
   private picking() {
-    return !!(this.ctx.store.snapPick() || this.ctx.store.movePick());
+    return !!(this.ctx.store.snapPick() || this.ctx.store.movePick() || this.ctx.store.originPick());
   }
 
   private hoverHandle(handle: THREE.Mesh | null) {
@@ -775,7 +786,7 @@ export class DocumentScene {
 
     const boxes = items.map(item => new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(this.entryFor(item)!.size)));
     const groupBox = boxes.reduce((all, box) => all.union(box), new THREE.Box3());
-    const pivot = groupBox.getCenter(new THREE.Vector3());
+    const pivot = this.pivotOf(items, groupBox);
 
     this.rotateGroup(items, step, pivot, groupBox.min.z);
     this.flashPivot(pivot);
@@ -796,7 +807,7 @@ export class DocumentScene {
       const step = next.clone().multiply(old.clone().invert()); // the turn that takes the part from where it is to where it should be
       const base = this.baseGeometries.get(item.path)!;
       const size = this.entryFor(item)!.size;
-      const centre = new THREE.Vector3(...item.position).addScaledVector(size, 0.5);
+      const centre = item.origin ? this.originWorld(item, base) : new THREE.Vector3(...item.position).addScaledVector(size, 0.5);
       const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old));
       const position = origin.sub(centre).applyQuaternion(step).add(centre).add(this.rotatedMin(base, next));
       const clean = (v: number) => Math.abs(v) < 1e-6 ? 0 : Math.round(v * 1e6) / 1e6;
@@ -812,8 +823,52 @@ export class DocumentScene {
   originOffset(item: DocItem): Vec3 | null {
     const base = this.baseGeometries.get(item.path);
     if (!base) return null;
-    const min = this.rotatedMin(base, new THREE.Quaternion(...item.rotation));
-    return [round3(item.position[0] - min.x), round3(item.position[1] - min.y), round3(item.position[2] - min.z)];
+    const world = this.originWorld(item, base);
+    return [round3(world.x), round3(world.y), round3(world.z)];
+  }
+
+  /** Where the part's origin point (the one the user set, or the STL's own 0, 0, 0) is in the world. */
+  private originWorld(item: DocItem, base = this.baseGeometries.get(item.path)!): THREE.Vector3 {
+    const q = new THREE.Quaternion(...item.rotation);
+    const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, q)); // where the STL's own 0, 0, 0 lies
+    return item.origin ? stlOrigin.add(new THREE.Vector3(...item.origin).applyQuaternion(q)) : stlOrigin;
+  }
+
+  /** What a selection turns about: the origin point of the part chosen last when it has one of its own, else the middle of the selection's box. */
+  private pivotOf(items: DocItem[], box: THREE.Box3): THREE.Vector3 {
+    const last = items.at(-1);
+    return last?.origin && this.baseGeometries.has(last.path) ? this.originWorld(last) : box.getCenter(new THREE.Vector3());
+  }
+
+  /** The "Set origin" buttons: handles appear on the corners and the middle of the selected parts; the one clicked becomes their origin. */
+  beginSetOrigin() {
+    const ids = this.ctx.store.selectedItems().filter(item => this.entryFor(item)).map(item => item.id);
+    if (ids.length) this.ctx.store.beginOriginPick(ids);
+  }
+
+  /** The clicked point (world) becomes the origin of every picked part: stored in the part's own STL coordinates, so it turns and moves with it. */
+  private setOriginAt(point: Vec3) {
+    const { store } = this.ctx;
+    const ids = new Set(store.originPick() ?? []);
+    store.originPick.set(null);
+    const changes = new Map<string, Partial<{ origin: Vec3 | null }>>();
+    for (const item of store.doc().items) {
+      if (!ids.has(item.id) || !this.baseGeometries.has(item.path)) continue;
+      const q = new THREE.Quaternion(...item.rotation);
+      const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(this.baseGeometries.get(item.path)!, q));
+      const local = new THREE.Vector3(...point).sub(stlOrigin).applyQuaternion(q.clone().invert());
+      changes.set(item.id, { origin: [round3(local.x), round3(local.y), round3(local.z)] });
+    }
+    if (changes.size) store.updateItems('Set origin', changes);
+  }
+
+  /** Back to the STL's own origin for the selected parts. */
+  clearOrigin() {
+    const { store } = this.ctx;
+    store.originPick.set(null);
+    const changes = new Map<string, Partial<{ origin: Vec3 | null }>>();
+    for (const item of store.selectedItems()) if (item.origin) changes.set(item.id, { origin: null });
+    if (changes.size) store.updateItems('Use STL origin', changes);
   }
 
   /** The − / + buttons of the Move panel: the selection moves `mm` along one axis, as one undo step, kept inside the work area. */
@@ -1074,6 +1129,14 @@ export class DocumentScene {
     return this.cancelMoveTool();
   }
 
+  /** Enter in the move or rotate tool: the changes stay (one undo step each, as made), the tool closes. */
+  private confirmTools() {
+    const what = this.moveToolOn && this.rotateToolOn ? 'Move and rotate' : this.moveToolOn ? 'Move' : 'Rotate';
+    this.closeMoveTool();
+    this.closeRotateTool();
+    this.ctx.store.announce(`${what} confirmed`);
+  }
+
   /** Esc in the move tool: closes it and puts every part back where it was when the tool was opened. False when the tool is not open. */
   private cancelMoveTool(): boolean {
     if (!this.moveToolOn) return false;
@@ -1133,7 +1196,7 @@ export class DocumentScene {
     if (this.rotateStart) return;
     const box = this.selectionBounds();
     if (!box) return;
-    this.rotatePivot.position.copy(box.getCenter(new THREE.Vector3()));
+    this.rotatePivot.position.copy(this.pivotOf(items, box));
     this.rotatePivot.quaternion.identity();
     this.rotateTool.setRotationSnap(THREE.MathUtils.degToRad(this.ctx.rotationStep()));
     if (this.rotateTool.object !== this.rotatePivot) this.rotateTool.attach(this.rotatePivot);
@@ -1146,7 +1209,7 @@ export class DocumentScene {
       const items = store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
       const box = this.selectionBounds();
       if (!items.length || !box) return;
-      this.rotateStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3, rotation: [...item.rotation] as Quat })), pivot: box.getCenter(new THREE.Vector3()), low: box.min.z };
+      this.rotateStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3, rotation: [...item.rotation] as Quat })), pivot: this.pivotOf(items, box), low: box.min.z };
       store.beginGesture('Rotate');
     } else if (this.rotateStart) {
       this.rotateStart = null;
@@ -1274,6 +1337,7 @@ export class DocumentScene {
         const { store } = this.ctx;
         const data = handle.userData;
         if (data['kind'] === 'snap') { const [fx, fy] = data['anchor'] as [number, number]; store.applySnap(fx, fy); }
+        else if (data['kind'] === 'origin') this.setOriginAt(data['point'] as Vec3);
         else if (data['kind'] === 'move-source') store.setMoveSource(data['point'] as Vec3);
         else if (data['kind'] === 'move-target') store.applyMoveTo(data['point'] as Vec3);
         return;
@@ -1422,6 +1486,7 @@ export class DocumentScene {
     else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
     else if (e.key === 'PageDown' || e.key === '[') moveZ(-1);
     else if (e.key === 'Delete' || e.key === 'Backspace') store.removeSelected();
+    else if (e.key === 'Enter' && !command && !e.altKey && !e.shiftKey && !this.drag && (this.moveToolOn || this.rotateToolOn)) this.confirmTools(); // Enter: keep what was done and leave the tool
     else if (e.key === 'Escape') { if (!this.drag && !this.escapeMoveTool() && !this.cancelRotateTool()) store.select(null); } // while dragging, Esc only cancels the drag
     else handled = false;
     if (handled) e.preventDefault();

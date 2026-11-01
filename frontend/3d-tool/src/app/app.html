@@ -113,7 +113,13 @@
         <button type="button" (click)="reloadPage()">Reload</button>
       </div>
     }
-    @if (store.snapPick()) {
+    @if (store.originPick()) {
+      <div class="banner">
+        <span>Set origin: click a <b>corner or the middle</b> of the selected part(s): it becomes their origin point (rotation, the Move panel and ↺ use it)</span>
+        <button type="button" (click)="viewer().clearOrigin()">Use STL origin</button>
+        <button type="button" (click)="viewer().cancelPicks()">Cancel (Esc)</button>
+      </div>
+    } @else if (store.snapPick()) {
       <div class="banner">
         <span>Snap to grid: click the <b>corner or side</b> of the part that should land on a grid intersection</span>
         <button type="button" (click)="viewer().cancelPicks()">Cancel (Esc)</button>

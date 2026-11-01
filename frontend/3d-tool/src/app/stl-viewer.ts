@@ -106,7 +106,9 @@ function readShowPath() {
       <div class="axis head">
         <span class="title">{{ documentMode() ? 'Rotate' : 'Rotate object' }}</span>
         <button type="button" class="undo" [style.visibility]="turned().x || turned().y || turned().z ? 'visible' : 'hidden'" title="Back to the rotation of the STL file about all axes" releaseFocus (click)="resetAllRotation()">↺</button>
-        <span class="pad"></span>
+        <span class="pad one"></span>
+        @if (documentMode()) { <button type="button" class="origin" [class.active]="hasOrigin()" [disabled]="!store.selectedId()" [title]="originTitle()" releaseFocus (click)="setOrigin()">⌖</button> }
+        @if (!documentMode()) { <span class="pad one"></span> }
       </div>
       @for (axis of axes; track axis) {
         <div class="axis">
@@ -128,8 +130,9 @@ function readShowPath() {
       <div class="rotate move" aria-label="Move object">
         <div class="axis head">
           <span class="title">Move</span>
-          <button type="button" class="undo" [style.visibility]="moved().x || moved().y || moved().z ? 'visible' : 'hidden'" title="Back to where the STL file puts the part along all axes" releaseFocus (click)="resetOffset('all')">↺</button>
-          <span class="pad"></span>
+          <button type="button" class="undo" [style.visibility]="moved().x || moved().y || moved().z ? 'visible' : 'hidden'" title="Back to the origin point along all axes" releaseFocus (click)="resetOffset('all')">↺</button>
+          <span class="pad one"></span>
+          <button type="button" class="origin" [class.active]="hasOrigin()" [disabled]="!store.selectedId()" [title]="originTitle()" releaseFocus (click)="setOrigin()">⌖</button>
         </div>
         @for (axis of axes; track axis) {
           <div class="axis">
@@ -239,7 +242,7 @@ function readShowPath() {
     .rotate button, .rotate select { padding: 3px 9px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     .rotate button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     .rotate button:disabled { opacity: .35; cursor: default; }
-    .rotate .axis button { width: 28px; padding: 3px 0; text-align: center; } .rotate .axis .pad { width: 60px; flex: none; } .rotate .axis.head .title { flex: 1; }
+    .rotate .axis button { width: 28px; padding: 3px 0; text-align: center; } .rotate .axis .pad { width: 60px; flex: none; } .rotate .axis .pad.one { width: 28px; } .rotate .axis.head .title { flex: 1; }
     .host:focus { outline: none; }
     .menu-backdrop { position: absolute; inset: 0; z-index: 8; }
     .cube-menu { position: absolute; z-index: 9; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
@@ -1089,6 +1092,20 @@ export class StlViewer implements OnDestroy {
 
   resetOffset(axis: 'x' | 'y' | 'z' | 'all') {
     this.documentScene.resetOffset(axis);
+  }
+
+  /** The ⌖ buttons of both panels: pick a corner or the middle of the selected part(s) as their new origin point. */
+  setOrigin() {
+    this.documentScene.beginSetOrigin();
+  }
+
+  clearOrigin() {
+    this.documentScene.clearOrigin();
+  }
+
+  protected readonly hasOrigin = computed(() => this.store.selectedItems().some(item => !!item.origin));
+  protected originTitle() {
+    return this.hasOrigin() ? 'Set a new origin point for the selected part(s): pick a corner or the middle. The part has an origin of its own now (saved in the document).' : 'Set an origin point for the selected part(s) other than the one in the STL file: pick a corner or the middle (saved in the document)';
   }
 
   /** The ↺ above the axes of the Rotate panel: all three axes back to the STL file. */

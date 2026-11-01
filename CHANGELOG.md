@@ -2,6 +2,13 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Set origin, Enter confirms the tools (0.10.55)
+
+### Added
+- **FE** (`document-scene.ts`, `stl-viewer.ts`, `app.html`): a **⌖ Set origin** button at the top right of the Rotate and Move panels. Handles appear on the corners and the middle of the selected parts; the one clicked becomes the origin point of those parts. The Move panel measures from it (its ↺ moves it to 0) and a selection turns about the origin of the part chosen last when it has one. *Use STL origin* in the banner clears it.
+- **BE** (`main.py`): documents keep an optional `origin` per item (the point in the part's own STL coordinates); an item without one is written without the field. A part added from the library again starts with the STL's own origin; copy and paste keep it.
+- **FE**: **Enter** in the move tool or the rotate tool keeps the result and leaves the tool (Esc still undoes it).
+
 ## 2026-11-01 - Rotate tool, move tool, Move panel (0.10.54)
 
 ### Added

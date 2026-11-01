@@ -61,6 +61,8 @@ export interface DocItem {
   centered?: boolean;
   /** A mock part (e.g. a component model) that is not printed: left out of the 3MF / SVG exports and the BOM. */
   noExport?: boolean;
+  /** The origin point the user set, in the part's own STL coordinates; none (or null) means the STL's own 0, 0, 0. Kept in the document file. */
+  origin?: Vec3 | null;
 }
 
 /** Measured from a part's STL as stored in the library (unrotated). */
@@ -517,7 +519,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'origin'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -762,6 +764,13 @@ export class DocumentStore {
   /** "Snap to grid…" is waiting for the user to click a corner/side handle on these items. */
   readonly snapPick = signal<string[] | null>(null);
 
+  /** "Set origin" is waiting for a click on a corner or the centre of one of these parts. */
+  readonly originPick = signal<string[] | null>(null);
+
+  beginOriginPick(ids: readonly string[]) {
+    this.originPick.set(ids.length ? [...ids] : null);
+  }
+
   beginSnapPick(ids: readonly string[]) {
     this.snapPick.set(ids.length ? [...ids] : null);
   }
@@ -785,6 +794,7 @@ export class DocumentStore {
   cancelPicks() {
     this.snapPick.set(null);
     this.movePick.set(null);
+    this.originPick.set(null);
   }
 
   /** Moves the picked items by (target - source), so the chosen corner lands exactly on the other item's corner. */

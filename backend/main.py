@@ -345,6 +345,7 @@ class DocumentItem(BaseModel):
     muted: bool = False  # dimmed in the editor and ignored by clicks; still part of BOM and exports
     centered: bool = False  # keep the footprint centre on the middle of a grid cell when moved
     noExport: bool = False  # mock part (e.g. a component model): left out of the 3MF and SVG exports
+    origin: tuple[float, float, float] | None = None  # origin point set by the user, in the part's own STL coordinates (None: the STL's own 0, 0, 0)
 
 
 class DocumentBody(BaseModel):
@@ -410,7 +411,7 @@ def write_document(documentId: str, body: DocumentBody) -> DocumentOut:
     documentsRoot.mkdir(parents=True, exist_ok=True)
     file = document_file(documentId)
     temporary = file.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(body.model_dump(), indent=2), encoding="utf-8")
+    temporary.write_text(json.dumps(body.model_dump(exclude_none=True), indent=2), encoding="utf-8")
     os.replace(temporary, file)
     return read_document(documentId)
 
