@@ -370,6 +370,7 @@ class DocumentRenderSettings(BaseModel):
     """What the Render dialog remembers for a document."""
     depthOfField: bool = False  # the Blender scene gets a depth of field
     focusId: str | None = Field(default=None, max_length=64)  # the part it is focused on; none: the part nearest to the camera in the picture
+    crop: bool = False  # the picture is as wide as the parts (the height stays)
     dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
 
 
@@ -705,7 +706,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None):
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -724,13 +725,14 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
     if focusId is not None and not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", focusId):
         raise HTTPException(status_code=422, detail="focus must be the id of a part")
     level = strength if strength is not None else (document.render.dofStrength if document.render else 3)
-    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}")
+    cropped = crop if crop is not None else bool(document.render and document.render.crop)
+    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}"), cropped
 
 
 @app.get("/api/documents/{documentId}/export.blend")
 def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5)) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
-    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength)
     try:
         data = blenderexport.build_blend(glb, blender, studio, sun, depthOfField)
     except ValueError as error:
@@ -742,12 +744,12 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 
 @app.get("/api/documents/{documentId}/render.png")
-def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5),
+def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None,
                         width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128)) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
-    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop)
     try:
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField)
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
@@ -822,7 +824,7 @@ async def events(websocket: WebSocket) -> None:
         notifier.connections.discard(websocket)
 
 
-def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, dof: str = "0") -> None:
+def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, dof: str = "0", crop: bool = False) -> None:
     def started(process: object) -> None:
         job.process = process
         if job.state == "cancelled":  # cancelled before Blender had started
@@ -837,7 +839,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
             notifier.notify({"type": "render", **job.view()})
 
     try:
-        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof)
+        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof, crop=crop)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
         if job.state == "running":
@@ -848,16 +850,16 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
-def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5),
+def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=3840), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
-    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop)
     if any(j.state == "running" for j in renderJobs.values()):
         raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
     renderJobs.clear()  # an older picture nobody collected is dropped
     job = RenderJob(document.name, width, samples)
     renderJobs[job.id] = job
-    threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField), daemon=True).start()
+    threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField, cropped), daemon=True).start()
     notifier.notify({"type": "render", **job.view()})
     return job.view()
 

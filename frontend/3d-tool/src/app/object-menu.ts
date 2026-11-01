@@ -1,12 +1,13 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
-import { DocumentStore, itemColors } from './document.store';
-import { plaColors } from './pla-colors';
+import { DocumentStore } from './document.store';
+import { ColorPalette } from './color-palette';
 import { closeOnEscape } from './escape-close';
 import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */
 @Component({
   selector: 'app-object-menu',
+  imports: [ColorPalette],
   template: `
     @if (store.contextMenu(); as menu) {
       <div class="backdrop" (mousedown)="close()" (contextmenu)="$event.preventDefault(); close()"></div>
@@ -84,13 +85,7 @@ import { baseThicknessMm } from './z-levels';
       </div>
       @if (colorsAt(); as at) {
         <div class="flyout" role="menu" aria-label="Color" (mouseenter)="keepColors()" [style.left.px]="at.x" [style.top.px]="at.y">
-          @for (c of colors; track c) {
-            <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c)" [style.background]="hex(c)" [title]="hex(c)" (click)="setColor(c)"></button>
-          }
-          <div class="section">PLA <small>Bambu Lab Basic</small></div>
-          @for (c of pla; track c.color) {
-            <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c.color)" [style.background]="hex(c.color)" [title]="c.name + ' ' + hex(c.color)" [attr.aria-label]="c.name" (click)="setColor(c.color)"></button>
-          }
+          <app-color-palette [isOn]="isColorFn" (picked)="setColor($event)" />
         </div>
       }
     }
@@ -104,11 +99,7 @@ import { baseThicknessMm } from './z-levels';
     .sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.12); }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .4; cursor: default; }
-    .flyout { position: fixed; z-index: 32; display: grid; grid-template-columns: repeat(6, 28px); gap: 4px; padding: 6px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
-    .section { grid-column: 1 / -1; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.14); font-size: 11px; font-weight: 600; opacity: .8; } .section small { font-weight: 400; opacity: .7; margin-left: 4px; }
-    .swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 5px; }
-    .swatch:hover:not(:disabled) { background-color: inherit; border-color: #fff; }
-    .swatch.on { border-color: #fff; box-shadow: inset 0 0 0 2px #2b2f38; }
+    .flyout { position: fixed; z-index: 32; padding: 6px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
     .icon { width: 1em; text-align: center; }
     .hint { margin-left: auto; opacity: .5; font-size: 11px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; padding-left: 12px; }
     .hint + .hint { margin-left: 10px; min-width: 14px; text-align: right; opacity: .75; }
@@ -125,14 +116,9 @@ export class ObjectMenu {
   /** Move to needs at least one part that is not part of the selection to snap onto. */
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
   protected readonly baseMm = baseThicknessMm;
-  protected readonly colors = itemColors;
-  protected readonly pla = plaColors;
+  protected readonly isColorFn = (c: number) => this.isColor(c);
   /** Where the colour flyout is shown (fixed, beside the Color row), or null while it is closed. */
   protected readonly colorsAt = signal<{ x: number; y: number } | null>(null);
-
-  protected hex(c: number) {
-    return '#' + c.toString(16).padStart(6, '0');
-  }
 
   protected isColor(c: number) {
     return this.items().length > 0 && this.items().every(i => i.color === c);

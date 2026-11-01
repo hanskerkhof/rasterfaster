@@ -4,6 +4,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
+import { ColorPalette } from './color-palette';
 import { DocLight, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
@@ -17,6 +18,9 @@ const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
 const groundGridStorageKey = 'rasterfaster.groundGrid';
+const groundModeStorageKey = 'rasterfaster.groundMode';
+const groundColorStorageKey = 'rasterfaster.groundColor';
+type GroundMode = 'none' | 'grid' | 'solid';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
 /** The light of the Shaded view when the document does not say otherwise: from high above and a little behind. */
 const defaultLightDirection = new THREE.Vector3(-0.5, 0.9, 2.6).normalize();
@@ -86,8 +90,21 @@ function readPivotOnSelection() {
   try { return localStorage.getItem(pivotStorageKey) !== 'false'; } catch { return true; } // default on
 }
 
-function readGroundGrid() {
-  try { return localStorage.getItem(groundGridStorageKey) !== 'false'; } catch { return true; } // default on
+/** What the ground shows: nothing, the grid (the default) or a solid colour; the old on/off setting of the grid is taken over. */
+function readGroundMode(): GroundMode {
+  try {
+    const stored = localStorage.getItem(groundModeStorageKey);
+    if (stored === 'none' || stored === 'grid' || stored === 'solid') return stored;
+    return localStorage.getItem(groundGridStorageKey) === 'false' ? 'none' : 'grid';
+  } catch { return 'grid'; }
+}
+
+function readGroundColor(): number {
+  try {
+    const stored = Number(localStorage.getItem(groundColorStorageKey));
+    if (Number.isInteger(stored) && stored >= 0 && stored <= 0xffffff && localStorage.getItem(groundColorStorageKey) !== null) return stored;
+  } catch { /* storage unavailable */ }
+  return 0x3b404c;
 }
 
 function readGrid3d() {
@@ -103,7 +120,7 @@ function readShowPath() {
 
 @Component({
   selector: 'app-stl-viewer',
-  imports: [ReleaseFocus],
+  imports: [ReleaseFocus, ColorPalette],
   template: `
     <div #host class="host" tabindex="0"></div>
     <div class="panels">
@@ -166,9 +183,25 @@ function readShowPath() {
     @if (cubeMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
       <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
-        <button type="button" role="menuitem" (click)="toggleGroundGrid()">
-          <span class="tick">{{ groundGrid() ? '✓' : '' }}</span>Ground grid<span class="hint">{{ groundGrid() ? 'on' : 'off' }}</span>
-        </button>
+        <div class="submenu-host" (mouseenter)="groundMenuOpen.set(true); cameraMenuOpen.set(false); gridModeOpen.set(false)" (mouseleave)="groundMenuOpen.set(false); groundSolidOpen.set(false)">
+          <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="groundMenuOpen()" (click)="groundMenuOpen.set(!groundMenuOpen())">
+            <span class="tick"></span>Ground<span class="hint">{{ groundModeTitle() }} ◂</span>
+          </button>
+          @if (groundMenuOpen()) {
+            <div class="flyout narrow" role="menu">
+              <button type="button" role="menuitemradio" [attr.aria-checked]="groundMode() === 'none'" (click)="setGroundMode('none')"><span class="tick">{{ groundMode() === 'none' ? '✓' : '' }}</span>None<span class="hint">no ground</span></button>
+              <button type="button" role="menuitemradio" [attr.aria-checked]="groundMode() === 'grid'" (click)="setGroundMode('grid')"><span class="tick">{{ groundMode() === 'grid' ? '✓' : '' }}</span>Grid<span class="hint">lines on the ground</span></button>
+              <div class="submenu-host" (mouseenter)="groundSolidOpen.set(true)" (mouseleave)="groundSolidOpen.set(false)">
+                <button type="button" role="menuitemradio" aria-haspopup="menu" [attr.aria-checked]="groundMode() === 'solid'" (click)="setGroundMode('solid')">
+                  <span class="tick">{{ groundMode() === 'solid' ? '✓' : '' }}</span>Solid<span class="dot" [style.background]="hex(groundColor())"></span><span class="hint">colour ◂</span>
+                </button>
+                @if (groundSolidOpen()) {
+                  <div class="flyout palette" role="menu" aria-label="Ground colour"><app-color-palette [isOn]="isGroundColor" (picked)="setGroundColor($event)" /></div>
+                }
+              </div>
+            </div>
+          }
+        </div>
         @if (mode() === 'shaded') {
           <button type="button" role="menuitem" (click)="resetLight(); cubeMenu.set(null)"><span class="tick"></span>Reset the light<span class="hint">default direction</span></button>
         }
@@ -273,6 +306,8 @@ function readShowPath() {
     .submenu-host { position: relative; }
     .flyout { position: absolute; right: calc(100% - 2px); top: -4px; min-width: 250px; padding: 4px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18);
               border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .flyout.narrow { min-width: 230px; } .flyout.palette { min-width: 0; padding: 6px; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255,255,255,.4); align-self: center; }
     .two-line { display: flex; flex-direction: column; gap: 1px; }
     .two-line small { opacity: .55; font-size: 11px; }
     .cube-menu .tick { width: 1em; text-align: center; }
@@ -397,7 +432,12 @@ export class StlViewer implements OnDestroy {
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
   /** Show the grid on the ground (and the 3D lattice with it); the view cube menu switches it. */
-  protected readonly groundGrid = signal(readGroundGrid());
+  protected readonly groundMode = signal<GroundMode>(readGroundMode());
+  protected readonly groundColor = signal(readGroundColor());
+  protected readonly groundGrid = computed(() => this.groundMode() === 'grid');
+  protected readonly groundMenuOpen = signal(false);
+  protected readonly groundSolidOpen = signal(false);
+  private groundPlane: THREE.Mesh | null = null;
   protected readonly silhouette = silhouetteEdges;
   protected readonly cubeMenu = signal<{ x: number; y: number } | null>(null);
   /** Height grid: fine (2 mm), baseplate (2 mm then 4 mm) or coarse (4 mm). Chosen in the view cube menu's "Grid mode" fly-out. */
@@ -441,8 +481,8 @@ export class StlViewer implements OnDestroy {
   private readonly pickRaycaster = new THREE.Raycaster();
   private lastItemCount = 0;
   private snapAnimation: { from: THREE.Vector3; rotation: THREE.Quaternion; start: number; distance: number } | null = null;
-  /** The Home view: from the front right and a bit above (about 20° up; it used to be 30°, which looked down on the parts too steeply). */
-  private readonly homeDirection = new THREE.Vector3(1, -1, 0.5).normalize();
+  /** The Home view: from the front right and only a little above (about 12° up; it was 30°, then 20°: looking down on the parts too steeply). */
+  private readonly homeDirection = new THREE.Vector3(1, -1, 0.3).normalize();
 
   constructor() {
     afterNextRender(() => { this.init(); this.ready.set(true); });
@@ -463,7 +503,8 @@ export class StlViewer implements OnDestroy {
       this.grid3d();
       this.zGridMode(); // the 3D grid's levels follow the mode
       this.groundGrid(); // switching the grid on or off only needs the visibility (rebuildGrid sets it)
-      if (this.ready()) untracked(() => this.rebuildGrid());
+      this.groundMode(); this.groundColor(); // and the solid ground is built with the grid
+      if (this.ready()) untracked(() => { this.rebuildGrid(); this.updateShadowRig(); });
     });
     // A file came back (or went away): parts that could not be loaded are tried again.
     effect(() => { this.store.missingPaths(); untracked(() => { if (this.ready()) this.documentScene.retryFailed(); }); });
@@ -1365,11 +1406,28 @@ export class StlViewer implements OnDestroy {
     this.cubeMenu.set(null);
   }
 
-  protected toggleGroundGrid() {
-    const on = !this.groundGrid();
-    this.groundGrid.set(on);
-    try { localStorage.setItem(groundGridStorageKey, String(on)); } catch { /* storage unavailable */ }
+  protected groundModeTitle() {
+    return { none: 'None', grid: 'Grid', solid: 'Solid' }[this.groundMode()];
+  }
+
+  protected hex(c: number) {
+    return '#' + c.toString(16).padStart(6, '0');
+  }
+
+  protected readonly isGroundColor = (c: number) => this.groundMode() === 'solid' && this.groundColor() === c;
+
+  protected setGroundMode(mode: GroundMode) {
+    this.groundMode.set(mode);
+    try { localStorage.setItem(groundModeStorageKey, mode); } catch { /* storage unavailable */ }
+    this.groundMenuOpen.set(false);
     this.cubeMenu.set(null);
+  }
+
+  /** A colour of the Solid ground's palette: the ground becomes solid in that colour. */
+  protected setGroundColor(color: number) {
+    this.groundColor.set(color);
+    try { localStorage.setItem(groundColorStorageKey, String(color)); } catch { /* storage unavailable */ }
+    this.setGroundMode('solid');
   }
 
   protected toggleGrid3d() {
@@ -1424,6 +1482,25 @@ export class StlViewer implements OnDestroy {
     this.grid = new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ color: gridColor, transparent: levels.length > 1, opacity: levels.length > 1 ? 0.7 : 1 }));
     this.grid.visible = this.groundGrid();
     this.scene.add(this.grid);
+    this.buildGroundPlane(minX, minY, maxX, maxY, cell);
+  }
+
+  /** The Solid ground: a plane under the parts (a hair below the grid) in the chosen colour, reaching a good way beyond the grid; it also catches the shadows in the Shaded view. */
+  private buildGroundPlane(minX: number, minY: number, maxX: number, maxY: number, cell: number) {
+    if (this.groundPlane) {
+      this.scene.remove(this.groundPlane);
+      this.groundPlane.geometry.dispose();
+      (this.groundPlane.material as THREE.Material).dispose();
+      this.groundPlane = null;
+    }
+    if (this.groundMode() !== 'solid') return;
+    const reach = 10 * cell;
+    const width = maxX - minX + 2 * reach, height = maxY - minY + 2 * reach;
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ color: this.groundColor(), roughness: 0.95, metalness: 0 }));
+    plane.position.set((minX + maxX) / 2, (minY + maxY) / 2, -0.1);
+    plane.receiveShadow = true;
+    this.groundPlane = plane;
+    this.scene.add(plane);
   }
 
   private clearModel() {
@@ -1432,6 +1509,7 @@ export class StlViewer implements OnDestroy {
     this.edges?.dispose();
     this.baseGeometry?.dispose();
     if (this.grid) { this.grid.geometry.dispose(); (this.grid.material as THREE.Material).dispose(); }
+    if (this.groundPlane) { this.scene.remove(this.groundPlane); this.groundPlane.geometry.dispose(); (this.groundPlane.material as THREE.Material).dispose(); this.groundPlane = null; }
   }
 
   private buildLightGizmo() {
@@ -1462,7 +1540,7 @@ export class StlViewer implements OnDestroy {
   private updateShadowRig() {
     const on = this.mode() === 'shaded';
     this.keyLight.castShadow = on;
-    this.shadowFloor.visible = on;
+    this.shadowFloor.visible = on && this.groundMode() !== 'solid'; // the Solid ground catches the shadows itself
     this.lightGizmo.visible = on;
     if (!on) return;
     let box: THREE.Box3 | null = null;

@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Depth of field relative to the size of the scene, Ground colours, Crop, render dialog layout (0.10.59)
+
+### Added
+- **FE** (`stl-viewer.ts`, new `color-palette.ts`): the **Ground** fly-out of the view cube menu has *None / Grid / Solid*; *Solid* opens a fly-out with the app's colours and the PLA colours (shared `ColorPalette` component).
+- **FE** + **BE** (`render-dialog.ts`, `blenderexport.py`, `main.py`): a **Crop** checkbox makes the render only as wide as the parts (same height); spinner and tick on the render buttons, HD named in the download button.
+
+### Changed
+- **BE** (`blenderexport.py`): the **depth of field** blur is relative to the size of the objects: the lens opening comes from the real extent of the parts in the picture instead of their centres, so small stacks are no longer blurred heavily, including the focused part.
+- **FE** + **BE**: the Home view is a little lower.
+
 ## 2026-11-02 - Depth of field in renders, PLA colours, document view saved, rotation and Home refinements (0.10.58)
 
 ### Added

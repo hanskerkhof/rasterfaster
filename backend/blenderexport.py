@@ -20,7 +20,7 @@ mmToMetre = 0.001
 toGltf = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])
 
 
-homeDirection = np.array([1.0, -1.0, 0.5]) / np.linalg.norm([1.0, -1.0, 0.5])  # the app's Home view (from the front right, about 20° above the horizon)
+homeDirection = np.array([1.0, -1.0, 0.3]) / np.linalg.norm([1.0, -1.0, 0.3])  # the app's Home view (from the front right, about 12° above the horizon)
 
 
 def parse_view(text: str) -> dict:
@@ -230,11 +230,14 @@ import sys
 import bpy
 from mathutils import Vector
 
+CROP_PADDING = 0.04  # room left on each side of the parts when the picture is cropped to them, as a share of their width
 DOF_BLUR_SHARES = [0.003, 0.006, 0.012, 0.025, 0.05]  # the five strengths: how blurred the part farthest from the focus is, as a share of the picture width (the third: unsharp, still recognizable)
 SUN_STRENGTH = 6.0  # W/m² (a clear day is ~ 5 in Blender; stronger washes the colours out)
 SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lights are turned down to this share so the key light shows
 
-source, target, studio, light_spec, render_spec, dof_spec = sys.argv[sys.argv.index("--") + 1:]  # dof_spec: "0" (none), "1" (focus on what is in front) or "1:<item id>" (focus on that part)  # render_spec: "width,samples" to render a PNG to `target` instead of saving the .blend, or ""  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
+# the arguments: the glTF, the .blend to write, "1" with the studio setup, the app's light ("dx,dy,dz;tx,ty,tz" in mm, or ""), "width,samples" to render a PNG
+# instead of saving the .blend (or ""), the depth of field ("0", "1" or "1|strength|part id") and "1" to crop the picture to the parts
+source, target, studio, light_spec, render_spec, dof_spec, crop_flag = sys.argv[sys.argv.index("--") + 1:]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -271,15 +274,28 @@ if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERS
         focus = max((focus_target[3] - camera_position).dot(looking), 0.01)
         camera.data.dof.use_dof = True
         camera.data.dof.focus_distance = focus
-        # The lens opening is chosen so that the part farthest from the focus (of what is in the picture) is blurred by a set share of the picture
-        # width: from barely soft to very soft. Thin lens: blur = f^2 * |d - s| / (N * d * (s - f)).
-        in_picture = [c[4] for c in candidates if c[1]] or [focus]
-        far = max(in_picture, key=lambda depth: abs(depth - focus))
+        # The lens opening is chosen from the size of what is in the picture: something that lies about half the scene's size behind (or in front of)
+        # the focus is blurred by a set share of the picture width, from barely soft to very soft. A small stack and a big machine, seen from the
+        # distance that makes them fill the picture, then look about equally blurred. Thin lens: blur = f^2 * |d - s| / (N * d * (s - f)).
+        points = []
+        for o in bpy.data.objects:
+            if o.type != "MESH" or o.name == "Camera path" or o.hide_render:
+                continue
+            corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
+            middle = sum(corners, Vector()) / len(corners)
+            view = world_to_camera_view(scene, camera, middle)
+            if 0 <= view.x <= 1 and 0 <= view.y <= 1 and view.z > 0:
+                points += corners
+        if not points:
+            points = [focus_target[3]]
+        size = (Vector(map(max, *points)) - Vector(map(min, *points))).length if len(points) > 1 else 0.1  # the diagonal of what is in the picture
+        farthest = max(abs(world_to_camera_view(scene, camera, p).z - focus) for p in points)  # how far from the focus the parts really reach
+        offset = min(max(farthest, 0.25 * size), 0.6 * size)
         f = camera.data.lens / 1000
         sensor = camera.data.sensor_width / 1000
-        share = DOF_BLUR_SHARES[strength - 1]
-        blur = share * sensor
-        n = f * f * abs(far - focus) / (blur * max(far, 0.01) * max(focus - f, 0.001)) if abs(far - focus) > 1e-4 else 8.0
+        blur = DOF_BLUR_SHARES[strength - 1] * sensor
+        depth = focus + offset
+        n = f * f * offset / (blur * max(depth, 0.01) * max(focus - f, 0.001))
         camera.data.dof.aperture_fstop = min(max(n, 0.1), 22.0)
 
 if studio == "1":
@@ -385,6 +401,34 @@ if render_spec:  # a picture of this size and with this many samples: the settin
     width, samples = (int(v) for v in render_spec.split(","))
     scene.render.resolution_x, scene.render.resolution_y = width, round(width * 9 / 16)
     scene.render.resolution_percentage = 100
+    if crop_flag == "1" and scene.camera:  # as wide as the parts: the height (and with it the framing) stays, the width follows the parts
+        from bpy_extras.object_utils import world_to_camera_view
+
+        camera = scene.camera
+        shown = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and not o.hide_render]
+
+        def horizontal_extent():
+            low, high = 1e9, -1e9
+            for o in shown:
+                for corner in o.bound_box:
+                    view = world_to_camera_view(scene, camera, o.matrix_world @ Vector(corner))
+                    if view.z > 0:
+                        low, high = min(low, view.x), max(high, view.x)
+            return low, high
+
+        low, high = horizontal_extent()
+        if high > low:
+            height = scene.render.resolution_y
+            padding = 1 + 2 * CROP_PADDING
+            fraction = min(max((high - low) * padding, 0.2), 1.0)  # the share of the 16:9 frame the parts take (a frame never gets wider)
+            scene.render.resolution_x = max(2, round(height * 16 / 9 * fraction / 2) * 2)
+            camera.data.shift_x = 0.0
+            for _ in range(8):  # the parts in the middle of the narrower frame: shift the lens until their middle is the middle of the picture
+                low, high = horizontal_extent()
+                middle = (low + high) / 2 - 0.5
+                if abs(middle) < 0.002:
+                    break
+                camera.data.shift_x += middle * (scene.render.resolution_x / max(scene.render.resolution_x, scene.render.resolution_y))
     if scene.render.engine == "CYCLES":
         scene.cycles.samples = samples
     scene.render.image_settings.file_format = "PNG"
@@ -403,7 +447,7 @@ def find_blender() -> str | None:
 
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0") -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False) -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -421,7 +465,7 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         script.write_text(blenderScript)
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
-                               f"{render[0]},{render[1]}" if render else "", dof], capture_output=True, text=True, timeout=timeout)
+                               f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0"], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -475,6 +519,6 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0") -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False) -> bytes:
     """A PNG of the scene (16:9, `width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop)

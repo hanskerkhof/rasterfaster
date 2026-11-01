@@ -100,6 +100,8 @@ export interface DocRenderSettings {
   focusId?: string | null;
   /** How blurred what is far from the focus is: 1 subtle to 5 extreme; 3 (the default): unsharp but still recognizable. */
   dofStrength?: number;
+  /** The picture is as wide as the parts (the height stays the same). */
+  crop?: boolean;
 }
 
 export interface RfDocument {

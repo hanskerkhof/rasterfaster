@@ -15,6 +15,9 @@ import { DocumentStore } from './document.store';
     <section class="dialog" role="dialog" aria-label="Render">
       <header>
         <h2>Render <small>{{ detail() }}</small></h2>
+        <label class="check" title="Crop: the picture is only as wide as the objects (the height stays: 450 px for the quick render, 1080 px for HD), so a tall stack gives a narrow picture and a row of parts a wide one">
+          <input type="checkbox" [checked]="render.crop()" (change)="toggleCrop($any($event.target).checked)" /> Crop
+        </label>
         <label class="check" title="Blurs what is in front of and behind the part nearest to the camera, like a real lens (needs the perspective camera: an orthographic view has no depth of field)">
           <input type="checkbox" [checked]="render.depthOfField()" (change)="toggleDepthOfField($any($event.target).checked)" /> Depth of field
         </label>
@@ -23,20 +26,31 @@ import { DocumentStore } from './document.store';
             <option value="" [selected]="!focusValue()">Focus: nearest in the picture</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === focusValue()">Focus: {{ part.label }}</option> }
           </select>
-          <button type="button" [disabled]="!selected()" title="Focus on the part that is selected in the document" (click)="chooseFocus(selected()!)">Selected</button>
+          <button type="button" [disabled]="!selected()" [title]="selected() ? 'Focus on the part that is selected in the document' : 'Select a part in the document before you open the Render dialog: it is then focused on that part with one click'" (click)="chooseFocus(selected()!)">Selected</button>
           <select class="focus strength" [value]="render.dofStrength()" title="How blurred what is far from the focus is. Medium: unsharp but still recognizable." (change)="chooseStrength(+$any($event.target).value)">
             @for (level of strengths; track level.value) { <option [value]="level.value" [selected]="level.value === render.dofStrength()">Blur: {{ level.label }}</option> }
           </select>
         }
-        @if (picture()) { <a class="button" [href]="picture()" [download]="fileName()">Download PNG</a> }
-        @if (url()) { <button type="button" [disabled]="busy()" title="800 px, 24 samples: a few seconds" (click)="quick()">Quick render</button> }
+        <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
+      </header>
+      <div class="actions">
+        @if (url()) {
+          <button type="button" [disabled]="busy()" title="800 px, 24 samples: a few seconds" (click)="quick()">
+            @if (busy()) { <span class="spinner small"></span> } @else if (quickReady()) { <svg class="tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="The quick render is ready"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> }Quick render
+          </button>
+        }
         @if (url()) {
           <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : '1920 px, 96 samples: about two minutes, in the background (you get a message when it is ready)'" (click)="startFullSize()">
             @if (render.running()) { <span class="spinner small"></span> }Render HD
           </button>
         }
-        <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
-      </header>
+        @if (picture()) {
+          <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render (1920 px) as a PNG file'">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>
+            {{ url() ? 'Download quick render PNG' : 'Download HD render PNG' }}
+          </a>
+        }
+      </div>
       @if (busy()) { <div class="busy"><span class="spinner"></span>{{ busyText() }}</div> }
       @if (error()) { <p class="error">{{ error() }}</p> }
       @if (picture()) { <img [src]="picture()" alt="Render of the document" /> }
@@ -46,15 +60,17 @@ import { DocumentStore } from './document.store';
     .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 10; }
     .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(960px, 94vw); max-height: 92vh; overflow: auto;
               padding: 14px; background: #23262d; color: #dde1e8; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
-    header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+    header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 34px; }
+    .actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
     .focus.strength { max-width: 130px; }
     .focus { max-width: 230px; padding: 3px 6px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .check { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; cursor: pointer; user-select: none; } .check input { margin: 0; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
-    button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { padding: 2px 8px; background: transparent; border: 0; }
+    button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
     img { display: block; width: 100%; height: auto; border-radius: 4px; background: #000; }
     .busy { display: flex; align-items: center; gap: 10px; padding: 24px 4px; opacity: .85; }
+    .tick { color: #5bd68a; flex: none; }
     .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.25); border-top-color: #2f6fed; border-radius: 50%; animation: spin .8s linear infinite; } .spinner.small { width: 11px; height: 11px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .error { margin: 0 0 10px; padding: 6px 8px; background: #3a2323; border: 1px solid #7a3030; border-radius: 6px; }
@@ -94,7 +110,9 @@ export class RenderDialog implements OnInit, OnDestroy {
     this.render.setFocus(id || null);
     if (this.url() && !this.busy()) void this.quick();
   }
-  protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render.png`;
+  /** The quick render is on show (it turns the button's spinner into a tick). */
+  protected readonly quickReady = signal(false);
+  protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render-${this.url() ? 'quick' : 'hd'}.png`;
 
   constructor() {
     closeOnEscape(() => this.close.emit());
@@ -137,6 +155,7 @@ export class RenderDialog implements OnInit, OnDestroy {
   }
 
   protected async quick() {
+    this.quickReady.set(false);
     this.busyText.set('Rendering a preview with Blender (800 px, a few seconds)…');
     this.busy.set(true);
     this.error.set('');
@@ -145,12 +164,18 @@ export class RenderDialog implements OnInit, OnDestroy {
       this.render.dofParams(quickUrl);
       const response = await fetch(quickUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
-      this.show(await response.blob(), `800 px · 24 samples${this.render.depthOfField() ? ' · depth of field' : ''}`);
+      this.show(await response.blob(), `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`);
+      this.quickReady.set(true);
     } catch (error) {
       this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected toggleCrop(on: boolean) {
+    this.render.setCrop(on);
+    if (this.url() && !this.busy()) void this.quick();
   }
 
   /** The checkbox: remembered, and the quick picture on show is made again with it. */
