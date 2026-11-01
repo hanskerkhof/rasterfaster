@@ -39,7 +39,7 @@ function loadPanelWidth(): number {
   return defaultPanelWidthPx;
 }
 const viewModeStorageKey = 'rasterfaster.viewMode';
-const viewModes: ViewMode[] = ['solid', 'solid-outline', 'wireframe', 'hidden-removed', 'hidden-shown'];
+const viewModes: ViewMode[] = ['solid', 'solid-outline', 'wireframe', 'hidden-removed', 'hidden-shown', 'shaded'];
 
 function readFilterMode(): 'any' | 'all' {
   try { return localStorage.getItem(filterModeStorageKey) === 'all' ? 'all' : 'any'; } catch { return 'any'; }
@@ -105,6 +105,7 @@ export class App {
     { id: 'wireframe', label: 'Wireframe' },
     { id: 'hidden-removed', label: 'Hidden lines removed' },
     { id: 'hidden-shown', label: 'Hidden lines dashed' },
+    { id: 'shaded', label: 'Shaded with light' },
   ];
 
   constructor() {

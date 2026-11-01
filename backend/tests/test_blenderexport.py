@@ -125,7 +125,7 @@ def test_blend_endpoint(tmp_path, monkeypatch):
     monkeypatch.setattr(blenderexport, "find_blender", lambda: None)
     assert client.get(f"/api/documents/{created['id']}/export.blend").status_code == 503
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
-    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender, studio=True: b"BLENDER-v500" + glb[:4])
+    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender, studio=True, light=None: b"BLENDER-v500" + glb[:4])
     response = client.get(f"/api/documents/{created['id']}/export.blend")
     assert response.status_code == 200 and response.content.startswith(b"BLENDER") and "Blend_me.blend" in response.headers["content-disposition"]
 
@@ -150,3 +150,31 @@ def test_zoomed_in_perspective_view_gets_its_narrow_field_of_view():
     assert blenderexport.parse_view("0,-1,0;0,0,0;10;persp")["fov"] == blenderexport.fovDegrees
     with pytest.raises(ValueError):
         blenderexport.parse_view("0,-1,0;0,0,0;10;persp;0")
+
+
+def test_light_of_the_shaded_view_is_parsed():
+    light = blenderexport.parse_light("0,0,5;100,20,30")
+    assert np.allclose(light["direction"], [0, 0, 1]) and np.allclose(light["target"], [100, 20, 30])
+    for bad in ("", "0,0,0;1,2,3", "1,2;3,4,5", "a,b,c;1,2,3"):
+        try:
+            blenderexport.parse_light(bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"{bad!r} should be refused")
+
+
+def test_blend_export_keeps_the_document_colours_unless_black_pla_is_asked_for(monkeypatch, tmp_path):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Colours", "items": [item]}).json()
+    seen = []
+    real = blenderexport.build_glb
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    monkeypatch.setattr(blenderexport, "build_glb", lambda document, load, camera=True, colours=False, view=None: seen.append(colours) or real(document, load, camera, colours, view))
+    monkeypatch.setattr(blenderexport, "build_blend", lambda glb, blender, studio=True, light=None: b"BLENDER-v500")
+    assert client.get(f"/api/documents/{created['id']}/export.blend").status_code == 200
+    assert client.get(f"/api/documents/{created['id']}/export.blend?colours=false").status_code == 200
+    assert seen == [True, False]

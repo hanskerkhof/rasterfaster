@@ -116,6 +116,16 @@ def test_document_item_origin_roundtrip(client):
     assert items[0]["origin"] == [1.5, 2, -3] and items[1].get("origin") is None
 
 
+def test_document_light_roundtrip(client):
+    light = {"direction": [-0.2, 0.3, 0.9], "targetId": "a"}
+    created = client.post("/api/documents", json={"name": "l", "items": [sample_item()], "light": light}).json()
+    fetched = client.get(f"/api/documents/{created['id']}").json()
+    assert fetched["light"] == {"direction": [-0.2, 0.3, 0.9], "target": None, "targetId": "a"}
+    updated = client.put(f"/api/documents/{created['id']}", json={"name": "l", "items": [sample_item()]}).json()
+    assert updated["light"] is None  # saving without a light puts the default one back
+    assert client.post("/api/documents", json={"name": "bad", "light": {"direction": [1, 2]}}).status_code == 422
+
+
 def test_health(client):
     first = client.get("/api/health").json()
     assert first["status"] == "ok" and first["documents"] == 0

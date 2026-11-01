@@ -819,12 +819,24 @@ export class DocumentScene {
     if (changes.size) this.ctx.store.updateItems('Reset rotation', changes);
   }
 
-  /** Where the STL's own origin sits in the world for this part (position minus the lowest corner of the turned mesh): 0, 0, 0 is where the file put it. */
+  /**
+   * Where the part's lowest corner is when its origin point sits at the world's 0, 0, 0 (the position the Move panel's ↺ goes to). A part saved
+   * far from the origin in its STL file (Fusion exports keep their place) cannot get there inside the work area: it goes as near as it can,
+   * and that spot counts as 0.
+   */
+  private zeroPosition(item: DocItem): Vec3 | null {
+    const base = this.baseGeometries.get(item.path), size = this.sizeOfItem(item);
+    if (!base || !size) return null;
+    const q = new THREE.Quaternion(...item.rotation);
+    const zero = this.rotatedMin(base, q);
+    if (item.origin) zero.sub(new THREE.Vector3(...item.origin).applyQuaternion(q));
+    return clampToWorkArea([zero.x, zero.y, zero.z], size);
+  }
+
+  /** The Move panel's numbers: how far the part is from its zero position (see zeroPosition). */
   originOffset(item: DocItem): Vec3 | null {
-    const base = this.baseGeometries.get(item.path);
-    if (!base) return null;
-    const world = this.originWorld(item, base);
-    return [round3(world.x), round3(world.y), round3(world.z)];
+    const zero = this.zeroPosition(item);
+    return zero ? [round3(item.position[0] - zero[0]), round3(item.position[1] - zero[1]), round3(item.position[2] - zero[2])] : null;
   }
 
   /** Where the part's origin point (the one the user set, or the STL's own 0, 0, 0) is in the world. */
@@ -887,13 +899,14 @@ export class DocumentScene {
 
   /** The ↺ button of the Move panel: the selected parts go back to where their STL files put them along one axis. */
   resetOffset(axis: 'x' | 'y' | 'z' | 'all') {
+    const only = axis === 'all' ? -1 : { x: 0, y: 1, z: 2 }[axis];
     const changes = new Map<string, Partial<{ position: Vec3 }>>();
     for (const item of this.ctx.store.selectedItems()) {
-      const offset = this.originOffset(item), size = this.sizeOfItem(item);
-      if (!offset || !size || offset.every((v, k) => v === 0 || (axis !== 'all' && k !== { x: 0, y: 1, z: 2 }[axis]))) continue;
+      const zero = this.zeroPosition(item);
+      if (!zero) continue;
       const position: Vec3 = [...item.position];
-      for (const k of [0, 1, 2]) if (axis === 'all' || k === { x: 0, y: 1, z: 2 }[axis]) position[k] = round3(item.position[k] - offset[k]);
-      changes.set(item.id, { position: clampToWorkArea(position, size) });
+      for (const k of [0, 1, 2]) if (only < 0 || k === only) position[k] = round3(zero[k]);
+      if (position.some((v, k) => v !== item.position[k])) changes.set(item.id, { position });
     }
     if (changes.size) this.ctx.store.updateItems('Reset position', changes);
   }

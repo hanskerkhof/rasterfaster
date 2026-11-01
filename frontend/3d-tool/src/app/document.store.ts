@@ -73,9 +73,20 @@ export interface PartStats {
   triangles: number;
 }
 
+/** The light source of the "Shaded with light" view: where it shines from and at what. Kept in the document file. */
+export interface DocLight {
+  /** From what the light shines at towards the light (a unit vector). */
+  direction: Vec3;
+  /** The point it shines at (mm); with neither this nor `targetId` it shines at the middle of the scene. */
+  target?: Vec3 | null;
+  /** A part it shines at: it follows that part when it moves. */
+  targetId?: string | null;
+}
+
 export interface RfDocument {
   name: string;
   items: DocItem[];
+  light?: DocLight | null;
 }
 
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
@@ -172,8 +183,8 @@ export class DocumentStore {
     addEventListener('pagehide', () => {
       const id = this.docId();
       if (!id || !this.dirty) return;
-      const { name, items } = this.doc();
-      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items }) });
+      const { name, items, light } = this.doc();
+      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items, light }) });
     });
   }
 
@@ -239,7 +250,7 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items }, stored.modified);
+    this.resetTo(stored.id, { name: stored.name, items: stored.items, light: stored.light }, stored.modified);
     this.takeVersionInfo(stored);
   }
 
@@ -305,7 +316,7 @@ export class DocumentStore {
       if (this.dirty) {
         this.conflict.set(stored);
       } else {
-        this.resetTo(id, { name: stored.name, items: stored.items }, stored.modified);
+        this.resetTo(id, { name: stored.name, items: stored.items, light: stored.light }, stored.modified);
         this.takeVersionInfo(stored);
         this.say('Updated from another window');
       }
@@ -316,7 +327,7 @@ export class DocumentStore {
   useRemoteVersion() {
     const remote = this.conflict();
     if (!remote) return;
-    this.resetTo(remote.id, { name: remote.name, items: remote.items }, remote.modified);
+    this.resetTo(remote.id, { name: remote.name, items: remote.items, light: remote.light }, remote.modified);
     this.takeVersionInfo(remote);
   }
 
@@ -365,7 +376,7 @@ export class DocumentStore {
     await this.flush();
     const stored = await firstValueFrom(this.api.getVersion(id, version));
     const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
-    this.resetTo(id, { name: stored.name, items: stored.items });
+    this.resetTo(id, { name: stored.name, items: stored.items, light: this.doc().light });
     clearTimeout(this.saveTimer);
     this.dirty = false;
     this.saveState.set('saved');
@@ -414,7 +425,7 @@ export class DocumentStore {
     const id = this.docId();
     if (!id || version === null) return;
     const promoted = await firstValueFrom(this.api.promote(id, version));
-    this.resetTo(id, { name: promoted.name, items: promoted.items }, promoted.modified);
+    this.resetTo(id, { name: promoted.name, items: promoted.items, light: this.doc().light }, promoted.modified);
     this.takeVersionInfo(promoted);
     this.say(`Promoted v${version} to v${promoted.version}`);
     await this.refreshVersions();
@@ -491,6 +502,11 @@ export class DocumentStore {
       this.saving = false;
     }
     if (this.dirty && this.saveState() !== 'error') await this.flush(); // edits arrived while saving
+  }
+
+  /** The light of the Shaded view changed (null: back to the default); one undo step, saved with the document. */
+  setLight(light: DocLight | null) {
+    this.mutate('Move the light', d => ({ ...d, light }));
   }
 
   setPartStats(path: string, stats: PartStats) {

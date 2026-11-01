@@ -4,7 +4,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
-import { DocumentStore, Vec3, workArea } from './document.store';
+import { DocLight, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
@@ -18,6 +18,8 @@ const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
 const groundGridStorageKey = 'rasterfaster.groundGrid';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
+/** The light of the Shaded view when the document does not say otherwise: from high above and a little behind. */
+const defaultLightDirection = new THREE.Vector3(-0.5, 0.9, 2.6).normalize();
 const rotationStepStorageKey = 'rasterfaster.rotationStep';
 const rotationStepChoices = [90, 45, 15, 5, 1];
 const moveStepStorageKey = 'rasterfaster.moveStepMm';
@@ -151,12 +153,22 @@ function readShowPath() {
       </div>
     }
     </div>
+    @if (lightMenu(); as menu) {
+      <div class="menu-backdrop" (mousedown)="lightMenu.set(null)" (contextmenu)="$event.preventDefault(); lightMenu.set(null)"></div>
+      <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+        <button type="button" role="menuitem" (click)="startPointAtObject()"><span class="tick"></span>Point at object</button>
+        <button type="button" role="menuitem" (click)="resetLight(); lightMenu.set(null)"><span class="tick"></span>Reset the light</button>
+      </div>
+    }
     @if (cubeMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
       <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
         <button type="button" role="menuitem" (click)="toggleGroundGrid()">
           <span class="tick">{{ groundGrid() ? '✓' : '' }}</span>Ground grid<span class="hint">{{ groundGrid() ? 'on' : 'off' }}</span>
         </button>
+        @if (mode() === 'shaded') {
+          <button type="button" role="menuitem" (click)="resetLight(); cubeMenu.set(null)"><span class="tick"></span>Reset the light<span class="hint">default direction</span></button>
+        }
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
           <span class="tick">{{ grid3d() ? '✓' : '' }}</span>3D grid<span class="hint">{{ grid3d() ? 'on' : 'off' }}</span>
         </button>
@@ -275,6 +287,25 @@ export class StlViewer implements OnDestroy {
 
   private readonly host = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private renderer!: THREE.WebGLRenderer;
+  /** The light source of the "Shaded" view: warm, from high above and a little behind, casting soft shadows on the build plate. */
+  private readonly keyLight = new THREE.DirectionalLight(0xfff0dc, 2.4);
+  /** The light source drawn like Blender's sun: a ring with rays, and a line with an arrow head to where it shines (wire, on top of everything). */
+  /** Where the light shines from (unit vector from what it points at to the light) and what it points at (null: the middle of the scene). */
+  private lightDir = defaultLightDirection.clone();
+  private lightAt: THREE.Vector3 | null = null;
+  /** A part the light follows (wins over `lightAt`). */
+  private lightTargetId: string | null = null;
+  /** What the gizmo is placed round now (set by updateShadowRig), and how far out it sits. */
+  private readonly lightAtNow = new THREE.Vector3();
+  private lightReach = 1;
+  private lightDrag: { move: (e: PointerEvent) => void; up: (e: PointerEvent) => void } | null = null;
+  protected readonly lightMenu = signal<{ x: number; y: number } | null>(null);
+  /** "Point at object": the light follows the part under the pointer, a click keeps it, Esc puts it back. */
+  private pointMode: { dir: THREE.Vector3; at: THREE.Vector3 | null; id: string | null } | null = null;
+  private readonly lightGizmo = new THREE.Group();
+  private readonly lightDisk = new THREE.Group();
+  private readonly lightBeam = new THREE.Group();
+  private readonly shadowFloor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.38 }));
   private scene = new THREE.Scene();
   private readonly orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -100000, 100000);
   private readonly perspectiveCamera = new THREE.PerspectiveCamera(perspectiveFovDegrees, 1, 1, 100000);
@@ -422,6 +453,12 @@ export class StlViewer implements OnDestroy {
     effect(() => { this.store.missingPaths(); untracked(() => { if (this.ready()) this.documentScene.retryFailed(); }); });
     // Another document was opened: fit the camera to it once its geometry has loaded.
     effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.lastItemCount = 0; }); });
+    // The light of the Shaded view is part of the document: whatever the document says, the light does (not while it is being dragged).
+    effect(() => {
+      const light = this.store.doc().light ?? null;
+      this.store.docId();
+      if (this.ready()) untracked(() => this.applyStoredLight(light));
+    });
     // The selection or the numbers of a part changed: the line about the selection at the bottom right follows.
     effect(() => {
       this.store.selectedIds(); this.store.doc(); this.store.partStats();
@@ -440,6 +477,8 @@ export class StlViewer implements OnDestroy {
     this.store.viewSvg = () => this.viewSvg();
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
+    this.renderer.shadowMap.enabled = true; // only the key light of the "Shaded" view casts (see updateShadowRig)
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     Object.assign(this.renderer.domElement.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
     el.appendChild(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x1b1d22);
@@ -448,6 +487,16 @@ export class StlViewer implements OnDestroy {
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
     dir.position.set(1, -2, 3);
     this.scene.add(dir);
+    this.keyLight.castShadow = false;
+    this.keyLight.shadow.mapSize.set(2048, 2048);
+    this.keyLight.shadow.bias = -0.0004;
+    this.keyLight.shadow.normalBias = 0.6;
+    this.keyLight.shadow.radius = 4;
+    this.scene.add(this.keyLight, this.keyLight.target);
+    this.shadowFloor.visible = false;
+    this.buildLightGizmo();
+    this.shadowFloor.renderOrder = -1;
+    this.scene.add(this.shadowFloor);
     // STL / 3D-printing convention: Z is up. Classic isometric: look along (-1,-1,-1).
     this.orthoCamera.up.set(0, 0, 1);
     this.perspectiveCamera.up.set(0, 0, 1);
@@ -457,6 +506,10 @@ export class StlViewer implements OnDestroy {
       const menuWidth = 300; // keep the menu inside the view when the cube is at the right edge
       this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
     }, () => this.startPivot());
+    this.renderer.domElement.addEventListener('contextmenu', this.onLightContext, true); // the light's own menu: capture phase, so the parts' menu does not open
+    this.renderer.domElement.addEventListener('pointerdown', this.onPointAtDown, true);
+    this.renderer.domElement.addEventListener('pointermove', this.onPointAtMove);
+    this.renderer.domElement.addEventListener('pointerdown', this.onLightDown); // before the parts and the orbit controls: the light source can be grabbed
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
     const viewer = this; // the scene reads the *current* camera (it changes with the camera mode)
     this.documentScene = new DocumentScene({
@@ -514,6 +567,15 @@ export class StlViewer implements OnDestroy {
     // A zoomed-in perspective view has a narrower field of view than the camera's own: send the effective one so the picture looks the same.
     const fov = this.camera instanceof THREE.PerspectiveCamera ? `;${round((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / this.camera.zoom)) * (180 / Math.PI))}` : '';
     return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.viewHeight())};${this.projection}${fov}`;
+  };
+
+  /** The light of the "Shaded with light" view for the Blender export: `dx,dy,dz;tx,ty,tz` (direction towards the light, the point it shines at, mm); null in the other views. */
+  readonly lightParam = (): string | null => {
+    if (!this.documentMode() || this.mode() !== 'shaded') return null;
+    this.updateShadowRig(); // lightAtNow follows the scene
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const at = this.lightAtNow;
+    return `${[this.lightDir.x, this.lightDir.y, this.lightDir.z].map(round)};${[at.x, at.y, at.z].map(round)}`;
   };
 
   protected toggleFlight() {
@@ -714,6 +776,7 @@ export class StlViewer implements OnDestroy {
     if (!this.documentMode() || !this.ready()) return;
     const bounds = this.documentScene.bounds();
     const count = this.store.doc().items.length;
+    this.updateShadowRig();
     if (count > this.lastItemCount) this.needsDocumentFit = true; // a new object: make sure it is in view
     this.lastItemCount = count;
     this.updateSelectionInfo();
@@ -882,7 +945,7 @@ export class StlViewer implements OnDestroy {
   viewSvg(): { svg: string; mode: ViewMode } | null {
     const mode = this.mode();
     if (!this.documentScene.readyCount()) return null;
-    const shaded = mode === 'solid' || mode === 'solid-outline';
+    const shaded = mode === 'solid' || mode === 'solid-outline' || mode === 'shaded';
     const parts = shaded ? [] : this.documentScene.viewParts(mode === 'wireframe'); // the solid picture needs no line geometry
     this.controls.update(); // the camera as the user sees it now (the orbit controls apply their last move in their update)
     this.camera.updateProjectionMatrix();
@@ -894,7 +957,9 @@ export class StlViewer implements OnDestroy {
     const grid = this.grid, gridWas = grid?.visible; // the solid picture shows the ground grid when it is on (view cube menu)
     if (grid) grid.visible = this.groundGrid();
     try {
-      return { svg: buildImageSvg(this.renderer, this.scene, this.camera, aspect, { title }), mode };
+      const lightWas = this.lightGizmo.visible;
+      this.lightGizmo.visible = false; // the light source is an editing aid, not part of the picture
+      try { return { svg: buildImageSvg(this.renderer, this.scene, this.camera, aspect, { title }), mode }; } finally { this.lightGizmo.visible = lightWas; }
     } finally {
       showHelpers();
       if (grid && gridWas !== undefined) grid.visible = gridWas;
@@ -1247,7 +1312,252 @@ export class StlViewer implements OnDestroy {
     if (this.grid) { this.grid.geometry.dispose(); (this.grid.material as THREE.Material).dispose(); }
   }
 
+  private buildLightGizmo() {
+    const material = new THREE.LineBasicMaterial({ color: 0xffd98a, depthTest: false, transparent: true });
+    const segments = (points: number[]) => {
+      const line = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(points, 3)), material);
+      line.renderOrder = 30;
+      return line;
+    };
+    const ring: number[] = [], rays: number[] = [];
+    const steps = 40;
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2, b = ((i + 1) / steps) * Math.PI * 2;
+      ring.push(Math.cos(a), Math.sin(a), 0, Math.cos(b), Math.sin(b), 0);
+    }
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; rays.push(Math.cos(a) * 1.35, Math.sin(a) * 1.35, 0, Math.cos(a) * 2.1, Math.sin(a) * 2.1, 0); }
+    this.lightDisk.add(segments(ring), segments(rays));
+    // the beam runs along +Z of the gizmo (the gizmo looks at the middle of the scene); the arrow head sits at its end
+    const head = 0.05;
+    this.lightBeam.add(segments([0, 0, 0, 0, 0, 1,
+      0, 0, 1, head, 0, 0.92, 0, 0, 1, -head, 0, 0.92, 0, 0, 1, 0, head, 0.92, 0, 0, 1, 0, -head, 0.92]));
+    this.lightGizmo.add(this.lightDisk, this.lightBeam);
+    this.lightGizmo.visible = false;
+    this.scene.add(this.lightGizmo);
+  }
+
+  /** Switches the light source on in the "Shaded" view and fits its shadow volume (and the floor that catches it) round what is on screen. */
+  private updateShadowRig() {
+    const on = this.mode() === 'shaded';
+    this.keyLight.castShadow = on;
+    this.shadowFloor.visible = on;
+    this.lightGizmo.visible = on;
+    if (!on) return;
+    let box: THREE.Box3 | null = null;
+    if (this.documentMode()) box = this.documentScene?.bounds() ?? null;
+    else if (this.geometry) { this.geometry.computeBoundingBox(); box = this.geometry.boundingBox; }
+    if (!box || box.isEmpty()) return;
+    const centre = box.getCenter(new THREE.Vector3());
+    const radius = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 10);
+    const followed = this.lightTargetId && this.documentMode() ? this.documentScene.boundsOf([this.lightTargetId]) : null;
+    const at = followed ? followed.getCenter(new THREE.Vector3()) : this.lightAt ?? centre;
+    const reach = radius * 1.25 + at.distanceTo(centre); // the shadow volume has to cover the whole scene seen from the light, wherever it points
+    this.keyLight.target.position.copy(at);
+    this.keyLight.position.copy(at).addScaledVector(this.lightDir, radius * 3 + reach);
+    const camera = this.keyLight.shadow.camera;
+    camera.left = camera.bottom = -reach;
+    camera.right = camera.top = reach;
+    camera.near = radius * 0.2;
+    camera.far = radius * 7 + reach * 2;
+    camera.updateProjectionMatrix();
+    this.keyLight.target.updateMatrixWorld();
+    // the light source as a wire model: the ring a little way out along the light's direction, the beam running to the middle
+    this.lightReach = radius * 1.3;
+    this.lightAtNow.copy(at);
+    const out = at.clone().addScaledVector(this.lightDir, this.lightReach);
+    this.lightGizmo.position.copy(out);
+    this.lightGizmo.lookAt(at);
+    this.lightDisk.scale.setScalar(radius * 0.09);
+    this.lightBeam.scale.setScalar(out.distanceTo(at) * 0.62);
+    // the build plate: z = 0 under the parts, as wide as the shadows can reach
+    this.shadowFloor.position.set(centre.x, centre.y, Math.min(0, box.min.z));
+    this.shadowFloor.scale.set(radius * 6, radius * 6, 1);
+  }
+
+  /** The light's ring is under the pointer (a generous disc round it on the screen). */
+  private overLight(e: { clientX: number; clientY: number }): boolean {
+    if (this.mode() !== 'shaded' || !this.lightGizmo.visible) return false;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const project = (p: THREE.Vector3) => { const v = p.clone().project(this.camera); return new THREE.Vector2((v.x + 1) / 2 * rect.width, (1 - v.y) / 2 * rect.height); };
+    const centre = project(this.lightGizmo.position);
+    const rim = project(this.lightGizmo.position.clone().add(new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0).multiplyScalar(this.lightDisk.scale.x * 2.1)));
+    const reach = Math.max(14, centre.distanceTo(rim) * 1.15);
+    return centre.distanceTo(new THREE.Vector2(e.clientX - rect.left, e.clientY - rect.top)) <= reach;
+  }
+
+  /**
+   * Dragging the light's ring swings the light round what it points at; letting go over a part makes the light point at that part.
+   * Registered before everything else on the canvas so that it is the light that is grabbed, not a part behind it.
+   */
+  private readonly onLightDown = (e: PointerEvent) => {
+    if (e.button !== 0 || e.metaKey || e.shiftKey || !this.overLight(e)) return;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    const canvas = this.renderer.domElement;
+    canvas.setPointerCapture(e.pointerId);
+    const was = { dir: this.lightDir.clone(), at: this.lightAt?.clone() ?? null, id: this.lightTargetId };
+    const move = (ev: PointerEvent) => this.swingLight(ev);
+    const up = (ev: PointerEvent) => {
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerup', up);
+      canvas.removeEventListener('pointercancel', cancel);
+      this.lightDrag = null;
+      this.pointLightAt(ev);
+      this.commitLight();
+    };
+    const cancel = () => { // the browser took the pointer away: back to where the light was
+      canvas.removeEventListener('pointermove', move);
+      canvas.removeEventListener('pointerup', up);
+      canvas.removeEventListener('pointercancel', cancel);
+      this.lightDrag = null;
+      this.lightDir.copy(was.dir);
+      this.lightAt = was.at;
+      this.lightTargetId = was.id;
+      this.updateShadowRig();
+    };
+    canvas.addEventListener('pointermove', move);
+    canvas.addEventListener('pointerup', up);
+    canvas.addEventListener('pointercancel', cancel);
+    this.lightDrag = { move, up };
+  };
+
+  /** Right-click on the light source: its menu. */
+  private readonly onLightContext = (e: MouseEvent) => {
+    if (this.pointMode) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (!this.overLight(e)) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const host = this.host().nativeElement.getBoundingClientRect();
+    this.lightMenu.set({ x: Math.min(e.clientX - host.left, host.width - 240), y: e.clientY - host.top });
+  };
+
+  /** "Point at object" from the light's menu: until a click or Esc, the light points at the part under the pointer. */
+  protected startPointAtObject() {
+    this.lightMenu.set(null);
+    if (!this.documentMode()) return;
+    this.pointMode = { dir: this.lightDir.clone(), at: this.lightAt?.clone() ?? null, id: this.lightTargetId };
+    this.renderer.domElement.style.cursor = 'crosshair';
+    window.addEventListener('keydown', this.onPointAtKey, true);
+    this.store.announce('Point at object: click a part for the light to point at (Esc cancels)', 6000);
+  }
+
+  private endPointAtObject(keep: boolean) {
+    const mode = this.pointMode;
+    if (!mode) return;
+    this.pointMode = null;
+    this.renderer.domElement.style.cursor = '';
+    window.removeEventListener('keydown', this.onPointAtKey, true);
+    if (!keep) { this.lightDir.copy(mode.dir); this.lightAt = mode.at; this.lightTargetId = mode.id; this.updateShadowRig(); }
+  }
+
+  /** The part under the pointer and the middle of its box, or null. */
+  private partUnder(e: { clientX: number; clientY: number }): { id: string; centre: THREE.Vector3 } | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pickRaycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1)), this.camera);
+    const hit = this.pickRaycaster.intersectObjects(this.documentScene.pickableMeshes(), false)[0];
+    const id = hit?.object.userData['itemId'] as string | undefined;
+    const box = id ? this.documentScene.boundsOf([id]) : null;
+    return id && box ? { id, centre: box.getCenter(new THREE.Vector3()) } : null;
+  }
+
+  private readonly onPointAtMove = (e: PointerEvent) => {
+    if (!this.pointMode) return;
+    const part = this.partUnder(e);
+    if (!part) return;
+    this.lightTargetId = part.id; // a preview: the light turns to whatever the pointer is over
+    this.updateShadowRig();
+  };
+
+  private readonly onPointAtDown = (e: PointerEvent) => {
+    if (!this.pointMode) return;
+    e.stopImmediatePropagation(); // the click belongs to this mode, not to selecting or dragging a part
+    e.preventDefault();
+    if (e.button !== 0) return;
+    const part = this.partUnder(e);
+    if (!part) return; // a click beside the parts changes nothing (Esc cancels)
+    this.lightTargetId = part.id;
+    this.lightAt = null;
+    this.updateShadowRig();
+    this.endPointAtObject(true);
+    this.commitLight();
+    this.store.announce(`The light points at ${this.store.doc().items.find(i => i.id === part.id)?.name ?? 'the part'}`);
+  };
+
+  private readonly onPointAtKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    e.stopPropagation();
+    e.preventDefault();
+    this.endPointAtObject(false);
+    this.store.announce('Point at object cancelled');
+  };
+
+  /** The light follows the pointer on a sphere round what it points at. */
+  private swingLight(e: PointerEvent) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pickRaycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1)), this.camera);
+    const ray = this.pickRaycaster.ray, at = this.lightAtNow;
+    const sphere = new THREE.Sphere(at, this.lightReach);
+    const hit = ray.intersectSphere(sphere, new THREE.Vector3()) ?? ray.closestPointToPoint(at, new THREE.Vector3()); // missing the sphere: the closest point of the ray
+    const dir = hit.sub(at);
+    if (dir.lengthSq() < 1e-6) return;
+    dir.normalize();
+    this.lightDir.copy(dir.normalize());
+    this.updateShadowRig();
+  }
+
+  /** Released over a part: the light now points at it (the middle of its box). */
+  private pointLightAt(e: PointerEvent) {
+    if (!this.documentMode()) return;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.pickRaycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1)), this.camera);
+    const hit = this.pickRaycaster.intersectObjects(this.documentScene.pickableMeshes(), false)[0];
+    const id = hit?.object.userData['itemId'] as string | undefined;
+    const box = id ? this.documentScene.boundsOf([id]) : null;
+    if (!id || !box) return;
+    this.lightTargetId = id;
+    this.lightAt = null;
+    this.updateShadowRig();
+    this.store.announce(`The light points at ${this.store.doc().items.find(i => i.id === id)?.name ?? 'the part'}`);
+  }
+
+  /** Back to the light's own direction, pointing at the middle of the scene. */
+  resetLight() {
+    this.lightDir.copy(defaultLightDirection);
+    this.lightAt = null;
+    this.lightTargetId = null;
+    this.updateShadowRig();
+    this.store.setLight(null);
+  }
+
+  /** Puts the light as it is now into the document (saved with it, one undo step). */
+  private commitLight() {
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const point = (v: THREE.Vector3): Vec3 => [round(v.x), round(v.y), round(v.z)];
+    this.store.setLight({
+      direction: point(this.lightDir),
+      ...(this.lightTargetId ? { targetId: this.lightTargetId } : this.lightAt ? { target: point(this.lightAt) } : {}),
+    });
+  }
+
+  /** The light the document asks for (none: the default one). */
+  private applyStoredLight(light: DocLight | null) {
+    if (this.lightDrag || this.pointMode) return;
+    if (light) {
+      this.lightDir.set(...light.direction);
+      if (this.lightDir.lengthSq() < 1e-9) this.lightDir.copy(defaultLightDirection);
+      this.lightDir.normalize();
+      this.lightAt = light.target ? new THREE.Vector3(...light.target) : null;
+      this.lightTargetId = light.targetId ?? null;
+    } else {
+      this.lightDir.copy(defaultLightDirection);
+      this.lightAt = null;
+      this.lightTargetId = null;
+    }
+    this.updateShadowRig();
+  }
+
   private applyMode() {
+    this.updateShadowRig();
     if (!this.geometry) return;
     const geometry = this.geometry;
     clearParts(this.model);

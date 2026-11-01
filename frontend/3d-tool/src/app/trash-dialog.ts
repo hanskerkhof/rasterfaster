@@ -19,6 +19,7 @@ import { closeOnEscape } from './escape-close';
               <button type="button" class="danger" (click)="empty()">Empty Trash</button>
               <button type="button" (click)="confirmEmpty.set(false)">Cancel</button></span>
           } @else {
+            <button type="button" [disabled]="busy() || !canPutBack()" title="Put everything back where it came from (a place that is taken gets “(restored)” added to the name)" (click)="putBackAll()">Put Back All</button>
             <button type="button" (click)="confirmEmpty.set(true)">Empty Trash…</button>
           }
         }
@@ -81,6 +82,8 @@ export class TrashDialog implements OnInit {
   protected readonly message = signal('');
   protected readonly conflict = signal<string | null>(null);
   protected readonly confirmEmpty = signal(false);
+  protected readonly busy = signal(false);
+  protected readonly canPutBack = () => this.items().some(item => !item.missing);
 
   ngOnInit() {
     void this.refresh();
@@ -107,6 +110,30 @@ export class TrashDialog implements OnInit {
       const detail = (error as { error?: { detail?: unknown } }).error?.detail;
       this.message.set(typeof detail === 'string' ? `Could not put it back: ${detail}` : 'Could not put it back');
     }
+    await this.refresh();
+  }
+
+  /** Puts every item back; one whose place is taken comes back as “(restored)”. Items whose file is gone from the Trash stay. */
+  protected async putBackAll() {
+    this.message.set('');
+    this.conflict.set(null);
+    this.busy.set(true);
+    let back = 0, renamed = 0, failed = 0;
+    try {
+      for (const item of [...this.items()].reverse().filter(i => !i.missing)) { // the oldest first, like they went in
+        try {
+          await firstValueFrom(this.lib.putBack(item.id));
+          back++;
+        } catch (error) {
+          if ((error as { status?: number }).status !== 409) { failed++; continue; }
+          try { await firstValueFrom(this.lib.putBack(item.id, 'rename')); back++; renamed++; } catch { failed++; }
+        }
+      }
+    } finally {
+      this.busy.set(false);
+    }
+    this.message.set(`Put back ${back} item${back === 1 ? '' : 's'}${renamed ? ` (${renamed} as “(restored)”: its place was taken)` : ''}${failed ? `; ${failed} could not be put back` : ''}`);
+    if (back) this.changed.emit();
     await this.refresh();
   }
 

@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Shaded view with a movable light, saved light, coloured Blender export (0.10.56)
+
+### Added
+- **FE** (`model-render.ts`, `stl-viewer.ts`): a new view mode **Shaded with light** (⌥6): glossy parts with smooth curved walls, lit by a key light that casts soft shadows on the parts and on the build plate. The light source is drawn as a wire model like Blender's sun (ring with rays, beam with an arrow head). Drag the ring to swing the light, also below the ground grid; letting go over a part points the light at it. **Right-click the ring** for a menu: *Point at object* (the light follows the part under the pointer, a click keeps it, Esc cancels) and *Reset the light*.
+- **BE** + **FE** (`main.py`, `document.store.ts`): the light is saved in the document file (`light`: `direction`, and `target` or `targetId` of a part it follows; also in the `.rasterfaster` export). Without a light the file has no `light` field.
+- **BE** (`blenderexport.py`): in the Shaded view the Blender export gets the app's light as its key light (a sun shining from the light's direction at its target; `?light=dx,dy,dz;tx,ty,tz`), also from **Zip all**.
+- **FE** (`trash-dialog.ts`): **Put Back All** before *Empty Trash…* in the Trash dialog: everything goes back, the oldest first; a place that is taken gets `(restored)` in the name; items missing from the Trash stay.
+
+### Changed
+- **BE** (`blenderexport.py`, `main.py`): the Blender export keeps the **colours of the document** instead of making every part black (`?colours=false` gives the single Black PLA material again); the coloured parts get the same satin finish and clear coat.
+- **FE** (`document-scene.ts`): the Move panel's zero is the nearest position inside the work area when the part's STL position lies outside it, so its ↺ really gets all axes to 0.
+
 ## 2026-11-01 - Set origin, Enter confirms the tools (0.10.55)
 
 ### Added

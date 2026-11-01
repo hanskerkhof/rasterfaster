@@ -1,7 +1,8 @@
 import * as THREE from 'three';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { silhouetteEdges, silhouetteParts } from './silhouette';
 
-export type ViewMode = 'solid' | 'solid-outline' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
+export type ViewMode = 'solid' | 'solid-outline' | 'shaded' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
 
 export interface PartStyle {
   background: THREE.Color;
@@ -24,11 +25,29 @@ const outlineColor = 0x15181f;
 
 export const previewStyle = { solid: 0xc9ced8, line: 0xe8ecf4, wire: 0x7fd1ff, dashed: 0x6f7a8c };
 
+/** Smooth-shaded copies of geometries (curved walls look round, sharp edges stay sharp: normals are shared below 35°), one per original. */
+const creased = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
+function creasedCopy(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
+  let copy = creased.get(geometry);
+  if (!copy) {
+    copy = toCreasedNormals(geometry, THREE.MathUtils.degToRad(35));
+    creased.set(geometry, copy);
+    geometry.addEventListener('dispose', () => { copy?.dispose(); creased.delete(geometry); });
+  }
+  return copy;
+}
+
 /** Builds the meshes/lines that draw one geometry in the given view mode. Geometry is shared, materials are new. */
 export function buildParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: PartStyle): THREE.Object3D[] {
   if (style.ghost) return buildGhostParts(geometry, mode, style);
   if (mode === 'solid') {
     return [new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true }))];
+  }
+  if (mode === 'shaded') { // a glossy material, smooth normals, and it casts and receives the shadows of the light source (see the viewer)
+    const mesh = new THREE.Mesh(creasedCopy(geometry), new THREE.MeshPhysicalMaterial({ color: style.solid, roughness: 0.38, metalness: 0.12, clearcoat: 0.3, clearcoatRoughness: 0.35 }));
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return [mesh];
   }
   if (mode === 'solid-outline') { // the shaded part with its visible edges drawn over it (the fill hides the edges behind it)
     const parts: THREE.Object3D[] = [
@@ -62,7 +81,7 @@ const ghostOpacity = 0.09;
 
 /** Muted look: no depth writes, so nothing behind a ghost is hidden by it. */
 function buildGhostParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: PartStyle): THREE.Object3D[] {
-  if (mode === 'solid' || mode === 'solid-outline') {
+  if (mode === 'solid' || mode === 'solid-outline' || mode === 'shaded') {
     return [new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true, transparent: true, opacity: ghostOpacity, depthWrite: false }))];
   }
   if (mode === 'wireframe') {

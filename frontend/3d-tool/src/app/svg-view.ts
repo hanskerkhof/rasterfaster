@@ -12,11 +12,11 @@ export interface ViewPart {
   wire?: THREE.BufferGeometry;
 }
 
-export type SvgMode = 'solid' | 'solid-outline' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
+export type SvgMode = 'solid' | 'solid-outline' | 'shaded' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
 
 export interface ViewSvgOptions {
   /** The display mode to follow: hidden lines removed (default), dashed hidden lines, wireframe (all triangle edges). Solid is a picture: see `buildImageSvg`. */
-  mode?: Exclude<SvgMode, 'solid' | 'solid-outline'>;
+  mode?: Exclude<SvgMode, 'solid' | 'solid-outline' | 'shaded'>;
   /** The ground grid (line segments in world coordinates), drawn light grey behind the model; parts hide what is behind them (not in wireframe). */
   grid?: THREE.BufferGeometry | null;
   /** Pixels of the longer side of the depth picture the lines are tested against (and so of the drawing's coordinates). */

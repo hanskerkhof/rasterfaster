@@ -40,6 +40,19 @@ def parse_view(text: str) -> dict:
     return view
 
 
+def parse_light(text: str) -> dict:
+    """`dx,dy,dz;tx,ty,tz`: where the app's light shines from (a direction, from what it points at to the light) and the point it points at (mm)."""
+    try:
+        direction, target = text.split(";")
+        light = {"direction": np.array([float(v) for v in direction.split(",")]), "target": np.array([float(v) for v in target.split(",")])}
+        assert light["direction"].shape == (3,) and light["target"].shape == (3,)
+        assert np.isfinite(light["direction"]).all() and np.isfinite(light["target"]).all() and np.linalg.norm(light["direction"]) > 1e-6
+    except (ValueError, AssertionError):
+        raise ValueError("light must be dx,dy,dz;tx,ty,tz")
+    light["direction"] = light["direction"] / np.linalg.norm(light["direction"])
+    return light
+
+
 def camera_basis(direction: np.ndarray):
     forward = -direction
     right = np.cross(forward, [0.0, 0.0, 1.0])
@@ -154,7 +167,8 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
                 materials.append(black_pla(dimmed))
             else:
                 materials.append({"name": f"colour_{colour:06x}" + ("_dimmed" if dimmed else ""), "pbrMetallicRoughness": {
-                    "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), dimmedAlpha if dimmed else 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.6},
+                    "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), dimmedAlpha if dimmed else 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.42},  # the same satin finish as Black PLA, in the document's colour
+                    "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}},
                     **({"alphaMode": "BLEND"} if dimmed else {})})
         key = (item["path"], colour, dimmed)  # one glTF mesh per library file, colour and dimming; parts used several times share it
         if key not in meshIndex:
@@ -209,7 +223,7 @@ import sys
 import bpy
 from mathutils import Vector
 
-source, target, studio = sys.argv[sys.argv.index("--") + 1:]
+source, target, studio, light_spec = sys.argv[sys.argv.index("--") + 1:]  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -287,7 +301,21 @@ if studio == "1":
         track.target, track.track_axis, track.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
 
     d = r * 3
-    light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
+    if light_spec:  # the light of the app's "Shaded with light" view: a sun shining from that direction at that point (mm -> m)
+        direction, aim_at = (Vector(float(v) for v in part.split(",")) for part in light_spec.split(";"))
+        sun_data = bpy.data.lights.new("Key (sun)", "SUN")
+        sun_data.energy, sun_data.color, sun_data.angle = 4.0, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
+        sun = bpy.data.objects.new("Key (sun)", sun_data)
+        point = aim_at * 0.001
+        sun.location = point + direction.normalized() * d
+        scene.collection.objects.link(sun)
+        sun_aim = bpy.data.objects.new("Key (sun) target", None)
+        sun_aim.location = point
+        scene.collection.objects.link(sun_aim)
+        sun_track = sun.constraints.new("TRACK_TO")
+        sun_track.target, sun_track.track_axis, sun_track.up_axis = sun_aim, "TRACK_NEGATIVE_Z", "UP_Y"
+    else:
+        light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
     light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2, (0.6, 0.75, 1.0), r * 3)
     light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
     light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4, (1.0, 0.45, 0.8), r * 1.5)
@@ -312,9 +340,10 @@ def find_blender() -> str | None:
     return next((c for c in candidates if c and Path(c).is_file()), None)
 
 
-def build_blend(glb: bytes, blender: str, studio: bool = True) -> bytes:
+def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | None = None) -> bytes:
     """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, 1080p;
-    with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles)."""
+    with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles; with `light` (see parse_light) the key
+    light is a sun like the app's light source instead of the warm area light)."""
     import subprocess
     import tempfile
     from pathlib import Path
@@ -322,8 +351,9 @@ def build_blend(glb: bytes, blender: str, studio: bool = True) -> bytes:
     with tempfile.TemporaryDirectory() as folder:
         source, target, script = Path(folder, "scene.glb"), Path(folder, "scene.blend"), Path(folder, "make_blend.py")
         source.write_bytes(glb)
+        spec = "" if light is None else ";".join(",".join(f"{v:.4f}" for v in light[k]) for k in ("direction", "target"))
         script.write_text(blenderScript)
-        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0"],
+        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec],
                                 capture_output=True, text=True, timeout=120)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(result.stderr or result.stdout)[-300:]}")

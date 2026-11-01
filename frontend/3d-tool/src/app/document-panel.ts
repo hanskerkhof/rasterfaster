@@ -11,7 +11,7 @@ import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.
 /** `snapRight`: the panel sits against the right edge of the view and stays there when the view gets wider or narrower (e.g. the file panel is collapsed). */
 interface PanelGeometry { left: number; top: number; width: number; height: number; snapRight?: boolean }
 /** The display mode in the name of an SVG view file. */
-const viewModeShort: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' };
+const viewModeShort: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', shaded: 'shaded', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' };
 const geometryStorageKey = 'rasterfaster.docPanelGeometry';
 const snapDistance = 24; // px from the right edge of the view at which the panel snaps to it
 const sideGap = 12;
@@ -403,6 +403,14 @@ export class DocumentPanel {
   readonly centerItem = output<string>();
   /** The 3D view's camera (see StlViewer.viewParam): the Blender export puts its camera there. */
   readonly viewProvider = input<() => string | null>(() => null);
+  /** The light of the "Shaded with light" view (null in the other views), for the Blender file. */
+  readonly lightProvider = input<() => string | null>(() => null);
+
+  /** The URL of the Blender export: the camera of the 3D view and, in the shaded view, its light. */
+  private blenderEndpoint() {
+    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()]].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
+    return params.length ? `export.blend?${params.join('&')}` : 'export.blend';
+  }
   protected readonly bomOpen = signal(false);
   protected readonly versionsOpen = signal(false);
 
@@ -427,8 +435,7 @@ export class DocumentPanel {
   }
 
   protected exportBlender() {
-    const view = this.viewProvider()();
-    return this.download(view ? `export.blend?view=${encodeURIComponent(view)}` : 'export.blend', 'scene.blend');
+    return this.download(this.blenderEndpoint(), 'scene.blend');
   }
 
   protected exportDocumentFile() {
@@ -540,7 +547,6 @@ export class DocumentPanel {
         if (!response.ok) throw new Error(`${endpoint}: ${(await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`}`);
         return new Uint8Array(await response.arrayBuffer());
       };
-      const view = this.viewProvider()();
       const drawing = this.store.viewSvg?.();
       if (!drawing) throw new Error('nothing to draw yet (the parts are still loading)');
       const encoder = new TextEncoder();
@@ -548,7 +554,7 @@ export class DocumentPanel {
         { name: `${base}.rasterfaster.json`, data: await fetchBytes('export.rasterfaster') },
         { name: `${base}-view-${viewModeShort[drawing.mode] ?? drawing.mode}.svg`, data: encoder.encode(drawing.svg) },
         { name: `${base}.svg`, data: await fetchBytes('export.svg') },
-        { name: `${base}.blend`, data: await fetchBytes(view ? `export.blend?view=${encodeURIComponent(view)}` : 'export.blend') },
+        { name: `${base}.blend`, data: await fetchBytes(this.blenderEndpoint()) },
         { name: `${base}-assembly.3mf`, data: await fetchBytes('export.3mf') },
       ];
       const link = document.createElement('a');

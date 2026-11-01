@@ -348,9 +348,17 @@ class DocumentItem(BaseModel):
     origin: tuple[float, float, float] | None = None  # origin point set by the user, in the part's own STL coordinates (None: the STL's own 0, 0, 0)
 
 
+class DocumentLight(BaseModel):
+    """The light source of the \"Shaded with light\" view (also the sun of the Blender export)."""
+    direction: tuple[float, float, float]  # from what it shines at towards the light (the frontend keeps it a unit vector)
+    target: tuple[float, float, float] | None = None  # the point it shines at (mm); without it and without targetId: the middle of the scene
+    targetId: str | None = Field(default=None, max_length=64)  # a part it shines at (it follows the part when that moves); wins over target
+
+
 class DocumentBody(BaseModel):
     name: str = Field(default="Untitled", min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+    light: DocumentLight | None = None  # none: the default light
 
 
 class DocumentOut(DocumentBody):
@@ -546,6 +554,7 @@ class DocumentFile(BaseModel):
     id: str = Field(max_length=81)
     name: str = Field(min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+    light: DocumentLight | None = None
     versions: list[StoredVersion] = Field(default_factory=list, max_length=1000)
 
 
@@ -556,7 +565,7 @@ def export_document_file(documentId: str) -> Response:
     directory = versions.versions_dir(documentsRoot, documentId)
     history = [data for number in versions.numbers(directory) if (data := versions.read(directory, number))]
     payload = DocumentFile(format=documentFileFormat, formatVersion=1, exportedAt=time.time(), id=documentId, name=document.name,
-                           items=document.items, versions=history)
+                           items=document.items, light=document.light, versions=history)
     label = (f"-v{document.version}" + ("-edited" if document.changedSinceVersion else "")) if document.version else ""  # e.g. Name-v3 (or Name-v3-edited: the working copy is ahead of v3)
     filename = re.sub(r"[^\w.-]+", "_", document.name) + label + ".rasterfaster.json"
     return Response(payload.model_dump_json(indent=2), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -578,7 +587,7 @@ def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "c
         stored = [{"version": v.version, "savedAt": v.savedAt, "name": v.name, "items": [i.model_dump() for i in v.items]} for v in sorted(file.versions, key=lambda v: v.version)]
         if len({v["version"] for v in stored}) != len(stored):
             raise HTTPException(status_code=422, detail="the file has duplicate version numbers")
-        write_document(documentId, DocumentBody(name=file.name, items=file.items))
+        write_document(documentId, DocumentBody(name=file.name, items=file.items, light=file.light))
         versions.replace_all(versions.versions_dir(documentsRoot, documentId), stored)
         return read_document(documentId)
 
@@ -662,8 +671,8 @@ def parsed_view(view: str | None):
 
 
 @app.get("/api/documents/{documentId}/export.glb")
-def export_document_glb(documentId: str, camera: bool = True, colours: bool = False, view: str | None = None) -> Response:
-    """glTF for Blender: the parts as placed in the document (Z up, metres) in Black PLA (or the document's colours with `colours=true`), plus, unless `camera` is false, a camera placed like the app's 3D view (`view`, see blenderexport.parse_view; default: the isometric Home view)."""
+def export_document_glb(documentId: str, camera: bool = True, colours: bool = True, view: str | None = None) -> Response:
+    """glTF for Blender: the parts as placed in the document (Z up, metres) in the document's colours (or all in Black PLA with `colours=false`), plus, unless `camera` is false, a camera placed like the app's 3D view (`view`, see blenderexport.parse_view; default: the isometric Home view)."""
     document = exportable(read_document(documentId))
     stlBytes = load_document_stls(document)
     try:
@@ -675,7 +684,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Fa
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = False, studio: bool = True, view: str | None = None) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -684,7 +693,7 @@ def export_document_blend(documentId: str, colours: bool = False, studio: bool =
     stlBytes = load_document_stls(document)
     try:
         glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours, parsed_view(view))
-        data = blenderexport.build_blend(glb, blender, studio)
+        data = blenderexport.build_blend(glb, blender, studio, blenderexport.parse_light(light) if light else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
