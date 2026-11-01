@@ -47,6 +47,8 @@ The **parts list** in the document panel (the panel on the right: document, expo
 
 File list: **⌥⌘⌫** deletes the selection immediately (asks first: Enter deletes, Esc cancels; not into the Trash), ⌘⌫ moves it to the Trash. Esc right after **New Folder** takes the new folder back. Esc closes an open dialog without deselecting anything.
 
+**Solid with outline** (⌥2, also in the quick look) draws the shaded parts with their visible sharp edges in dark lines on top; the SVG view of it is the shaded picture, like Solid.
+
 SVG view (Export row): the 3D view as an SVG in the display mode that is selected (hidden lines removed / dashed and wireframe are line drawings, solid is a picture), with the ground grid when it is on (view cube menu ▸ Ground grid). Dimmed parts are translucent in the Blender export.
 
 Versions (the version button of the document panel): **Delete** a version, or **Delete all previous versions…** (the newest stays). The document panel folds up with the chevron in its header.
@@ -55,7 +57,7 @@ Relink: a part whose file is missing (⚠) or that only has 3MF geometry gets an
 
 3MF: **Import 3MF…** (document panel) makes a new document from a 3MF of this app or Bambu Studio and links each part to its library file (by path, name, then shape); parts without a library file keep the 3MF's geometry (⚠, stored in `documents/_embedded/`). Right-click a part: **Export STL** (as placed / original), **Show in assembly**. **Shift-drag** on empty space selects by rectangle. The document panel can be moved and resized.
 
-Keyboard: **Space** toggles the fly-around, **⌥1–⌥4** the view modes, **⌘0–⌘6** the view direction (home, top, bottom, front, rear, left, right). The object menu (right-click a part) has **Color ▸**; right-click empty canvas for **Paste**. `scripts/dev_stack.py` starts the API and the dev server together.
+Keyboard: **Space** toggles the fly-around, **⌥1–⌥5** the view modes, **⌘0–⌘6** the view direction (home, top, bottom, front, rear, left, right). The object menu (right-click a part) has **Color ▸**; right-click empty canvas for **Paste**. `scripts/dev_stack.py` starts the API and the dev server together.
 
 Copy / paste: ⌘C copies the selected parts, ⌘X cuts them, ⌘V pastes at the view centre (the copied group's lowest corner snaps to the nearest grid intersection, heights and spacing are kept, parts set to Center on grid are re-centered). One paste is one undo step and the pasted parts become the selection. The clipboard holds content only (file, rotation, color, dimmed/centered flags, offsets), never ids, and is kept in local storage, so it survives reloads and works across documents and tabs. The part context menu has Copy / Cut / Paste too.
 

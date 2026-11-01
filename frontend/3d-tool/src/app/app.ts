@@ -39,7 +39,7 @@ function loadPanelWidth(): number {
   return defaultPanelWidthPx;
 }
 const viewModeStorageKey = 'rasterfaster.viewMode';
-const viewModes: ViewMode[] = ['solid', 'wireframe', 'hidden-removed', 'hidden-shown'];
+const viewModes: ViewMode[] = ['solid', 'solid-outline', 'wireframe', 'hidden-removed', 'hidden-shown'];
 
 function readFilterMode(): 'any' | 'all' {
   try { return localStorage.getItem(filterModeStorageKey) === 'all' ? 'all' : 'any'; } catch { return 'any'; }
@@ -101,6 +101,7 @@ export class App {
 
   protected readonly modes: { id: ViewMode; label: string }[] = [
     { id: 'solid', label: 'Solid' },
+    { id: 'solid-outline', label: 'Solid with outline' },
     { id: 'wireframe', label: 'Wireframe' },
     { id: 'hidden-removed', label: 'Hidden lines removed' },
     { id: 'hidden-shown', label: 'Hidden lines dashed' },
@@ -439,7 +440,7 @@ export class App {
       event.preventDefault();
       this.togglePanel();
     }
-    const digit = /^Digit([1-9])$/.exec(event.code); // ⌥1 … ⌥4: the view modes in the order of the buttons (event.code: ⌥ changes the typed character)
+    const digit = /^Digit([1-9])$/.exec(event.code); // ⌥1 … ⌥5: the view modes in the order of the buttons (event.code: ⌥ changes the typed character)
     if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && this.modes[+digit[1] - 1]) {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);

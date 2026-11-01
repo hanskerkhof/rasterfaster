@@ -505,7 +505,7 @@ export class DocumentPanel {
     try {
       const drawing = this.store.viewSvg?.();
       if (!drawing) throw new Error('nothing to draw yet (the parts are still loading)');
-      const short: Record<string, string> = { solid: 'solid', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' }; // the display mode, in the file name
+      const short: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' }; // the display mode, in the file name
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob([drawing.svg], { type: 'image/svg+xml' }));
       link.download = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-view-${short[drawing.mode] ?? drawing.mode}.svg`;

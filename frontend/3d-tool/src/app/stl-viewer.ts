@@ -779,13 +779,14 @@ export class StlViewer implements OnDestroy {
   viewSvg(): { svg: string; mode: ViewMode } | null {
     const mode = this.mode();
     if (!this.documentScene.readyCount()) return null;
-    const parts = mode === 'solid' ? [] : this.documentScene.viewParts(mode === 'wireframe'); // the solid picture needs no line geometry
+    const shaded = mode === 'solid' || mode === 'solid-outline';
+    const parts = shaded ? [] : this.documentScene.viewParts(mode === 'wireframe'); // the solid picture needs no line geometry
     this.controls.update(); // the camera as the user sees it now (the orbit controls apply their last move in their update)
     this.camera.updateProjectionMatrix();
     const canvas = this.renderer.domElement;
     const aspect = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
     const title = this.store.doc().name;
-    if (mode !== 'solid') return { svg: buildViewSvg(this.renderer, this.camera, aspect, parts, { title, mode, grid: this.groundGrid() ? this.grid?.geometry : null }), mode };
+    if (!shaded) return { svg: buildViewSvg(this.renderer, this.camera, aspect, parts, { title, mode, grid: this.groundGrid() ? this.grid?.geometry : null }), mode };
     const showHelpers = this.documentScene.hideHelpers();
     const grid = this.grid, gridWas = grid?.visible; // the solid picture shows the ground grid when it is on (view cube menu)
     if (grid) grid.visible = this.groundGrid();

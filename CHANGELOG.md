@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Solid with outline view mode (0.10.49)
+
+### Added
+- **FE** (`model-render.ts`, `app.ts`, `quick-look.ts`, `stl-viewer.ts`): a new view mode **Solid with outline**: the shaded parts with their visible sharp edges (and silhouette edges, when on) drawn in dark lines on top; edges behind a part stay hidden. It sits after Solid in the toolbar and the quick look. Muted parts get the faint ghost of Solid. The SVG view of it is the shaded picture, like Solid.
+
+### Changed
+- **FE**: the view-mode keys are now ⌥1–⌥5: Wireframe, Hidden lines removed and Hidden lines dashed moved to ⌥3, ⌥4 and ⌥5.
+
 ## 2026-10-31 - The preview stays open after Move to Trash (0.10.48)
 
 ### Changed

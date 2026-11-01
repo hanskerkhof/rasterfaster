@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { silhouetteEdges, silhouetteParts } from './silhouette';
 
-export type ViewMode = 'solid' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
+export type ViewMode = 'solid' | 'solid-outline' | 'wireframe' | 'hidden-removed' | 'hidden-shown';
 
 export interface PartStyle {
   background: THREE.Color;
@@ -19,6 +19,9 @@ export interface PartStyle {
   ghost?: boolean;
 }
 
+/** The outline of the solid-with-outline mode: dark, to stand out on the light grey parts. */
+const outlineColor = 0x15181f;
+
 export const previewStyle = { solid: 0xc9ced8, line: 0xe8ecf4, wire: 0x7fd1ff, dashed: 0x6f7a8c };
 
 /** Builds the meshes/lines that draw one geometry in the given view mode. Geometry is shared, materials are new. */
@@ -26,6 +29,14 @@ export function buildParts(geometry: THREE.BufferGeometry, mode: ViewMode, style
   if (style.ghost) return buildGhostParts(geometry, mode, style);
   if (mode === 'solid') {
     return [new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true }))];
+  }
+  if (mode === 'solid-outline') { // the shaded part with its visible edges drawn over it (the fill hides the edges behind it)
+    const parts: THREE.Object3D[] = [
+      new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 })),
+      new THREE.LineSegments(style.edges(), new THREE.LineBasicMaterial({ color: outlineColor })),
+    ];
+    if (style.silhouette && silhouetteEdges()) parts.push(...silhouetteParts(style.silhouette(), 'hidden-removed', { line: outlineColor, dashed: style.dashed }));
+    return parts;
   }
   if (mode === 'wireframe') {
     return [new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: style.wire, wireframe: true }))];
@@ -51,7 +62,7 @@ const ghostOpacity = 0.09;
 
 /** Muted look: no depth writes, so nothing behind a ghost is hidden by it. */
 function buildGhostParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: PartStyle): THREE.Object3D[] {
-  if (mode === 'solid') {
+  if (mode === 'solid' || mode === 'solid-outline') {
     return [new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true, transparent: true, opacity: ghostOpacity, depthWrite: false }))];
   }
   if (mode === 'wireframe') {

@@ -23,6 +23,7 @@ function readSize(): { w: number; h: number } | null {
 }
 const quickModes: { id: ViewMode; label: string; title: string }[] = [
   { id: 'solid', label: 'Solid', title: 'Solid' },
+  { id: 'solid-outline', label: 'Outline', title: 'Solid with outline' },
   { id: 'wireframe', label: 'Wireframe', title: 'Wireframe' },
   { id: 'hidden-removed', label: 'Hidden removed', title: 'Hidden lines removed' },
   { id: 'hidden-shown', label: 'Hidden dashed', title: 'Hidden lines dashed' },
