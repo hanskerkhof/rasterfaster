@@ -171,7 +171,7 @@ function readGeometry(): PanelGeometry | null {
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
     @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
     <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌥D: fold / unfold this panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · M: move a corner onto another part · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌥D: fold / unfold this panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · R: show or hide the rotate tool (drag a ring) · M: show or hide the move tool (drag an arrow, or click a corner and then a corner of another part; Esc steps back, then undoes) · ⇧M: only the corner-to-corner move · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
     </details>
 
   `,

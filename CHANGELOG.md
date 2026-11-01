@@ -2,6 +2,23 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Rotate tool, move tool, Move panel (0.10.54)
+
+### Added
+- **FE** (`document-scene.ts`, `stl-viewer.ts`): the **rotate tool** (key **R**): rings about X, Y and Z with X / Y / Z letters at the middle of the selection, a grey pivot dot, dim colours that light up on hover; dragging a ring or a letter turns the selection as one rigid body, snapped to the Step of the rotate panel (remembered). Only shown after R (or after − / + in the panel); choosing other parts closes it. **Esc** undoes every rotation of the session.
+- **FE**: the **move tool** (key **M**): arrows with X / Y / Z letters at the lower left corner of the selection; dragging an arrow or its letter moves the selection along that axis, on the grid (20 mm in X and Y, the height levels in Z) or, with **Option**, in the fine step (1 mm or 0.1 mm). Esc closes it and puts the parts back. In the move tool the corners of the selection show too: click one, then a corner of another part (**Move to…**, also **⇧M**); the banner's Cancel button now cancels like Esc.
+- **FE** (`stl-viewer.ts`): a **Move panel** under the Rotate panel: − / + by a Step (100, 20, 10, 5, 1, 0.1 mm, remembered), the offset of each axis from where the STL file puts the part, and a ↺ per axis. The Rotate panel got a ↺ per axis too (back to the rotation of the STL file) and shows the turn per axis; both panels have a ↺ in the title row that resets all three axes.
+- **FE**: the Step of the rotate panel is remembered in local storage.
+
+### Changed
+- **FE**: the rotate panel is titled **Rotate**; rotating a single part now turns it about the middle of its box too (a visible pivot), so a part is no longer re-centred afterwards.
+- **FE**: **Move to…** moved from M to **⇧M** (M is the move tool).
+- **FE**: a plain click on the canvas no longer makes the view glide to the selection; grabbing a ring or an arrow of the tools leaves the view where it is.
+
+### Fixed
+- **FE** (`document-scene.ts`): rotating a group of parts scattered them; the group now turns as one rigid body about its pivot.
+- **FE** (`tree-panel.ts`): a file ⌘-clicked out of a selection in the file list looked still selected (its cursor row had the selection colour); it now shows as an outline.
+
 ## 2026-11-01 - Added STLs keep their exported place, also outside the work area (0.10.53)
 
 ### Fixed

@@ -1,10 +1,10 @@
-import { Component, ElementRef, OnDestroy, effect, inject, input, signal, untracked, viewChild, afterNextRender } from '@angular/core';
+import { Component, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild, afterNextRender } from '@angular/core';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
-import { DocumentScene } from './document-scene';
-import { DocumentStore, workArea } from './document.store';
+import { DocumentScene, axisAngles } from './document-scene';
+import { DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
@@ -18,6 +18,10 @@ const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
 const groundGridStorageKey = 'rasterfaster.groundGrid';
 const pivotStorageKey = 'rasterfaster.pivotOnSelection';
+const rotationStepStorageKey = 'rasterfaster.rotationStep';
+const rotationStepChoices = [90, 45, 15, 5, 1];
+const moveStepStorageKey = 'rasterfaster.moveStepMm';
+const moveStepChoices = [100, 20, 10, 5, 1, 0.1];
 const zGridModeStorageKey = 'rasterfaster.zGridMode';
 const cameraModeStorageKey = 'rasterfaster.cameraMode';
 const perspectiveFovDegrees = 35;
@@ -55,6 +59,24 @@ function readZGridMode(): ZGridMode {
   return defaultZGridMode;
 }
 
+/** The Step of the rotate panel as the user left it (45° the first time). */
+function readRotationStep() {
+  try {
+    const stored = Number(localStorage.getItem(rotationStepStorageKey));
+    if (rotationStepChoices.includes(stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 45;
+}
+
+/** The Step of the Move panel as the user left it (20 mm, one grid cell, the first time). */
+function readMoveStep() {
+  try {
+    const stored = Number(localStorage.getItem(moveStepStorageKey));
+    if (moveStepChoices.includes(stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 20;
+}
+
 function readPivotOnSelection() {
   try { return localStorage.getItem(pivotStorageKey) !== 'false'; } catch { return true; } // default on
 }
@@ -79,22 +101,52 @@ function readShowPath() {
   imports: [ReleaseFocus],
   template: `
     <div #host class="host" tabindex="0"></div>
+    <div class="panels">
     <div class="rotate" aria-label="Rotate object">
-      <div class="title">{{ documentMode() ? 'Rotate selected' : 'Rotate object' }}</div>
+      <div class="axis head">
+        <span class="title">{{ documentMode() ? 'Rotate' : 'Rotate object' }}</span>
+        <button type="button" class="undo" [style.visibility]="turned().x || turned().y || turned().z ? 'visible' : 'hidden'" title="Back to the rotation of the STL file about all axes" releaseFocus (click)="resetAllRotation()">↺</button>
+        <span class="pad"></span>
+      </div>
       @for (axis of axes; track axis) {
         <div class="axis">
-          <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ rotated()[axis] ? ' ' + (rotated()[axis] > 0 ? '+' : '') + rotated()[axis] + '°' : '' }}</small></span>
+          <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ angles()[axis] ? ' ' + (angles()[axis] > 0 ? '+' : '') + angles()[axis] + '°' : '' }}</small></span>
+          <button type="button" class="undo" [style.visibility]="turned()[axis] ? 'visible' : 'hidden'" [title]="'Back to the rotation of the STL file about ' + axis.toUpperCase()" releaseFocus (click)="resetAxisRotation(axis)">↺</button>
           <button type="button" [title]="'Rotate −' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] < 0" releaseFocus (click)="rotateObject(axis, -rotationStep())">−</button>
           <button type="button" [title]="'Rotate +' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] > 0" releaseFocus (click)="rotateObject(axis, rotationStep())">+</button>
         </div>
       }
       <div class="axis">
         <span class="name">Step</span>
-        <select releaseFocus [value]="rotationStep()" (change)="rotationStep.set(+$any($event.target).value)">
+        <select releaseFocus [value]="rotationStep()" (change)="setRotationStep(+$any($event.target).value)">
           @for (s of rotationSteps; track s) { <option [value]="s" [selected]="s === rotationStep()">{{ s }}°</option> }
         </select>
       </div>
       @if (!documentMode()) { <button type="button" class="reset" releaseFocus (click)="resetObjectRotation()">Reset</button> }
+    </div>
+    @if (documentMode()) {
+      <div class="rotate move" aria-label="Move object">
+        <div class="axis head">
+          <span class="title">Move</span>
+          <button type="button" class="undo" [style.visibility]="moved().x || moved().y || moved().z ? 'visible' : 'hidden'" title="Back to where the STL file puts the part along all axes" releaseFocus (click)="resetOffset('all')">↺</button>
+          <span class="pad"></span>
+        </div>
+        @for (axis of axes; track axis) {
+          <div class="axis">
+            <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ offsetText(offsets()[axis]) }}</small></span>
+            <button type="button" class="undo" [style.visibility]="moved()[axis] ? 'visible' : 'hidden'" [title]="'Back to where the STL file puts it along ' + axis.toUpperCase()" releaseFocus (click)="resetOffset(axis)">↺</button>
+            <button type="button" [title]="'Move −' + moveStep() + ' mm along ' + axis.toUpperCase()" [disabled]="!store.selectedId()" releaseFocus (click)="moveBy(axis, -moveStep())">−</button>
+            <button type="button" [title]="'Move +' + moveStep() + ' mm along ' + axis.toUpperCase()" [disabled]="!store.selectedId()" releaseFocus (click)="moveBy(axis, moveStep())">+</button>
+          </div>
+        }
+        <div class="axis">
+          <span class="name">Step</span>
+          <select releaseFocus [value]="moveStep()" (change)="setMoveStep(+$any($event.target).value)">
+            @for (s of moveSteps; track s) { <option [value]="s" [selected]="s === moveStep()">{{ s }} mm</option> }
+          </select>
+        </div>
+      </div>
+    }
     </div>
     @if (cubeMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="cubeMenu.set(null)" (contextmenu)="$event.preventDefault(); cubeMenu.set(null)"></div>
@@ -178,14 +230,16 @@ function readShowPath() {
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
     .home.fly { right: 110px; } .home.fly.zoom-reset { right: 76px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
-    .rotate { position: absolute; top: 12px; left: 12px; width: 124px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+    .panels { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rotate { width: 164px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
     .title { font-weight: 600; opacity: .8; }
     .axis { display: flex; align-items: center; gap: 4px; }
-    .name { flex: 1; font-weight: 700; } .name.x { color: #c9605e; } .name.y { color: #6fb56f; } .name.z { color: #7b7fd6; }
+    .name { flex: 1; font-weight: 700; white-space: nowrap; min-width: 0; } .name small { font-weight: 400; font-size: 10px; opacity: .8; } .name.x { color: #c9605e; } .name.y { color: #6fb56f; } .name.z { color: #7b7fd6; }
     .rotate button, .rotate select { padding: 3px 9px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
     .rotate button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     .rotate button:disabled { opacity: .35; cursor: default; }
+    .rotate .axis button { width: 28px; padding: 3px 0; text-align: center; } .rotate .axis .pad { width: 60px; flex: none; } .rotate .axis.head .title { flex: 1; }
     .host:focus { outline: none; }
     .menu-backdrop { position: absolute; inset: 0; z-index: 8; }
     .cube-menu { position: absolute; z-index: 9; min-width: 220px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
@@ -239,10 +293,54 @@ export class StlViewer implements OnDestroy {
   private baseGeometry: THREE.BufferGeometry | null = null;
   private readonly objectRotation = new THREE.Quaternion();
   private grid: THREE.LineSegments | null = null;
-  protected readonly rotationStep = signal(45);
+  protected readonly rotationStep = signal(readRotationStep());
   /** Net degrees applied per world axis (button presses summed, folded into -180..180) so the panel can show what was rotated. */
   protected readonly rotated = signal({ x: 0, y: 0, z: 0 });
-  protected readonly rotationSteps = [90, 45, 15, 5, 1];
+  /** Document view: the turns of the selected part (the last one chosen) away from its STL file; otherwise the turns of the preview. */
+  protected readonly angles = computed(() => {
+    if (!this.documentMode()) return this.rotated();
+    const item = this.store.selectedItems().at(-1);
+    return item ? axisAngles(item.rotation) : { x: 0, y: 0, z: 0 };
+  });
+  /** Per axis: is any selected part (or the preview) turned away from its STL file? Then the undo button of the axis shows. */
+  protected readonly turned = computed(() => {
+    if (!this.documentMode()) { const r = this.rotated(); return { x: r.x !== 0, y: r.y !== 0, z: r.z !== 0 }; }
+    const all = this.store.selectedItems().map(item => axisAngles(item.rotation));
+    return { x: all.some(a => a.x !== 0), y: all.some(a => a.y !== 0), z: all.some(a => a.z !== 0) };
+  });
+  protected readonly rotationSteps = rotationStepChoices;
+  protected readonly moveSteps = moveStepChoices;
+  protected readonly moveStep = signal(readMoveStep());
+
+  /** An offset for the Move panel: short, with a sign (whole millimetres once it is large). */
+  protected offsetText(mm: number) {
+    if (!mm) return '';
+    const shown = Math.abs(mm) >= 100 ? Math.round(mm) : Math.round(mm * 10) / 10;
+    return ` ${shown > 0 ? '+' : ''}${shown}`;
+  }
+
+  protected setMoveStep(mm: number) {
+    this.moveStep.set(mm);
+    try { localStorage.setItem(moveStepStorageKey, String(mm)); } catch { /* storage unavailable */ }
+  }
+
+  /** Move panel: where the STL's origin sits for the selected part (the last one chosen): 0 is where the file puts it. */
+  protected readonly offsets = computed(() => {
+    this.store.partStats(); // the geometry has loaded
+    const item = this.store.selectedItems().at(-1);
+    const offset = item ? this.documentScene?.originOffset(item) : null;
+    return offset ? { x: offset[0], y: offset[1], z: offset[2] } : { x: 0, y: 0, z: 0 };
+  });
+  protected readonly moved = computed(() => {
+    this.store.partStats();
+    const all = this.store.selectedItems().map(item => this.documentScene?.originOffset(item)).filter((o): o is Vec3 => !!o);
+    return { x: all.some(o => o[0] !== 0), y: all.some(o => o[1] !== 0), z: all.some(o => o[2] !== 0) };
+  });
+
+  protected setRotationStep(degrees: number) {
+    this.rotationStep.set(degrees);
+    try { localStorage.setItem(rotationStepStorageKey, String(degrees)); } catch { /* storage unavailable */ }
+  }
   private viewCube!: ViewCube;
   private documentScene!: DocumentScene;
   private needsDocumentFit = true;
@@ -365,6 +463,7 @@ export class StlViewer implements OnDestroy {
       zGridMode: () => this.zGridMode(),
       viewCenter: () => ({ x: this.controls.target.x, y: this.controls.target.y }),
       rotationStep: () => this.rotationStep(),
+      setOrbitEnabled: enabled => { this.controls.enabled = enabled; },
       changed: () => this.onDocumentChanged(),
     });
     // ⌘-click centres the view on the clicked point. Registered before OrbitControls so it can swallow the click.
@@ -701,6 +800,7 @@ export class StlViewer implements OnDestroy {
 
   /** ⌘-click: look at the clicked surface point (or, over empty space, the point on the plane through the current target). */
   private readonly onCentreClick = (e: PointerEvent) => {
+    if (this.documentMode() && this.documentScene.gizmoGrabbed()) return; // a ring or arrow of the rotate / move tool was grabbed: the view stays where it is
     if (!e.metaKey) { // a plain left press that reached here starts a view rotation (nothing else claimed it)
       if (e.button === 0) this.pivotOnDrag(e); // only a drag turns the view; a plain click must not move it
       return;
@@ -964,13 +1064,43 @@ export class StlViewer implements OnDestroy {
 
   /** Rotate the object (not the camera) around a world axis; it is re-seated on the ground afterwards. */
   rotateObject(axis: 'x' | 'y' | 'z', degrees: number) {
-    if (this.documentMode()) { this.documentScene.rotateSelected(axis, degrees); return; }
+    if (this.documentMode()) {
+      if (this.store.selectedIds().length) this.documentScene.showRotateTool(); // before the turn, so Esc can take it back
+      this.documentScene.rotateSelected(axis, degrees);
+      return;
+    }
     if (!this.baseGeometry) return;
     const worldAxis = new THREE.Vector3(axis === 'x' ? 1 : 0, axis === 'y' ? 1 : 0, axis === 'z' ? 1 : 0);
     const step = new THREE.Quaternion().setFromAxisAngle(worldAxis, THREE.MathUtils.degToRad(degrees));
     this.objectRotation.premultiply(step).normalize();
     this.rotated.update(r => ({ ...r, [axis]: foldDegrees(r[axis] + degrees) }));
     this.rebuildGeometry(false);
+  }
+
+  /** The Cancel button of the "Snap to grid" / "Move to" banners: like Esc. */
+  cancelPicks() {
+    this.documentScene.cancelPicks();
+  }
+
+  /** The − / + of the Move panel and its ↺ (see DocumentScene). */
+  moveBy(axis: 'x' | 'y' | 'z', mm: number) {
+    this.documentScene.moveSelected(axis, mm);
+  }
+
+  resetOffset(axis: 'x' | 'y' | 'z' | 'all') {
+    this.documentScene.resetOffset(axis);
+  }
+
+  /** The ↺ above the axes of the Rotate panel: all three axes back to the STL file. */
+  resetAllRotation() {
+    if (this.documentMode()) this.documentScene.resetRotation('all');
+    else this.resetObjectRotation();
+  }
+
+  /** The ↺ button of one axis: back to the rotation of the STL file about that axis. */
+  resetAxisRotation(axis: 'x' | 'y' | 'z') {
+    if (this.documentMode()) { this.documentScene.resetRotation(axis); return; }
+    if (this.rotated()[axis]) this.rotateObject(axis, -this.rotated()[axis]);
   }
 
   resetObjectRotation() {

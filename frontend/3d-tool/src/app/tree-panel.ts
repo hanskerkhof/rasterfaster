@@ -43,7 +43,7 @@ interface Row {
     <div class="tree" [class.drop-root]="dropTarget() === ''" tabindex="0" (keydown)="onKey($event)" (mousedown)="onTreeMouseDown($event)" (contextmenu)="onEmptyContextMenu($event)"
          (dragover)="onDragOver($event, null)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event, null)">
       @for (r of rows(); track r.entry.path) {
-        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)" [class.drop]="dropTarget() === r.entry.path"
+        <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)" [class.out]="isOutOfSelection(r.entry.path)" [class.drop]="dropTarget() === r.entry.path"
              draggable="true" (dragstart)="onDragStart($event, r)" (dragend)="endDrag()" (dragover)="onDragOver($event, r)" (drop)="onDrop($event, r)"
              [class.sel]="r.entry.type === 'file' && r.entry.path === selected()"
              [style.padding-left.px]="6 + r.depth * 14" (click)="onClick(r, $event)" (dblclick)="onDoubleClick(r)" (contextmenu)="onContextMenu($event, r)">
@@ -119,6 +119,9 @@ interface Row {
     .menu button:disabled:hover { background: transparent; color: inherit; }
     .tree:focus .focus { background: #2f6fed !important; color: #fff; }
     .tree:focus .focus .date { opacity: .8; }
+    .row.out, .tree:focus .row.out { background: transparent !important; color: inherit; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
+    .tree:focus .row.out { box-shadow: inset 0 0 0 1px #2f6fed; }
+    .tree:focus .row.out .date { opacity: .4; }
     .muted { opacity: .5; font-style: italic; padding-left: 12px; }
     .list-notice { padding: 4px 8px; font-size: 11px; background: #3a3320; border-bottom: 1px solid #6b5a20; }
     .list-notice.confirm .buttons { display: flex; gap: 4px; margin-top: 4px; }
@@ -229,7 +232,13 @@ export class TreePanel {
 
   /** Highlighted as part of a multi-selection (a single selection is just the focused row). */
   protected isPicked(path: string) {
-    return this.selection().size > 1 && this.selection().has(path);
+    const selection = this.selection();
+    return selection.has(path) && (selection.size > 1 || path !== this.focused()); // the last one left stays lit when the cursor sits on a row that was ⌘-clicked out
+  }
+
+  /** The cursor is on a row that is not part of the selection (⌘-click took it out): drawn as an outline, not as a selected row. */
+  protected isOutOfSelection(path: string) {
+    return path === this.focused() && this.selection().size > 0 && !this.selection().has(path);
   }
 
   private selectOnly(path: string | null) {

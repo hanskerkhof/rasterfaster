@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
 import { ViewMode, buildParts, clearParts } from './model-render';
 import { ViewPart, buildWireGeometry } from './svg-view';
@@ -6,6 +7,8 @@ import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silho
 import { ZGridMode, nearestZLevel, nextZLevel } from './z-levels';
 
 const selectedColor = 0xf0a040;
+/** The rings of the rotate tool: dimmed at rest, the same colour brighter under the pointer. */
+const ringColors = { X: { dim: 0x9a4b4b, bright: 0xff5c5c }, Y: { dim: 0x4a8a5a, bright: 0x5cff84 }, Z: { dim: 0x4b5f9e, bright: 0x6c8cff } };
 const handleColor = 0xffe066;
 const handleHoverColor = 0x55e68a;
 const handleRadiusPx = 7;
@@ -59,6 +62,8 @@ export interface DocumentSceneContext {
   loadGeometry: (path: string) => Promise<THREE.BufferGeometry>;
   /** Degrees per keyboard rotation press (the rotate panel's step). */
   rotationStep: () => number;
+  /** Switches the orbit controls off while a handle of the rotate tool is dragged. */
+  setOrbitEnabled?: (enabled: boolean) => void;
   /** X/Y of the point the view is centred on (where pasted parts land). */
   viewCenter: () => { x: number; y: number };
   /** Current height grid mode (fine / baseplate / coarse). */
@@ -129,6 +134,35 @@ function writeStl(parts: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4
   return buffer;
 }
 
+/** A letter in the given colour with a dark outline, for the labels of the tools (a sprite texture). */
+function letterTexture(letter: string, color: number): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 64;
+  const c2d = canvas.getContext('2d');
+  if (c2d) {
+    c2d.font = 'bold 44px system-ui, sans-serif';
+    c2d.textAlign = 'center';
+    c2d.textBaseline = 'middle';
+    c2d.lineJoin = 'round';
+    c2d.lineWidth = 7;
+    c2d.strokeStyle = 'rgba(15, 17, 22, 0.95)';
+    c2d.strokeText(letter, 32, 34);
+    c2d.fillStyle = '#' + color.toString(16).padStart(6, '0');
+    c2d.fillText(letter, 32, 34);
+  }
+  return new THREE.CanvasTexture(canvas);
+}
+
+/**
+ * How far a part is turned about each world axis from the way its STL file is saved, in degrees. The turns are applied about the world axes
+ * one after the other (X, then Y, then Z), which is Euler order ZYX.
+ */
+export function axisAngles(rotation: Quat): { x: number; y: number; z: number } {
+  const e = new THREE.Euler().setFromQuaternion(new THREE.Quaternion(...rotation), 'ZYX');
+  const deg = (v: number) => Math.round(THREE.MathUtils.radToDeg(v) * 10) / 10 || 0;
+  return { x: deg(e.x), y: deg(e.y), z: deg(e.z) };
+}
+
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 const snap = (value: number, step: number) => Math.round(Math.round(value / step) * step * 1000) / 1000; // (rounded: 0.1 steps must not leave 10.100000000000001)
 const quatKey = (q: Quat) => q.map(n => n.toFixed(4)).join(',');
@@ -157,11 +191,75 @@ export class DocumentScene {
   /** Shift-drag on empty space: the dashed selection rectangle (client coordinates) and its overlay element. */
   private marquee: { x0: number; y0: number; x1: number; y1: number; box: HTMLDivElement } | null = null;
   private readonly listeners: [EventTarget, string, EventListener][] = [];
+  /** The rotate tool (key R): rings about X, Y and Z at the centre of the selection, like Fusion's Move/Copy rotate handles. */
+  private readonly rotatePivot = new THREE.Object3D();
+  private readonly rotateTool: TransformControls;
+  private rotateToolOn = false;
+  /** The move tool (key M): arrows along X, Y and Z at the lower left corner of the selection (the corner of its box with the lowest X, Y and Z). */
+  private readonly movePivot = new THREE.Object3D();
+  private readonly moveTool: TransformControls;
+  private moveToolOn = false;
+  private moveToolFor = '';
+  /** Option is held (read in the capture phase, so it is up to date when the move tool reports a drag). */
+  private altHeld = false;
+  private readonly trackAlt = (e: Event) => { this.altHeld = (e as KeyboardEvent | PointerEvent).altKey; };
+  /** The tool put the corner handles of "Move to…" up (so it can take them down again). */
+  private movePickOwned = false;
+  private moveSnapshot: Map<string, { position: Vec3 }> | null = null;
+  private moveStart: { items: DocItem[]; min: THREE.Vector3 } | null = null;
+  private readonly moveLabels = new Map<string, { sprite: THREE.Sprite; dim: THREE.CanvasTexture; bright: THREE.CanvasTexture }>();
+  /** The pivot point the selection turns about: a dot in the middle of the selection's box, the same size on screen at any zoom. */
+  private readonly pivotMarker = new THREE.Group();
+  private pivotFlash?: ReturnType<typeof setTimeout>;
+  private pivotFlashing = false;
+  /** The selection the tool was opened for: choosing other parts (or none) closes it, so it only shows after R. */
+  private rotateToolFor = '';
+  /** Where every part was when the tool was opened: Esc puts them back (the rotate session is undone). */
+  private rotateSnapshot: Map<string, { position: Vec3; rotation: Quat }> | null = null;
+  /** The letters on the rings: dim at rest, bright while their ring (or the letter itself) is under the pointer. */
+  private readonly ringLabels = new Map<string, { sprite: THREE.Sprite; dim: THREE.CanvasTexture; bright: THREE.CanvasTexture }>();
+  /** The selection as it was when a ring was grabbed, and the centre it turns about and its lowest point. */
+  private rotateStart: { items: DocItem[]; pivot: THREE.Vector3; low: number } | null = null;
 
   constructor(private readonly ctx: DocumentSceneContext) {
     this.group.visible = false;
     this.selectionBoxes.visible = false;
     ctx.scene.add(this.group, this.selectionBoxes, this.snapHandles);
+    this.rotateTool = new TransformControls(ctx.camera, ctx.canvas);
+    this.rotateTool.setMode('rotate');
+    this.rotateTool.setSpace('world');
+    this.rotateTool.setSize(1.1);
+    this.rotateTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, 0xffffff);
+    this.rotateTool.addEventListener('axis-changed', event => { // the ring under the pointer lights up in its own colour
+      const axis = (event as unknown as { value: string | null }).value as 'X' | 'Y' | 'Z' | null;
+      this.rotateTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, axis && axis in ringColors ? ringColors[axis].bright : 0xffffff);
+      for (const [letter, label] of this.ringLabels) { label.sprite.material.map = axis === letter ? label.bright : label.dim; label.sprite.material.needsUpdate = true; } // and so does its letter
+    });
+    this.addRingLabels();
+    const helper = this.rotateTool.getHelper();
+    helper.visible = false;
+    ctx.scene.add(this.rotatePivot, helper);
+    this.buildPivotMarker();
+    this.rotateTool.addEventListener('dragging-changed', event => this.onRotateDragging(!!(event as unknown as { value: boolean }).value));
+    this.rotateTool.addEventListener('objectChange', () => this.onRotateChange());
+    for (const type of ['pointermove', 'pointerdown', 'keydown', 'keyup']) window.addEventListener(type, this.trackAlt, true);
+    this.moveTool = new TransformControls(ctx.camera, ctx.canvas);
+    this.moveTool.setMode('translate');
+    this.moveTool.setSpace('world');
+    this.moveTool.setSize(1);
+    this.moveTool.showXY = this.moveTool.showYZ = this.moveTool.showXZ = false; // the arrows only (this also hides the free-move dot in the middle)
+    this.moveTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, 0xffffff);
+    this.moveTool.addEventListener('axis-changed', event => {
+      const axis = (event as unknown as { value: string | null }).value as 'X' | 'Y' | 'Z' | null;
+      this.moveTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, axis && axis in ringColors ? ringColors[axis].bright : 0xffffff);
+      for (const [letter, label] of this.moveLabels) { label.sprite.material.map = axis === letter ? label.bright : label.dim; label.sprite.material.needsUpdate = true; }
+    });
+    this.addMoveLabels();
+    const moveHelper = this.moveTool.getHelper();
+    moveHelper.visible = false;
+    ctx.scene.add(this.movePivot, moveHelper);
+    this.moveTool.addEventListener('dragging-changed', event => this.onMoveDragging(!!(event as unknown as { value: boolean }).value));
+    this.moveTool.addEventListener('objectChange', () => this.onMoveChange());
     this.on(ctx.canvas, 'pointerdown', e => this.onPointerDown(e as PointerEvent));
     this.on(ctx.canvas, 'pointermove', e => this.onPointerMove(e as PointerEvent));
     this.on(ctx.canvas, 'pointerup', e => this.onPointerUp(e as PointerEvent));
@@ -177,6 +275,7 @@ export class DocumentScene {
       if ((e as KeyboardEvent).key !== 'Escape') return;
       if (this.marquee) { this.endMarquee(); e.preventDefault(); return; }
       if (this.drag) { this.cancelDrag(); e.preventDefault(); return; }
+      if (this.moveToolOn && !(e as KeyboardEvent).defaultPrevented && this.escapeMoveTool()) { e.preventDefault(); return; }
       if (!this.picking()) return;
       ctx.store.cancelPicks();
       e.preventDefault();
@@ -305,6 +404,8 @@ export class DocumentScene {
     this.selectionBoxes.visible = active;
     this.snapHandles.visible = active;
     if (!active) { this.finishDrag(); this.ctx.store.cancelPicks(); }
+    this.updateRotateTool();
+    this.updateMoveTool();
   }
 
   /** Redraws whatever differs between the store and the scene. Call from a reactive effect. */
@@ -323,6 +424,8 @@ export class DocumentScene {
     for (const item of items) this.syncItem(item, selectedIds.has(item.id));
     this.updateSelectionBox();
     this.updateSnapHandles();
+    this.updateRotateTool();
+    this.updateMoveTool();
     this.ctx.changed();
   }
 
@@ -660,8 +763,8 @@ export class DocumentScene {
   }
 
   /**
-   * Rotates the selection around a world axis through its common centre, then re-snaps each item to the grid.
-   * One item turns in place. The lowest point of the selection stays where it was.
+   * Rotates the selection around a world axis through the middle of its box (the pivot point, drawn while it turns), as one rigid body.
+   * The lowest point of the selection stays where it was and the group goes back to the grid as a whole.
    */
   rotateSelected(axis: 'x' | 'y' | 'z', degrees: number) {
     const { store } = this.ctx;
@@ -674,30 +777,426 @@ export class DocumentScene {
     const groupBox = boxes.reduce((all, box) => all.union(box), new THREE.Box3());
     const pivot = groupBox.getCenter(new THREE.Vector3());
 
-    const turned = items.map((item, index) => {
-      const rotation = step.clone().multiply(new THREE.Quaternion(...item.rotation)).normalize();
-      const next: Quat = [rotation.x, rotation.y, rotation.z, rotation.w];
-      const key = `${item.path}|${quatKey(next)}`;
-      const entry = this.oriented.get(key) ?? this.orient(this.baseGeometries.get(item.path)!, next);
-      this.oriented.set(key, entry);
-      const center = boxes[index].getCenter(new THREE.Vector3()).sub(pivot).applyQuaternion(step).add(pivot);
-      return { item, next, size: entry.size, center };
-    });
-    const oldLow = groupBox.min.z;
-    const newLow = Math.min(...turned.map(t => t.center.z - t.size.z / 2));
+    this.rotateGroup(items, step, pivot, groupBox.min.z);
+    this.flashPivot(pivot);
+  }
+
+  /**
+   * Puts the selected parts back to the rotation of their STL file about one axis (the turns about the other axes stay). Each part turns about
+   * the middle of its own box, so it stays where it is.
+   */
+  resetRotation(axis: 'x' | 'y' | 'z' | 'all') {
+    const items = this.ctx.store.selectedItems().filter(item => this.baseGeometries.has(item.path) && this.entryFor(item));
     const changes = new Map<string, Partial<{ position: Vec3; rotation: Quat }>>();
-    for (const t of turned) {
-      changes.set(t.item.id, {
-        rotation: t.next,
-        position: clampToWorkArea(
-          t.item.centered
-            ? cellCenteredPosition([t.center.x - t.size.x / 2, t.center.y - t.size.y / 2, t.center.z - t.size.z / 2 + (oldLow - newLow)], t.size.toArray() as Vec3, this.ctx.zGridMode())
-            : [snap(t.center.x - t.size.x / 2, snapStepMm.x), snap(t.center.y - t.size.y / 2, snapStepMm.y), t.center.z - t.size.z / 2 + (oldLow - newLow)],
-          t.size.toArray() as Vec3,
-        ),
-      });
+    for (const item of items) {
+      const old = new THREE.Quaternion(...item.rotation);
+      const euler = new THREE.Euler().setFromQuaternion(old, 'ZYX');
+      if (axis === 'all') euler.set(0, 0, 0, 'ZYX'); else euler[axis] = 0;
+      const next = new THREE.Quaternion().setFromEuler(euler);
+      const step = next.clone().multiply(old.clone().invert()); // the turn that takes the part from where it is to where it should be
+      const base = this.baseGeometries.get(item.path)!;
+      const size = this.entryFor(item)!.size;
+      const centre = new THREE.Vector3(...item.position).addScaledVector(size, 0.5);
+      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old));
+      const position = origin.sub(centre).applyQuaternion(step).add(centre).add(this.rotatedMin(base, next));
+      const clean = (v: number) => Math.abs(v) < 1e-6 ? 0 : Math.round(v * 1e6) / 1e6;
+      const rotation: Quat = [clean(next.x), clean(next.y), clean(next.z), clean(next.w)];
+      const key = `${item.path}|${quatKey(rotation)}`;
+      if (!this.oriented.has(key)) this.oriented.set(key, this.orient(base, rotation));
+      changes.set(item.id, { rotation, position: clampToWorkArea([round3(position.x), round3(position.y), round3(position.z)], this.oriented.get(key)!.size.toArray() as Vec3) });
     }
-    store.updateItems('Rotate', changes);
+    if (changes.size) this.ctx.store.updateItems('Reset rotation', changes);
+  }
+
+  /** Where the STL's own origin sits in the world for this part (position minus the lowest corner of the turned mesh): 0, 0, 0 is where the file put it. */
+  originOffset(item: DocItem): Vec3 | null {
+    const base = this.baseGeometries.get(item.path);
+    if (!base) return null;
+    const min = this.rotatedMin(base, new THREE.Quaternion(...item.rotation));
+    return [round3(item.position[0] - min.x), round3(item.position[1] - min.y), round3(item.position[2] - min.z)];
+  }
+
+  /** The − / + buttons of the Move panel: the selection moves `mm` along one axis, as one undo step, kept inside the work area. */
+  moveSelected(axis: 'x' | 'y' | 'z', mm: number) {
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item));
+    if (!items.length) return;
+    const i = { x: 0, y: 1, z: 2 }[axis];
+    const delta: Vec3 = [0, 0, 0];
+    delta[i] = mm;
+    const d = this.clampDelta(delta, items.map(item => ({ position: item.position, size: this.sizeOfItem(item) ?? [0, 0, 0] as Vec3 })));
+    if (d[i] === 0) return;
+    const changes = new Map<string, Partial<{ position: Vec3 }>>();
+    for (const item of items) changes.set(item.id, { position: [round3(item.position[0] + d[0]), round3(item.position[1] + d[1]), round3(item.position[2] + d[2])] });
+    this.ctx.store.updateItems('Move', changes);
+  }
+
+  /** The ↺ button of the Move panel: the selected parts go back to where their STL files put them along one axis. */
+  resetOffset(axis: 'x' | 'y' | 'z' | 'all') {
+    const changes = new Map<string, Partial<{ position: Vec3 }>>();
+    for (const item of this.ctx.store.selectedItems()) {
+      const offset = this.originOffset(item), size = this.sizeOfItem(item);
+      if (!offset || !size || offset.every((v, k) => v === 0 || (axis !== 'all' && k !== { x: 0, y: 1, z: 2 }[axis]))) continue;
+      const position: Vec3 = [...item.position];
+      for (const k of [0, 1, 2]) if (axis === 'all' || k === { x: 0, y: 1, z: 2 }[axis]) position[k] = round3(item.position[k] - offset[k]);
+      changes.set(item.id, { position: clampToWorkArea(position, size) });
+    }
+    if (changes.size) this.ctx.store.updateItems('Reset position', changes);
+  }
+
+  /** An X, Y and Z at the rings. Each label is a child of its ring, so it follows the scale that keeps the gizmo the same size on screen. */
+  private addRingLabels() {
+    const gizmo = (this.rotateTool as unknown as { _gizmo?: { gizmo?: { rotate?: THREE.Object3D }; picker?: { rotate?: THREE.Object3D } } })._gizmo;
+    const rings = gizmo?.gizmo?.rotate, pickers = gizmo?.picker?.rotate;
+    if (!rings || !pickers) return;
+    for (const axis of ['X', 'Y', 'Z'] as const) {
+      const ring = rings.children.find(c => c.name === axis && (c as THREE.Mesh).geometry instanceof THREE.TorusGeometry) as THREE.Mesh | undefined;
+      const g = ring?.geometry as THREE.TorusGeometry | undefined;
+      if (!ring || !g) continue;
+      // A point of the ring at 45° (the rings are thin tori already lying in their plane; some are half circles): the label sits there.
+      const { arc, tubularSegments } = g.parameters;
+      const at = g.getAttribute('position');
+      const index = Math.round(tubularSegments * (Math.PI / 4) / arc);
+      if (index > tubularSegments) continue;
+      const letter = (color: number) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 64;
+        const c2d = canvas.getContext('2d');
+        if (c2d) {
+          c2d.font = 'bold 44px system-ui, sans-serif';
+          c2d.textAlign = 'center';
+          c2d.textBaseline = 'middle';
+          c2d.lineJoin = 'round';
+          c2d.lineWidth = 7; // a dark outline keeps the letter readable over parts of any colour
+          c2d.strokeStyle = 'rgba(15, 17, 22, 0.95)';
+          c2d.strokeText(axis, 32, 34);
+          c2d.fillStyle = '#' + color.toString(16).padStart(6, '0');
+          c2d.fillText(axis, 32, 34);
+        }
+        return new THREE.CanvasTexture(canvas);
+      };
+      const dim = letter(ringColors[axis].dim), bright = letter(ringColors[axis].bright);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dim, depthTest: false, transparent: true }));
+      this.ringLabels.set(axis, { sprite, dim, bright });
+      sprite.position.set(at.getX(index), at.getY(index), at.getZ(index));
+      sprite.scale.setScalar(0.26);
+      sprite.renderOrder = Infinity; // like the rings themselves: drawn over everything, the letters over the rings
+      ring.add(sprite);
+      // A letter can be grabbed like its ring: an invisible ball in the picker group (what the tool tests the pointer against) follows it.
+      const grab = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+      grab.name = axis;
+      pickers.add(grab);
+      const spot = new THREE.Vector3();
+      sprite.onBeforeRender = () => { sprite.getWorldPosition(spot); grab.position.copy(pickers.worldToLocal(spot)); };
+    }
+  }
+
+  private buildPivotMarker() {
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0x8c919c, depthTest: false, transparent: true }));
+    const edge = new THREE.Mesh(new THREE.SphereGeometry(1.45, 16, 12), new THREE.MeshBasicMaterial({ color: 0x15181f, depthTest: false, transparent: true, side: THREE.BackSide }));
+    edge.renderOrder = 1e9; // the dark rim first, the grey dot over it
+    dot.renderOrder = Infinity;
+    this.pivotMarker.add(edge, dot);
+    this.pivotMarker.visible = false;
+    dot.onBeforeRender = () => { // 5 px, whatever the zoom or the camera
+      const camera = this.ctx.camera, height = this.ctx.canvas.clientHeight || 1;
+      const worldPerPixel = (camera as THREE.PerspectiveCamera).isPerspectiveCamera
+        ? 2 * camera.position.distanceTo(this.rotatePivot.position) * Math.tan(THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov) / 2) / height
+        : ((camera as THREE.OrthographicCamera).top - (camera as THREE.OrthographicCamera).bottom) / camera.zoom / height;
+      this.pivotMarker.scale.setScalar(5 * worldPerPixel);
+      this.pivotMarker.updateMatrixWorld(true);
+    };
+    this.rotatePivot.add(this.pivotMarker);
+  }
+
+  /** Shows the pivot point for a moment while a button or key turns the selection (the rotate tool shows it for as long as it is open). */
+  private flashPivot(at: THREE.Vector3) {
+    if (this.rotateStart) return;
+    this.rotatePivot.position.copy(at);
+    this.pivotMarker.visible = true;
+    this.pivotFlashing = true;
+    clearTimeout(this.pivotFlash);
+    this.pivotFlash = setTimeout(() => { this.pivotFlashing = false; this.updateRotateTool(); }, 1200);
+  }
+
+  /**
+   * Esc in the rotate tool: closes it and undoes every rotation made since it was opened (also one that is being dragged), putting the parts
+   * back where they were. Returns false when the tool is not open, so Esc can do its usual job.
+   */
+  private cancelRotateTool(): boolean {
+    if (!this.rotateToolOn) return false;
+    const { store } = this.ctx;
+    if (this.rotateStart) { this.rotateStart = null; store.abortGesture(); }
+    const back = this.rotateSnapshot;
+    const changes = new Map<string, Partial<{ position: Vec3; rotation: Quat }>>();
+    for (const item of store.doc().items) {
+      const before = back?.get(item.id);
+      if (before && (before.position.some((v, i) => v !== item.position[i]) || before.rotation.some((v, i) => v !== item.rotation[i]))) changes.set(item.id, { position: before.position, rotation: before.rotation });
+    }
+    if (changes.size) store.updateItems('Cancel rotation', changes);
+    this.rotateToolOn = false;
+    this.rotateSnapshot = null;
+    this.updateRotateTool();
+    store.announce(changes.size ? 'Rotation cancelled' : 'Rotate tool off');
+    return true;
+  }
+
+  // --- the move tool (M) -------------------------------------------------------------------------------------------------------------
+
+  /** An X, Y and Z at the arrow tips (children of the arrows: they keep the gizmo's scale), grabbable like the arrows. */
+  private addMoveLabels() {
+    const gizmo = (this.moveTool as unknown as { _gizmo?: { gizmo?: { translate?: THREE.Object3D }; picker?: { translate?: THREE.Object3D } } })._gizmo;
+    const arrows = gizmo?.gizmo?.translate, pickers = gizmo?.picker?.translate;
+    if (!arrows || !pickers) return;
+    const tips = { X: 0, Y: 1, Z: 2 };
+    for (const axis of ['X', 'Y', 'Z'] as const) {
+      // The arrows' offsets are baked into their geometry: the + arrow is the one whose geometry lies on the positive side of its axis.
+      const arrow = arrows.children.find(c => {
+        const g = (c as THREE.Mesh).geometry;
+        if (c.name !== axis || !(g instanceof THREE.CylinderGeometry)) return false;
+        g.computeBoundingBox();
+        return g.boundingBox!.max.getComponent(tips[axis]) > 0.3;
+      }) as THREE.Mesh | undefined;
+      if (!arrow) continue;
+      const tip = arrow.geometry.boundingBox!.max.getComponent(tips[axis]);
+      const dim = letterTexture(axis, ringColors[axis].dim), bright = letterTexture(axis, ringColors[axis].bright);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dim, depthTest: false, transparent: true }));
+      this.moveLabels.set(axis, { sprite, dim, bright });
+      sprite.position.setComponent(tips[axis], tip + 0.12); // just beyond the tip, along the axis
+      sprite.scale.setScalar(0.2);
+      sprite.renderOrder = Infinity;
+      arrow.add(sprite);
+      const grab = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+      grab.name = axis;
+      pickers.add(grab);
+      const spot = new THREE.Vector3();
+      sprite.onBeforeRender = () => { sprite.getWorldPosition(spot); grab.position.copy(pickers.worldToLocal(spot)); };
+    }
+  }
+
+  /** M: shows or hides the move tool (arrows at the lower left corner of the selection). */
+  toggleMoveTool() {
+    if (!this.moveToolOn) this.closeRotateTool();
+    this.moveToolOn = !this.moveToolOn;
+    this.moveToolFor = this.ctx.store.selectedIds().join(',');
+    this.moveSnapshot = this.moveToolOn ? new Map(this.ctx.store.doc().items.map(i => [i.id, { position: [...i.position] as Vec3 }])) : null;
+    this.updateMoveTool();
+    const { store } = this.ctx;
+    store.announce(!this.moveToolOn ? 'Move tool off' : store.selectedIds().length ? 'Move tool: drag an arrow, or click a corner and then a corner of another part (M to close)' : 'Move tool: select one or more parts, then drag an arrow (M to close)');
+  }
+
+  private closeRotateTool() {
+    if (!this.rotateToolOn) return;
+    this.rotateToolOn = false;
+    this.rotateSnapshot = null;
+    this.updateRotateTool();
+  }
+
+  private closeMoveTool() {
+    if (!this.moveToolOn) return;
+    this.moveToolOn = false;
+    this.moveSnapshot = null;
+    this.updateMoveTool();
+  }
+
+  /** Puts the arrows at the lower left corner of the selection (not while one is being dragged), or hides them when there is nothing to move. */
+  private updateMoveTool() {
+    const chosen = this.ctx.store.selectedIds().join(',');
+    if (this.moveToolOn && !this.moveStart && chosen !== this.moveToolFor) {
+      if (this.moveToolFor === '' && chosen !== '') { // opened with nothing selected: the first choice gets the arrows
+        this.moveToolFor = chosen;
+        this.ctx.store.announce('Move tool: drag an arrow, or click a corner and then a corner of another part (M to close)');
+      } else { this.moveToolOn = false; this.moveSnapshot = null; }
+    }
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item));
+    const show = this.active && this.moveToolOn && items.length > 0;
+    this.moveTool.getHelper().visible = show;
+    this.moveTool.enabled = show;
+    if (!show) {
+      if (this.moveTool.object) this.moveTool.detach();
+      if (this.movePickOwned) { this.movePickOwned = false; this.ctx.store.cancelPicks(); }
+      return;
+    }
+    if (this.moveStart) return;
+    const { store } = this.ctx;
+    if (!store.movePick() && !store.snapPick()) { // "Move to…" belongs to this tool: the corners of the selection to start from
+      store.beginMovePick(items.map(item => item.id));
+      this.movePickOwned = true;
+    }
+    const box = this.selectionBounds();
+    if (!box) return;
+    this.movePivot.position.copy(box.min);
+    if (this.moveTool.object !== this.movePivot) this.moveTool.attach(this.movePivot);
+  }
+
+  private onMoveDragging(dragging: boolean) {
+    this.ctx.setOrbitEnabled?.(!dragging);
+    const { store } = this.ctx;
+    if (dragging) {
+      const items = store.selectedItems().filter(item => this.entryFor(item));
+      const box = this.selectionBounds();
+      if (!items.length || !box) return;
+      this.moveStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3 })), min: box.min.clone() };
+      store.beginGesture('Move');
+    } else if (this.moveStart) {
+      this.moveStart = null;
+      store.endGesture();
+      this.updateMoveTool();
+    }
+  }
+
+  /** An arrow was dragged: the selection follows along that axis only, with its lowest corner on the grid (X and Y 20 mm, Z the height levels). */
+  private onMoveChange() {
+    const start = this.moveStart;
+    const axis = this.moveTool.axis;
+    if (!start || (axis !== 'X' && axis !== 'Y' && axis !== 'Z')) return;
+    const i = { X: 0, Y: 1, Z: 2 }[axis];
+    const raw = start.min.getComponent(i) + (this.movePivot.position.getComponent(i) - start.min.getComponent(i));
+    const fine = this.altHeld; // Option: the fine step (1 mm or 0.1 mm, as chosen with the step button) instead of the grid
+    const target = fine ? snap(raw, this.ctx.store.fineStepMm()) : i === 2 ? nearestZLevel(raw, this.ctx.zGridMode()) : snap(raw, i === 0 ? snapStepMm.x : snapStepMm.y);
+    const delta: Vec3 = [0, 0, 0];
+    delta[i] = target - start.min.getComponent(i);
+    const clamped = this.clampDelta(delta, start.items.map(item => ({ position: item.position, size: this.sizeOfItem(item) ?? [0, 0, 0] as Vec3 })));
+    const changes = new Map<string, Partial<{ position: Vec3 }>>();
+    for (const item of start.items) changes.set(item.id, { position: [round3(item.position[0] + clamped[0]), round3(item.position[1] + clamped[1]), round3(item.position[2] + clamped[2])] });
+    this.ctx.store.updateItems('Move', changes);
+  }
+
+  /** The Cancel button of the pick banners: the same as Esc (in the move tool it steps back, then closes the tool and puts the parts back). */
+  cancelPicks() {
+    if (!this.escapeMoveTool()) this.ctx.store.cancelPicks();
+  }
+
+  /** Esc in the move tool: first back from a chosen corner to choosing one, then it closes the tool and puts the parts back. */
+  private escapeMoveTool(): boolean {
+    if (!this.moveToolOn) return false;
+    const pick = this.ctx.store.movePick();
+    if (pick?.source) { this.ctx.store.beginMovePick(pick.ids); return true; }
+    return this.cancelMoveTool();
+  }
+
+  /** Esc in the move tool: closes it and puts every part back where it was when the tool was opened. False when the tool is not open. */
+  private cancelMoveTool(): boolean {
+    if (!this.moveToolOn) return false;
+    const { store } = this.ctx;
+    if (this.moveStart) { this.moveStart = null; store.abortGesture(); }
+    const back = this.moveSnapshot;
+    const changes = new Map<string, Partial<{ position: Vec3 }>>();
+    for (const item of store.doc().items) {
+      const before = back?.get(item.id);
+      if (before && before.position.some((v, k) => v !== item.position[k])) changes.set(item.id, { position: before.position });
+    }
+    if (changes.size) store.updateItems('Cancel move', changes);
+    this.moveToolOn = false;
+    this.moveSnapshot = null;
+    this.updateMoveTool();
+    store.announce(changes.size ? 'Move cancelled' : 'Move tool off');
+    return true;
+  }
+
+  /** True while the pointer is on a ring or arrow of the rotate / move tool (a press then belongs to the tool, not to the view). */
+  gizmoGrabbed(): boolean {
+    return (this.rotateToolOn && !!this.rotateTool.axis) || (this.moveToolOn && !!this.moveTool.axis);
+  }
+
+  /** Opens the rotate tool if it is closed (the − / + buttons of the rotate panel do this, so the rings show where the part turns). */
+  showRotateTool() {
+    if (!this.rotateToolOn) this.toggleRotateTool();
+  }
+
+  /** R: shows or hides the rotate tool (rings about X, Y and Z at the centre of the selection). */
+  toggleRotateTool() {
+    if (!this.rotateToolOn) this.closeMoveTool();
+    this.rotateToolOn = !this.rotateToolOn;
+    this.rotateToolFor = this.ctx.store.selectedIds().join(',');
+    this.rotateSnapshot = this.rotateToolOn ? new Map(this.ctx.store.doc().items.map(i => [i.id, { position: [...i.position] as Vec3, rotation: [...i.rotation] as Quat }])) : null;
+    this.updateRotateTool();
+    const { store } = this.ctx;
+    store.announce(!this.rotateToolOn ? 'Rotate tool off' : store.selectedIds().length ? 'Rotate tool: drag a ring (R to close)' : 'Rotate tool: select one or more parts, then drag a ring (R to close)');
+  }
+
+  /** Puts the rings at the centre of the selection (not while one is being dragged), or hides them when there is nothing to turn. */
+  private updateRotateTool() {
+    const helper = this.rotateTool.getHelper();
+    const chosen = this.ctx.store.selectedIds().join(',');
+    if (this.rotateToolOn && !this.rotateStart && chosen !== this.rotateToolFor) {
+      if (this.rotateToolFor === '' && chosen !== '') { // opened with nothing selected: the first choice gets the rings
+        this.rotateToolFor = chosen;
+        this.ctx.store.announce('Rotate tool: drag a ring (R to close)');
+      } else { this.rotateToolOn = false; this.rotateSnapshot = null; }
+    }
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item));
+    const show = this.active && this.rotateToolOn && items.length > 0;
+    helper.visible = show;
+    this.rotateTool.enabled = show;
+    this.pivotMarker.visible = show || this.pivotFlashing;
+    if (!show) { if (this.rotateTool.object) this.rotateTool.detach(); return; }
+    if (this.rotateStart) return;
+    const box = this.selectionBounds();
+    if (!box) return;
+    this.rotatePivot.position.copy(box.getCenter(new THREE.Vector3()));
+    this.rotatePivot.quaternion.identity();
+    this.rotateTool.setRotationSnap(THREE.MathUtils.degToRad(this.ctx.rotationStep()));
+    if (this.rotateTool.object !== this.rotatePivot) this.rotateTool.attach(this.rotatePivot);
+  }
+
+  private onRotateDragging(dragging: boolean) {
+    this.ctx.setOrbitEnabled?.(!dragging);
+    const { store } = this.ctx;
+    if (dragging) {
+      const items = store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
+      const box = this.selectionBounds();
+      if (!items.length || !box) return;
+      this.rotateStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3, rotation: [...item.rotation] as Quat })), pivot: box.getCenter(new THREE.Vector3()), low: box.min.z };
+      store.beginGesture('Rotate');
+    } else if (this.rotateStart) {
+      this.rotateStart = null;
+      store.endGesture();
+      this.updateRotateTool();
+    }
+  }
+
+  /** A ring turned: the parts are put where turning the selection as it was at the start by this angle leaves them (live, one undo step at the end). */
+  private onRotateChange() {
+    const start = this.rotateStart;
+    if (!start) return;
+    this.rotateGroup(start.items, this.rotatePivot.quaternion.clone(), start.pivot, start.low);
+  }
+
+  /**
+   * Turns several items as one rigid body: every point of every part is rotated about the pivot, so the parts keep their places relative to each
+   * other (a part's own box centre is not its mesh's centre, so turning each box about the pivot would pull them apart). The group as a whole
+   * goes back to the grid and keeps its lowest point.
+   */
+  private rotateGroup(items: DocItem[], step: THREE.Quaternion, pivot: THREE.Vector3, oldLow: number) {
+    const turned = items.map(item => {
+      const base = this.baseGeometries.get(item.path)!;
+      const old = new THREE.Quaternion(...item.rotation);
+      const next = step.clone().multiply(old).normalize();
+      const nextRotation: Quat = [next.x, next.y, next.z, next.w];
+      const key = `${item.path}|${quatKey(nextRotation)}`;
+      const entry = this.oriented.get(key) ?? this.orient(base, nextRotation);
+      this.oriented.set(key, entry);
+      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old)); // where the mesh's own origin sits in the world
+      const newOrigin = origin.sub(pivot).applyQuaternion(step).add(pivot);
+      const position = newOrigin.add(this.rotatedMin(base, next));
+      return { item, rotation: nextRotation, size: entry.size, position };
+    });
+    const low = new THREE.Vector3(Math.min(...turned.map(t => t.position.x)), Math.min(...turned.map(t => t.position.y)), Math.min(...turned.map(t => t.position.z)));
+    const shift = new THREE.Vector3(snap(low.x, snapStepMm.x) - low.x, snap(low.y, snapStepMm.y) - low.y, oldLow - low.z);
+    const delta = this.clampDelta(shift.toArray() as Vec3, turned.map(t => ({ position: t.position.toArray() as Vec3, size: t.size.toArray() as Vec3 })));
+    const round3 = (v: number) => Math.round(v * 1000) / 1000;
+    const changes = new Map<string, Partial<{ position: Vec3; rotation: Quat }>>();
+    for (const t of turned) changes.set(t.item.id, { rotation: t.rotation, position: [round3(t.position.x + delta[0]), round3(t.position.y + delta[1]), round3(t.position.z + delta[2])] });
+    this.ctx.store.updateItems('Rotate', changes);
+  }
+
+  /** The lowest corner of the mesh's box once it is turned by `rotation` (the mesh itself is stored around its own origin). */
+  private rotatedMin(base: THREE.BufferGeometry, rotation: THREE.Quaternion): THREE.Vector3 {
+    const geometry = base.clone().applyQuaternion(rotation);
+    geometry.computeBoundingBox();
+    const min = geometry.boundingBox!.min.clone();
+    geometry.dispose();
+    return min;
   }
 
   /** Shortens a move so every item in `items` stays inside the work area (the group keeps its shape at the edge). */
@@ -763,6 +1262,11 @@ export class DocumentScene {
 
   private onPointerDown(e: PointerEvent) {
     if (!this.active || e.button !== 0) return;
+    this.moveTool.camera = this.ctx.camera;
+    this.rotateTool.camera = this.ctx.camera;
+    this.rotateTool.setRotationSnap(THREE.MathUtils.degToRad(this.ctx.rotationStep())); // the Step may have changed since the tool was shown
+    if (this.rotateToolOn && this.rotateTool.axis) return; // a ring of the rotate tool was grabbed: it handles the drag
+    if (this.moveToolOn && this.moveTool.axis) return; // an arrow of the move tool
     if (this.picking()) { // "Snap to grid…" / "Move to…": the next click chooses a handle
       const handle = this.pickHandle(e);
       if (handle) {
@@ -810,6 +1314,8 @@ export class DocumentScene {
   }
 
   private onPointerMove(e: PointerEvent) {
+    this.rotateTool.camera = this.ctx.camera;
+    this.moveTool.camera = this.ctx.camera;
     if (this.active && this.picking()) this.hoverHandle(this.pickHandle(e));
     if (this.marquee) { this.updateMarquee(e); return; }
     const drag = this.drag;
@@ -904,17 +1410,19 @@ export class DocumentScene {
       const selected = store.selectedItems();
       if (selected.length) store.setMuted(selected.map(i => i.id), !selected.every(i => i.muted));
     }
-    else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'm') { // M: Move to… (the same as the menu item; needs another part to move onto)
+    else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'm' && !e.repeat) this.toggleMoveTool(); // M: the move tool
+    else if (!command && !e.altKey && e.shiftKey && e.key.toLowerCase() === 'm') { // Shift+M: Move to… (the same as the menu item; needs another part to move onto)
       const selected = store.selectedItems();
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
+    else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) this.toggleRotateTool(); // R: the rotate tool
     else if (!command && !e.altKey && ['x', 'y', 'z'].includes(e.key.toLowerCase())) this.rotateSelected(e.key.toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -this.ctx.rotationStep() : this.ctx.rotationStep());
     else if (e.key === 'ArrowUp') (e.shiftKey ? moveZ(1) : move(0, stepY, 0)); // Shift = height, like Shift+drag
     else if (e.key === 'ArrowDown') (e.shiftKey ? moveZ(-1) : move(0, -stepY, 0));
     else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
     else if (e.key === 'PageDown' || e.key === '[') moveZ(-1);
     else if (e.key === 'Delete' || e.key === 'Backspace') store.removeSelected();
-    else if (e.key === 'Escape') { if (!this.drag) store.select(null); } // while dragging, Esc only cancels the drag
+    else if (e.key === 'Escape') { if (!this.drag && !this.escapeMoveTool() && !this.cancelRotateTool()) store.select(null); } // while dragging, Esc only cancels the drag
     else handled = false;
     if (handled) e.preventDefault();
   }
@@ -932,5 +1440,10 @@ export class DocumentScene {
     for (const geometry of this.baseGeometries.values()) geometry.dispose();
     this.clearSelectionBoxes();
     this.snapHandles.clear();
+    this.rotateTool.dispose();
+    for (const type of ['pointermove', 'pointerdown', 'keydown', 'keyup']) window.removeEventListener(type, this.trackAlt, true);
+    this.moveTool.dispose();
+    this.ctx.scene.remove(this.movePivot, this.moveTool.getHelper());
+    this.ctx.scene.remove(this.rotatePivot, this.rotateTool.getHelper());
   }
 }
