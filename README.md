@@ -49,6 +49,8 @@ File list: **⌥⌘⌫** deletes the selection immediately (asks first: Enter de
 
 **Solid with outline** (⌥2, also in the quick look) draws the shaded parts with their visible sharp edges in dark lines on top; the SVG view of it is the shaded picture, like Solid.
 
+**Zip all** (Export row) packs the document file, the SVG view (in the selected display mode), the SVG drawing, the Blender file and the assembly 3MF into `<name>-v<N>.zip`.
+
 SVG view (Export row): the 3D view as an SVG in the display mode that is selected (hidden lines removed / dashed and wireframe are line drawings, solid is a picture), with the ground grid when it is on (view cube menu ▸ Ground grid). Dimmed parts are translucent in the Blender export.
 
 Versions (the version button of the document panel): **Delete** a version, or **Delete all previous versions…** (the newest stays). The document panel folds up with the chevron in its header.

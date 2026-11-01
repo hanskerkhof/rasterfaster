@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Zip all: the whole export set in one file (0.10.50)
+
+### Added
+- **FE** (`document-panel.ts`, new `zip.ts`): a **Zip all** button in the Export row downloads `<name>-v<N>.zip` (no `-v<N>` before a first version is saved) with the document file (`.rasterfaster.json`), the SVG view in the selected display mode (`-view-<mode>.svg`), the SVG drawing, the Blender file and the assembly 3MF. The zip is written in the browser (stored, no compression) with a small writer and a spec.
+
 ## 2026-11-01 - Solid with outline view mode (0.10.49)
 
 ### Added

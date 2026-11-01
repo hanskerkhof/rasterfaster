@@ -5,10 +5,13 @@ import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, compu
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
 import { rangeEndingAt } from './tree-selection';
+import { ZipEntry, buildZip } from './zip';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
 /** `snapRight`: the panel sits against the right edge of the view and stays there when the view gets wider or narrower (e.g. the file panel is collapsed). */
 interface PanelGeometry { left: number; top: number; width: number; height: number; snapRight?: boolean }
+/** The display mode in the name of an SVG view file. */
+const viewModeShort: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' };
 const geometryStorageKey = 'rasterfaster.docPanelGeometry';
 const snapDistance = 24; // px from the right edge of the view at which the panel snaps to it
 const sideGap = 12;
@@ -93,6 +96,7 @@ function readGeometry(): PanelGeometry | null {
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="SVG of the 3D view as it is now, in the display mode that is selected (solid is a picture, the others are line drawings)" (click)="exportViewSvg()">SVG view</button>
       <button type="button" [disabled]="!store.doc().items.length" title="Bill of materials" (click)="bomOpen.set(true)">BOM</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" title="One zip with the document file, SVG, SVG view (in the display mode that is selected), Blender file and assembly 3MF" (click)="exportSet()">Zip all</button>
     </div>
     <div class="export">
       <span>Document file</span>
@@ -505,10 +509,9 @@ export class DocumentPanel {
     try {
       const drawing = this.store.viewSvg?.();
       if (!drawing) throw new Error('nothing to draw yet (the parts are still loading)');
-      const short: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' }; // the display mode, in the file name
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob([drawing.svg], { type: 'image/svg+xml' }));
-      link.download = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-view-${short[drawing.mode] ?? drawing.mode}.svg`;
+      link.download = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-view-${viewModeShort[drawing.mode] ?? drawing.mode}.svg`;
       link.click();
       setTimeout(() => URL.revokeObjectURL(link.href), 2000);
     } catch (error) {
@@ -520,6 +523,44 @@ export class DocumentPanel {
 
   protected exportSvg() {
     return this.download('export.svg', 'drawing.svg');
+  }
+
+  /** The document file, both SVGs, the Blender file and the assembly 3MF in one zip: `<name>-v<N>.zip`. */
+  protected async exportSet() {
+    const id = this.store.docId();
+    if (!id) return;
+    this.exporting.set(true);
+    this.exportError.set('');
+    await new Promise(resolve => setTimeout(resolve, 30)); // let the button show it is busy
+    try {
+      await this.store.flush();
+      const base = `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}${this.store.version() ? `-v${this.store.version()}` : ''}`;
+      const fetchBytes = async (endpoint: string) => {
+        const response = await fetch(`/api/documents/${id}/${endpoint}`);
+        if (!response.ok) throw new Error(`${endpoint}: ${(await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`}`);
+        return new Uint8Array(await response.arrayBuffer());
+      };
+      const view = this.viewProvider()();
+      const drawing = this.store.viewSvg?.();
+      if (!drawing) throw new Error('nothing to draw yet (the parts are still loading)');
+      const encoder = new TextEncoder();
+      const entries: ZipEntry[] = [
+        { name: `${base}.rasterfaster.json`, data: await fetchBytes('export.rasterfaster') },
+        { name: `${base}-view-${viewModeShort[drawing.mode] ?? drawing.mode}.svg`, data: encoder.encode(drawing.svg) },
+        { name: `${base}.svg`, data: await fetchBytes('export.svg') },
+        { name: `${base}.blend`, data: await fetchBytes(view ? `export.blend?view=${encodeURIComponent(view)}` : 'export.blend') },
+        { name: `${base}-assembly.3mf`, data: await fetchBytes('export.3mf') },
+      ];
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([buildZip(entries)], { type: 'application/zip' }));
+      link.download = `${base}.zip`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+    } catch (error) {
+      this.exportError.set(`Export set failed: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.exporting.set(false);
+    }
   }
 
   /** Saves pending edits, asks the API for the file and hands it to the browser as a download. */
