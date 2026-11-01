@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Render sizes, richer render toasts (0.10.62)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `main.py`): a size menu next to **Render HD**: Full HD (default), QHD, QHD+, 4K UHD, 5K and 8K UHD (the API accepts widths up to 7680).
+- **FE** + **BE** (`app.html`, `main.py`): the "render is ready" toast shows a thumbnail of the picture, its resolution, samples and render time; the progress and ready toasts name the size (Full HD, 4K UHD …).
+
+### Changed
+- **FE** (`render.service.ts`): a document without saved render settings starts with the lamp at 100%.
+
 ## 2026-11-02 - Lighting row with a lamp slider, automatic exposure for ambient light (0.10.61)
 
 ### Added

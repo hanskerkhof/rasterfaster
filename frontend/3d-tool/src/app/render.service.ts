@@ -6,6 +6,22 @@ const cropStorageKey = 'rasterfaster.renderCrop';
 const dofStrengthStorageKey = 'rasterfaster.renderDofStrength';
 const ambientStorageKey = 'rasterfaster.renderAmbient';
 const lampStorageKey = 'rasterfaster.renderLamp';
+const hdWidthStorageKey = 'rasterfaster.renderHdWidth';
+/** The widths the full-size render can be made at (16:9): the first is the default. */
+export const hdWidths = [{ width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
+
+/** The common name of a render width: "Full HD", "4K UHD" … (empty for a width without one). */
+export function sizeName(width: number): string {
+  return hdWidths.find(w => w.width === width)?.label.split(' · ')[1] ?? '';
+}
+
+function readHdWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(hdWidthStorageKey));
+    if (hdWidths.some(w => w.width === stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 1920;
+}
 
 function readLamp(): number {
   try {
@@ -52,6 +68,8 @@ export interface RenderState {
   width: number;
   samples: number;
   elapsed: number;
+  /** Width and height of the finished picture. */
+  size?: [number, number] | null;
   error: string;
 }
 
@@ -102,6 +120,8 @@ export class RenderService {
   readonly ambient = signal(readAmbient());
   /** The lamp slider, 0 to 60; 40 is the normal strength (two thirds of the way). */
   readonly lamp = signal(readLamp());
+  /** The width of the full-size render (its height follows at 16:9). */
+  readonly hdWidth = signal(readHdWidth());
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
   private socket?: WebSocket;
@@ -115,7 +135,7 @@ export class RenderService {
       const own = this.store.doc().render;
       const id = this.store.docId();
       if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); }
-      else this.focusId.set(id ? readFocus(id) : null);
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); } // a document without render settings starts with the normal lamp (100%)
     });
     this.connect();
     void this.poll(); // the WebSocket may be unavailable (a proxy that does not pass it on): the same messages can be asked for
@@ -217,6 +237,17 @@ export class RenderService {
     this.saveSettings();
   }
 
+  /** For the toasts: " (4K UHD)" after a width, or nothing. */
+  sizeSuffix(width: number): string {
+    const name = sizeName(width);
+    return name ? ` (${name})` : '';
+  }
+
+  setHdWidth(width: number) {
+    this.hdWidth.set(width);
+    try { localStorage.setItem(hdWidthStorageKey, String(width)); } catch { /* storage unavailable */ }
+  }
+
   setLamp(value: number) {
     this.lamp.set(value);
     try { localStorage.setItem(lampStorageKey, String(value)); } catch { /* storage unavailable */ }
@@ -254,7 +285,7 @@ export class RenderService {
     try {
       const url = new URL(quickUrl.replace('/render.png', '/render-jobs'), location.origin);
       this.dofParams(url);
-      url.searchParams.set('width', '1920');
+      url.searchParams.set('width', String(this.hdWidth()));
       url.searchParams.set('samples', '96');
       const response = await fetch(url, { method: 'POST' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);

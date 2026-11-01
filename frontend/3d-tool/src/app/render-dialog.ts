@@ -1,6 +1,6 @@
 import { Component, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
-import { RenderService } from './render.service';
+import { RenderService, hdWidths } from './render.service';
 import { DocumentStore } from './document.store';
 
 /**
@@ -48,12 +48,15 @@ import { DocumentStore } from './document.store';
           </button>
         }
         @if (url()) {
-          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : '1920 px, 96 samples: about two minutes, in the background (you get a message when it is ready)'" (click)="startFullSize()">
+          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, 96 samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
             @if (render.running()) { <span class="spinner small"></span> }Render HD
           </button>
+          <select class="focus size" [disabled]="render.running()" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
+            @for (size of hdSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.hdWidth()">{{ size.label }}</option> }
+          </select>
         }
         @if (picture()) {
-          <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render (1920 px) as a PNG file'">
+          <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>
             {{ url() ? 'Download quick render PNG' : 'Download HD render PNG' }}
           </a>
@@ -79,7 +82,7 @@ import { DocumentStore } from './document.store';
     .lighting { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; } .bar-title { font-weight: 600; opacity: .7; }
     .lamp-value { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; opacity: .85; }
     .lamp { display: inline-flex; align-items: center; gap: 6px; } .lamp input { width: 130px; margin: 0; accent-color: #2f6fed; }
-    .focus.strength { max-width: 150px; }
+    .focus.strength { max-width: 150px; } .focus.size { max-width: 200px; }
     .focus:disabled { opacity: .45; cursor: default; }
     .focus { max-width: 230px; padding: 3px 6px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .check { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; cursor: pointer; user-select: none; } .check input { margin: 0; }
@@ -122,6 +125,7 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected readonly strengths = [{ value: 1, label: 'Subtle' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Medium' }, { value: 4, label: 'Strong' }, { value: 5, label: 'Extreme' }];
   protected readonly ambients = [{ value: 0, label: 'None' }, { value: 1, label: 'Soft glow' }, { value: 2, label: 'Overcast' }, { value: 3, label: 'Softbox' }, { value: 4, label: 'Daylight' }, { value: 5, label: 'Bright studio' }];
   /** The lamp as a share of its normal strength: every 10 steps of the slider double or halve it. */
+  protected readonly hdSizes = hdWidths;
   protected lampText() {
     const share = 2 ** ((this.render.lamp() - 40) / 10) * 100;
     return `${share >= 100 ? Math.round(share) : Math.round(share * 10) / 10} %`;

@@ -104,7 +104,7 @@
           <div class="bar"><span [style.width.%]="render.percent()"></span></div>
           <div class="line">
             <span class="spinner"></span>
-            <span>Rendering {{ r.name }} · {{ r.width }} px · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ render.eta() === null ? ' · estimating…' : ' · about ' + time(render.eta()!) + ' left' }}</span>
+            <span>Rendering {{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ render.eta() === null ? ' · estimating…' : ' · about ' + time(render.eta()!) + ' left' }}</span>
             <button type="button" (click)="render.cancel()">Cancel</button>
           </div>
         </div>
@@ -112,7 +112,11 @@
     }
     @if (render.toast(); as t) {
       <button type="button" class="notice undo render-ready" role="status" (click)="render.view()">
-        @if ('id' in t) { Render of {{ t.name }} is ready: click to view } @else { {{ t.error }} }
+        @if ('id' in t) {
+          <img class="thumb" [src]="'/api/render-jobs/' + t.id + '/image.png'" alt="" />
+          <span class="text"><span>Render of {{ t.name }} is ready: click to view</span>
+            <small>{{ t.size ? t.size[0] + ' × ' + t.size[1] : t.width }} px{{ render.sizeSuffix(t.width) }} · {{ t.samples }} samples · rendered in {{ time(t.elapsed) }}</small></span>
+        } @else { {{ t.error }} }
       </button>
     }
     @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }

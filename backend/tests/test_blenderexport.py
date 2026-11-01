@@ -316,3 +316,10 @@ def test_ambient_preset_comes_from_the_call_or_the_document(tmp_path, monkeypatc
     assert client.get(url + "?ambient=6").status_code == 422
     assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20"
     assert client.get(url + "?lamp=61").status_code == 422
+
+
+def test_render_job_reports_the_size_of_its_picture():
+    job = main.RenderJob("Size", 1920, 96)
+    assert job.view()["size"] is None
+    job.png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (1920).to_bytes(4, "big") + (1080).to_bytes(4, "big")
+    assert job.view()["size"] == [1920, 1080]

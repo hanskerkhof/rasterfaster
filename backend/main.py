@@ -777,8 +777,14 @@ class RenderJob:
         self.error = ""
         self.process: object | None = None
 
+    def size(self) -> list[int] | None:
+        """Width and height of the finished picture (read from the PNG header)."""
+        if self.png and len(self.png) >= 24 and self.png[:8] == b"\x89PNG\r\n\x1a\n":
+            return [int.from_bytes(self.png[16:20], "big"), int.from_bytes(self.png[20:24], "big")]
+        return None
+
     def view(self) -> dict:
-        return {"id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
+        return {"size": self.size(), "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error}
 
 
@@ -856,7 +862,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60),
-                     width: int = Query(default=1920, ge=160, le=3840), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
+                     width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp)
     if any(j.state == "running" for j in renderJobs.values()):

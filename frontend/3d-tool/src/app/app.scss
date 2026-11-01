@@ -99,5 +99,8 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress button:hover { background: #b03a3a; color: #fff; }
 @keyframes render-spin { to { transform: rotate(360deg); } }
 .notice.render-ready { color: inherit; font: inherit; font-size: 12px; cursor: pointer; background: rgba(35,38,45,.95); border: 1px solid #2f6fed; }
+.notice.render-ready { display: flex; align-items: center; gap: 10px; text-align: left; }
+.notice.render-ready .thumb { width: 96px; max-height: 64px; object-fit: contain; border-radius: 3px; background: #000; flex: none; }
+.notice.render-ready .text { display: flex; flex-direction: column; gap: 2px; } .notice.render-ready small { opacity: .75; font-size: 11px; }
 .notice.render-ready:hover { background: #2f6fed; color: #fff; }
 .notice.undo button { margin-left: 8px; padding: 1px 8px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
