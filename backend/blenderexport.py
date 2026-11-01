@@ -230,6 +230,9 @@ import sys
 import bpy
 from mathutils import Vector
 
+# the ambient light presets (Soft glow, Overcast, Softbox, Daylight, Bright studio): the power of the softbox above the scene (per square metre of its
+# distance above the parts), its colour and how much brighter the world gets
+AMBIENT_PRESETS = [(2, (0.85, 0.9, 1.0), 0.15), (4, (0.92, 0.95, 1.0), 0.3), (7, (1.0, 0.98, 0.95), 0.45), (11, (1.0, 0.95, 0.88), 0.7), (16, (1.0, 1.0, 1.0), 1.1)]
 CROP_PADDING = 0.04  # room left on each side of the parts when the picture is cropped to them, as a share of their width
 DOF_BLUR_SHARES = [0.003, 0.006, 0.012, 0.025, 0.05]  # the five strengths: how blurred the part farthest from the focus is, as a share of the picture width (the third: unsharp, still recognizable)
 SUN_STRENGTH = 6.0  # W/m² (a clear day is ~ 5 in Blender; stronger washes the colours out)
@@ -238,6 +241,8 @@ SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lig
 # the arguments: the glTF, the .blend to write, "1" with the studio setup, the app's light ("dx,dy,dz;tx,ty,tz" in mm, or ""), "width,samples" to render a PNG
 # instead of saving the .blend (or ""), the depth of field ("0", "1" or "1|strength|part id") and "1" to crop the picture to the parts
 source, target, studio, light_spec, render_spec, dof_spec, crop_flag = sys.argv[sys.argv.index("--") + 1:]
+dof_spec, _, ambient_text = dof_spec.partition("#")  # the depth of field spec may end in "#<ambient light preset, 0 to 5>"
+ambient = min(max(int(ambient_text or 0), 0), 5)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -390,6 +395,15 @@ if studio == "1":
     light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2 * support, (0.6, 0.75, 1.0), r * 3)
     light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3 * support, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
     light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4 * support, (1.0, 0.45, 0.8), r * 1.5)
+    if ambient:  # the ambient light presets: a big softbox above the scene (the generic soft top light of a studio) and a lighter world
+        power, tint, world_extra = AMBIENT_PRESETS[ambient - 1]
+        above = r * 2.5
+        top = bpy.data.lights.new("Ambient softbox", "AREA")
+        top.shape, top.size, top.size_y, top.energy, top.color = "RECTANGLE", r * 5, r * 5, power * above * above * 10, tint
+        top_object = bpy.data.objects.new("Ambient softbox", top)
+        top_object.location = (centre.x, centre.y, high.z + above)  # an area light shines down along its own -Z
+        scene.collection.objects.link(top_object)
+        bg.inputs["Strength"].default_value += world_extra
     scene.render.engine = "CYCLES"
     scene.cycles.samples = 96
     scene.cycles.use_denoising = True

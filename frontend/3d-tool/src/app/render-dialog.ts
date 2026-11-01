@@ -31,6 +31,9 @@ import { DocumentStore } from './document.store';
             @for (level of strengths; track level.value) { <option [value]="level.value" [selected]="level.value === render.dofStrength()">Blur: {{ level.label }}</option> }
           </select>
         }
+        <select class="focus strength" [value]="render.ambient()" title="Ambient light: a big soft light above the scene that lightens the shadows." (change)="chooseAmbient(+$any($event.target).value)">
+          @for (level of ambients; track level.value) { <option [value]="level.value" [selected]="level.value === render.ambient()">Ambient: {{ level.label }}</option> }
+        </select>
         <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
       </header>
       <div class="actions">
@@ -63,7 +66,7 @@ import { DocumentStore } from './document.store';
     header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 34px; }
     .actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
-    .focus.strength { max-width: 130px; }
+    .focus.strength { max-width: 150px; }
     .focus { max-width: 230px; padding: 3px 6px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .check { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; cursor: pointer; user-select: none; } .check input { margin: 0; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
@@ -100,6 +103,11 @@ export class RenderDialog implements OnInit, OnDestroy {
     });
   }
   protected readonly strengths = [{ value: 1, label: 'Subtle' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Medium' }, { value: 4, label: 'Strong' }, { value: 5, label: 'Extreme' }];
+  protected readonly ambients = [{ value: 0, label: 'None' }, { value: 1, label: 'Soft glow' }, { value: 2, label: 'Overcast' }, { value: 3, label: 'Softbox' }, { value: 4, label: 'Daylight' }, { value: 5, label: 'Bright studio' }];
+  protected chooseAmbient(level: number) {
+    this.render.setAmbient(level);
+    if (this.url() && !this.busy()) void this.quick();
+  }
   protected chooseStrength(level: number) {
     this.render.setDofStrength(level);
     if (this.url() && !this.busy()) void this.quick();

@@ -21,6 +21,13 @@ describe('clipboard', () => {
     expect(JSON.stringify(clip)).not.toContain('"id"');
   });
 
+  it('keeps the scale of a part through copy and paste', () => {
+    const clip = copyItems([item('a', [100, 60, 6], { scale: [2, 1, 0.5] }), item('b', [140, 40, 10])])!;
+    const pasted = pasteItems(clip, null, step, identity);
+    expect(pasted[0].scale).toEqual([2, 1, 0.5]);
+    expect(pasted[1].scale).toBeUndefined();
+  });
+
   it('pastes at the anchor, snapped to the grid, with the same spacing and height', () => {
     const clip = copyItems([item('a', [100, 60, 6]), item('b', [140, 40, 10])])!;
     const pasted = pasteItems(clip, { x: 213, y: -47 }, step, identity);

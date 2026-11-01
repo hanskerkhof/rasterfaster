@@ -28,6 +28,8 @@ const rotationStepStorageKey = 'rasterfaster.rotationStep';
 const rotationStepChoices = [90, 45, 15, 5, 1];
 const moveStepStorageKey = 'rasterfaster.moveStepMm';
 const moveStepChoices = [100, 20, 10, 5, 1, 0.1];
+const scaleStepStorageKey = 'rasterfaster.scaleStepPercent';
+const scaleStepChoices = [50, 25, 10, 5, 1];
 const zGridModeStorageKey = 'rasterfaster.zGridMode';
 const cameraModeStorageKey = 'rasterfaster.cameraMode';
 const perspectiveFovDegrees = 35;
@@ -75,6 +77,15 @@ function readRotationStep() {
     if (rotationStepChoices.includes(stored)) return stored;
   } catch { /* storage unavailable */ }
   return 45;
+}
+
+/** The Step of the Scale panel (percent of the original size) as the user left it (10%, the first time). */
+function readScaleStep(): number {
+  try {
+    const stored = Number(localStorage.getItem(scaleStepStorageKey));
+    if (scaleStepChoices.includes(stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 10;
 }
 
 /** The Step of the Move panel as the user left it (20 mm, one grid cell, the first time). */
@@ -168,6 +179,35 @@ function readShowPath() {
           <span class="name">Step</span>
           <select releaseFocus [value]="moveStep()" (change)="setMoveStep(+$any($event.target).value)">
             @for (s of moveSteps; track s) { <option [value]="s" [selected]="s === moveStep()">{{ s }} mm</option> }
+          </select>
+        </div>
+      </div>
+
+      <div class="rotate move scale" aria-label="Scale object">
+        <div class="axis head">
+          <span class="title">Scale</span>
+          <button type="button" class="undo" [style.visibility]="scaled().x || scaled().y || scaled().z ? 'visible' : 'hidden'" title="Back to the size of the STL file along all axes" releaseFocus (click)="resetScale('all')">↺</button>
+          <span class="pad one"></span>
+          <span class="pad one"></span>
+        </div>
+        <div class="axis">
+          <span class="name">XYZ<small>{{ scaleText(scales().x === scales().y && scales().y === scales().z ? scales().x : 1) }}</small></span>
+          <span class="pad one"></span>
+          <button type="button" [title]="'Scale all axes −' + scaleStep() + '%'" [disabled]="!store.selectedId()" releaseFocus (click)="scaleBy('all', -scaleStep())">−</button>
+          <button type="button" [title]="'Scale all axes +' + scaleStep() + '%'" [disabled]="!store.selectedId()" releaseFocus (click)="scaleBy('all', scaleStep())">+</button>
+        </div>
+        @for (axis of axes; track axis) {
+          <div class="axis">
+            <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ scaleText(scales()[axis]) }}</small></span>
+            <button type="button" class="undo" [style.visibility]="scaled()[axis] ? 'visible' : 'hidden'" [title]="'Back to the size of the STL file along ' + axis.toUpperCase()" releaseFocus (click)="resetScale(axis)">↺</button>
+            <button type="button" [title]="'Scale −' + scaleStep() + '% along ' + axis.toUpperCase()" [disabled]="!store.selectedId()" releaseFocus (click)="scaleBy(axis, -scaleStep())">−</button>
+            <button type="button" [title]="'Scale +' + scaleStep() + '% along ' + axis.toUpperCase()" [disabled]="!store.selectedId()" releaseFocus (click)="scaleBy(axis, scaleStep())">+</button>
+          </div>
+        }
+        <div class="axis">
+          <span class="name">Step</span>
+          <select releaseFocus [value]="scaleStep()" (change)="setScaleStep(+$any($event.target).value)">
+            @for (s of scaleSteps; track s) { <option [value]="s" [selected]="s === scaleStep()">{{ s }} %</option> }
           </select>
         </div>
       </div>
@@ -389,6 +429,31 @@ export class StlViewer implements OnDestroy {
   protected readonly rotationSteps = rotationStepChoices;
   protected readonly moveSteps = moveStepChoices;
   protected readonly moveStep = signal(readMoveStep());
+  protected readonly scaleSteps = scaleStepChoices;
+  protected readonly scaleStep = signal(readScaleStep());
+
+  protected setScaleStep(percent: number) {
+    this.scaleStep.set(percent);
+    try { localStorage.setItem(scaleStepStorageKey, String(percent)); } catch { /* storage unavailable */ }
+  }
+
+  /** A scale for the Scale panel: nothing at 100%, else the percentage. */
+  protected scaleText(factor: number) {
+    return factor === 1 ? '' : ` ${Math.round(factor * 1000) / 10}%`;
+  }
+
+  /** Scale panel: the scale of the part chosen last along the world X, Y and Z (1 = the size of the STL file). */
+  protected readonly scales = computed(() => {
+    this.store.partStats();
+    const item = this.store.selectedItems().at(-1);
+    const scale = item ? this.documentScene?.scaleOf(item) : null;
+    return scale ? { x: scale[0], y: scale[1], z: scale[2] } : { x: 1, y: 1, z: 1 };
+  });
+  protected readonly scaled = computed(() => {
+    this.store.partStats();
+    const all = this.store.selectedItems().map(item => this.documentScene?.scaleOf(item)).filter((o): o is Vec3 => !!o);
+    return { x: all.some(o => o[0] !== 1), y: all.some(o => o[1] !== 1), z: all.some(o => o[2] !== 1) };
+  });
 
   /** An offset for the Move panel: short, with a sign (whole millimetres once it is large). */
   protected offsetText(mm: number) {
@@ -1316,6 +1381,15 @@ export class StlViewer implements OnDestroy {
   /** The − / + of the Move panel and its ↺ (see DocumentScene). */
   moveBy(axis: 'x' | 'y' | 'z', mm: number) {
     this.documentScene.moveSelected(axis, mm);
+  }
+
+  /** The − / + of the Scale panel and its ↺ (see DocumentScene). */
+  scaleBy(axis: 'x' | 'y' | 'z' | 'all', percent: number) {
+    this.documentScene.scaleSelected(axis, percent);
+  }
+
+  resetScale(axis: 'x' | 'y' | 'z' | 'all') {
+    this.documentScene.resetScale(axis);
   }
 
   resetOffset(axis: 'x' | 'y' | 'z' | 'all') {

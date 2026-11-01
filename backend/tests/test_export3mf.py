@@ -140,3 +140,14 @@ def test_export_with_every_part_excluded_is_refused(client):
     for kind in ("export.3mf", "export.svg"):
         response = client.get(f"/api/documents/{document['id']}/{kind}")
         assert response.status_code == 422 and "Do not export" in response.json()["detail"]
+
+
+def test_scaled_part_is_scaled_along_its_own_axes_before_turning():
+    stls = {"small.stl": box_stl(10, 20, 30)}
+    # scaled 2, 1, 0.5 along the part's own axes, then turned 90° about Z: 20 x 20 x 15 becomes 20 x 20 x 15 (X and Y swap)
+    item = {"id": "a", "path": "small.stl", "name": "S", "color": 1, "position": [0, 0, 0], "scale": [2, 1, 0.5],
+            "rotation": [0, 0, 0.7071067811865476, 0.7071067811865476]}
+    placement = export3mf.place_assembly([item], {"small.stl": export3mf.read_stl(stls["small.stl"])}, 256, centre=False)[0]
+    assert np.allclose(placement.size, [20, 20, 15], atol=1e-3)
+    plain = dict(item, scale=None, rotation=[0, 0, 0, 1])
+    assert np.allclose(export3mf.place_assembly([plain], {"small.stl": export3mf.read_stl(stls["small.stl"])}, 256, centre=False)[0].size, [10, 20, 30], atol=1e-3)

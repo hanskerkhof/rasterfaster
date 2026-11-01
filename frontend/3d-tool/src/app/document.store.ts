@@ -55,6 +55,8 @@ export interface DocItem {
   /** World position of the bounding-box minimum corner *after* rotation (mm). */
   position: Vec3;
   rotation: Quat;
+  /** Scale along the part's own X, Y and Z axes, applied before the rotation; none means 1, 1, 1. Kept in the document file. */
+  scale?: Vec3 | null;
   /** Dimmed to a ghost and ignored by clicks (e.g. a cover while working on what's inside). */
   muted?: boolean;
   /** Keeps the footprint centre on the middle of a grid cell when the item is dragged, nudged or rotated. */
@@ -102,6 +104,8 @@ export interface DocRenderSettings {
   dofStrength?: number;
   /** The picture is as wide as the parts (the height stays the same). */
   crop?: boolean;
+  /** The ambient light preset: 0 none, 1 Soft glow … 5 Bright studio. */
+  ambient?: number;
 }
 
 export interface RfDocument {
@@ -143,6 +147,7 @@ function sanitize(doc: RfDocument): boolean {
     if (clamped.some((v, i) => v !== item.position[i])) changed = true;
     item.position = clamped;
     if (!item.rotation.every(Number.isFinite)) { item.rotation = [0, 0, 0, 1]; changed = true; }
+    if (item.scale && !item.scale.every(v => Number.isFinite(v) && v >= 0.01 && v <= 100)) { item.scale = null; changed = true; }
   }
   return changed;
 }
@@ -590,7 +595,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'origin'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'origin' | 'scale'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -816,7 +821,7 @@ export class DocumentStore {
     if (!clip) return 0;
     const round = (v: number) => Math.round(v * 1000) / 1000;
     const created = pasteItems(clip, this.viewCenter?.() ?? null, snapStepMm, (position, item) => {
-      const size = this.sizeOf?.({ path: item.path, rotation: item.rotation } as DocItem) ?? undefined; // unknown until its geometry has loaded
+      const size = this.sizeOf?.({ path: item.path, rotation: item.rotation, scale: item.scale } as DocItem) ?? undefined; // unknown until its geometry has loaded
       const placed = item.centered && size ? cellCenteredPosition(position, size, this.zMode?.()) : (position.map(round) as Vec3);
       return clampToWorkArea(placed, size);
     });

@@ -166,6 +166,11 @@ export function axisAngles(rotation: Quat): { x: number; y: number; z: number } 
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 const snap = (value: number, step: number) => Math.round(Math.round(value / step) * step * 1000) / 1000; // (rounded: 0.1 steps must not leave 10.100000000000001)
 const quatKey = (q: Quat) => q.map(n => n.toFixed(4)).join(',');
+const cornerColor = 0xffb347;
+const isUnitScale = (scale?: Vec3 | null) => !scale || scale.every(v => v === 1);
+/** The key of an oriented geometry: the part's file, its rotation and (when it has one) its scale. */
+const orientKey = (path: string, rotation: Quat, scale?: Vec3 | null) => `${path}|${quatKey(rotation)}${isUnitScale(scale) ? '' : '|' + scale!.map(n => n.toFixed(4)).join(',')}`;
+const clampScale = (v: number) => Math.round(Math.min(Math.max(v, 0.01), 100) * 10000) / 10000;
 
 /**
  * Renders the document's items and lets the user pick, drag and nudge them on the snap grid.
@@ -204,11 +209,25 @@ export class DocumentScene {
   private readonly moveTool: TransformControls;
   private moveToolOn = false;
   private moveToolFor = '';
+  /** The scale tool (key S): square handles on the X, Y and Z axes, on the planes between two axes and in the middle (all three), at the middle of the selection. */
+  private readonly scalePivot = new THREE.Object3D();
+  private readonly scaleTool: TransformControls;
+  private scaleToolOn = false;
+  private scaleToolFor = '';
+  private scaleSnapshot: Map<string, { position: Vec3; scale: Vec3 | null }> | null = null;
+  /** The selection as it was when a handle was grabbed, and the point it scales from (the middle of its footprint, on its lowest level). */
+  private scaleStart: { items: DocItem[]; anchor: THREE.Vector3 } | null = null;
+  /** Square handles on the eight corners of the selection's box: dragging one scales the selection evenly along X, Y and Z. */
+  private readonly scaleCorners = new THREE.Group();
+  private cornerDrag: { corner: THREE.Vector3; plane: THREE.Plane; stop: () => void } | null = null;
+  private hoveredCorner: THREE.Mesh | null = null;
+  private readonly scaleLabels = new Map<string, { sprite: THREE.Sprite; dim: THREE.CanvasTexture; bright: THREE.CanvasTexture }>();
   /** Option is held (read in the capture phase, so it is up to date when the move tool reports a drag). */
   private altHeld = false;
   private readonly trackAlt = (e: Event) => {
     this.altHeld = (e as KeyboardEvent | PointerEvent).altKey;
     this.applyRotationSnap(); // the rotate tool turns in fine steps while Option is down
+    this.scaleTool?.setScaleSnap(this.altHeld ? 0.001 : 0.01); // and the scale tool scales in steps of 0.1% instead of 1%
   };
 
   /** The rotate tool snaps to the Step of the rotate panel, or, with Option held, to the fine step (1° or 0.1°, as set with the step button). */
@@ -278,6 +297,30 @@ export class DocumentScene {
     ctx.scene.add(this.movePivot, moveHelper);
     this.moveTool.addEventListener('dragging-changed', event => this.onMoveDragging(!!(event as unknown as { value: boolean }).value));
     this.moveTool.addEventListener('objectChange', () => this.onMoveChange());
+    this.scaleTool = new TransformControls(ctx.camera, ctx.canvas);
+    this.scaleTool.setMode('scale');
+    this.scaleTool.setSpace('local'); // the pivot is never turned, so local is world
+    this.scaleTool.setSize(1);
+    this.scaleTool.setScaleSnap(0.01);
+    this.scaleTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, 0xffffff);
+    this.scaleTool.addEventListener('axis-changed', event => {
+      const axis = (event as unknown as { value: string | null }).value;
+      const lit = axis && axis.length === 1 && axis in ringColors ? ringColors[axis as 'X' | 'Y' | 'Z'].bright : 0xffffff;
+      this.scaleTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, lit);
+      for (const [letter, label] of this.scaleLabels) { label.sprite.material.map = axis === letter ? label.bright : label.dim; label.sprite.material.needsUpdate = true; }
+    });
+    this.addScaleLabels();
+    const scaleHelper = this.scaleTool.getHelper();
+    scaleHelper.visible = false;
+    for (let i = 0; i < 8; i++) {
+      const corner = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: cornerColor, depthTest: false, transparent: true }));
+      corner.renderOrder = 30;
+      this.scaleCorners.add(corner);
+    }
+    this.scaleCorners.visible = false;
+    ctx.scene.add(this.scalePivot, scaleHelper, this.scaleCorners);
+    this.scaleTool.addEventListener('dragging-changed', event => this.onScaleDragging(!!(event as unknown as { value: boolean }).value));
+    this.scaleTool.addEventListener('objectChange', () => this.onScaleChange());
     this.on(ctx.canvas, 'pointerdown', e => this.onPointerDown(e as PointerEvent));
     this.on(ctx.canvas, 'pointermove', e => this.onPointerMove(e as PointerEvent));
     this.on(ctx.canvas, 'pointerup', e => this.onPointerUp(e as PointerEvent));
@@ -444,12 +487,15 @@ export class DocumentScene {
     this.updateSnapHandles();
     this.updateRotateTool();
     this.updateMoveTool();
+    this.updateScaleTool();
     this.ctx.changed();
   }
 
   private syncItem(item: DocItem, selected: boolean) {
-    const key = `${item.path}|${quatKey(item.rotation)}`;
-    const entry = this.oriented.get(key);
+    const key = orientKey(item.path, item.rotation, item.scale);
+    let entry = this.oriented.get(key);
+    const loaded = this.baseGeometries.get(item.path);
+    if (!entry && loaded) { entry = this.orient(loaded, item.rotation, item.scale); this.oriented.set(key, entry); } // at once (a scale drag must not flicker)
     if (!entry) { if (!this.failed.has(key)) void this.prepare(item, key); return; }
     let runtime = this.runtimes.get(item.id);
     if (!runtime) {
@@ -483,7 +529,7 @@ export class DocumentScene {
     this.preparing.add(key);
     try {
       const base = await this.loadBase(item.path);
-      this.oriented.set(key, this.orient(base, item.rotation));
+      this.oriented.set(key, this.orient(base, item.rotation, item.scale));
       this.reconcile(this.mode);
     } catch (err) {
       console.warn(`Could not load ${item.path}`, err);
@@ -507,8 +553,9 @@ export class DocumentScene {
     return loading;
   }
 
-  private orient(base: THREE.BufferGeometry, rotation: Quat): OrientedEntry {
+  private orient(base: THREE.BufferGeometry, rotation: Quat, scale?: Vec3 | null): OrientedEntry {
     const geometry = base.clone();
+    if (!isUnitScale(scale)) geometry.scale(...scale!); // along the part's own axes, before it is turned
     geometry.applyQuaternion(new THREE.Quaternion(...rotation));
     geometry.computeBoundingBox();
     const box = geometry.boundingBox!;
@@ -517,7 +564,7 @@ export class DocumentScene {
   }
 
   private entryFor(item: DocItem) {
-    return this.oriented.get(`${item.path}|${quatKey(item.rotation)}`);
+    return this.oriented.get(orientKey(item.path, item.rotation, item.scale));
   }
 
   /** One orange outline per selected item. */
@@ -599,9 +646,17 @@ export class DocumentScene {
 
   /** Called every frame: keeps the snap handles the same size on screen whatever the zoom. */
   tick() {
-    if (!this.snapHandles.children.length) return;
     const camera = this.ctx.camera;
     const height = this.ctx.canvas.clientHeight;
+    if (this.scaleCorners.visible) { // the corner handles keep their size on screen
+      for (const corner of this.scaleCorners.children) {
+        const mmPerPixel = camera instanceof THREE.PerspectiveCamera
+          ? (camera.position.distanceTo(corner.position) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / camera.zoom / height
+          : (camera.top - camera.bottom) / camera.zoom / height;
+        corner.scale.setScalar(mmPerPixel * 9);
+      }
+    }
+    if (!this.snapHandles.children.length) return;
     for (const handle of this.snapHandles.children) {
       const mmPerPixel = camera instanceof THREE.PerspectiveCamera
         ? (camera.position.distanceTo(handle.position) * 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / camera.zoom / height // grows with distance
@@ -756,7 +811,7 @@ export class DocumentScene {
 
   /** Number of items that are settled: their geometry is loaded, or it could not be (to know when a fit-to-view is meaningful). */
   readyCount() {
-    return this.ctx.store.doc().items.filter(i => this.entryFor(i) || this.failed.has(`${i.path}|${quatKey(i.rotation)}`)).length;
+    return this.ctx.store.doc().items.filter(i => this.entryFor(i) || this.failed.has(orientKey(i.path, i.rotation, i.scale))).length;
   }
 
   /** Tries the parts that failed to load again (their files may be back, e.g. after Put Back from the Trash). */
@@ -866,12 +921,12 @@ export class DocumentScene {
       const base = this.baseGeometries.get(item.path)!;
       const size = this.entryFor(item)!.size;
       const centre = item.origin ? this.originWorld(item, base) : new THREE.Vector3(...item.position).addScaledVector(size, 0.5);
-      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old));
-      const position = origin.sub(centre).applyQuaternion(step).add(centre).add(this.rotatedMin(base, next));
+      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old, item.scale));
+      const position = origin.sub(centre).applyQuaternion(step).add(centre).add(this.rotatedMin(base, next, item.scale));
       const clean = (v: number) => Math.abs(v) < 1e-6 ? 0 : Math.round(v * 1e6) / 1e6;
       const rotation: Quat = [clean(next.x), clean(next.y), clean(next.z), clean(next.w)];
-      const key = `${item.path}|${quatKey(rotation)}`;
-      if (!this.oriented.has(key)) this.oriented.set(key, this.orient(base, rotation));
+      const key = orientKey(item.path, rotation, item.scale);
+      if (!this.oriented.has(key)) this.oriented.set(key, this.orient(base, rotation, item.scale));
       changes.set(item.id, { rotation, position: clampToWorkArea([round3(position.x), round3(position.y), round3(position.z)], this.oriented.get(key)!.size.toArray() as Vec3) });
     }
     if (changes.size) this.ctx.store.updateItems('Reset rotation', changes);
@@ -886,8 +941,8 @@ export class DocumentScene {
     const base = this.baseGeometries.get(item.path), size = this.sizeOfItem(item);
     if (!base || !size) return null;
     const q = new THREE.Quaternion(...item.rotation);
-    const zero = this.rotatedMin(base, q);
-    if (item.origin) zero.sub(new THREE.Vector3(...item.origin).applyQuaternion(q));
+    const zero = this.rotatedMin(base, q, item.scale);
+    if (item.origin) zero.sub(new THREE.Vector3(...item.origin).multiply(this.scaleVector(item)).applyQuaternion(q));
     return clampToWorkArea([zero.x, zero.y, zero.z], size);
   }
 
@@ -900,8 +955,8 @@ export class DocumentScene {
   /** Where the part's origin point (the one the user set, or the STL's own 0, 0, 0) is in the world. */
   private originWorld(item: DocItem, base = this.baseGeometries.get(item.path)!): THREE.Vector3 {
     const q = new THREE.Quaternion(...item.rotation);
-    const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, q)); // where the STL's own 0, 0, 0 lies
-    return item.origin ? stlOrigin.add(new THREE.Vector3(...item.origin).applyQuaternion(q)) : stlOrigin;
+    const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, q, item.scale)); // where the STL's own 0, 0, 0 lies
+    return item.origin ? stlOrigin.add(new THREE.Vector3(...item.origin).multiply(this.scaleVector(item)).applyQuaternion(q)) : stlOrigin;
   }
 
   /** What a selection turns about: the origin point of the part chosen last when it has one of its own, else the middle of the selection's box. */
@@ -925,8 +980,8 @@ export class DocumentScene {
     for (const item of store.doc().items) {
       if (!ids.has(item.id) || !this.baseGeometries.has(item.path)) continue;
       const q = new THREE.Quaternion(...item.rotation);
-      const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(this.baseGeometries.get(item.path)!, q));
-      const local = new THREE.Vector3(...point).sub(stlOrigin).applyQuaternion(q.clone().invert());
+      const stlOrigin = new THREE.Vector3(...item.position).sub(this.rotatedMin(this.baseGeometries.get(item.path)!, q, item.scale));
+      const local = new THREE.Vector3(...point).sub(stlOrigin).applyQuaternion(q.clone().invert()).divide(this.scaleVector(item));
       changes.set(item.id, { origin: [round3(local.x), round3(local.y), round3(local.z)] });
     }
     if (changes.size) store.updateItems('Set origin', changes);
@@ -1133,7 +1188,7 @@ export class DocumentScene {
 
   /** M: shows or hides the move tool (arrows at the lower left corner of the selection). */
   toggleMoveTool() {
-    if (!this.moveToolOn) this.closeRotateTool();
+    if (!this.moveToolOn) { this.closeRotateTool(); this.closeScaleTool(); }
     this.moveToolOn = !this.moveToolOn;
     this.moveToolFor = this.ctx.store.selectedIds().join(',');
     this.moveSnapshot = this.moveToolOn ? new Map(this.ctx.store.doc().items.map(i => [i.id, { position: [...i.position] as Vec3 }])) : null;
@@ -1234,9 +1289,10 @@ export class DocumentScene {
 
   /** Enter in the move or rotate tool: the changes stay (one undo step each, as made), the tool closes. */
   private confirmTools() {
-    const what = this.moveToolOn && this.rotateToolOn ? 'Move and rotate' : this.moveToolOn ? 'Move' : 'Rotate';
+    const what = this.scaleToolOn ? 'Scale' : this.moveToolOn ? 'Move' : 'Rotate';
     this.closeMoveTool();
     this.closeRotateTool();
+    this.closeScaleTool();
     this.ctx.store.announce(`${what} confirmed`);
   }
 
@@ -1259,9 +1315,284 @@ export class DocumentScene {
     return true;
   }
 
+
+  // --- the scale tool (S) ------------------------------------------------------------------------------------------------------------
+
+  /** An X, Y and Z beside the square handles on the axes (children of the handles: they keep the gizmo's scale), grabbable like the handles. */
+  private addScaleLabels() {
+    const gizmo = (this.scaleTool as unknown as { _gizmo?: { gizmo?: { scale?: THREE.Object3D }; picker?: { scale?: THREE.Object3D } } })._gizmo;
+    const handles = gizmo?.gizmo?.scale, pickers = gizmo?.picker?.scale;
+    if (!handles || !pickers) return;
+    for (const axis of ['X', 'Y', 'Z'] as const) {
+      const box = handles.children.find(c => c.name === axis && (c as THREE.Mesh).geometry instanceof THREE.BoxGeometry) as THREE.Mesh | undefined;
+      if (!box) continue;
+      const dim = letterTexture(axis, ringColors[axis].dim), bright = letterTexture(axis, ringColors[axis].bright);
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: dim, depthTest: false, transparent: true }));
+      this.scaleLabels.set(axis, { sprite, dim, bright });
+      sprite.position.set(0, 0.2, 0); // a handle's own Y points along its axis, away from the middle
+      sprite.scale.setScalar(0.2);
+      sprite.renderOrder = Infinity;
+      box.add(sprite);
+      const grab = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 6), new THREE.MeshBasicMaterial({ visible: false }));
+      grab.name = axis;
+      pickers.add(grab);
+      const spot = new THREE.Vector3();
+      sprite.onBeforeRender = () => { sprite.getWorldPosition(spot); grab.position.copy(pickers.worldToLocal(spot)); };
+    }
+  }
+
+  /** S: shows or hides the scale tool. */
+  toggleScaleTool() {
+    if (!this.scaleToolOn) { this.closeMoveTool(); this.closeRotateTool(); }
+    this.scaleToolOn = !this.scaleToolOn;
+    this.scaleToolFor = this.ctx.store.selectedIds().join(',');
+    this.scaleSnapshot = this.scaleToolOn ? new Map(this.ctx.store.doc().items.map(i => [i.id, { position: [...i.position] as Vec3, scale: i.scale ? [...i.scale] as Vec3 : null }])) : null;
+    this.updateScaleTool();
+    const { store } = this.ctx;
+    store.announce(!this.scaleToolOn ? 'Scale tool off' : store.selectedIds().length ? 'Scale tool: drag a handle (S to close)' : 'Scale tool: select one or more parts, then drag a handle (S to close)');
+  }
+
+  /** Opens the tool if it is closed (the − / + buttons of the Scale panel do this, so the handles show what is scaled). */
+  showScaleTool() {
+    if (!this.scaleToolOn) this.toggleScaleTool();
+  }
+
+  private closeScaleTool() {
+    if (!this.scaleToolOn) return;
+    this.scaleToolOn = false;
+    this.scaleSnapshot = null;
+    this.updateScaleTool();
+  }
+
+  /** Puts the handles at the middle of the selection (not while one is being dragged), or hides them when there is nothing to scale. */
+  private updateScaleTool() {
+    const chosen = this.ctx.store.selectedIds().join(',');
+    if (this.scaleToolOn && !this.scaleStart && chosen !== this.scaleToolFor) {
+      if (this.scaleToolFor === '' && chosen !== '') { // opened with nothing selected: the first choice gets the handles
+        this.scaleToolFor = chosen;
+        this.ctx.store.announce('Scale tool: drag a handle (S to close)');
+      } else { this.scaleToolOn = false; this.scaleSnapshot = null; }
+    }
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item));
+    const show = this.active && this.scaleToolOn && items.length > 0;
+    this.scaleTool.getHelper().visible = show;
+    this.scaleTool.enabled = show;
+    this.scaleCorners.visible = show;
+    if (!show) { if (this.scaleTool.object) this.scaleTool.detach(); return; }
+    const box = this.selectionBounds();
+    if (!box) return;
+    this.scaleCorners.children.forEach((corner, i) => corner.position.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z));
+    if (this.scaleStart) return;
+    this.scalePivot.position.copy(box.getCenter(new THREE.Vector3()));
+    this.scalePivot.scale.set(1, 1, 1);
+    if (this.scaleTool.object !== this.scalePivot) this.scaleTool.attach(this.scalePivot);
+  }
+
+  /** The pointer's ray as hits on the corner handles. */
+  private cornerAt(e: PointerEvent): THREE.Mesh | null {
+    const rect = this.ctx.canvas.getBoundingClientRect();
+    this.raycaster.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -(((e.clientY - rect.top) / rect.height) * 2 - 1)), this.ctx.camera);
+    return (this.raycaster.intersectObjects(this.scaleCorners.children, false)[0]?.object as THREE.Mesh | undefined) ?? null;
+  }
+
+  private hoverCorner(corner: THREE.Mesh | null) {
+    if (corner === this.hoveredCorner) return;
+    if (this.hoveredCorner) (this.hoveredCorner.material as THREE.MeshBasicMaterial).color.setHex(cornerColor);
+    if (corner) (corner.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
+    this.hoveredCorner = corner;
+  }
+
+  /** A press on a corner handle: the drag scales the selection evenly about the middle of its footprint (the corner follows the pointer along the line from there). */
+  private beginCornerScale(e: PointerEvent): boolean {
+    const grabbed = this.cornerAt(e);
+    const { store } = this.ctx;
+    const items = store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
+    const box = this.selectionBounds();
+    if (!grabbed || !items.length || !box) return false;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+    const centre = box.getCenter(new THREE.Vector3());
+    const anchor = new THREE.Vector3(centre.x, centre.y, box.min.z);
+    const corner = grabbed.position.clone();
+    const arm = corner.clone().sub(anchor);
+    if (arm.lengthSq() < 1e-6) return true;
+    const normal = this.ctx.camera.getWorldDirection(new THREE.Vector3());
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, corner);
+    this.scaleStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3 })), anchor };
+    store.beginGesture('Scale');
+    this.ctx.setOrbitEnabled?.(false);
+    const move = (ev: PointerEvent) => {
+      const rect = this.ctx.canvas.getBoundingClientRect();
+      this.raycaster.setFromCamera(new THREE.Vector2(((ev.clientX - rect.left) / rect.width) * 2 - 1, -(((ev.clientY - rect.top) / rect.height) * 2 - 1)), this.ctx.camera);
+      const hit = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+      if (!hit || !this.scaleStart) return;
+      const step = ev.altKey ? 0.001 : 0.01;
+      const factor = Math.max(Math.round((hit.sub(anchor).dot(arm) / arm.lengthSq()) / step) * step, 0.01);
+      this.scaleGroup(this.scaleStart.items, () => new THREE.Vector3(factor, factor, factor), anchor);
+    };
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      this.cornerDrag = null;
+      this.ctx.setOrbitEnabled?.(true);
+      if (this.scaleStart) { this.scaleStart = null; store.endGesture(); this.updateScaleTool(); }
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    this.cornerDrag = { corner, plane, stop };
+    return true;
+  }
+
+  private onScaleDragging(dragging: boolean) {
+    this.ctx.setOrbitEnabled?.(!dragging);
+    const { store } = this.ctx;
+    if (dragging) {
+      const items = store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
+      const box = this.selectionBounds();
+      if (!items.length || !box) return;
+      const centre = box.getCenter(new THREE.Vector3());
+      this.scaleStart = { items: items.map(item => ({ ...item, position: [...item.position] as Vec3 })), anchor: new THREE.Vector3(centre.x, centre.y, box.min.z) };
+      store.beginGesture('Scale');
+    } else if (this.scaleStart) {
+      this.scaleStart = null;
+      store.endGesture();
+      this.updateScaleTool();
+    }
+  }
+
+  /** A handle was dragged: the selection is the one at the start, scaled by what the handle has stretched (live, one undo step at the end). */
+  private onScaleChange() {
+    const start = this.scaleStart;
+    if (!start) return;
+    const factors = new THREE.Vector3(...this.scalePivot.scale.toArray().map(v => Math.max(v, 0.01)) as Vec3);
+    this.scaleGroup(start.items, () => factors, start.anchor);
+  }
+
+  /** The factor along each of the part's own axes when the world X, Y and Z are scaled by `factors`: each own axis takes the factor of the world axis it points along. */
+  private ownFactors(item: DocItem, factors: THREE.Vector3): Vec3 {
+    const turn = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion(...item.rotation));
+    const result: Vec3 = [1, 1, 1];
+    for (let k = 0; k < 3; k++) {
+      const column = new THREE.Vector3().setFromMatrixColumn(turn, k);
+      const along = Math.abs(column.x) >= Math.abs(column.y) && Math.abs(column.x) >= Math.abs(column.z) ? 0 : Math.abs(column.y) >= Math.abs(column.z) ? 1 : 2;
+      result[k] = factors.getComponent(along);
+    }
+    return result;
+  }
+
+  /** The scale of a part along the world X, Y and Z (what the Scale panel shows): the factor of the own axis that points along each. */
+  scaleOf(item: DocItem): Vec3 {
+    const own = item.scale ?? [1, 1, 1];
+    const turn = new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion(...item.rotation));
+    const world: Vec3 = [1, 1, 1];
+    for (let k = 0; k < 3; k++) {
+      const column = new THREE.Vector3().setFromMatrixColumn(turn, k);
+      const along = Math.abs(column.x) >= Math.abs(column.y) && Math.abs(column.x) >= Math.abs(column.z) ? 0 : Math.abs(column.y) >= Math.abs(column.z) ? 1 : 2;
+      world[along] = own[k];
+    }
+    return world;
+  }
+
+  private scaleVector(item: DocItem): THREE.Vector3 {
+    return new THREE.Vector3(...(item.scale ?? [1, 1, 1]));
+  }
+
+  /**
+   * Scales parts about `anchor` (the middle of their footprint, on the lowest level, like Bambu Studio keeps a part on the plate). `factorsOf` gives
+   * the factors along the world X, Y and Z for each part. The scale is stored per part along its own axes, so a turned part scales along its own
+   * sides (a part turned by something other than quarter turns follows the world axis its sides are nearest to).
+   */
+  private scaleGroup(items: DocItem[], factorsOf: (item: DocItem) => THREE.Vector3, anchor: THREE.Vector3) {
+    const changes = new Map<string, Partial<{ position: Vec3; scale: Vec3 | null }>>();
+    const placed: { id: string; position: THREE.Vector3; size: THREE.Vector3; scale: Vec3 | null }[] = [];
+    for (const item of items) {
+      const base = this.baseGeometries.get(item.path);
+      const now = this.entryFor(item);
+      if (!base || !now) continue;
+      const factors = factorsOf(item);
+      const own = this.ownFactors(item, factors);
+      const old = item.scale ?? [1, 1, 1];
+      const scale = old.map((v, k) => clampScale(v * own[k])) as Vec3;
+      const key = orientKey(item.path, item.rotation, scale);
+      const entry = this.oriented.get(key) ?? this.orient(base, item.rotation, scale);
+      this.oriented.set(key, entry);
+      const centre = new THREE.Vector3(...item.position).addScaledVector(now.size, 0.5);
+      const moved = centre.clone().sub(anchor).multiply(factors).add(anchor); // the middle of the box goes where scaling the middle by the factors puts it
+      placed.push({ id: item.id, position: moved.sub(entry.size.clone().multiplyScalar(0.5)), size: entry.size, scale: isUnitScale(scale) ? null : scale });
+    }
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    for (const p of placed) changes.set(p.id, { scale: p.scale, position: clampToWorkArea([round(p.position.x), round(p.position.y), round(p.position.z)], p.size.toArray() as Vec3) });
+    this.ctx.store.updateItems('Scale', changes);
+  }
+
+  /** The anchor the − / + buttons scale from: the middle of the selection's footprint on its lowest level. */
+  private scaleAnchor(items: DocItem[]): THREE.Vector3 | null {
+    const box = new THREE.Box3();
+    for (const item of items) {
+      const entry = this.entryFor(item);
+      if (!entry) return null;
+      const low = new THREE.Vector3(...item.position);
+      box.expandByPoint(low).expandByPoint(low.clone().add(entry.size));
+    }
+    const centre = box.getCenter(new THREE.Vector3());
+    return new THREE.Vector3(centre.x, centre.y, box.min.z);
+  }
+
+  /** The − / + buttons of the Scale panel: along one world axis (or all three) the scale goes up or down by `percent` of the original size. */
+  scaleSelected(axis: 'x' | 'y' | 'z' | 'all', percent: number) {
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
+    const anchor = this.scaleAnchor(items);
+    if (!items.length || !anchor) return;
+    this.showScaleTool();
+    const only = axis === 'all' ? -1 : { x: 0, y: 1, z: 2 }[axis];
+    this.scaleGroup(items, item => {
+      const current = this.scaleOf(item);
+      const factors = new THREE.Vector3(1, 1, 1);
+      for (let k = 0; k < 3; k++) if (only < 0 || k === only) factors.setComponent(k, clampScale(current[k] + percent / 100) / current[k]);
+      return factors;
+    }, anchor);
+  }
+
+  /** The ↺ buttons of the Scale panel: back to the size of the STL file along one axis (or all). */
+  resetScale(axis: 'x' | 'y' | 'z' | 'all') {
+    const items = this.ctx.store.selectedItems().filter(item => this.entryFor(item) && this.baseGeometries.has(item.path));
+    const anchor = this.scaleAnchor(items);
+    if (!items.length || !anchor) return;
+    const only = axis === 'all' ? -1 : { x: 0, y: 1, z: 2 }[axis];
+    this.scaleGroup(items, item => {
+      const current = this.scaleOf(item);
+      const factors = new THREE.Vector3(1, 1, 1);
+      for (let k = 0; k < 3; k++) if (only < 0 || k === only) factors.setComponent(k, 1 / current[k]);
+      return factors;
+    }, anchor);
+  }
+
+  /** Esc in the scale tool: closes it and puts every part back as it was when the tool was opened. False when the tool is not open. */
+  private cancelScaleTool(): boolean {
+    if (!this.scaleToolOn) return false;
+    const { store } = this.ctx;
+    this.cornerDrag?.stop();
+    if (this.scaleStart) { this.scaleStart = null; store.abortGesture(); }
+    const back = this.scaleSnapshot;
+    const changes = new Map<string, Partial<{ position: Vec3; scale: Vec3 | null }>>();
+    for (const item of store.doc().items) {
+      const before = back?.get(item.id);
+      const was = before?.scale ?? [1, 1, 1], is = item.scale ?? [1, 1, 1];
+      if (before && (before.position.some((v, i) => v !== item.position[i]) || was.some((v, i) => v !== is[i]))) changes.set(item.id, { position: before.position, scale: before.scale });
+    }
+    if (changes.size) store.updateItems('Cancel scale', changes);
+    this.scaleToolOn = false;
+    this.scaleSnapshot = null;
+    this.updateScaleTool();
+    store.announce(changes.size ? 'Scale cancelled' : 'Scale tool off');
+    return true;
+  }
+
   /** True while the pointer is on a ring or arrow of the rotate / move tool (a press then belongs to the tool, not to the view). */
   gizmoGrabbed(): boolean {
-    return (this.rotateToolOn && !!this.rotateTool.axis) || (this.moveToolOn && !!this.moveTool.axis);
+    return (this.rotateToolOn && !!this.rotateTool.axis) || (this.moveToolOn && !!this.moveTool.axis) || (this.scaleToolOn && (!!this.scaleTool.axis || !!this.hoveredCorner || !!this.cornerDrag));
   }
 
   /** Opens the rotate tool if it is closed (the − / + buttons of the rotate panel do this, so the rings show where the part turns). */
@@ -1271,7 +1602,7 @@ export class DocumentScene {
 
   /** R: shows or hides the rotate tool (rings about X, Y and Z at the centre of the selection). */
   toggleRotateTool() {
-    if (!this.rotateToolOn) this.closeMoveTool();
+    if (!this.rotateToolOn) { this.closeMoveTool(); this.closeScaleTool(); }
     this.rotateToolOn = !this.rotateToolOn;
     this.rotateToolFor = this.ctx.store.selectedIds().join(',');
     this.rotateSnapshot = this.rotateToolOn ? new Map(this.ctx.store.doc().items.map(i => [i.id, { position: [...i.position] as Vec3, rotation: [...i.rotation] as Quat }])) : null;
@@ -1341,12 +1672,12 @@ export class DocumentScene {
       const old = new THREE.Quaternion(...item.rotation);
       const next = step.clone().multiply(old).normalize();
       const nextRotation: Quat = [next.x, next.y, next.z, next.w];
-      const key = `${item.path}|${quatKey(nextRotation)}`;
-      const entry = this.oriented.get(key) ?? this.orient(base, nextRotation);
+      const key = orientKey(item.path, nextRotation, item.scale);
+      const entry = this.oriented.get(key) ?? this.orient(base, nextRotation, item.scale);
       this.oriented.set(key, entry);
-      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old)); // where the mesh's own origin sits in the world
+      const origin = new THREE.Vector3(...item.position).sub(this.rotatedMin(base, old, item.scale)); // where the mesh's own origin sits in the world
       const newOrigin = origin.sub(pivot).applyQuaternion(step).add(pivot);
-      const position = newOrigin.add(this.rotatedMin(base, next));
+      const position = newOrigin.add(this.rotatedMin(base, next, item.scale));
       return { item, rotation: nextRotation, size: entry.size, position };
     });
     const low = new THREE.Vector3(Math.min(...turned.map(t => t.position.x)), Math.min(...turned.map(t => t.position.y)), Math.min(...turned.map(t => t.position.z)));
@@ -1359,8 +1690,10 @@ export class DocumentScene {
   }
 
   /** The lowest corner of the mesh's box once it is turned by `rotation` (the mesh itself is stored around its own origin). */
-  private rotatedMin(base: THREE.BufferGeometry, rotation: THREE.Quaternion): THREE.Vector3 {
-    const geometry = base.clone().applyQuaternion(rotation);
+  private rotatedMin(base: THREE.BufferGeometry, rotation: THREE.Quaternion, scale?: Vec3 | null): THREE.Vector3 {
+    const geometry = base.clone();
+    if (!isUnitScale(scale)) geometry.scale(...scale!);
+    geometry.applyQuaternion(rotation);
     geometry.computeBoundingBox();
     const min = geometry.boundingBox!.min.clone();
     geometry.dispose();
@@ -1435,9 +1768,12 @@ export class DocumentScene {
     if (!this.active || e.button !== 0) return;
     this.moveTool.camera = this.ctx.camera;
     this.rotateTool.camera = this.ctx.camera;
+    this.scaleTool.camera = this.ctx.camera;
     this.applyRotationSnap(); // the Step may have changed since the tool was shown
     if (this.rotateToolOn && this.rotateTool.axis) return; // a ring of the rotate tool was grabbed: it handles the drag
     if (this.moveToolOn && this.moveTool.axis) return; // an arrow of the move tool
+    if (this.scaleToolOn && this.scaleTool.axis) return; // a handle of the scale tool
+    if (this.scaleToolOn && this.beginCornerScale(e)) return; // a corner of the selection: even scaling
     if (this.picking()) { // "Snap to grid…" / "Move to…": the next click chooses a handle
       const handle = this.pickHandle(e);
       if (handle) {
@@ -1488,6 +1824,7 @@ export class DocumentScene {
   private onPointerMove(e: PointerEvent) {
     this.rotateTool.camera = this.ctx.camera;
     this.moveTool.camera = this.ctx.camera;
+    if (this.scaleToolOn && !this.cornerDrag) this.hoverCorner(this.cornerAt(e));
     if (this.active && this.picking()) this.hoverHandle(this.pickHandle(e));
     if (this.marquee) { this.updateMarquee(e); return; }
     const drag = this.drag;
@@ -1588,6 +1925,7 @@ export class DocumentScene {
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
     else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) this.toggleRotateTool(); // R: the rotate tool
+    else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 's' && !e.repeat) this.toggleScaleTool(); // S: the scale tool
     else if (!command && /^Key[XYZ]$/.test(e.code)) { // X / Y / Z: turn about that axis (Shift: the other way, Option: in fine steps; e.code because Option changes the typed letter)
       const degrees = fine ? fineStep : this.ctx.rotationStep();
       this.rotateSelected(e.code.slice(3).toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -degrees : degrees);
@@ -1597,8 +1935,8 @@ export class DocumentScene {
     else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
     else if (e.key === 'PageDown' || e.key === '[') moveZ(-1);
     else if (e.key === 'Delete' || e.key === 'Backspace') store.removeSelected();
-    else if (e.key === 'Enter' && !command && !e.altKey && !e.shiftKey && !this.drag && (this.moveToolOn || this.rotateToolOn)) this.confirmTools(); // Enter: keep what was done and leave the tool
-    else if (e.key === 'Escape') { if (!this.drag && !this.escapeMoveTool() && !this.cancelRotateTool()) store.select(null); } // while dragging, Esc only cancels the drag
+    else if (e.key === 'Enter' && !command && !e.altKey && !e.shiftKey && !this.drag && (this.moveToolOn || this.rotateToolOn || this.scaleToolOn)) this.confirmTools(); // Enter: keep what was done and leave the tool
+    else if (e.key === 'Escape') { if (!this.drag && !this.escapeMoveTool() && !this.cancelRotateTool() && !this.cancelScaleTool()) store.select(null); } // while dragging, Esc only cancels the drag
     else handled = false;
     if (handled) e.preventDefault();
   }
@@ -1620,6 +1958,10 @@ export class DocumentScene {
     this.ctx.scene.remove(this.rotateAxes);
     for (const type of ['pointermove', 'pointerdown', 'keydown', 'keyup']) window.removeEventListener(type, this.trackAlt, true);
     this.moveTool.dispose();
+    this.scaleTool.dispose();
+    this.ctx.scene.remove(this.scalePivot, this.scaleTool.getHelper(), this.scaleCorners);
+    for (const corner of this.scaleCorners.children) { (corner as THREE.Mesh).geometry.dispose(); ((corner as THREE.Mesh).material as THREE.Material).dispose(); }
+    this.cornerDrag?.stop();
     this.ctx.scene.remove(this.movePivot, this.moveTool.getHelper());
     this.ctx.scene.remove(this.rotatePivot, this.rotateTool.getHelper());
   }

@@ -4,6 +4,15 @@ import { DocumentStore } from './document.store';
 const depthOfFieldStorageKey = 'rasterfaster.renderDepthOfField';
 const cropStorageKey = 'rasterfaster.renderCrop';
 const dofStrengthStorageKey = 'rasterfaster.renderDofStrength';
+const ambientStorageKey = 'rasterfaster.renderAmbient';
+
+function readAmbient(): number {
+  try {
+    const stored = Number(localStorage.getItem(ambientStorageKey));
+    if (Number.isInteger(stored) && stored >= 0 && stored <= 5) return stored;
+  } catch { /* storage unavailable */ }
+  return 0;
+}
 
 function readCrop(): boolean {
   try { return localStorage.getItem(cropStorageKey) === 'true'; } catch { return false; }
@@ -80,6 +89,8 @@ export class RenderService {
   readonly focusId = signal<string | null>(null);
   /** The strength of the depth of field, 1 (subtle) to 5 (extreme). */
   readonly dofStrength = signal(readDofStrength());
+  /** The ambient light preset, 0 (none) to 5. */
+  readonly ambient = signal(readAmbient());
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
   private socket?: WebSocket;
@@ -92,7 +103,7 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); }
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); }
       else this.focusId.set(id ? readFocus(id) : null);
     });
     this.connect();
@@ -189,13 +200,20 @@ export class RenderService {
     this.saveSettings();
   }
 
+  setAmbient(level: number) {
+    this.ambient.set(level);
+    try { localStorage.setItem(ambientStorageKey, String(level)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
   dofParams(url: URL) {
     url.searchParams.set('crop', String(this.crop()));
+    url.searchParams.set('ambient', String(this.ambient()));
     url.searchParams.set('dof', String(this.depthOfField()));
     url.searchParams.set('strength', String(this.dofStrength()));
     const focus = this.focusId();

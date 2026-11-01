@@ -289,12 +289,28 @@ def test_depth_of_field_focus_comes_from_the_call_or_the_document(tmp_path, monk
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a"  # what the document says
+    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0"  # what the document says
     client.get(url, params={"dof": "false"})
-    assert seen[-1] == "0"
+    assert seen[-1] == "0#0"
     client.get(url, params={"dof": "true", "focus": "other-part"})
-    assert seen[-1] == "1|3|other-part"
+    assert seen[-1] == "1|3|other-part#0"
     client.get(url, params={"dof": "true", "strength": 5})
-    assert seen[-1] == "1|5|a"
+    assert seen[-1] == "1|5|a#0"
     assert client.get(url, params={"dof": "true", "strength": 6}).status_code == 422
     assert client.get(url, params={"dof": "true", "focus": "not a part"}).status_code == 422
+
+
+def test_ambient_preset_comes_from_the_call_or_the_document(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Amb", "items": [item], "render": {"ambient": 2}}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = []
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False: seen.append(dof) or b"\x89PNG")
+    url = f"/api/documents/{created['id']}/render.png"
+    assert client.get(url).status_code == 200 and seen[-1] == "0#2"  # what the document says
+    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5"
+    assert client.get(url + "?ambient=6").status_code == 422

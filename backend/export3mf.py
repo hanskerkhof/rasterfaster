@@ -73,6 +73,9 @@ def place_assembly(items: list[dict], meshes: dict[str, Mesh], plateSize: float,
     for item in items:
         mesh = meshes[item["path"]]
         rotation = rotation_matrix(item["rotation"])
+        scale = item.get("scale")
+        if scale:
+            rotation = rotation @ np.diag(np.clip(np.array(scale, dtype=np.float64), 0.01, 100.0))  # the part's own axes are scaled first, then turned
         rotated = mesh.vertices @ rotation.T
         low = rotated.min(axis=0)
         translation = np.array(item["position"], dtype=np.float64) - low

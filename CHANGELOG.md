@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Scale tool, ambient light presets (0.10.60)
+
+### Added
+- **FE** + **BE** (`document-scene.ts`, `stl-viewer.ts`, `document.store.ts`, `export3mf.py`, `main.py`): **S** shows the **scale tool**: square handles on the X, Y and Z axes, on the planes between two axes and in the middle, plus orange square handles on the eight corners of the selection that scale evenly along all three axes. Scaling is about the middle of the footprint with the lowest level fixed; 1% steps (Option: 0.1%); Enter keeps, Esc undoes. A **Scale** panel below the Move panel has − / + per axis and for all three (Step 50, 25, 10, 5 or 1 %), the scale per axis and a ↺. The scale is stored per part in the document (`scale`, along the part's own axes, before the rotation) and used by the 3MF, SVG, glTF / Blender and STL exports; copy and paste keep it.
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): an **Ambient** menu in the Render dialog with five presets (Soft glow, Overcast, Softbox, Daylight, Bright studio): a big soft light above the scene and a lighter world, so shadows are no longer black (API `ambient=0…5`, document field `render.ambient`).
+
 ## 2026-11-02 - Depth of field relative to the size of the scene, Ground colours, Crop, render dialog layout (0.10.59)
 
 ### Added

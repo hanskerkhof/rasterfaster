@@ -412,7 +412,7 @@ export class DocumentPanel {
 
   /** The URL of the Blender export: the camera of the 3D view and, in the shaded view, its light. */
   private blenderEndpoint() {
-    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()], ['dof', this.render.depthOfField() ? 'true' : ''], ['focus', this.render.depthOfField() && this.store.doc().items.some(i => i.id === this.render.focusId()) ? this.render.focusId() : ''], ['strength', this.render.depthOfField() ? String(this.render.dofStrength()) : '']].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
+    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()], ['dof', this.render.depthOfField() ? 'true' : ''], ['focus', this.render.depthOfField() && this.store.doc().items.some(i => i.id === this.render.focusId()) ? this.render.focusId() : ''], ['strength', this.render.depthOfField() ? String(this.render.dofStrength()) : ''], ['ambient', this.render.ambient() ? String(this.render.ambient()) : '']].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
     return params.length ? `export.blend?${params.join('&')}` : 'export.blend';
   }
   protected readonly bomOpen = signal(false);
