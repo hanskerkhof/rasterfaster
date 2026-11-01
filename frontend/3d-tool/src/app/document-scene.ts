@@ -624,6 +624,16 @@ export class DocumentScene {
     for (const path of paths) {
       const base = await this.loadBase(path);
       const size = this.orient(base, [0, 0, 0, 1]).size;
+      // An STL keeps the place it was exported from (Fusion does too): the part goes there, unless that spot lies outside the work area or
+      // another copy of the same file already sits exactly there. Then it goes to the first free spot along +X.
+      base.computeBoundingBox();
+      const saved = clampToWorkArea(base.boundingBox!.min.toArray().map(v => Math.round(v * 1000) / 1000) as Vec3, size.toArray() as Vec3);
+      const exact = (a: Vec3, b: Vec3) => a.every((v, i) => Math.abs(v - b[i]) < 0.001);
+      const duplicate = [...store.doc().items, ...created].some(i => i.path === path && exact(i.position, saved));
+      if (!duplicate && exact(saved, base.boundingBox!.min.toArray() as Vec3)) {
+        created.push({ path, name: path.split('/').pop()!.replace(/\.stl$/i, ''), position: saved, rotation: [0, 0, 0, 1] });
+        continue;
+      }
       let x = 0;
       for (let attempt = 0; attempt < 200; attempt++) {
         const candidate = new THREE.Box3(new THREE.Vector3(x + 0.01, 0.01, 0.01), new THREE.Vector3(x + size.x - 0.01, size.y - 0.01, size.z - 0.01));

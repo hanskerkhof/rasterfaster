@@ -28,6 +28,7 @@ OPEN_DIALOG_EVENT = 'rasterfaster_localf3d_open_dialog'  # starts the Save dialo
 CLOSE_COMMAND = 'CloseDocumentCommand'  # the id of the command Fusion runs to close a document (found with the command log)
 EXPORT_EVENT = 'rasterfaster_localf3d_export'  # fired a moment after Save is pressed, so that Fusion can draw the progress dialog first
 CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'localf3d.json')
+DIALOG_WIDTH, DIALOG_HEIGHT = 720, 460  # initial size of the Save Local Copy dialog, in pixels
 DEFAULT_FOLDER = os.path.expanduser('~/Documents/FUSION360')
 
 app = None
@@ -77,8 +78,22 @@ def active_design():
     return adsk.fusion.Design.cast(app.activeProduct)
 
 
+_documents = []  # [(document, key)]: every document the add-in has seen, to tell them apart
+_next_key = [0]
+
+
 def token(design):
-    return design.rootComponent.entityToken
+    """A key for the document of this design. The entityToken of the root component cannot be used: it is the same in every document
+    (`/v4BAAEAAwAAAAAAAAAAAAAA`), so the file one document came from showed up as the default name of all of them. The wrappers of the same
+    document compare equal; the ones of closed documents are dropped."""
+    document = design.parentDocument
+    _documents[:] = [(d, k) for d, k in _documents if d.isValid]
+    for d, k in _documents:
+        if d == document:
+            return k
+    _next_key[0] += 1
+    _documents.append((document, _next_key[0]))
+    return _next_key[0]
 
 
 def design_fingerprint(design):
@@ -437,6 +452,8 @@ def on_save_created(args):
     inputs.addBoolValueInput('remind', 'Remind me to save a local copy when closing', True, '', bool(settings().get('remind', True)))
     inputs.addTextBoxCommandInput('about', 'Add-in', '', 1, True).text = 'Rasterfaster Local F3D v' + addin_version()
     command.okButtonText = 'Save'
+    command.setDialogInitialSize(DIALOG_WIDTH, DIALOG_HEIGHT)  # Fusion's default is narrow: long file names and folders do not fit
+    command.setDialogMinimumSize(DIALOG_WIDTH // 2, DIALOG_HEIGHT // 2)
     command.inputChanged.add(keep(ChangedHandler(on_save_changed)))
     command.execute.add(keep(Handler(on_save_execute)))
     command.destroy.add(keep(Handler(lambda _: pending_close.clear())))  # Cancel: the document stays open; a later save must not close anything

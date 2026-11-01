@@ -113,3 +113,17 @@ def test_when_closing_a_document_loses_work_that_is_not_in_a_local_file():
     assert needs(True, "a", "a", True, True) is False                                  # opened from a file and not changed: Fusion says modified, we know better
     assert needs(True, "a", "b", False, True) is True                                  # changed since the local copy was saved
     assert needs(True, None, "b", True, True) is True and needs(True, "a", None, False, True) is False          # no fingerprint: back to the modified flag
+
+
+def test_each_document_gets_its_own_key_even_when_the_root_components_look_alike():
+    class Document:
+        isValid = True
+
+    def design_of(document):
+        return types.SimpleNamespace(parentDocument=document, rootComponent=types.SimpleNamespace(entityToken="/v4BAAEAAwAAAAAAAAAAAAAA"))
+
+    one, two = Document(), Document()
+    assert addin.token(design_of(one)) != addin.token(design_of(two))
+    assert addin.token(design_of(one)) == addin.token(design_of(one))
+    one.isValid = False                                                                    # a closed document is forgotten
+    assert addin.token(design_of(two)) == addin.token(design_of(two))

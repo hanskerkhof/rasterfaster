@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Fusion add-in: the Save dialog uses the name of the active document (0.10.51)
+
+### Changed
+- **Fusion add-in**: the Save Local Copy dialog opens larger (720 × 460 px, `DIALOG_WIDTH` / `DIALOG_HEIGHT`), with a minimum size of half that.
+
+### Fixed
+- **Fusion add-in**: with several documents open, the Save Local Copy dialog could show the file name of another document (`RF16_STROZZI_v340` for `RF5 Various models`). The add-in told documents apart by the entityToken of their root component, which is the same string in every document, so one document's remembered file and fingerprint applied to all. Documents are now told apart by the document itself.
+
 ## 2026-11-01 - Zip all: the whole export set in one file (0.10.50)
 
 ### Added
