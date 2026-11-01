@@ -427,8 +427,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        120.502,
-        -39.499,
+        100.502,
+        -59.499,
         0.0
       ],
       "rotation": [
@@ -447,8 +447,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        240.502,
-        -39.499,
+        260.502,
+        -59.499,
         0.0
       ],
       "rotation": [
@@ -467,8 +467,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        120.502,
-        60.501,
+        100.502,
+        80.501,
         0.0
       ],
       "rotation": [
@@ -487,8 +487,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        240.502,
-        60.501,
+        260.502,
+        80.501,
         0.0
       ],
       "rotation": [
@@ -588,7 +588,7 @@
       "color": 12745632,
       "position": [
         302.401,
-        -97.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -728,7 +728,7 @@
       "color": 12745632,
       "position": [
         302.401,
-        -77.599,
+        2.401,
         0.0
       ],
       "rotation": [
@@ -747,7 +747,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        302.401,
+        2.401,
         -57.599,
         0.0
       ],
@@ -767,7 +767,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        302.401,
+        2.401,
         -37.599,
         0.0
       ],
@@ -788,7 +788,7 @@
       "color": 12745632,
       "position": [
         322.401,
-        -97.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -808,7 +808,7 @@
       "color": 12745632,
       "position": [
         322.401,
-        -77.599,
+        2.401,
         0.0
       ],
       "rotation": [
@@ -827,7 +827,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
+        22.401,
         -57.599,
         0.0
       ],
@@ -847,7 +847,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
+        22.401,
         -37.599,
         0.0
       ],
@@ -867,8 +867,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
-        -17.599,
+        22.401,
+        22.401,
         0.0
       ],
       "rotation": [
@@ -887,8 +887,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
-        2.401,
+        22.401,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -908,7 +908,7 @@
       "color": 12745632,
       "position": [
         342.401,
-        -97.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -928,7 +928,7 @@
       "color": 12745632,
       "position": [
         342.401,
-        -77.599,
+        2.401,
         0.0
       ],
       "rotation": [
@@ -947,7 +947,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
+        42.401,
         -57.599,
         0.0
       ],
@@ -967,7 +967,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
+        42.401,
         -37.599,
         0.0
       ],
@@ -987,8 +987,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
-        -17.599,
+        42.401,
+        22.401,
         0.0
       ],
       "rotation": [
@@ -1007,8 +1007,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
-        2.401,
+        42.401,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -1028,7 +1028,7 @@
       "color": 12745632,
       "position": [
         362.401,
-        -97.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -1048,7 +1048,7 @@
       "color": 12745632,
       "position": [
         362.401,
-        -77.599,
+        2.401,
         0.0
       ],
       "rotation": [
@@ -1067,7 +1067,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
+        62.401,
         -57.599,
         0.0
       ],
@@ -1087,7 +1087,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
+        62.401,
         -37.599,
         0.0
       ],
@@ -1107,8 +1107,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
-        -17.599,
+        62.401,
+        22.401,
         0.0
       ],
       "rotation": [
@@ -1127,8 +1127,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
-        2.401,
+        62.401,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -1139,26 +1139,6 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "dd36621a-6f25-4f29-ae80-31f9c9ac2fe5",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
-      "position": [
-        319.995,
-        -120.001,
-        0.0
-      ],
-      "rotation": [
-        5.5511151231257815e-17,
-        5.5511151231257815e-17,
-        1.0,
-        -5.551115123125781e-17
-      ],
-      "muted": false,
-      "centered": false,
       "noExport": false
     },
     {
@@ -1259,6 +1239,166 @@
       ],
       "muted": false,
       "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "4fa11bfc-a475-4e74-9fcf-ebcb547e5a9c",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        305.15,
+        -75.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "645a1e7d-c6da-406c-94c6-df9090c621e3",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        285.15,
+        -75.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "9003a2c0-bad5-4976-bf27-a2823418ff39",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        305.15,
+        -95.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "3b09db2c-ebb6-4620-8923-14314b47d671",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        285.15,
+        -95.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "33a511fd-2e0f-4475-921c-44f2c7388fed",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        102.401,
+        -97.599,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4f127361-8f11-42d6-a417-524b1106193c",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        262.401,
+        -97.599,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "89929359-1949-4805-9ddf-c6ccdacc69da",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        262.401,
+        122.401,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "b73b44b0-5f6a-46cc-ab99-805f5d8c9509",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        102.401,
+        122.401,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
       "noExport": false
     }
   ]

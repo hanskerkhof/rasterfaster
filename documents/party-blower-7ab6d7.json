@@ -103,8 +103,8 @@
     },
     {
       "id": "e757b8f5-c0a4-4ba4-b1e4-ca418112285e",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
+      "path": "SPACERS/spacers_RF1 v236_32.stl",
+      "name": "spacers_RF1 v236_32",
       "color": 16767334,
       "position": [
         123.251,
@@ -123,8 +123,8 @@
     },
     {
       "id": "876c8751-cea3-4a09-8d38-6e202f144ea2",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
+      "path": "SPACERS/spacers_RF1 v236_32.stl",
+      "name": "spacers_RF1 v236_32",
       "color": 16767334,
       "position": [
         143.251,
@@ -189,7 +189,7 @@
       "position": [
         111.6,
         20.0,
-        38.0
+        42.0
       ],
       "rotation": [
         0.0,
@@ -479,6 +479,46 @@
       ],
       "muted": false,
       "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "7bab5176-4ba7-440e-aaae-5793acaa78de",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 - COVER 6x2 FLAT.stl",
+      "name": "5.25 - COVER 6x2 FLAT",
+      "color": 7775663,
+      "position": [
+        111.6,
+        20.0,
+        46.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "704b39e8-5faf-4bd8-b5da-0899f092bab7",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 - COVER 6x2 FLAT.stl",
+      "name": "5.25 - COVER 6x2 FLAT",
+      "color": 7775663,
+      "position": [
+        111.6,
+        20.0,
+        10.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
       "noExport": false
     }
   ]

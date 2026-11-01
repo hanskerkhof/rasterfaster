@@ -7,15 +7,15 @@
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
       "color": 12745632,
       "position": [
-        194.2,
-        131.108,
-        36.004999999999995
+        171.108,
+        100.0,
+        36.005
       ],
       "rotation": [
         0.0,
         0.0,
-        1.0,
-        -5.5511151231257815e-17
+        -0.7071067811865478,
+        -0.7071067811865475
       ],
       "muted": false,
       "centered": false,
@@ -27,15 +27,15 @@
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
       "color": 9338051,
       "position": [
-        194.2,
-        131.108,
+        171.108,
+        100.0,
         6.0
       ],
       "rotation": [
         0.0,
         0.0,
-        1.0,
-        -5.5511151231257815e-17
+        -0.7071067811865478,
+        -0.7071067811865475
       ],
       "muted": false,
       "centered": false,
@@ -67,15 +67,15 @@
       "name": "BOLT_S9",
       "color": 7775663,
       "position": [
-        202.345,
-        162.349,
-        0.0
+        202.349,
+        122.345,
+        2.0
       ],
       "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
+        0.7071067811865477,
+        -0.7071067811865475,
+        -3.925231146709435e-17,
+        3.925231146709437e-17
       ],
       "muted": false,
       "centered": true,
@@ -87,15 +87,15 @@
       "name": "BOLT_S9",
       "color": 7775663,
       "position": [
-        222.345,
-        162.349,
-        0.0
+        202.349,
+        102.345,
+        2.0
       ],
       "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
+        0.7071067811865477,
+        -0.7071067811865475,
+        -3.925231146709435e-17,
+        3.925231146709437e-17
       ],
       "muted": false,
       "centered": true,
@@ -137,7 +137,7 @@
         0.0,
         1.0
       ],
-      "muted": false,
+      "muted": true,
       "centered": false,
       "noExport": false
     },
@@ -176,46 +176,6 @@
         -1.0,
         0.0,
         -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "2ef7bb0f-f31d-430e-8cd0-25074b1ae633",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 16167531,
-      "position": [
-        122.34899999999999,
-        69.997,
-        21.995
-      ],
-      "rotation": [
-        -0.5,
-        0.5000000000000002,
-        -0.49999999999999994,
-        -0.5000000000000001
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "9ce91a5e-1692-483b-9ed7-9089357b429c",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 16167531,
-      "position": [
-        222.0,
-        71.0,
-        21.995
-      ],
-      "rotation": [
-        -0.5,
-        0.5000000000000002,
-        -0.49999999999999994,
-        -0.5000000000000001
       ],
       "muted": false,
       "centered": false,
@@ -307,9 +267,9 @@
       "name": "rotary+encoder_14mm_hole_spc",
       "color": 16767334,
       "position": [
-        185.4,
+        173.4,
         46.8,
-        24.1
+        27.0
       ],
       "rotation": [
         0.25881904510252074,
@@ -347,8 +307,8 @@
       "name": "3w 6x1 needles BOTTOM  - 3.9",
       "color": 16167531,
       "position": [
-        140.0,
         120.0,
+        100.0,
         6.0
       ],
       "rotation": [
@@ -367,8 +327,8 @@
       "name": "3w 6x1 needles TOP - 3.9",
       "color": 16167531,
       "position": [
-        140.0,
         120.0,
+        100.0,
         12.0
       ],
       "rotation": [
@@ -379,6 +339,46 @@
       ],
       "muted": false,
       "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "faf346bf-0c1c-4b98-9152-b0f1ad7b48b5",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 12745632,
+      "position": [
+        282.345,
+        -17.651,
+        1.997
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "aca65f79-d516-47bc-847a-ae30dd0ecf47",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 12745632,
+      "position": [
+        302.345,
+        -17.651,
+        1.997
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
       "noExport": false
     }
   ]

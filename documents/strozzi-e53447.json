@@ -39,7 +39,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "c2cc52e8-05ab-4309-8cec-45b7472a5ef6",
@@ -79,7 +79,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "ee0b83ce-b85d-45de-a742-0d27ce8973bd",
@@ -99,7 +99,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noExport": true
     },
     {
       "id": "f3b2d411-facf-4481-b831-d4524adb88ab",
@@ -139,7 +139,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noExport": true
     },
     {
       "id": "e8102d2c-c4eb-426f-b6b9-cad975649576",
@@ -199,7 +199,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
@@ -237,7 +237,7 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": false,
       "noExport": false
     },
@@ -267,8 +267,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        120.502,
-        -39.499,
+        100.502,
+        -59.499,
         0.0
       ],
       "rotation": [
@@ -287,8 +287,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        240.502,
-        -39.499,
+        260.502,
+        -59.499,
         0.0
       ],
       "rotation": [
@@ -307,8 +307,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        120.502,
-        60.501,
+        100.502,
+        80.501,
         0.0
       ],
       "rotation": [
@@ -327,8 +327,8 @@
       "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
       "color": 7317724,
       "position": [
-        240.502,
-        60.501,
+        260.502,
+        80.501,
         0.0
       ],
       "rotation": [
@@ -387,7 +387,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        302.401,
+        102.401,
         -97.599,
         0.0
       ],
@@ -448,7 +448,7 @@
       "color": 12745632,
       "position": [
         302.401,
-        -77.599,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -468,7 +468,7 @@
       "color": 12745632,
       "position": [
         302.401,
-        -57.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -487,8 +487,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        302.401,
-        -37.599,
+        42.401,
+        82.401,
         0.0
       ],
       "rotation": [
@@ -507,7 +507,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
+        262.401,
         -97.599,
         0.0
       ],
@@ -528,7 +528,7 @@
       "color": 12745632,
       "position": [
         322.401,
-        -77.599,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -548,7 +548,7 @@
       "color": 12745632,
       "position": [
         322.401,
-        -57.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -567,8 +567,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
-        -37.599,
+        22.401,
+        22.401,
         0.0
       ],
       "rotation": [
@@ -587,8 +587,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
-        -17.599,
+        22.401,
+        -57.599,
         0.0
       ],
       "rotation": [
@@ -607,7 +607,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
+        22.401,
         2.401,
         0.0
       ],
@@ -627,8 +627,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
-        -97.599,
+        262.401,
+        122.401,
         0.0
       ],
       "rotation": [
@@ -648,7 +648,7 @@
       "color": 12745632,
       "position": [
         342.401,
-        -77.599,
+        42.401,
         0.0
       ],
       "rotation": [
@@ -668,7 +668,7 @@
       "color": 12745632,
       "position": [
         342.401,
-        -57.599,
+        -17.599,
         0.0
       ],
       "rotation": [
@@ -687,8 +687,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
-        -37.599,
+        42.401,
+        22.401,
         0.0
       ],
       "rotation": [
@@ -707,8 +707,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
-        -17.599,
+        42.401,
+        -57.599,
         0.0
       ],
       "rotation": [
@@ -727,48 +727,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        342.401,
+        42.401,
         2.401,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "122153b5-a35b-4158-89e8-9174788ee204",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        362.401,
-        -97.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "a1dc66c9-151f-4dbc-bed0-c3a902475993",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        362.401,
-        -77.599,
         0.0
       ],
       "rotation": [
@@ -787,8 +747,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
-        -57.599,
+        102.401,
+        122.401,
         0.0
       ],
       "rotation": [
@@ -807,8 +767,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
-        -37.599,
+        22.401,
+        82.401,
         0.0
       ],
       "rotation": [
@@ -827,8 +787,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
-        -17.599,
+        62.401,
+        -57.599,
         0.0
       ],
       "rotation": [
@@ -847,7 +807,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        362.401,
+        62.401,
         2.401,
         0.0
       ],
@@ -859,26 +819,6 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "dd36621a-6f25-4f29-ae80-31f9c9ac2fe5",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
-      "position": [
-        319.995,
-        -120.001,
-        0.0
-      ],
-      "rotation": [
-        5.5511151231257815e-17,
-        5.5511151231257815e-17,
-        1.0,
-        -5.551115123125781e-17
-      ],
-      "muted": false,
-      "centered": false,
       "noExport": false
     },
     {
@@ -919,7 +859,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noExport": true
     },
     {
       "id": "6dc81e10-3794-42c6-92c4-939d844136a6",
@@ -1099,7 +1039,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noExport": true
     },
     {
       "id": "d0bf27c1-79a9-4057-8395-aa907dc9506f",
@@ -1334,8 +1274,8 @@
       "rotation": [
         0.0,
         0.0,
-        -0.7071067811865475,
-        -0.7071067811865477
+        0.0,
+        1.0
       ],
       "muted": false,
       "centered": false,
@@ -1354,8 +1294,8 @@
       "rotation": [
         0.0,
         0.0,
-        -0.7071067811865475,
-        -0.7071067811865477
+        0.0,
+        1.0
       ],
       "muted": false,
       "centered": false,
@@ -1399,7 +1339,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "fc409816-4c26-47e2-8527-7aa36156e3de",
@@ -1419,7 +1359,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "7660e2a3-184b-459e-834e-fd42c1ecd756",
@@ -1439,7 +1379,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "be5c55f4-1e85-443b-bfa6-9149501c9a52",
@@ -1459,7 +1399,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": true
+      "noExport": false
     },
     {
       "id": "35bc4a9d-0fb2-46f2-81ee-4b993e3ac951",
@@ -1494,6 +1434,166 @@
       "rotation": [
         0.0,
         1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "f16fd536-b841-4744-a831-5fea0f724650",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        62.401,
+        82.401,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "a3dddaf9-2651-4546-9aba-eb4bf2e325f5",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        62.401,
+        22.401,
+        1.01
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "46ccaae8-2df3-4f57-80d4-748f0a07f363",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        305.15,
+        -55.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "4519ffa5-5163-4a85-9596-2f9e5dd2f28b",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        285.15,
+        -55.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "9c8be700-5dcd-478a-98fd-4b0a338f54d5",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        305.15,
+        -75.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "c98d7209-83e7-42d9-a213-d6246f562485",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        285.15,
+        -75.6,
+        0.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "b4002198-4abf-4f9a-ad89-30d6cf18e1c6",
+      "path": "BOLTS/BOLT_S2.stl",
+      "name": "BOLT_S2",
+      "color": 7775663,
+      "position": [
+        202.349,
+        2.345,
+        15.997
+      ],
+      "rotation": [
+        0.7071067811865477,
+        -0.7071067811865475,
+        -3.925231146709435e-17,
+        3.925231146709437e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "9246facb-c2c0-4724-be71-fe7358fbdd3d",
+      "path": "BOLTS/BOLT_S2.stl",
+      "name": "BOLT_S2",
+      "color": 7775663,
+      "position": [
+        182.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
         0.0,
         -5.5511151231257815e-17
       ],
