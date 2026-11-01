@@ -5,6 +5,15 @@ const depthOfFieldStorageKey = 'rasterfaster.renderDepthOfField';
 const cropStorageKey = 'rasterfaster.renderCrop';
 const dofStrengthStorageKey = 'rasterfaster.renderDofStrength';
 const ambientStorageKey = 'rasterfaster.renderAmbient';
+const lampStorageKey = 'rasterfaster.renderLamp';
+
+function readLamp(): number {
+  try {
+    const stored = Number(localStorage.getItem(lampStorageKey));
+    if (Number.isInteger(stored) && stored >= 0 && stored <= 60 && localStorage.getItem(lampStorageKey) !== null) return stored;
+  } catch { /* storage unavailable */ }
+  return 40;
+}
 
 function readAmbient(): number {
   try {
@@ -91,6 +100,8 @@ export class RenderService {
   readonly dofStrength = signal(readDofStrength());
   /** The ambient light preset, 0 (none) to 5. */
   readonly ambient = signal(readAmbient());
+  /** The lamp slider, 0 to 60; 40 is the normal strength (two thirds of the way). */
+  readonly lamp = signal(readLamp());
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
   private socket?: WebSocket;
@@ -103,7 +114,7 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); }
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); }
       else this.focusId.set(id ? readFocus(id) : null);
     });
     this.connect();
@@ -206,14 +217,21 @@ export class RenderService {
     this.saveSettings();
   }
 
+  setLamp(value: number) {
+    this.lamp.set(value);
+    try { localStorage.setItem(lampStorageKey, String(value)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
   dofParams(url: URL) {
     url.searchParams.set('crop', String(this.crop()));
     url.searchParams.set('ambient', String(this.ambient()));
+    url.searchParams.set('lamp', String(this.lamp()));
     url.searchParams.set('dof', String(this.depthOfField()));
     url.searchParams.set('strength', String(this.dofStrength()));
     const focus = this.focusId();

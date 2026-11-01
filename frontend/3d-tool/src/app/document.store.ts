@@ -106,6 +106,8 @@ export interface DocRenderSettings {
   crop?: boolean;
   /** The ambient light preset: 0 none, 1 Soft glow … 5 Bright studio. */
   ambient?: number;
+  /** The strength of the lamp pointed at the part, 0 to 60 on the slider; 40 (the default) is the normal strength. */
+  lamp?: number;
 }
 
 export interface RfDocument {

@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Lighting row with a lamp slider, automatic exposure for ambient light (0.10.61)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): the Render dialog has a **Lighting** row with the Ambient menu and a **Lamp** slider (6 % to 400 %, 100 % two thirds of the way, double-click to reset; API `lamp=0…60`, document field `render.lamp`) for the strength of the lamp pointed at the parts.
+- **BE** (`blenderexport.py`): with an Ambient preset a tiny test render sets the exposure so the brightest areas are not burnt out.
+- **FE** (`render-dialog.ts`): while a new quick render is made the old picture dims and a spinner shows over it.
+
+### Changed
+- **FE** (`render-dialog.ts`): the Focus, Selected and Blur controls stay in place, greyed out, while Depth of field is off, so the dialog does not jump.
+
 ## 2026-11-02 - Scale tool, ambient light presets (0.10.60)
 
 ### Added

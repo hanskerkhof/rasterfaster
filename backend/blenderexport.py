@@ -241,8 +241,10 @@ SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lig
 # the arguments: the glTF, the .blend to write, "1" with the studio setup, the app's light ("dx,dy,dz;tx,ty,tz" in mm, or ""), "width,samples" to render a PNG
 # instead of saving the .blend (or ""), the depth of field ("0", "1" or "1|strength|part id") and "1" to crop the picture to the parts
 source, target, studio, light_spec, render_spec, dof_spec, crop_flag = sys.argv[sys.argv.index("--") + 1:]
-dof_spec, _, ambient_text = dof_spec.partition("#")  # the depth of field spec may end in "#<ambient light preset, 0 to 5>"
+dof_spec, _, extra_text = dof_spec.partition("#")  # the depth of field spec may end in "#<ambient light preset, 0 to 5>,<lamp, 0 to 60>"
+ambient_text, _, lamp_text = extra_text.partition(",")
 ambient = min(max(int(ambient_text or 0), 0), 5)
+lamp = 2 ** ((min(max(int(lamp_text or 40), 0), 60) - 40) / 10)  # the lamp slider: 40 is the normal strength, every 10 steps double or halve it (from 1/16 to 4 times)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -379,7 +381,7 @@ if studio == "1":
         elif aim_text:
             aim_point = Vector(float(v) for v in aim_text.split(",")) * 0.001
         sun_data = bpy.data.lights.new("Key (sun)", "SUN")
-        sun_data.energy, sun_data.color, sun_data.angle = SUN_STRENGTH, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
+        sun_data.energy, sun_data.color, sun_data.angle = SUN_STRENGTH * lamp, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
         sun = bpy.data.objects.new("Key (sun)", sun_data)
         sun.location = aim_point + direction.normalized() * d
         scene.collection.objects.link(sun)
@@ -391,7 +393,7 @@ if studio == "1":
         support = SUPPORT_SCALE
     else:
         support = 1.0
-        light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
+        light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7 * lamp, (1.0, 0.86, 0.7), r * 2.2)
     light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2 * support, (0.6, 0.75, 1.0), r * 3)
     light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3 * support, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
     light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4 * support, (1.0, 0.45, 0.8), r * 1.5)
@@ -410,6 +412,23 @@ if studio == "1":
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
     scene.view_settings.exposure = -0.3
+    if ambient and scene.camera:  # a closed scene (a box around the parts) lit from above can come out burnt: a tiny test render sets the exposure so the brightest areas stay below white
+        import os
+        import tempfile
+        import numpy
+        saved = (scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising, scene.render.filepath, scene.render.image_settings.file_format)
+        probe = os.path.join(tempfile.mkdtemp(), "probe.png")
+        scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising = 96, 54, 12, False
+        scene.render.filepath, scene.render.image_settings.file_format = probe, "PNG"
+        bpy.ops.render.render(write_still=True)
+        image = bpy.data.images.load(probe)
+        pixels = numpy.array(image.pixels[:], dtype=numpy.float32).reshape(-1, 4)[:, :3]
+        bpy.data.images.remove(image)
+        bright = float(numpy.percentile(pixels.max(axis=1), 97))  # what the picture shows (display values 0 to 1): the 97th percentile of the brightest channel
+        if bright > 0.85:  # about the brightness of a white wall that is still not burnt
+            stops = math.log2(0.85 ** 2.2 / max(bright, 1e-3) ** 2.2)  # the display values are about gamma 2.2 of the light
+            scene.view_settings.exposure += max(stops, -3.0)
+        scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising, scene.render.filepath, scene.render.image_settings.file_format = saved
 
 if render_spec:  # a picture of this size and with this many samples: the settings go into the .blend, which is then rendered (see _run_blender)
     width, samples = (int(v) for v in render_spec.split(","))

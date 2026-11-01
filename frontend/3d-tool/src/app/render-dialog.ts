@@ -21,21 +21,26 @@ import { DocumentStore } from './document.store';
         <label class="check" title="Blurs what is in front of and behind the part nearest to the camera, like a real lens (needs the perspective camera: an orthographic view has no depth of field)">
           <input type="checkbox" [checked]="render.depthOfField()" (change)="toggleDepthOfField($any($event.target).checked)" /> Depth of field
         </label>
-        @if (render.depthOfField()) {
-          <select class="focus" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture." (change)="chooseFocus($any($event.target).value)">
+          <select class="focus" [disabled]="!render.depthOfField()" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture." (change)="chooseFocus($any($event.target).value)">
             <option value="" [selected]="!focusValue()">Focus: nearest in the picture</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === focusValue()">Focus: {{ part.label }}</option> }
           </select>
-          <button type="button" [disabled]="!selected()" [title]="selected() ? 'Focus on the part that is selected in the document' : 'Select a part in the document before you open the Render dialog: it is then focused on that part with one click'" (click)="chooseFocus(selected()!)">Selected</button>
-          <select class="focus strength" [value]="render.dofStrength()" title="How blurred what is far from the focus is. Medium: unsharp but still recognizable." (change)="chooseStrength(+$any($event.target).value)">
+          <button type="button" [disabled]="!render.depthOfField() || !selected()" [title]="selected() ? 'Focus on the part that is selected in the document' : 'Select a part in the document before you open the Render dialog: it is then focused on that part with one click'" (click)="chooseFocus(selected()!)">Selected</button>
+          <select class="focus strength" [disabled]="!render.depthOfField()" [value]="render.dofStrength()" title="How blurred what is far from the focus is. Medium: unsharp but still recognizable." (change)="chooseStrength(+$any($event.target).value)">
             @for (level of strengths; track level.value) { <option [value]="level.value" [selected]="level.value === render.dofStrength()">Blur: {{ level.label }}</option> }
           </select>
-        }
+        <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
+      </header>
+      <div class="lighting" aria-label="Lighting">
+        <span class="bar-title">Lighting</span>
         <select class="focus strength" [value]="render.ambient()" title="Ambient light: a big soft light above the scene that lightens the shadows." (change)="chooseAmbient(+$any($event.target).value)">
           @for (level of ambients; track level.value) { <option [value]="level.value" [selected]="level.value === render.ambient()">Ambient: {{ level.label }}</option> }
         </select>
-        <button type="button" class="x" aria-label="Close" (click)="close.emit()">✕</button>
-      </header>
+        <label class="lamp" title="The strength of the lamp pointed at the parts: left is darker, right is brighter. Two thirds of the way is the normal strength (double-click to go back to it).">Lamp
+          <input type="range" min="0" max="60" step="1" [value]="render.lamp()" (input)="render.setLamp(+$any($event.target).value)" (change)="lampChanged()" (dblclick)="resetLamp()" />
+          <output class="lamp-value">{{ lampText() }}</output>
+        </label>
+      </div>
       <div class="actions">
         @if (url()) {
           <button type="button" [disabled]="busy()" title="800 px, 24 samples: a few seconds" (click)="quick()">
@@ -54,9 +59,14 @@ import { DocumentStore } from './document.store';
           </a>
         }
       </div>
-      @if (busy()) { <div class="busy"><span class="spinner"></span>{{ busyText() }}</div> }
+      @if (busy() && !picture()) { <div class="busy"><span class="spinner"></span>{{ busyText() }}</div> }
       @if (error()) { <p class="error">{{ error() }}</p> }
-      @if (picture()) { <img [src]="picture()" alt="Render of the document" /> }
+      @if (picture()) {
+        <div class="frame">
+          <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" />
+          @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
+        </div>
+      }
     </section>
   `,
   styles: `
@@ -66,12 +76,19 @@ import { DocumentStore } from './document.store';
     header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 34px; }
     .actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
+    .lighting { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; } .bar-title { font-weight: 600; opacity: .7; }
+    .lamp-value { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; opacity: .85; }
+    .lamp { display: inline-flex; align-items: center; gap: 6px; } .lamp input { width: 130px; margin: 0; accent-color: #2f6fed; }
     .focus.strength { max-width: 150px; }
+    .focus:disabled { opacity: .45; cursor: default; }
     .focus { max-width: 230px; padding: 3px 6px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .check { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; cursor: pointer; user-select: none; } .check input { margin: 0; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
     button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
     img { display: block; width: 100%; height: auto; border-radius: 4px; background: #000; }
+    .frame { position: relative; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
+    .over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-shadow: 0 1px 4px #000; }
+    .spinner.big { width: 44px; height: 44px; border-width: 4px; }
     .busy { display: flex; align-items: center; gap: 10px; padding: 24px 4px; opacity: .85; }
     .tick { color: #5bd68a; flex: none; }
     .spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.25); border-top-color: #2f6fed; border-radius: 50%; animation: spin .8s linear infinite; } .spinner.small { width: 11px; height: 11px; }
@@ -104,6 +121,18 @@ export class RenderDialog implements OnInit, OnDestroy {
   }
   protected readonly strengths = [{ value: 1, label: 'Subtle' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Medium' }, { value: 4, label: 'Strong' }, { value: 5, label: 'Extreme' }];
   protected readonly ambients = [{ value: 0, label: 'None' }, { value: 1, label: 'Soft glow' }, { value: 2, label: 'Overcast' }, { value: 3, label: 'Softbox' }, { value: 4, label: 'Daylight' }, { value: 5, label: 'Bright studio' }];
+  /** The lamp as a share of its normal strength: every 10 steps of the slider double or halve it. */
+  protected lampText() {
+    const share = 2 ** ((this.render.lamp() - 40) / 10) * 100;
+    return `${share >= 100 ? Math.round(share) : Math.round(share * 10) / 10} %`;
+  }
+  protected lampChanged() {
+    if (this.url() && !this.busy()) void this.quick();
+  }
+  protected resetLamp() {
+    this.render.setLamp(40);
+    this.lampChanged();
+  }
   protected chooseAmbient(level: number) {
     this.render.setAmbient(level);
     if (this.url() && !this.busy()) void this.quick();
