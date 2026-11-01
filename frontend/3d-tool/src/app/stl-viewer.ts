@@ -234,6 +234,11 @@ function readShowPath() {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5M8.5 11h5"/></svg>
       </button>
     }
+    @if (documentMode()) {
+      <button class="home fit" type="button" title="Fit all: zoom and move the view so every object of the document is in it (the viewing angle stays)" aria-label="Fit all objects in view" [disabled]="!store.doc().items.length" releaseFocus (click)="fitAll()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V6a2 2 0 0 1 2-2h3M20 9V6a2 2 0 0 0-2-2h-3M4 15v3a2 2 0 0 0 2 2h3M20 15v3a2 2 0 0 1-2 2h-3"/><path d="M12 7.6l4 2.3v4.2l-4 2.3-4-2.3V9.9z"/><path d="M8 9.9l4 2.3 4-2.3M12 12.2v4.2"/></svg>
+      </button>
+    }
     <button class="home" type="button" title="Home: isometric view, fit to the model" aria-label="Home view" releaseFocus (click)="goHome()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
@@ -243,6 +248,7 @@ function readShowPath() {
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
     .home { position: absolute; top: 12px; right: 144px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
+    .home.fit { right: 178px; } .home.fit:disabled { opacity: .3; pointer-events: none; }
     .home.fly { right: 110px; } .home.fly.zoom-reset { right: 76px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .panels { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -792,6 +798,14 @@ export class StlViewer implements OnDestroy {
       this.needsDocumentFit = false;
       this.fitDocument();
     }
+  }
+
+  /** The Fit all button: every object of the document in view, from the angle the user has set. */
+  fitAll() {
+    this.panAnimation = null;
+    this.snapAnimation = null;
+    this.pivotGoal = null;
+    this.fitDocument();
   }
 
   /** Re-centres the camera on the document without changing the viewing direction. */

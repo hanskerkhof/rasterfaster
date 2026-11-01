@@ -41,12 +41,19 @@ def parse_view(text: str) -> dict:
 
 
 def parse_light(text: str) -> dict:
-    """`dx,dy,dz;tx,ty,tz`: where the app's light shines from (a direction, from what it points at to the light) and the point it points at (mm)."""
+    """`dx,dy,dz;tx,ty,tz`: where the app's light shines from (a direction, from what it points at to the light) and the point it points at (mm).
+    The target can also be `part:<item id>` (the middle of that part) or empty (the middle of the scene)."""
     try:
         direction, target = text.split(";")
-        light = {"direction": np.array([float(v) for v in direction.split(",")]), "target": np.array([float(v) for v in target.split(",")])}
-        assert light["direction"].shape == (3,) and light["target"].shape == (3,)
-        assert np.isfinite(light["direction"]).all() and np.isfinite(light["target"]).all() and np.linalg.norm(light["direction"]) > 1e-6
+        light = {"direction": np.array([float(v) for v in direction.split(",")]), "target": None, "part": None}
+        if target.startswith("part:"):
+            light["part"] = target[5:]
+            assert light["part"] and all(c.isalnum() or c in "-_" for c in light["part"])
+        elif target:
+            light["target"] = np.array([float(v) for v in target.split(",")])
+            assert light["target"].shape == (3,) and np.isfinite(light["target"]).all()
+        assert light["direction"].shape == (3,)
+        assert np.isfinite(light["direction"]).all() and np.linalg.norm(light["direction"]) > 1e-6
     except (ValueError, AssertionError):
         raise ValueError("light must be dx,dy,dz;tx,ty,tz")
     light["direction"] = light["direction"] / np.linalg.norm(light["direction"])
@@ -176,7 +183,7 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
             position, indices = accessors[item["path"]]
             gltfMeshes.append({"name": item["path"].rsplit("/", 1)[-1], "primitives": [{
                 "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[(colour, dimmed)]}]})  # no normals: faces shade flat
-        nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement)})
+        nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement), "extras": {"itemId": item["id"]}})  # the id lets a light find its part
         partNodes.append(len(nodes) - 1)
 
     sceneNodes = list(partNodes)
@@ -223,7 +230,10 @@ import sys
 import bpy
 from mathutils import Vector
 
-source, target, studio, light_spec = sys.argv[sys.argv.index("--") + 1:]  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
+SUN_STRENGTH = 6.0  # W/m² (a clear day is ~ 5 in Blender; stronger washes the colours out)
+SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lights are turned down to this share so the key light shows
+
+source, target, studio, light_spec, render_spec = sys.argv[sys.argv.index("--") + 1:]  # render_spec: "width,samples" to render a PNG to `target` instead of saving the .blend, or ""  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -252,6 +262,7 @@ if studio == "1":
     bpy.ops.mesh.primitive_circle_add(vertices=96, radius=r * 6, fill_type="NGON", location=(centre.x, centre.y, low.z - 0.0005))
     floor = bpy.context.active_object
     floor.name = "Studio floor"
+    floor.visible_shadow = False  # the floor receives shadows but casts none: a light below the ground (the app allows it) still reaches the parts
     mat = bpy.data.materials.new("Studio floor")
     mat.use_nodes = True
     tree = mat.node_tree
@@ -302,23 +313,33 @@ if studio == "1":
 
     d = r * 3
     if light_spec:  # the light of the app's "Shaded with light" view: a sun shining from that direction at that point (mm -> m)
-        direction, aim_at = (Vector(float(v) for v in part.split(",")) for part in light_spec.split(";"))
+        direction_text, aim_text = light_spec.split(";")
+        direction = Vector(float(v) for v in direction_text.split(","))
+        aim_point = centre
+        if aim_text.startswith("part:"):  # the middle of a part (found by the id the export put on it)
+            for o in parts:
+                if o.get("itemId") == aim_text[5:]:
+                    corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
+                    aim_point = sum(corners, Vector()) / len(corners)
+        elif aim_text:
+            aim_point = Vector(float(v) for v in aim_text.split(",")) * 0.001
         sun_data = bpy.data.lights.new("Key (sun)", "SUN")
-        sun_data.energy, sun_data.color, sun_data.angle = 4.0, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
+        sun_data.energy, sun_data.color, sun_data.angle = SUN_STRENGTH, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
         sun = bpy.data.objects.new("Key (sun)", sun_data)
-        point = aim_at * 0.001
-        sun.location = point + direction.normalized() * d
+        sun.location = aim_point + direction.normalized() * d
         scene.collection.objects.link(sun)
         sun_aim = bpy.data.objects.new("Key (sun) target", None)
-        sun_aim.location = point
+        sun_aim.location = aim_point
         scene.collection.objects.link(sun_aim)
         sun_track = sun.constraints.new("TRACK_TO")
         sun_track.target, sun_track.track_axis, sun_track.up_axis = sun_aim, "TRACK_NEGATIVE_Z", "UP_Y"
+        support = SUPPORT_SCALE
     else:
+        support = 1.0
         light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7, (1.0, 0.86, 0.7), r * 2.2)
-    light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2, (0.6, 0.75, 1.0), r * 3)
-    light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
-    light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4, (1.0, 0.45, 0.8), r * 1.5)
+    light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2 * support, (0.6, 0.75, 1.0), r * 3)
+    light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3 * support, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
+    light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4 * support, (1.0, 0.45, 0.8), r * 1.5)
     scene.render.engine = "CYCLES"
     scene.cycles.samples = 96
     scene.cycles.use_denoising = True
@@ -326,6 +347,13 @@ if studio == "1":
     scene.view_settings.look = "AgX - Medium High Contrast"
     scene.view_settings.exposure = -0.3
 
+if render_spec:  # a picture of this size and with this many samples: the settings go into the .blend, which is then rendered (see _run_blender)
+    width, samples = (int(v) for v in render_spec.split(","))
+    scene.render.resolution_x, scene.render.resolution_y = width, round(width * 9 / 16)
+    scene.render.resolution_percentage = 100
+    if scene.render.engine == "CYCLES":
+        scene.cycles.samples = samples
+    scene.render.image_settings.file_format = "PNG"
 bpy.ops.wm.save_as_mainfile(filepath=target, compress=True)
 '''
 
@@ -340,21 +368,79 @@ def find_blender() -> str | None:
     return next((c for c in candidates if c and Path(c).is_file()), None)
 
 
-def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | None = None) -> bytes:
-    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, 1080p;
-    with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles; with `light` (see parse_light) the key
-    light is a sun like the app's light source instead of the warm area light)."""
+def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None) -> bytes:
+    """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
+    `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
+    import os
+    import pty
+    import re
     import subprocess
     import tempfile
+    import time
     from pathlib import Path
 
     with tempfile.TemporaryDirectory() as folder:
         source, target, script = Path(folder, "scene.glb"), Path(folder, "scene.blend"), Path(folder, "make_blend.py")
         source.write_bytes(glb)
-        spec = "" if light is None else ";".join(",".join(f"{v:.4f}" for v in light[k]) for k in ("direction", "target"))
+        spec = "" if light is None else ",".join(f"{v:.4f}" for v in light["direction"]) + ";" + (f"part:{light['part']}" if light.get("part") else ",".join(f"{v:.4f}" for v in light["target"]) if light.get("target") is not None else "")
         script.write_text(blenderScript)
-        result = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec],
-                                capture_output=True, text=True, timeout=120)
+        deadline = time.monotonic() + timeout
+        made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
+                               f"{render[0]},{render[1]}" if render else ""], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
-            raise RuntimeError(f"Blender could not write the .blend: {(result.stderr or result.stdout)[-300:]}")
-        return target.read_bytes()
+            raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
+        if not render:
+            return target.read_bytes()
+
+        # Rendering the saved file prints its progress ("Sample 24/96"); Blender buffers that when it writes to a pipe, so a pseudo-terminal is used.
+        master, slave = pty.openpty()
+        try:
+            process = subprocess.Popen([blender, "--background", str(target), "-o", str(Path(folder, "picture_####")), "-f", "1"], stdout=slave, stderr=slave, stdin=subprocess.DEVNULL, close_fds=True)
+        finally:
+            os.close(slave)
+        if started:
+            started(process)
+        tail = b""
+        sample = re.compile(rb"Sample (\d+)/(\d+)")
+        try:
+            buffer = b""
+            while True:
+                try:
+                    chunk = os.read(master, 4096)
+                except OSError:  # the other end is closed: Blender has ended
+                    break
+                if not chunk:
+                    break
+                tail = (tail + chunk)[-600:]
+                buffer = (buffer + chunk)[-4096:]
+                if progress:
+                    found = sample.findall(buffer)
+                    if found:
+                        done, total = (int(v) for v in found[-1])
+                        progress(min(done / max(total, 1), 1.0))
+                if time.monotonic() > deadline:
+                    process.kill()
+                    raise RuntimeError("Blender took too long")
+            process.wait()
+        finally:
+            if process.poll() is None:
+                process.kill()
+            os.close(master)
+        picture = Path(folder, "picture_0001.png")
+        if not picture.is_file():
+            raise RuntimeError(f"Blender could not render the picture: {tail.decode(errors='replace')[-300:]}")
+        return picture.read_bytes()
+
+
+def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | None = None) -> bytes:
+    """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, 1080p;
+    with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles; with `light` (see parse_light) the key
+    light is a sun like the app's light source instead of the warm area light)."""
+    return _run_blender(glb, blender, studio, light, None, 120)
+
+
+def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180) -> bytes:
+    """A PNG of the scene (16:9, `width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours."""
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started)

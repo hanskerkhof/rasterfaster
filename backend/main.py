@@ -16,7 +16,9 @@ import secrets
 import shutil
 import subprocess
 import sys
+import asyncio
 import threading
+import uuid
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -31,7 +33,7 @@ import import3mf
 import library_ops
 import searchterms
 import svgexport
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -683,9 +685,8 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-@app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None) -> Response:
-    """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None):
+    """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
         raise HTTPException(status_code=503, detail="Blender was not found on this machine (set the BLENDER environment variable to its path)")
@@ -693,13 +694,189 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
     stlBytes = load_document_stls(document)
     try:
         glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours, parsed_view(view))
-        data = blenderexport.build_blend(glb, blender, studio, blenderexport.parse_light(light) if light else None)
+        saved = document.light  # the light placed in the document is the key light unless the call brings its own
+        sun = blenderexport.parse_light(light) if light else (blenderexport.parse_light(
+            ",".join(str(v) for v in saved.direction) + ";" + (f"part:{saved.targetId}" if saved.targetId else ",".join(str(v) for v in saved.target) if saved.target else "")) if saved else None)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return document, blender, glb, sun
+
+
+@app.get("/api/documents/{documentId}/export.blend")
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None) -> Response:
+    """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
+    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    try:
+        data = blenderexport.build_blend(glb, blender, studio, sun)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".blend"
     return Response(data, media_type="application/x-blender", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+@app.get("/api/documents/{documentId}/render.png")
+def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None,
+                        width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128)) -> Response:
+    """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
+    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    try:
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        raise HTTPException(status_code=500, detail=str(error))
+    filename = re.sub(r"[^\w.-]+", "_", document.name) + ".png"
+    return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+class RenderJob:
+    """A full-size render running in the background: Blender runs in a thread, its progress is read from its output."""
+
+    def __init__(self, name: str, width: int, samples: int):
+        self.id = uuid.uuid4().hex[:12]
+        self.name, self.width, self.samples = name, width, samples
+        self.state = "running"  # running | done | error | cancelled
+        self.progress = 0.0
+        self.started = time.time()
+        self.finished: float | None = None
+        self.png: bytes | None = None
+        self.error = ""
+        self.process: object | None = None
+
+    def view(self) -> dict:
+        return {"id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
+                "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error}
+
+
+renderJobs: dict[str, RenderJob] = {}
+
+
+class Notifier:
+    """The open WebSockets (/api/ws): what happens on the server that a page should hear about at once, e.g. a render that is ready."""
+
+    def __init__(self) -> None:
+        self.connections: set[WebSocket] = set()
+        self.loop: asyncio.AbstractEventLoop | None = None
+
+    async def broadcast(self, message: dict) -> None:
+        for connection in list(self.connections):
+            try:
+                await connection.send_json(message)
+            except Exception:  # noqa: BLE001 - a page that went away
+                self.connections.discard(connection)
+
+    def notify(self, message: dict) -> None:
+        """Callable from any thread (the render runs in one)."""
+        if self.loop and self.connections:
+            asyncio.run_coroutine_threadsafe(self.broadcast(message), self.loop)
+
+
+notifier = Notifier()
+
+
+def latest_render() -> RenderJob | None:
+    return max(renderJobs.values(), key=lambda j: j.started, default=None)
+
+
+@app.websocket("/api/ws")
+async def events(websocket: WebSocket) -> None:
+    """Messages for the page: `{type: "render", ...job}` whenever the render changes (and once on connecting, so a page that was closed meanwhile still learns it is ready)."""
+    await websocket.accept()
+    notifier.loop = asyncio.get_running_loop()
+    notifier.connections.add(websocket)
+    try:
+        job = latest_render()
+        await websocket.send_json({"type": "render", **(job.view() if job else {"state": "idle"})})
+        while True:
+            await websocket.receive_text()  # the page sends nothing; this just notices when it goes away
+    except WebSocketDisconnect:
+        pass
+    finally:
+        notifier.connections.discard(websocket)
+
+
+def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None) -> None:
+    def started(process: object) -> None:
+        job.process = process
+        if job.state == "cancelled":  # cancelled before Blender had started
+            process.kill()  # type: ignore[attr-defined]
+
+    last = [-1.0]
+
+    def progress(value: float) -> None:
+        job.progress = value
+        if value - last[0] >= 0.01:  # a message per percent is plenty
+            last[0] = value
+            notifier.notify({"type": "render", **job.view()})
+
+    try:
+        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800)
+        job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
+    except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
+        if job.state == "running":
+            job.state, job.error = "error", str(error)
+    finally:
+        job.finished = time.time()
+        notifier.notify({"type": "render", **job.view()})
+
+
+@app.post("/api/documents/{documentId}/render-jobs", status_code=202)
+def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None,
+                     width: int = Query(default=1920, ge=160, le=3840), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
+    """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
+    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    if any(j.state == "running" for j in renderJobs.values()):
+        raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
+    renderJobs.clear()  # an older picture nobody collected is dropped
+    job = RenderJob(document.name, width, samples)
+    renderJobs[job.id] = job
+    threading.Thread(target=run_render_job, args=(job, blender, glb, sun), daemon=True).start()
+    notifier.notify({"type": "render", **job.view()})
+    return job.view()
+
+
+def render_job(jobId: str) -> RenderJob:
+    job = renderJobs.get(jobId)
+    if not job:
+        raise HTTPException(status_code=404, detail="render job not found")
+    return job
+
+
+@app.get("/api/render-jobs/latest")
+def latest_render_job() -> dict:
+    """The newest render, or `{state: "idle"}`: what the WebSocket says on connecting, for a page that cannot use it."""
+    job = latest_render()
+    return job.view() if job else {"state": "idle"}
+
+
+@app.get("/api/render-jobs/{jobId}")
+def get_render_job(jobId: str) -> dict:
+    return render_job(jobId).view()
+
+
+@app.get("/api/render-jobs/{jobId}/image.png")
+def get_render_job_image(jobId: str) -> Response:
+    job = render_job(jobId)
+    if job.state != "done" or job.png is None:
+        raise HTTPException(status_code=409, detail=f"the render is {job.state}")
+    filename = re.sub(r"[^\w.-]+", "_", job.name) + f"-{job.width}px.png"
+    return Response(job.png, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+@app.delete("/api/render-jobs/{jobId}")
+def cancel_render_job(jobId: str) -> dict:
+    """Stops a running render (Blender is killed); a finished job is just forgotten."""
+    job = render_job(jobId)
+    if job.state == "running":
+        job.state = "cancelled"
+        if job.process is not None:
+            job.process.kill()  # type: ignore[attr-defined]
+    else:
+        renderJobs.pop(job.id, None)
+    notifier.notify({"type": "render", "state": "idle"} if job.state != "cancelled" else {"type": "render", **job.view()})
+    return job.view()
 
 
 @app.get("/api/documents/{documentId}/export.svg")

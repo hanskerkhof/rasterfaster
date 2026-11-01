@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Render dialog, full-size render in the background, Fit all (0.10.57)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `main.py`, `blenderexport.py`): a **Render** button in the Export row: a quick Cycles picture (800 px, 24 samples, a few seconds) of how Blender renders the scene, with the camera of the 3D view, the document colours and the light of the document (`GET /api/documents/{id}/render.png`). **Render HD** starts a 1920 px, 96 sample render in the background (`POST /api/documents/{id}/render-jobs`, one at a time; `GET /api/render-jobs/{id}`, `…/image.png`, `DELETE` to cancel; about a minute and a half for a small scene). The Render button shows a spinner and is disabled while it runs, a progress toast shows the percentage, the time so far, an estimate of the time left and a **Cancel** button, and when it is done a message *Render of … is ready: click to view* opens the picture. The page hears about it over the WebSocket `/api/ws` (new dependency `websockets`; `"ws": true` in the dev proxy, which needs a restart of the dev server) and polls `GET /api/render-jobs/latest` when no WebSocket is open.
+- **FE** (`stl-viewer.ts`): a **Fit all** button (a cube in a frame) left of Home in the document view: every object in view from the angle you have set, where Home turns the view to the isometric angle.
+
+### Changed
+- **BE** (`blenderexport.py`): the Blender export uses the light saved in the document as its key light (a sun of strength 6; the other lights are turned down to 35%) even when the call brings no `light`; a light aimed at a part finds the part in the scene (the parts carry their item id). The studio floor no longer casts shadows, so a light below the ground reaches the parts.
+
+### Fixed
+- **FE** (`model-render.ts`): the Reload button of the file list did nothing in the *Shaded with light* view ("Maximum call stack size exceeded": the smooth copy of an STL geometry was the geometry itself and disposed itself in a loop). The smooth copy is now made from a clone.
+
 ## 2026-11-01 - Shaded view with a movable light, saved light, coloured Blender export (0.10.56)
 
 ### Added

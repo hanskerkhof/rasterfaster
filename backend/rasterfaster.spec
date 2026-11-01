@@ -13,7 +13,7 @@ analysis = Analysis(
     ["app.py"],
     pathex=[here],
     datas=[(frontend, "frontend")] + ([(seed, "seed_documents")] if os.path.isdir(seed) else []),
-    hiddenimports=collect_submodules("uvicorn") + ["AppKit", "Quartz", "PyObjCTools.AppHelper"] + ["blenderexport", "export3mf", "svgexport", "appconfig"],
+    hiddenimports=collect_submodules("uvicorn") + collect_submodules("websockets") + ["AppKit", "Quartz", "PyObjCTools.AppHelper"] + ["blenderexport", "export3mf", "svgexport", "appconfig"],
     excludes=["pytest", "tkinter"],
 )
 pyz = PYZ(analysis.pure)

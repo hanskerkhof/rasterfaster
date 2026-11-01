@@ -2,4 +2,5 @@ fastapi==0.121.0
 uvicorn==0.35.0
 pytest==9.0.2
 httpx==0.28.1
+websockets==15.0.1  # uvicorn needs a WebSocket library for /api/ws (the render-ready messages)
 numpy==2.3.2

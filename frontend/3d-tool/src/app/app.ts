@@ -10,6 +10,8 @@ import { DocItem, DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
 import { TrashDialog } from './trash-dialog';
+import { RenderDialog } from './render-dialog';
+import { RenderService } from './render.service';
 import { ApiStatus } from './api-status';
 import { APP_VERSION } from './build-info';
 
@@ -47,7 +49,7 @@ function readFilterMode(): 'any' | 'all' {
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, StlViewer, DocumentPanel, ObjectMenu, ReleaseFocus],
+  imports: [TreePanel, TrashDialog, RenderDialog, StlViewer, DocumentPanel, ObjectMenu, ReleaseFocus],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
@@ -55,6 +57,12 @@ function readFilterMode(): 'any' | 'all' {
 export class App {
   protected readonly lib = inject(LibraryService);
   protected readonly store = inject(DocumentStore);
+  protected readonly render = inject(RenderService);
+
+  protected time(seconds: number) {
+    const whole = Math.round(seconds);
+    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+  }
 
   protected readonly selected = signal<string | null>(null);
   protected readonly mode = signal<ViewMode>(this.readViewMode());

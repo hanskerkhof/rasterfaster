@@ -4,6 +4,7 @@ import { ReleaseFocus } from './release-focus';
 import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
+import { RenderService } from './render.service';
 import { rangeEndingAt } from './tree-selection';
 import { ZipEntry, buildZip } from './zip';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
@@ -93,6 +94,7 @@ function readGeometry(): PanelGeometry | null {
       <span>Export</span>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf()">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): Black PLA parts as placed, studio lighting, and a camera where the 3D view is now" (click)="exportBlender()">Blender</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting() || render.running()" [title]="render.running() ? 'A full-size render is running in the background: ' + render.percent() + '%' : 'A picture of how Blender renders the scene: the colours, the camera of the 3D view and the light. Quick (a few seconds) or full size in the background'" (click)="openRender()">@if (render.running()) { <span class="spinner"></span> }Render</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="SVG of the 3D view as it is now, in the display mode that is selected (solid is a picture, the others are line drawings)" (click)="exportViewSvg()">SVG view</button>
       <button type="button" [disabled]="!store.doc().items.length" title="Bill of materials" (click)="bomOpen.set(true)">BOM</button>
@@ -188,7 +190,9 @@ function readGeometry(): PanelGeometry | null {
     .picker { display: flex; gap: 4px; }
     .picker select { flex: 1; min-width: 0; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .export { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-    .export button { padding: 3px 6px; } /* Assembly, Blender, SVG and BOM fit in one row */
+    .export button { padding: 3px 6px; }
+    .spinner { display: inline-block; width: 9px; height: 9px; margin-right: 5px; border: 2px solid rgba(255,255,255,.3); border-top-color: #2f6fed; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -1px; }
+    @keyframes spin { to { transform: rotate(360deg); } } /* Assembly, Blender, SVG and BOM fit in one row */
     .export span { flex: 1 0 100%; opacity: .8; white-space: nowrap; }
     .export-error { color: #ff8a8a; font-size: 11px; }
     .import-ask { padding: 6px 8px; background: #3a3320; border: 1px solid #6b5a20; border-radius: 6px; font-size: 11px; }
@@ -412,6 +416,14 @@ export class DocumentPanel {
     return params.length ? `export.blend?${params.join('&')}` : 'export.blend';
   }
   protected readonly bomOpen = signal(false);
+  protected readonly render = inject(RenderService);
+
+  protected async openRender() {
+    const id = this.store.docId();
+    if (!id) return;
+    await this.store.flush(); // the picture shows what is saved
+    this.render.openQuick(`/api/documents/${id}/` + this.blenderEndpoint().replace('export.blend', 'render.png'));
+  }
   protected readonly versionsOpen = signal(false);
 
   /** "v3" (latest saved version), with a dot while the working copy has changes since it; "v–" before the first version. */

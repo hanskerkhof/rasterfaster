@@ -90,4 +90,14 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .trash-button:hover { background: rgba(255,255,255,.08); opacity: 1; }
 .trash-button .count { margin-left: 6px; padding: 0 6px; font-size: 10px; background: #31353f; border-radius: 8px; }
 .notice.undo { bottom: 48px; }
+.notice.render-progress { bottom: 84px; min-width: 340px; padding: 8px 12px; }
+.notice.render-progress .bar { height: 4px; margin-bottom: 7px; background: #14161a; border-radius: 2px; overflow: hidden; }
+.notice.render-progress .bar span { display: block; height: 100%; background: #2f6fed; transition: width .6s linear; }
+.notice.render-progress .line { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.notice.render-progress .spinner { flex: none; width: 10px; height: 10px; border: 2px solid rgba(255,255,255,.3); border-top-color: #2f6fed; border-radius: 50%; animation: render-spin .8s linear infinite; }
+.notice.render-progress button { margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
+.notice.render-progress button:hover { background: #b03a3a; color: #fff; }
+@keyframes render-spin { to { transform: rotate(360deg); } }
+.notice.render-ready { color: inherit; font: inherit; font-size: 12px; cursor: pointer; background: rgba(35,38,45,.95); border: 1px solid #2f6fed; }
+.notice.render-ready:hover { background: #2f6fed; color: #fff; }
 .notice.undo button { margin-left: 8px; padding: 1px 8px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }

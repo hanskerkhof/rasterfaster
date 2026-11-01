@@ -178,3 +178,101 @@ def test_blend_export_keeps_the_document_colours_unless_black_pla_is_asked_for(m
     assert client.get(f"/api/documents/{created['id']}/export.blend").status_code == 200
     assert client.get(f"/api/documents/{created['id']}/export.blend?colours=false").status_code == 200
     assert seen == [True, False]
+
+
+def test_light_can_aim_at_a_part_and_parts_carry_their_id():
+    light = blenderexport.parse_light("0,0,1;part:abc-123_x")
+    assert light["part"] == "abc-123_x" and light["target"] is None
+    assert blenderexport.parse_light("0,0,1;")["part"] is None
+    with pytest.raises(ValueError):
+        blenderexport.parse_light("0,0,1;part:no spaces")
+    items, stls = items_and_stls()
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False))
+    assert [n["extras"]["itemId"] for n in gltf["nodes"] if "mesh" in n] == [i["id"] for i in items]
+
+
+def test_render_endpoint_returns_a_png_and_checks_the_size(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Render me", "items": [item], "light": {"direction": [0, 0, 1], "targetId": "a"}}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = {}
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24: seen.update(light=light, width=width, samples=samples) or b"\x89PNG-fake")
+    response = client.get(f"/api/documents/{created['id']}/render.png", params={"width": 640, "samples": 8})
+    assert response.status_code == 200 and response.headers["content-type"] == "image/png" and response.content.startswith(b"\x89PNG")
+    assert seen["width"] == 640 and seen["samples"] == 8 and seen["light"]["part"] == "a"  # the light saved in the document is the key light
+    assert client.get(f"/api/documents/{created['id']}/render.png", params={"width": 20}).status_code == 422
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: None)
+    assert client.get(f"/api/documents/{created['id']}/render.png").status_code == 503
+
+
+def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypatch):
+    import time
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    main.renderJobs.clear()
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Job", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180):
+        progress(0.5)
+        time.sleep(0.2)
+        return b"\x89PNG-hd"
+
+    monkeypatch.setattr(blenderexport, "build_render", fake)
+    job = client.post(f"/api/documents/{created['id']}/render-jobs", params={"width": 1920}).json()
+    assert job["state"] == "running" and job["width"] == 1920 and job["samples"] == 96
+    for _ in range(50):
+        status = client.get(f"/api/render-jobs/{job['id']}").json()
+        if status["state"] != "running":
+            break
+        time.sleep(0.05)
+    assert status["state"] == "done" and status["progress"] == 1.0
+    assert client.get(f"/api/render-jobs/{job['id']}/image.png").content == b"\x89PNG-hd"
+
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180):
+        time.sleep(0.3)
+        raise RuntimeError("killed")
+
+    monkeypatch.setattr(blenderexport, "build_render", slow)
+    second = client.post(f"/api/documents/{created['id']}/render-jobs").json()
+    assert client.delete(f"/api/render-jobs/{second['id']}").json()["state"] == "cancelled"
+    time.sleep(0.5)
+    assert client.get(f"/api/render-jobs/{second['id']}").json()["state"] == "cancelled"  # a killed Blender is not reported as an error
+    assert client.get(f"/api/render-jobs/{second['id']}/image.png").status_code == 409
+    assert client.get("/api/render-jobs/nope").status_code == 404
+
+
+def test_render_state_reaches_the_page_over_the_websocket_and_only_one_render_runs(tmp_path, monkeypatch):
+    import time
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    main.renderJobs.clear()
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Socket", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180):
+        progress(0.5)
+        time.sleep(0.4)
+        return b"\x89PNG-hd"
+
+    monkeypatch.setattr(blenderexport, "build_render", fake)
+    with client.websocket_connect("/api/ws") as socket:
+        assert socket.receive_json() == {"type": "render", "state": "idle"}
+        job = client.post(f"/api/documents/{created['id']}/render-jobs").json()
+        assert client.post(f"/api/documents/{created['id']}/render-jobs").status_code == 409  # one render at a time
+        states = []
+        while not states or states[-1]["state"] == "running":
+            states.append(socket.receive_json())
+        assert all(m["type"] == "render" and m["id"] == job["id"] for m in states) and states[-1]["state"] == "done" and states[-1]["name"] == "Socket"
+    with client.websocket_connect("/api/ws") as late:  # a page opened afterwards still hears that a render is ready
+        assert late.receive_json()["state"] == "done"

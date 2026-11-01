@@ -98,6 +98,24 @@
     @if (undoTrash(); as undo) {
       <div class="notice undo" role="status">Moved {{ undo.label }} to the Trash <button type="button" (click)="undoMoveToTrash()">Undo</button></div>
     }
+    @if (render.state(); as r) {
+      @if (r.state === 'running') {
+        <div class="notice render-progress" role="status" aria-label="Render in progress">
+          <div class="bar"><span [style.width.%]="render.percent()"></span></div>
+          <div class="line">
+            <span class="spinner"></span>
+            <span>Rendering {{ r.name }} · {{ r.width }} px · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ render.eta() === null ? ' · estimating…' : ' · about ' + time(render.eta()!) + ' left' }}</span>
+            <button type="button" (click)="render.cancel()">Cancel</button>
+          </div>
+        </div>
+      }
+    }
+    @if (render.toast(); as t) {
+      <button type="button" class="notice undo render-ready" role="status" (click)="render.view()">
+        @if ('id' in t) { Render of {{ t.name }} is ready: click to view } @else { {{ t.error }} }
+      </button>
+    }
+    @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }
     @if (trashOpen()) { <app-trash-dialog (close)="trashOpen.set(false)" (changed)="onTrashChanged()" /> }
     @if (store.conflict()) {
       <div class="conflict" role="alert">

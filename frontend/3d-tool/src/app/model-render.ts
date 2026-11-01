@@ -30,9 +30,10 @@ const creased = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
 function creasedCopy(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
   let copy = creased.get(geometry);
   if (!copy) {
-    copy = toCreasedNormals(geometry, THREE.MathUtils.degToRad(35));
+    // a clone: toCreasedNormals hands back the very geometry it is given when that has no index (an STL), and changes it
+    copy = toCreasedNormals(geometry.clone(), THREE.MathUtils.degToRad(35));
     creased.set(geometry, copy);
-    geometry.addEventListener('dispose', () => { copy?.dispose(); creased.delete(geometry); });
+    geometry.addEventListener('dispose', () => { creased.delete(geometry); if (copy && copy !== geometry) copy.dispose(); });
   }
   return copy;
 }
