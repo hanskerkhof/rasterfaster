@@ -1,5 +1,6 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DocumentStore, itemColors } from './document.store';
+import { plaColors } from './pla-colors';
 import { closeOnEscape } from './escape-close';
 import { baseThicknessMm } from './z-levels';
 
@@ -55,7 +56,7 @@ import { baseThicknessMm } from './z-levels';
         </button>
         <button type="button" role="menuitem" [disabled]="!hasOthers()" (click)="moveTo()">
           <span class="icon">⇥</span>Move to…
-          <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span><span class="hint key">M</span>
+          <span class="hint">{{ hasOthers() ? 'a corner onto a corner of another part' : 'needs another part' }}</span><span class="hint key">⇧M</span>
         </button>
         <button type="button" role="menuitem" [disabled]="lowestAt(0)" (click)="moveToHeight(0)">
           <span class="icon">⤓</span>Move to ground
@@ -86,6 +87,10 @@ import { baseThicknessMm } from './z-levels';
           @for (c of colors; track c) {
             <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c)" [style.background]="hex(c)" [title]="hex(c)" (click)="setColor(c)"></button>
           }
+          <div class="section">PLA <small>Bambu Lab Basic</small></div>
+          @for (c of pla; track c.color) {
+            <button type="button" class="swatch" role="menuitem" [class.on]="isColor(c.color)" [style.background]="hex(c.color)" [title]="c.name + ' ' + hex(c.color)" [attr.aria-label]="c.name" (click)="setColor(c.color)"></button>
+          }
         </div>
       }
     }
@@ -99,7 +104,8 @@ import { baseThicknessMm } from './z-levels';
     .sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,.12); }
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .4; cursor: default; }
-    .flyout { position: fixed; z-index: 32; display: grid; grid-template-columns: repeat(4, 28px); gap: 4px; padding: 6px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .flyout { position: fixed; z-index: 32; display: grid; grid-template-columns: repeat(6, 28px); gap: 4px; padding: 6px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .section { grid-column: 1 / -1; margin-top: 4px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.14); font-size: 11px; font-weight: 600; opacity: .8; } .section small { font-weight: 400; opacity: .7; margin-left: 4px; }
     .swatch { width: 28px; height: 28px; padding: 0; border: 2px solid transparent; border-radius: 5px; }
     .swatch:hover:not(:disabled) { background-color: inherit; border-color: #fff; }
     .swatch.on { border-color: #fff; box-shadow: inset 0 0 0 2px #2b2f38; }
@@ -120,6 +126,7 @@ export class ObjectMenu {
   protected readonly hasOthers = computed(() => this.store.doc().items.length > this.items().length);
   protected readonly baseMm = baseThicknessMm;
   protected readonly colors = itemColors;
+  protected readonly pla = plaColors;
   /** Where the colour flyout is shown (fixed, beside the Color row), or null while it is closed. */
   protected readonly colorsAt = signal<{ x: number; y: number } | null>(null);
 
@@ -131,12 +138,12 @@ export class ObjectMenu {
     return this.items().length > 0 && this.items().every(i => i.color === c);
   }
 
-  /** Opens the flyout to the right of the row (to the left when there is no room); it is 4 swatches wide. */
+  /** Opens the flyout to the right of the row (to the left when there is no room); it is 6 swatches wide. */
   protected openColors(event: Event) {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const width = 4 * 28 + 3 * 4 + 14;
+    const width = 6 * 28 + 5 * 4 + 14;
     const x = rect.right + width + 8 <= window.innerWidth ? rect.right + 2 : Math.max(8, rect.left - width - 2);
-    this.colorsAt.set({ x, y: Math.min(rect.top, window.innerHeight - 100) });
+    this.colorsAt.set({ x, y: Math.max(8, Math.min(rect.top, window.innerHeight - 290)) });
   }
 
   /** Leaving the Color row (on the way to the flyout, across the menu's edge or another row) closes the flyout only after a moment, so it can be reached. */

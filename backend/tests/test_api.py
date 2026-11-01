@@ -275,3 +275,16 @@ def test_document_file_name_carries_the_version(client):
     assert 'filename="Named-v1.rasterfaster.json"' in client.get(f"{url}/export.rasterfaster").headers["content-disposition"]
     client.put(url, json={"name": "Named", "items": []})
     assert 'filename="Named-v1-edited.rasterfaster.json"' in client.get(f"{url}/export.rasterfaster").headers["content-disposition"]
+
+
+def test_document_view_roundtrip_and_validation(client):
+    view = {"projection": "persp", "position": [1, 2, 3], "target": [0, 0, 0], "zoom": 2.5, "radius": 120}
+    created = client.post("/api/documents", json={"name": "v", "items": [sample_item()], "view": view}).json()
+    fetched = client.get(f"/api/documents/{created['id']}").json()
+    assert fetched["view"] == {**view, "position": [1, 2, 3], "target": [0, 0, 0]}
+    assert fetched["changedSinceVersion"] is True
+    version = client.post(f"/api/documents/{created['id']}/versions").json()
+    moved = client.put(f"/api/documents/{created['id']}", json={"name": "v", "items": [sample_item()], "view": {**view, "zoom": 4}}).json()
+    assert moved["view"]["zoom"] == 4 and moved["changedSinceVersion"] is False  # moving the camera is not a change since the version
+    assert client.post("/api/documents", json={"name": "bad", "view": {**view, "zoom": 0}}).status_code == 422
+    assert client.post("/api/documents", json={"name": "bad", "view": {**view, "projection": "fisheye"}}).status_code == 422

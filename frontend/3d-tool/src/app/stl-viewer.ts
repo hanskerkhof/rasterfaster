@@ -4,7 +4,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
-import { DocLight, DocumentStore, Vec3, workArea } from './document.store';
+import { DocLight, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
@@ -28,7 +28,10 @@ const zGridModeStorageKey = 'rasterfaster.zGridMode';
 const cameraModeStorageKey = 'rasterfaster.cameraMode';
 const perspectiveFovDegrees = 35;
 /** Home / fit leaves this much room around what it frames (1 = touching the edge of the view). */
+const viewStoragePrefix = 'rasterfaster.docView.';
 const fitMargin = 1.35;
+/** The "Fit all" button fills the view much more closely than Home does: this little room is left round the objects. */
+const fitAllMargin = 1.05;
 
 /** Fusion-style camera choice. Ortho faces = perspective, but orthographic while looking straight at a face of the cube. */
 export type CameraMode = 'orthographic' | 'perspective' | 'perspective-ortho-faces';
@@ -116,8 +119,8 @@ function readShowPath() {
         <div class="axis">
           <span [class]="'name ' + axis">{{ axis.toUpperCase() }}<small>{{ angles()[axis] ? ' ' + (angles()[axis] > 0 ? '+' : '') + angles()[axis] + '°' : '' }}</small></span>
           <button type="button" class="undo" [style.visibility]="turned()[axis] ? 'visible' : 'hidden'" [title]="'Back to the rotation of the STL file about ' + axis.toUpperCase()" releaseFocus (click)="resetAxisRotation(axis)">↺</button>
-          <button type="button" [title]="'Rotate −' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] < 0" releaseFocus (click)="rotateObject(axis, -rotationStep())">−</button>
-          <button type="button" [title]="'Rotate +' + rotationStep() + '° around ' + axis.toUpperCase()" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] > 0" releaseFocus (click)="rotateObject(axis, rotationStep())">+</button>
+          <button type="button" [title]="'Rotate −' + rotationStep() + '° around ' + axis.toUpperCase() + ' (Option: −' + store.fineStepMm() + '°)'" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] < 0" releaseFocus (click)="rotateObject(axis, $event.altKey ? -store.fineStepMm() : -rotationStep())">−</button>
+          <button type="button" [title]="'Rotate +' + rotationStep() + '° around ' + axis.toUpperCase() + ' (Option: +' + store.fineStepMm() + '°)'" [disabled]="documentMode() && !store.selectedId()" [class.active]="rotated()[axis] > 0" releaseFocus (click)="rotateObject(axis, $event.altKey ? store.fineStepMm() : rotationStep())">+</button>
         </div>
       }
       <div class="axis">
@@ -384,6 +387,12 @@ export class StlViewer implements OnDestroy {
   private viewCube!: ViewCube;
   private documentScene!: DocumentScene;
   private needsDocumentFit = true;
+  /** A document was just opened: its saved view (see saveView) is used instead of fitting it, once. */
+  private restoreSavedView = true;
+  private saveViewTimer?: ReturnType<typeof setTimeout>;
+  /** When the user last moved the camera on purpose (drag, wheel, a view button): the automatic fit when a document opens is not saved as its view. */
+  private viewTouchedAt = 0;
+  private touchView() { this.viewTouchedAt = Date.now(); }
   private gridKey = '';
   /** Full 3D lattice (X, Y and the z levels) instead of only the ground grid; toggled from the view cube's right-click menu. */
   protected readonly grid3d = signal(readGrid3d());
@@ -432,7 +441,8 @@ export class StlViewer implements OnDestroy {
   private readonly pickRaycaster = new THREE.Raycaster();
   private lastItemCount = 0;
   private snapAnimation: { from: THREE.Vector3; rotation: THREE.Quaternion; start: number; distance: number } | null = null;
-  private readonly homeDirection = new THREE.Vector3(1, -1, 0.8).normalize();
+  /** The Home view: from the front right and a bit above (about 20° up; it used to be 30°, which looked down on the parts too steeply). */
+  private readonly homeDirection = new THREE.Vector3(1, -1, 0.5).normalize();
 
   constructor() {
     afterNextRender(() => { this.init(); this.ready.set(true); });
@@ -458,7 +468,7 @@ export class StlViewer implements OnDestroy {
     // A file came back (or went away): parts that could not be loaded are tried again.
     effect(() => { this.store.missingPaths(); untracked(() => { if (this.ready()) this.documentScene.retryFailed(); }); });
     // Another document was opened: fit the camera to it once its geometry has loaded.
-    effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.lastItemCount = 0; }); });
+    effect(() => { this.store.docId(); untracked(() => { this.needsDocumentFit = true; this.restoreSavedView = true; this.lastItemCount = 0; clearTimeout(this.saveViewTimer); }); });
     // The light of the Shaded view is part of the document: whatever the document says, the light does (not while it is being dragged).
     effect(() => {
       const light = this.store.doc().light ?? null;
@@ -515,6 +525,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.domElement.addEventListener('contextmenu', this.onLightContext, true); // the light's own menu: capture phase, so the parts' menu does not open
     this.renderer.domElement.addEventListener('pointerdown', this.onPointAtDown, true);
     this.renderer.domElement.addEventListener('pointermove', this.onPointAtMove);
+    this.renderer.domElement.addEventListener('pointerdown', () => this.touchView(), true); // any press on the view may move the camera
     this.renderer.domElement.addEventListener('pointerdown', this.onLightDown); // before the parts and the orbit controls: the light source can be grabbed
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
     const viewer = this; // the scene reads the *current* camera (it changes with the camera mode)
@@ -536,6 +547,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.domElement.addEventListener('pointerdown', this.stopFlight); // grabbing the view takes over from the fly-around
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
+    this.controls.addEventListener('change', () => this.scheduleSaveView());
     this.applyCameraMode(); // start in the saved mode (controls exist now)
     // Trackpad like Fusion 360: two-finger scroll pans, pinch zooms (towards the cursor). OrbitControls keeps rotate (drag).
     this.controls.enableZoom = false;
@@ -710,6 +722,7 @@ export class StlViewer implements OnDestroy {
 
   /** Animate the camera to look at the model from `direction` (unit vector model -> camera). */
   private snapTo(direction: THREE.Vector3) {
+    this.touchView();
     const dir = direction.clone();
     // Straight down/up the Z axis would make lookAt degenerate with Z-up; tilt a hair so +Y stays "up" on screen.
     if (Math.abs(dir.z) > 0.999) dir.y = -0.001 * Math.sign(dir.z);
@@ -720,6 +733,7 @@ export class StlViewer implements OnDestroy {
   }
 
   goHome() {
+    this.touchView();
     if (this.documentMode()) this.fitDocument();
     this.snapTo(this.homeDirection);
   }
@@ -796,16 +810,108 @@ export class StlViewer implements OnDestroy {
     }
     if (this.needsDocumentFit && this.documentScene.readyCount() === count && count > 0) {
       this.needsDocumentFit = false;
-      this.fitDocument();
+      const restore = this.restoreSavedView;
+      this.restoreSavedView = false;
+      if (!(restore && this.restoreView())) this.fitDocument();
     }
   }
 
-  /** The Fit all button: every object of the document in view, from the angle the user has set. */
+  /** The view of the open document (where the camera is, its zoom) is kept in the document file and in local storage, so a reload shows the document as it was left. */
+  private scheduleSaveView() {
+    const id = this.store.docId();
+    if (!id || !this.documentMode() || !this.ready() || this.restoreSavedView || this.needsDocumentFit) return; // not before the document has been put in view
+    if (Date.now() - this.viewTouchedAt > 4000) return; // the camera moved by itself (the fit on opening, a flight): nothing to keep
+    clearTimeout(this.saveViewTimer);
+    this.saveViewTimer = setTimeout(() => this.saveView(id), 400);
+  }
+
+  private saveView(id: string) {
+    if (id !== this.store.docId() || !this.documentMode()) return;
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    const view: DocView = {
+      projection: this.projection,
+      position: this.camera.position.toArray().map(round) as Vec3, target: this.controls.target.toArray().map(round) as Vec3, zoom: round(this.camera.zoom),
+      radius: round(this.radius),
+    };
+    this.store.setView(view); // in the document file, for every browser
+    try { localStorage.setItem(viewStoragePrefix + id, JSON.stringify(view)); } catch { /* storage unavailable */ } // and here, in case the document cannot be saved
+  }
+
+  /** Puts the camera where the user left it with this document; false when there is no saved view (or it was made with the other camera). */
+  private restoreView(): boolean {
+    const id = this.store.docId();
+    if (!id) return false;
+    try {
+      const saved = this.store.doc().view ?? JSON.parse(localStorage.getItem(viewStoragePrefix + id) ?? 'null'); // the document's own view first
+      const vector = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(n => Number.isFinite(n));
+      if (!saved || saved.projection !== this.projection || !vector(saved.position) || !vector(saved.target) || !Number.isFinite(saved.zoom) || !(saved.zoom > 0) || !(saved.radius > 0)) return false;
+      this.radius = saved.radius;
+      this.controls.target.set(...(saved.target as [number, number, number]));
+      this.camera.position.set(...(saved.position as [number, number, number]));
+      this.camera.zoom = saved.zoom;
+      this.controls.update();
+      this.resize();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** The Fit all button: every object of the document in view, as large as fits, from the angle the user has set. */
   fitAll() {
+    this.touchView();
     this.panAnimation = null;
     this.snapAnimation = null;
     this.pivotGoal = null;
-    this.fitDocument();
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const direction = offset.lengthSq() > 1e-6 ? offset.normalize() : this.homeDirection.clone();
+    const forward = direction.clone().negate();
+    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 0, 1));
+    if (right.lengthSq() < 1e-8) right.set(1, 0, 0);
+    right.normalize();
+    const up = new THREE.Vector3().crossVectors(right, forward).normalize();
+    const extent = this.documentScene.projectedExtent(right, up);
+    if (!extent) { this.fitDocument(); return; }
+    // a first guess from the outline on a flat screen ...
+    const size = extent.box.getSize(new THREE.Vector3());
+    this.radius = Math.max(size.length() / 2, 60);
+    const centre = extent.box.getCenter(new THREE.Vector3());
+    centre.addScaledVector(right, (extent.minU + extent.maxU) / 2 - centre.dot(right)).addScaledVector(up, (extent.minV + extent.maxV) / 2 - centre.dot(up));
+    const el = this.host().nativeElement;
+    const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
+    const needed = Math.max((extent.maxV - extent.minV) / 2, (extent.maxU - extent.minU) / 2 / aspect, 1) * fitAllMargin;
+    this.controls.target.copy(centre);
+    this.camera.position.copy(centre).addScaledVector(direction, this.fitDistance());
+    this.camera.zoom = Math.min(Math.max((this.radius * 1.3) / needed, 0.05), 60);
+    this.resize();
+    // ... then corrected with what the camera really shows (a perspective camera shows what is nearer larger): the parts are projected, the view is
+    // moved so their outline is in the middle of the screen, and zoomed so it nearly reaches the edges. A few rounds settle it.
+    const points = this.documentScene.worldPoints();
+    const point = new THREE.Vector3();
+    for (let round = 0; round < 6; round++) {
+      this.controls.update();
+      this.camera.updateMatrixWorld(true);
+      this.camera.updateProjectionMatrix();
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < points.length; i += 3) {
+        point.set(points[i], points[i + 1], points[i + 2]).project(this.camera);
+        if (!Number.isFinite(point.x) || point.z > 1) continue; // behind the camera
+        if (point.x < minX) minX = point.x; if (point.x > maxX) maxX = point.x;
+        if (point.y < minY) minY = point.y; if (point.y > maxY) maxY = point.y;
+      }
+      if (!Number.isFinite(minX)) break;
+      const middleX = (minX + maxX) / 2, middleY = (minY + maxY) / 2;
+      const halfX = (maxX - minX) / 2, halfY = (maxY - minY) / 2;
+      if (Math.abs(middleX) < 0.004 && Math.abs(middleY) < 0.004 && Math.abs(Math.max(halfX, halfY) - 1 / fitAllMargin) < 0.006) break;
+      // the visible half-size at the view centre, in mm, to turn the offset on the screen into a move of the view
+      const visibleHalfHeight = this.viewHeight() / 2;
+      const shift = right.clone().multiplyScalar(middleX * visibleHalfHeight * aspect).addScaledVector(up, middleY * visibleHalfHeight);
+      this.controls.target.add(shift);
+      this.camera.position.add(shift);
+      this.camera.zoom = Math.min(Math.max(this.camera.zoom * Math.min((1 / fitAllMargin) / Math.max(halfX, 1e-4), (1 / fitAllMargin) / Math.max(halfY, 1e-4)), 0.05), 60);
+    }
+    this.controls.update();
+    this.resize();
   }
 
   /** Re-centres the camera on the document without changing the viewing direction. */
@@ -814,13 +920,13 @@ export class StlViewer implements OnDestroy {
   }
 
   /** Centres the view on the box and zooms so it fills the view; the viewing direction stays. */
-  private fitBounds(bounds: THREE.Box3, keepRadius = false) {
+  private fitBounds(bounds: THREE.Box3, keepRadius = false, margin = fitMargin) {
     const center = bounds.getCenter(new THREE.Vector3());
     const size = bounds.getSize(new THREE.Vector3());
     if (!keepRadius) this.radius = Math.max(size.length() / 2, 60); // zooming to a part keeps the document's, so the rest still lies inside the clipping range
     const offset = this.camera.position.clone().sub(this.controls.target);
     const direction = offset.lengthSq() > 1e-6 ? offset.normalize() : this.homeDirection.clone(); // no view yet: start isometric
-    const zoom = this.fitZoom(size, direction);
+    const zoom = this.fitZoom(size, direction, margin);
     this.controls.target.copy(center);
     this.camera.position.copy(center).add(direction.multiplyScalar(this.fitDistance()));
     this.camera.zoom = zoom;
@@ -832,6 +938,7 @@ export class StlViewer implements OnDestroy {
    * Alt/Option + wheel zooms too, for a mouse wheel.
    */
   private readonly onWheel = (e: WheelEvent) => {
+    this.touchView();
     e.preventDefault();
     this.snapAnimation = null;
     this.panAnimation = null;
@@ -1047,7 +1154,7 @@ export class StlViewer implements OnDestroy {
    * The zoom at which a box (`size` mm across, centred on the view centre) fills the view along `direction` with `fitMargin` to spare.
    * It uses the box's real extent as seen from that direction (not its bounding sphere) and the window's aspect ratio.
    */
-  private fitZoom(size: THREE.Vector3, direction: THREE.Vector3) {
+  private fitZoom(size: THREE.Vector3, direction: THREE.Vector3, margin = fitMargin) {
     const forward = direction.clone().negate(); // from the camera towards the centre
     const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 0, 1));
     if (right.lengthSq() < 1e-8) right.set(1, 0, 0); // looking straight down or up
@@ -1061,7 +1168,7 @@ export class StlViewer implements OnDestroy {
     }
     const el = this.host().nativeElement;
     const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
-    const needed = Math.max(halfHeight, halfWidth / aspect, 1) * fitMargin;
+    const needed = Math.max(halfHeight, halfWidth / aspect, 1) * margin;
     return Math.min(Math.max((this.radius * 1.3) / needed, 0.05), 60); // the frustum at zoom 1 is radius * 1.3 high
   }
 
@@ -1086,6 +1193,7 @@ export class StlViewer implements OnDestroy {
    * stay the same, so the model does not jump when the projection changes.
    */
   private setProjection(kind: 'ortho' | 'persp') {
+    this.touchView();
     if (kind === this.projection) return;
     const target = this.controls.target;
     const offset = this.camera.position.clone().sub(target);

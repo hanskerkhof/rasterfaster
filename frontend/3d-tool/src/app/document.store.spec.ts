@@ -36,6 +36,32 @@ describe('DocumentStore history (mutate, gestures, undo)', () => {
     expect(store.canRedo()).toBe(false);
   });
 
+  it('moving the camera is saved with the document but is no edit: no undo step, and undo leaves the camera alone', () => {
+    vi.useFakeTimers();
+    try {
+      store.docId.set('doc-1');
+      const { id } = store.addItem(part());
+      const steps = () => (store.canUndo() ? 1 : 0);
+      expect(steps()).toBe(1);
+      store.undo(); // back to the empty document: now the only history is the camera
+      store.redo();
+      const view = { projection: 'persp' as const, position: [1, 2, 3] as Vec3, target: [0, 0, 0] as Vec3, zoom: 2, radius: 100 };
+      store.setView(view);
+      expect(store.doc().view).toEqual(view);
+      store.updateItems('Move', new Map([[id, { position: [20, 0, 0] }]]));
+      store.undo();
+      expect(positions()).toEqual([[0, 0, 0]]);
+      expect(store.doc().view).toEqual(view); // undoing a move did not put the camera back
+      store.setView({ ...view, zoom: 3 });
+      store.undo();
+      expect(store.doc().items).toEqual([]); // the next undo step is the part that was added, not the camera
+      expect(store.doc().view?.zoom).toBe(3);
+    } finally {
+      store.docId.set(null);
+      vi.useRealTimers();
+    }
+  });
+
   it('a change that changes nothing makes no undo step', () => {
     const { id } = store.addItem(part([20, 0, 0]));
     store.undo();

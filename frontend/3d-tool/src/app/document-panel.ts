@@ -1,7 +1,7 @@
 import { LibraryService } from './library.service';
 import { cubeKeepOut } from './view-cube';
 import { ReleaseFocus } from './release-focus';
-import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
 import { RenderService } from './render.service';
@@ -173,7 +173,7 @@ function readGeometry(): PanelGeometry | null {
     @if (bomOpen()) { <app-bom-dialog (close)="bomOpen.set(false)" /> }
     @if (versionsOpen()) { <app-versions-dialog (close)="versionsOpen.set(false)" /> }
     <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌥D: fold / unfold this panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · R: show or hide the rotate tool (drag a ring) · M: show or hide the move tool (drag an arrow, or click a corner and then a corner of another part) · in both tools Enter keeps the result and leaves, Esc undoes it and leaves · ⇧M: only the corner-to-corner move · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
+        <div class="hint">Drag: move on grid ({{ step.x }}×{{ step.y }} mm) · Shift+drag on a part: height (steps follow the Grid mode: right-click the view cube) · Alt: 1 mm · Shift+drag on empty space: select by rectangle (⌘ adds) · Arrows nudge X/Y · Shift+↑↓ or PgUp/PgDn: Z · Shift+←→: turn about Z · X / Y / Z keys: rotate about that axis (Shift = reverse), by the Step in the rotate panel · ⌥D: fold / unfold this panel · ⌘C / ⌘X / ⌘V: copy, cut, paste at the view centre · V: dim / show the selection · R: show or hide the rotate tool (drag a ring) · M: show or hide the move tool (drag an arrow, or click a corner and then a corner of another part) · in both tools Enter keeps the result and leaves, Esc undoes it and leaves · ⇧M: only the corner-to-corner move · F12: render (the Render dialog) · ⌘-click: centre the view there · Work area 100 × 100 cells (±1000 mm)</div>
     </details>
 
   `,
@@ -412,7 +412,7 @@ export class DocumentPanel {
 
   /** The URL of the Blender export: the camera of the 3D view and, in the shaded view, its light. */
   private blenderEndpoint() {
-    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()]].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
+    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()], ['dof', this.render.depthOfField() ? 'true' : ''], ['focus', this.render.depthOfField() && this.store.doc().items.some(i => i.id === this.render.focusId()) ? this.render.focusId() : ''], ['strength', this.render.depthOfField() ? String(this.render.dofStrength()) : '']].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
     return params.length ? `export.blend?${params.join('&')}` : 'export.blend';
   }
   protected readonly bomOpen = signal(false);
@@ -425,6 +425,9 @@ export class DocumentPanel {
     this.render.openQuick(`/api/documents/${id}/` + this.blenderEndpoint().replace('export.blend', 'render.png'));
   }
   protected readonly versionsOpen = signal(false);
+  private readonly renderRequests = effect(() => { // F12
+    if (this.render.openRequests() > 0) untracked(() => void this.openRender());
+  });
 
   /** "v3" (latest saved version), with a dot while the working copy has changes since it; "v–" before the first version. */
   protected versionLabel() {

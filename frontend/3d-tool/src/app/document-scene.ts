@@ -193,6 +193,10 @@ export class DocumentScene {
   private readonly listeners: [EventTarget, string, EventListener][] = [];
   /** The rotate tool (key R): rings about X, Y and Z at the centre of the selection, like Fusion's Move/Copy rotate handles. */
   private readonly rotatePivot = new THREE.Object3D();
+  /** The X, Y and Z axes drawn through the pivot while the rotate tool is open: lines with an arrow head, the size of the rings on the screen. */
+  private readonly rotateAxes = new THREE.Group();
+  private readonly rotateAxisParts = new Map<string, { line: THREE.MeshBasicMaterial; tip: THREE.MeshBasicMaterial }>();
+  private ringRadius = 1;
   private readonly rotateTool: TransformControls;
   private rotateToolOn = false;
   /** The move tool (key M): arrows along X, Y and Z at the lower left corner of the selection (the corner of its box with the lowest X, Y and Z). */
@@ -202,7 +206,15 @@ export class DocumentScene {
   private moveToolFor = '';
   /** Option is held (read in the capture phase, so it is up to date when the move tool reports a drag). */
   private altHeld = false;
-  private readonly trackAlt = (e: Event) => { this.altHeld = (e as KeyboardEvent | PointerEvent).altKey; };
+  private readonly trackAlt = (e: Event) => {
+    this.altHeld = (e as KeyboardEvent | PointerEvent).altKey;
+    this.applyRotationSnap(); // the rotate tool turns in fine steps while Option is down
+  };
+
+  /** The rotate tool snaps to the Step of the rotate panel, or, with Option held, to the fine step (1° or 0.1°, as set with the step button). */
+  private applyRotationSnap() {
+    this.rotateTool?.setRotationSnap(THREE.MathUtils.degToRad(this.altHeld ? this.ctx.store.fineStepMm() : this.ctx.rotationStep()));
+  }
   /** The tool put the corner handles of "Move to…" up (so it can take them down again). */
   private movePickOwned = false;
   private moveSnapshot: Map<string, { position: Vec3 }> | null = null;
@@ -234,12 +246,18 @@ export class DocumentScene {
       const axis = (event as unknown as { value: string | null }).value as 'X' | 'Y' | 'Z' | null;
       this.rotateTool.setColors(ringColors.X.dim, ringColors.Y.dim, ringColors.Z.dim, axis && axis in ringColors ? ringColors[axis].bright : 0xffffff);
       for (const [letter, label] of this.ringLabels) { label.sprite.material.map = axis === letter ? label.bright : label.dim; label.sprite.material.needsUpdate = true; } // and so does its letter
+      for (const [letter, part] of this.rotateAxisParts) { // and its axis
+        const colors = ringColors[letter as 'X' | 'Y' | 'Z'];
+        part.line.color.setHex(axis === letter ? colors.bright : colors.dim);
+        part.tip.color.setHex(colors.bright);
+      }
     });
     this.addRingLabels();
     const helper = this.rotateTool.getHelper();
     helper.visible = false;
     ctx.scene.add(this.rotatePivot, helper);
     this.buildPivotMarker();
+    this.buildRotateAxes();
     this.rotateTool.addEventListener('dragging-changed', event => this.onRotateDragging(!!(event as unknown as { value: boolean }).value));
     this.rotateTool.addEventListener('objectChange', () => this.onRotateChange());
     for (const type of ['pointermove', 'pointerdown', 'keydown', 'keyup']) window.addEventListener(type, this.trackAlt, true);
@@ -634,6 +652,46 @@ export class DocumentScene {
     return box.isEmpty() ? null : box;
   }
 
+  /**
+   * How far the drawn parts reach on the screen: their real vertices (not the corners of their boxes) projected on the view's right and up
+   * directions. Returns the extents on both and the box of the parts, or null when nothing is drawn.
+   */
+  projectedExtent(right: THREE.Vector3, up: THREE.Vector3): { minU: number; maxU: number; minV: number; maxV: number; box: THREE.Box3 } | null {
+    const box = this.bounds();
+    if (!box) return null;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const item of this.ctx.store.doc().items) {
+      const entry = this.entryFor(item);
+      if (!entry) continue;
+      const position = entry.geometry.getAttribute('position');
+      const offsetU = right.x * item.position[0] + right.y * item.position[1] + right.z * item.position[2];
+      const offsetV = up.x * item.position[0] + up.y * item.position[1] + up.z * item.position[2];
+      for (let i = 0; i < position.count; i++) {
+        const x = position.getX(i), y = position.getY(i), z = position.getZ(i);
+        const u = offsetU + right.x * x + right.y * y + right.z * z;
+        const v = offsetV + up.x * x + up.y * y + up.z * z;
+        if (u < minU) minU = u; if (u > maxU) maxU = u;
+        if (v < minV) minV = v; if (v > maxV) maxV = v;
+      }
+    }
+    return Number.isFinite(minU) ? { minU, maxU, minV, maxV, box } : null;
+  }
+
+  /** Points on the drawn parts in world coordinates (their vertices, thinned out to at most `max`, and the corners of their boxes), for fitting the view. */
+  worldPoints(max = 150000): Float32Array {
+    const items = this.ctx.store.doc().items.filter(item => this.entryFor(item));
+    const total = items.reduce((sum, item) => sum + this.entryFor(item)!.geometry.getAttribute('position').count, 0);
+    const stride = Math.max(1, Math.ceil(total / max));
+    const points: number[] = [];
+    for (const item of items) {
+      const entry = this.entryFor(item)!;
+      const position = entry.geometry.getAttribute('position');
+      for (let i = 0; i < position.count; i += stride) points.push(position.getX(i) + item.position[0], position.getY(i) + item.position[1], position.getZ(i) + item.position[2]);
+      for (const fx of [0, 1]) for (const fy of [0, 1]) for (const fz of [0, 1]) points.push(item.position[0] + entry.size.x * fx, item.position[1] + entry.size.y * fy, item.position[2] + entry.size.z * fz);
+    }
+    return new Float32Array(points);
+  }
+
   /** Centre of the box around all selected items, or null when nothing (loaded) is selected. */
   selectionCenter() {
     const box = new THREE.Box3();
@@ -923,6 +981,7 @@ export class DocumentScene {
       // A point of the ring at 45° (the rings are thin tori already lying in their plane; some are half circles): the label sits there.
       const { arc, tubularSegments } = g.parameters;
       const at = g.getAttribute('position');
+      this.ringRadius = g.parameters.radius;
       const index = Math.round(tubularSegments * (Math.PI / 4) / arc);
       if (index > tubularSegments) continue;
       const letter = (color: number) => {
@@ -956,6 +1015,37 @@ export class DocumentScene {
       const spot = new THREE.Vector3();
       sprite.onBeforeRender = () => { sprite.getWorldPosition(spot); grab.position.copy(pickers.worldToLocal(spot)); };
     }
+  }
+
+  /** The three axes through the pivot, as lines with an arrow head at the positive end, drawn over everything like the rings. */
+  private buildRotateAxes() {
+    const directions: Record<'X' | 'Y' | 'Z', THREE.Vector3> = { X: new THREE.Vector3(1, 0, 0), Y: new THREE.Vector3(0, 1, 0), Z: new THREE.Vector3(0, 0, 1) };
+    let first: THREE.Object3D | null = null;
+    for (const axis of ['X', 'Y', 'Z'] as const) {
+      const direction = directions[axis];
+      const lineMaterial = new THREE.MeshBasicMaterial({ color: ringColors[axis].dim, depthTest: false, transparent: true, opacity: 0.9 });
+      const line = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 2, 8), lineMaterial); // a thin bar: a plain line would be one pixel
+      line.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction);
+      line.renderOrder = 25;
+      const tipMaterial = new THREE.MeshBasicMaterial({ color: ringColors[axis].bright, depthTest: false, transparent: true });
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.22, 14), tipMaterial);
+      tip.position.copy(direction).multiplyScalar(1.08);
+      tip.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction); // the cone points along the axis
+      tip.renderOrder = 26;
+      this.rotateAxes.add(line, tip);
+      this.rotateAxisParts.set(axis, { line: lineMaterial, tip: tipMaterial });
+      first ??= line;
+    }
+    // the size of the rings: the rotate tool scales its rings to keep their size on the screen, the axes follow that scale
+    const gizmo = (this.rotateTool as unknown as { _gizmo?: { gizmo?: { rotate?: THREE.Object3D } } })._gizmo;
+    first!.onBeforeRender = () => {
+      const k = gizmo?.gizmo?.rotate?.children[0]?.scale.x || 1;
+      this.rotateAxes.position.copy(this.rotatePivot.position);
+      this.rotateAxes.scale.setScalar(k * this.ringRadius);
+      this.rotateAxes.updateMatrixWorld(true);
+    };
+    this.rotateAxes.visible = false;
+    this.ctx.scene.add(this.rotateAxes);
   }
 
   private buildPivotMarker() {
@@ -1205,13 +1295,14 @@ export class DocumentScene {
     helper.visible = show;
     this.rotateTool.enabled = show;
     this.pivotMarker.visible = show || this.pivotFlashing;
+    this.rotateAxes.visible = show;
     if (!show) { if (this.rotateTool.object) this.rotateTool.detach(); return; }
     if (this.rotateStart) return;
     const box = this.selectionBounds();
     if (!box) return;
     this.rotatePivot.position.copy(this.pivotOf(items, box));
     this.rotatePivot.quaternion.identity();
-    this.rotateTool.setRotationSnap(THREE.MathUtils.degToRad(this.ctx.rotationStep()));
+    this.applyRotationSnap();
     if (this.rotateTool.object !== this.rotatePivot) this.rotateTool.attach(this.rotatePivot);
   }
 
@@ -1235,15 +1326,16 @@ export class DocumentScene {
   private onRotateChange() {
     const start = this.rotateStart;
     if (!start) return;
-    this.rotateGroup(start.items, this.rotatePivot.quaternion.clone(), start.pivot, start.low);
+    this.rotateGroup(start.items, this.rotatePivot.quaternion.clone(), start.pivot, start.low, false);
   }
 
   /**
    * Turns several items as one rigid body: every point of every part is rotated about the pivot, so the parts keep their places relative to each
    * other (a part's own box centre is not its mesh's centre, so turning each box about the pivot would pull them apart). The group as a whole
-   * goes back to the grid and keeps its lowest point.
+   * keeps its lowest point, and, with `toGrid` (the buttons and keys), goes back to the grid; the rotate tool turns without that, so the parts do not
+   * jump when a ring is grabbed.
    */
-  private rotateGroup(items: DocItem[], step: THREE.Quaternion, pivot: THREE.Vector3, oldLow: number) {
+  private rotateGroup(items: DocItem[], step: THREE.Quaternion, pivot: THREE.Vector3, oldLow: number, toGrid = true) {
     const turned = items.map(item => {
       const base = this.baseGeometries.get(item.path)!;
       const old = new THREE.Quaternion(...item.rotation);
@@ -1258,7 +1350,7 @@ export class DocumentScene {
       return { item, rotation: nextRotation, size: entry.size, position };
     });
     const low = new THREE.Vector3(Math.min(...turned.map(t => t.position.x)), Math.min(...turned.map(t => t.position.y)), Math.min(...turned.map(t => t.position.z)));
-    const shift = new THREE.Vector3(snap(low.x, snapStepMm.x) - low.x, snap(low.y, snapStepMm.y) - low.y, oldLow - low.z);
+    const shift = new THREE.Vector3(toGrid ? snap(low.x, snapStepMm.x) - low.x : 0, toGrid ? snap(low.y, snapStepMm.y) - low.y : 0, oldLow - low.z);
     const delta = this.clampDelta(shift.toArray() as Vec3, turned.map(t => ({ position: t.position.toArray() as Vec3, size: t.size.toArray() as Vec3 })));
     const round3 = (v: number) => Math.round(v * 1000) / 1000;
     const changes = new Map<string, Partial<{ position: Vec3; rotation: Quat }>>();
@@ -1292,9 +1384,12 @@ export class DocumentScene {
     return (this.entryFor(item)?.size.toArray() as Vec3 | undefined) ?? null;
   }
 
-  /** For items set to "keep centered on grid", puts the footprint centre back on a cell middle after a horizontal move. */
-  private keepCentered(item: DocItem, position: Vec3, horizontal: boolean): Vec3 {
-    const size = item.centered && horizontal ? this.sizeOfItem(item) : null;
+  /**
+   * For items set to "keep centered on grid", puts the footprint centre back on a cell middle after a horizontal move. Not for a fine (Option) move:
+   * that one is meant to leave the cell middle by 1 mm (or 0.1 mm); the next ordinary move centres the part again.
+   */
+  private keepCentered(item: DocItem, position: Vec3, horizontal: boolean, fine = false): Vec3 {
+    const size = item.centered && horizontal && !fine ? this.sizeOfItem(item) : null;
     return size ? clampToWorkArea(cellCenteredPosition(position, size), size) : position;
   }
 
@@ -1340,7 +1435,7 @@ export class DocumentScene {
     if (!this.active || e.button !== 0) return;
     this.moveTool.camera = this.ctx.camera;
     this.rotateTool.camera = this.ctx.camera;
-    this.rotateTool.setRotationSnap(THREE.MathUtils.degToRad(this.ctx.rotationStep())); // the Step may have changed since the tool was shown
+    this.applyRotationSnap(); // the Step may have changed since the tool was shown
     if (this.rotateToolOn && this.rotateTool.axis) return; // a ring of the rotate tool was grabbed: it handles the drag
     if (this.moveToolOn && this.moveTool.axis) return; // an arrow of the move tool
     if (this.picking()) { // "Snap to grid…" / "Move to…": the next click chooses a handle
@@ -1417,7 +1512,7 @@ export class DocumentScene {
     if (drag.vertical && !fine && grabbed?.centered && grabbedSize) { // a centered part moves by its centre: the centre hops from level to level
       delta = [0, 0, nearestZLevel(point.z - drag.grabOffset.z + grabbedSize[2] / 2, this.ctx.zGridMode()) - grabbedSize[2] / 2 - start[2]];
     } else if (drag.vertical) delta = [0, 0, (fine ? snap(point.z - drag.grabOffset.z, fineStep) : nearestZLevel(point.z - drag.grabOffset.z, this.ctx.zGridMode())) - start[2]];
-    else if (grabbed?.centered && grabbedSize) {
+    else if (grabbed?.centered && grabbedSize && !fine) {
       const cell = cellCenteredPosition([rawX, rawY, start[2]], grabbedSize); // a centered item hops from cell middle to cell middle
       delta = [cell[0] - start[0], cell[1] - start[1], 0];
     } else delta = [snap(rawX, step('x')) - start[0], snap(rawY, step('y')) - start[1], 0];
@@ -1427,7 +1522,7 @@ export class DocumentScene {
     const changes = new Map<string, Partial<{ position: Vec3 }>>();
     for (const item of dragged) {
       const from = drag.starts.get(item.id)!;
-      changes.set(item.id, { position: this.keepCentered(item, [from[0] + dx, from[1] + dy, from[2] + dz], !drag.vertical) });
+      changes.set(item.id, { position: this.keepCentered(item, [from[0] + dx, from[1] + dy, from[2] + dz], !drag.vertical, fine) });
     }
     const current = grabbed?.position;
     const target = changes.get(drag.id)!.position!;
@@ -1461,7 +1556,7 @@ export class DocumentScene {
       if (!items.length) return false;
       const [cx, cy, cz] = this.clampDelta([dx, dy, dz], this.placed(items));
       const horizontal = cx !== 0 || cy !== 0;
-      store.updateItems('Nudge', new Map(items.map(i => [i.id, { position: this.keepCentered(i, [round3(i.position[0] + cx), round3(i.position[1] + cy), round3(i.position[2] + cz)], horizontal) }])));
+      store.updateItems('Nudge', new Map(items.map(i => [i.id, { position: this.keepCentered(i, [round3(i.position[0] + cx), round3(i.position[1] + cy), round3(i.position[2] + cz)], horizontal, fine) }])));
       return true;
     };
     const stepX = fine ? fineStep : snapStepMm.x, stepY = fine ? fineStep : snapStepMm.y;
@@ -1481,8 +1576,8 @@ export class DocumentScene {
     else if (command && e.key.toLowerCase() === 'x') store.cutSelection();
     else if (command && e.key.toLowerCase() === 'v') store.pasteClipboard();
     else if (command && e.key.toLowerCase() === 'a') store.selectAll();
-    else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z
-    else if (e.key === 'ArrowRight') (e.shiftKey ? this.rotateSelected('z', -this.ctx.rotationStep()) : move(stepX, 0, 0));
+    else if (e.key === 'ArrowLeft') (e.shiftKey ? this.rotateSelected('z', fine ? fineStep : this.ctx.rotationStep()) : move(-stepX, 0, 0)); // Shift+←/→: turn about Z (Option: in fine steps)
+    else if (e.key === 'ArrowRight') (e.shiftKey ? this.rotateSelected('z', -(fine ? fineStep : this.ctx.rotationStep())) : move(stepX, 0, 0));
     else if (!command && !e.altKey && e.key.toLowerCase() === 'v') { // V: dim / show the selection (the same as the menu's Dim)
       const selected = store.selectedItems();
       if (selected.length) store.setMuted(selected.map(i => i.id), !selected.every(i => i.muted));
@@ -1493,7 +1588,10 @@ export class DocumentScene {
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
     else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) this.toggleRotateTool(); // R: the rotate tool
-    else if (!command && !e.altKey && ['x', 'y', 'z'].includes(e.key.toLowerCase())) this.rotateSelected(e.key.toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -this.ctx.rotationStep() : this.ctx.rotationStep());
+    else if (!command && /^Key[XYZ]$/.test(e.code)) { // X / Y / Z: turn about that axis (Shift: the other way, Option: in fine steps; e.code because Option changes the typed letter)
+      const degrees = fine ? fineStep : this.ctx.rotationStep();
+      this.rotateSelected(e.code.slice(3).toLowerCase() as 'x' | 'y' | 'z', e.shiftKey ? -degrees : degrees);
+    }
     else if (e.key === 'ArrowUp') (e.shiftKey ? moveZ(1) : move(0, stepY, 0)); // Shift = height, like Shift+drag
     else if (e.key === 'ArrowDown') (e.shiftKey ? moveZ(-1) : move(0, -stepY, 0));
     else if (e.key === 'PageUp' || e.key === ']') moveZ(1);
@@ -1519,6 +1617,7 @@ export class DocumentScene {
     this.clearSelectionBoxes();
     this.snapHandles.clear();
     this.rotateTool.dispose();
+    this.ctx.scene.remove(this.rotateAxes);
     for (const type of ['pointermove', 'pointerdown', 'keydown', 'keyup']) window.removeEventListener(type, this.trackAlt, true);
     this.moveTool.dispose();
     this.ctx.scene.remove(this.movePivot, this.moveTool.getHelper());

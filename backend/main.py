@@ -357,10 +357,28 @@ class DocumentLight(BaseModel):
     targetId: str | None = Field(default=None, max_length=64)  # a part it shines at (it follows the part when that moves); wins over target
 
 
+class DocumentView(BaseModel):
+    """Where the camera of the 3D view was left: the document opens like that again."""
+    projection: Literal["ortho", "persp"]
+    position: tuple[float, float, float]
+    target: tuple[float, float, float]
+    zoom: float = Field(gt=0, le=1000)
+    radius: float = Field(gt=0, le=1e7)  # the size the frontend gives the scene (it decides the clipping range)
+
+
+class DocumentRenderSettings(BaseModel):
+    """What the Render dialog remembers for a document."""
+    depthOfField: bool = False  # the Blender scene gets a depth of field
+    focusId: str | None = Field(default=None, max_length=64)  # the part it is focused on; none: the part nearest to the camera in the picture
+    dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
+
+
 class DocumentBody(BaseModel):
     name: str = Field(default="Untitled", min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
     light: DocumentLight | None = None  # none: the default light
+    view: DocumentView | None = None  # the camera of the 3D view; none: the document is fitted into the view
+    render: DocumentRenderSettings | None = None  # the settings of the Render dialog; none: the defaults
 
 
 class DocumentOut(DocumentBody):
@@ -557,6 +575,8 @@ class DocumentFile(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
     light: DocumentLight | None = None
+    view: DocumentView | None = None
+    render: DocumentRenderSettings | None = None
     versions: list[StoredVersion] = Field(default_factory=list, max_length=1000)
 
 
@@ -567,7 +587,7 @@ def export_document_file(documentId: str) -> Response:
     directory = versions.versions_dir(documentsRoot, documentId)
     history = [data for number in versions.numbers(directory) if (data := versions.read(directory, number))]
     payload = DocumentFile(format=documentFileFormat, formatVersion=1, exportedAt=time.time(), id=documentId, name=document.name,
-                           items=document.items, light=document.light, versions=history)
+                           items=document.items, light=document.light, view=document.view, render=document.render, versions=history)
     label = (f"-v{document.version}" + ("-edited" if document.changedSinceVersion else "")) if document.version else ""  # e.g. Name-v3 (or Name-v3-edited: the working copy is ahead of v3)
     filename = re.sub(r"[^\w.-]+", "_", document.name) + label + ".rasterfaster.json"
     return Response(payload.model_dump_json(indent=2), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -589,7 +609,7 @@ def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "c
         stored = [{"version": v.version, "savedAt": v.savedAt, "name": v.name, "items": [i.model_dump() for i in v.items]} for v in sorted(file.versions, key=lambda v: v.version)]
         if len({v["version"] for v in stored}) != len(stored):
             raise HTTPException(status_code=422, detail="the file has duplicate version numbers")
-        write_document(documentId, DocumentBody(name=file.name, items=file.items, light=file.light))
+        write_document(documentId, DocumentBody(name=file.name, items=file.items, light=file.light, view=file.view, render=file.render))
         versions.replace_all(versions.versions_dir(documentsRoot, documentId), stored)
         return read_document(documentId)
 
@@ -685,7 +705,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None):
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -699,15 +719,20 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
             ",".join(str(v) for v in saved.direction) + ";" + (f"part:{saved.targetId}" if saved.targetId else ",".join(str(v) for v in saved.target) if saved.target else "")) if saved else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
-    return document, blender, glb, sun
+    on = dof if dof is not None else bool(document.render and document.render.depthOfField)
+    focusId = focus if focus is not None else (document.render.focusId if document.render else None)
+    if focusId is not None and not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", focusId):
+        raise HTTPException(status_code=422, detail="focus must be the id of a part")
+    level = strength if strength is not None else (document.render.dofStrength if document.render else 3)
+    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}")
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5)) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
-    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
     try:
-        data = blenderexport.build_blend(glb, blender, studio, sun)
+        data = blenderexport.build_blend(glb, blender, studio, sun, depthOfField)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
@@ -717,12 +742,12 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 
 @app.get("/api/documents/{documentId}/render.png")
-def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None,
+def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5),
                         width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128)) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
-    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
     try:
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples)
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
@@ -797,7 +822,7 @@ async def events(websocket: WebSocket) -> None:
         notifier.connections.discard(websocket)
 
 
-def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None) -> None:
+def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, dof: str = "0") -> None:
     def started(process: object) -> None:
         job.process = process
         if job.state == "cancelled":  # cancelled before Blender had started
@@ -812,7 +837,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None) -
             notifier.notify({"type": "render", **job.view()})
 
     try:
-        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800)
+        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
         if job.state == "running":
@@ -823,16 +848,16 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None) -
 
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
-def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None,
+def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5),
                      width: int = Query(default=1920, ge=160, le=3840), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
-    document, blender, glb, sun = blender_scene(documentId, colours, view, light)
+    document, blender, glb, sun, depthOfField = blender_scene(documentId, colours, view, light, dof, focus, strength)
     if any(j.state == "running" for j in renderJobs.values()):
         raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
     renderJobs.clear()  # an older picture nobody collected is dropped
     job = RenderJob(document.name, width, samples)
     renderJobs[job.id] = job
-    threading.Thread(target=run_render_job, args=(job, blender, glb, sun), daemon=True).start()
+    threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField), daemon=True).start()
     notifier.notify({"type": "render", **job.view()})
     return job.view()
 

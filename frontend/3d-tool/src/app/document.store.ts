@@ -83,10 +83,36 @@ export interface DocLight {
   targetId?: string | null;
 }
 
+/** Where the camera of the 3D view was left. Kept in the document file, but not part of the undo history. */
+export interface DocView {
+  projection: 'ortho' | 'persp';
+  position: Vec3;
+  target: Vec3;
+  zoom: number;
+  radius: number;
+}
+
+/** What the Render dialog remembers for a document. */
+export interface DocRenderSettings {
+  /** The Blender scene gets a depth of field, focused on the part nearest to the camera. */
+  depthOfField: boolean;
+  /** The part the depth of field is focused on; none: the part nearest to the camera in the picture. */
+  focusId?: string | null;
+  /** How blurred what is far from the focus is: 1 subtle to 5 extreme; 3 (the default): unsharp but still recognizable. */
+  dofStrength?: number;
+}
+
 export interface RfDocument {
   name: string;
   items: DocItem[];
   light?: DocLight | null;
+  view?: DocView | null;
+  render?: DocRenderSettings | null;
+}
+
+/** What the undo history compares and stores: the document without its camera view (moving the camera is not an edit). */
+function historyOf(doc: RfDocument): string {
+  return JSON.stringify({ ...doc, view: undefined, render: undefined });
 }
 
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
@@ -96,6 +122,8 @@ const fineStepStorageKey = 'rasterfaster.fineStepMm';
 export const itemColors = [0x6fa8dc, 0x93c47d, 0xf6b26b, 0xc27ba0, 0x8e7cc3, 0xe06666, 0x76a5af, 0xffd966];
 const maxHistory = 200;
 /** A gesture open this long never got its end (lost pointer, tab switch): treat it as finished. */
+/** The camera view is saved this long after its last change (it is not worth a save per move). */
+const viewSaveDelayMs = 3000;
 const gestureStaleMs = 30_000;
 const saveDelayMs = 400;
 
@@ -171,7 +199,7 @@ export class DocumentStore {
 
   private past: string[] = [];
   private future: string[] = [];
-  private committed = JSON.stringify(this.doc());
+  private committed = historyOf(this.doc());
   private gestureLabel: string | null = null;
   private gestureStartedAt = 0;
   private saveTimer?: ReturnType<typeof setTimeout>;
@@ -183,8 +211,8 @@ export class DocumentStore {
     addEventListener('pagehide', () => {
       const id = this.docId();
       if (!id || !this.dirty) return;
-      const { name, items, light } = this.doc();
-      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items, light }) });
+      const { name, items, light, view, render } = this.doc();
+      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items, light, view, render }) });
     });
   }
 
@@ -250,7 +278,7 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items, light: stored.light }, stored.modified);
+    this.resetTo(stored.id, { name: stored.name, items: stored.items, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
     this.takeVersionInfo(stored);
   }
 
@@ -287,7 +315,7 @@ export class DocumentStore {
     this.selectedIds.set([]);
     this.past = [];
     this.future = [];
-    this.committed = JSON.stringify(doc);
+    this.committed = historyOf(doc);
     this.updateFlags();
     this.saveState.set('saved');
     if (repaired) this.scheduleSave(); // write the repaired document back
@@ -316,7 +344,7 @@ export class DocumentStore {
       if (this.dirty) {
         this.conflict.set(stored);
       } else {
-        this.resetTo(id, { name: stored.name, items: stored.items, light: stored.light }, stored.modified);
+        this.resetTo(id, { name: stored.name, items: stored.items, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
         this.takeVersionInfo(stored);
         this.say('Updated from another window');
       }
@@ -327,7 +355,7 @@ export class DocumentStore {
   useRemoteVersion() {
     const remote = this.conflict();
     if (!remote) return;
-    this.resetTo(remote.id, { name: remote.name, items: remote.items, light: remote.light }, remote.modified);
+    this.resetTo(remote.id, { name: remote.name, items: remote.items, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
     this.takeVersionInfo(remote);
   }
 
@@ -376,7 +404,7 @@ export class DocumentStore {
     await this.flush();
     const stored = await firstValueFrom(this.api.getVersion(id, version));
     const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
-    this.resetTo(id, { name: stored.name, items: stored.items, light: this.doc().light });
+    this.resetTo(id, { name: stored.name, items: stored.items, light: this.doc().light, view: this.doc().view, render: this.doc().render });
     clearTimeout(this.saveTimer);
     this.dirty = false;
     this.saveState.set('saved');
@@ -425,7 +453,7 @@ export class DocumentStore {
     const id = this.docId();
     if (!id || version === null) return;
     const promoted = await firstValueFrom(this.api.promote(id, version));
-    this.resetTo(id, { name: promoted.name, items: promoted.items, light: this.doc().light }, promoted.modified);
+    this.resetTo(id, { name: promoted.name, items: promoted.items, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
     this.takeVersionInfo(promoted);
     this.say(`Promoted v${version} to v${promoted.version}`);
     await this.refreshVersions();
@@ -504,6 +532,31 @@ export class DocumentStore {
     if (this.dirty && this.saveState() !== 'error') await this.flush(); // edits arrived while saving
   }
 
+  /**
+   * The camera of the 3D view moved: it is kept in the document (so it opens like this again, also in another browser). Not an edit: no undo step,
+   * the version diamond does not light up, and it is saved quietly a few seconds after the last move.
+   */
+  setView(view: DocView) {
+    if (this.viewing() !== null || !this.docId()) return;
+    const current = this.doc();
+    if (JSON.stringify(current.view ?? null) === JSON.stringify(view)) return;
+    this.doc.set({ ...current, view });
+    this.dirty = true;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => void this.flush(), viewSaveDelayMs);
+  }
+
+  /** A setting of the Render dialog changed: kept in the document, quietly like the camera view (no undo step, no version diamond). */
+  setRenderSettings(render: DocRenderSettings) {
+    if (this.viewing() !== null || !this.docId()) return;
+    const current = this.doc();
+    if (JSON.stringify(current.render ?? null) === JSON.stringify(render)) return;
+    this.doc.set({ ...current, render });
+    this.dirty = true;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => void this.flush(), 800);
+  }
+
   /** The light of the Shaded view changed (null: back to the default); one undo step, saved with the document. */
   setLight(light: DocLight | null) {
     this.mutate('Move the light', d => ({ ...d, light }));
@@ -528,7 +581,7 @@ export class DocumentStore {
     if (this.gestureLabel && Date.now() - this.gestureStartedAt > gestureStaleMs) this.endGesture(); // a drag that never got its end
     const current = this.doc();
     const next = change(current);
-    if (next === current || JSON.stringify(next) === JSON.stringify(current)) return false;
+    if (next === current || historyOf(next) === historyOf(current)) return false;
     this.doc.set(next);
     if (!this.gestureLabel) this.commit();
     return true;
@@ -881,7 +934,7 @@ export class DocumentStore {
 
   /** Writes the undo step for what changed since the last one (no-op when nothing changed). Only mutate() and endGesture() call this. */
   private commit() {
-    const now = JSON.stringify(this.doc());
+    const now = historyOf(this.doc());
     if (now === this.committed) return;
     this.past.push(this.committed);
     if (this.past.length > maxHistory) this.past.shift();
@@ -907,7 +960,7 @@ export class DocumentStore {
 
   private restore(json: string) {
     this.committed = json;
-    this.doc.set(JSON.parse(json));
+    this.doc.set({ ...JSON.parse(json), view: this.doc().view, render: this.doc().render }); // undoing does not move the camera or change the render settings
     const present = new Set(this.doc().items.map(i => i.id));
     this.selectedIds.update(ids => ids.filter(id => present.has(id)));
     this.updateFlags();

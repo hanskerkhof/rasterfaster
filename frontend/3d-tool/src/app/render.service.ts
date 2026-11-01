@@ -1,5 +1,25 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
+
+const depthOfFieldStorageKey = 'rasterfaster.renderDepthOfField';
+const dofStrengthStorageKey = 'rasterfaster.renderDofStrength';
+const focusStoragePrefix = 'rasterfaster.renderFocus.';
+
+function readDofStrength(): number {
+  try {
+    const stored = Number(localStorage.getItem(dofStrengthStorageKey));
+    if (Number.isInteger(stored) && stored >= 1 && stored <= 5) return stored;
+  } catch { /* storage unavailable */ }
+  return 3;
+}
+
+function readFocus(docId: string): string | null {
+  try { return localStorage.getItem(focusStoragePrefix + docId); } catch { return null; }
+}
+
+function readDepthOfField(): boolean {
+  try { return localStorage.getItem(depthOfFieldStorageKey) === 'true'; } catch { return false; }
+}
 
 export interface RenderState {
   id: string;
@@ -44,9 +64,17 @@ export class RenderService {
   });
   /** The message that asks to be clicked: a render that is ready (or that failed). */
   readonly toast = signal<RenderState | { error: string } | null>(null);
+  /** F12 was pressed: the document panel (which knows the camera and the light of the view) opens the render dialog. Counts up. */
+  readonly openRequests = signal(0);
   /** The render dialog: the quick render's address, or a finished full-size render to show. */
   readonly dialog = signal<{ url: string; jobId: string } | null>(null);
   private readonly store = inject(DocumentStore);
+  /** The Depth of field checkbox of the Render dialog: remembered in local storage and, per document, in the document file. */
+  readonly depthOfField = signal(readDepthOfField());
+  /** The part the depth of field is focused on (an item id of the open document), or null for the part nearest to the camera in the picture. */
+  readonly focusId = signal<string | null>(null);
+  /** The strength of the depth of field, 1 (subtle) to 5 (extreme). */
+  readonly dofStrength = signal(readDofStrength());
   private socket?: WebSocket;
   private reconnect?: ReturnType<typeof setTimeout>;
   private wait = 3000;
@@ -54,6 +82,12 @@ export class RenderService {
   private pollTimer?: ReturnType<typeof setTimeout>;
 
   constructor() {
+    effect(() => { // a document that says what it wants wins over what this browser remembers
+      const own = this.store.doc().render;
+      const id = this.store.docId();
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); }
+      else this.focusId.set(id ? readFocus(id) : null);
+    });
     this.connect();
     void this.poll(); // the WebSocket may be unavailable (a proxy that does not pass it on): the same messages can be asked for
   }
@@ -122,6 +156,43 @@ export class RenderService {
     if (progress > 0 && progress !== this.reports.at(-1)?.progress) this.reports.push({ at: now, progress });
   }
 
+  setDepthOfField(on: boolean) {
+    this.depthOfField.set(on);
+    try { localStorage.setItem(depthOfFieldStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
+  /** The part to focus on (null: the part nearest to the camera in the picture): remembered per document, here and in the document file. */
+  setFocus(id: string | null) {
+    this.focusId.set(id);
+    const doc = this.store.docId();
+    if (doc) { try { id ? localStorage.setItem(focusStoragePrefix + doc, id) : localStorage.removeItem(focusStoragePrefix + doc); } catch { /* storage unavailable */ } }
+    this.saveSettings();
+  }
+
+  setDofStrength(level: number) {
+    this.dofStrength.set(level);
+    try { localStorage.setItem(dofStrengthStorageKey, String(level)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
+  private saveSettings() {
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+  }
+
+  /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
+  dofParams(url: URL) {
+    url.searchParams.set('dof', String(this.depthOfField()));
+    url.searchParams.set('strength', String(this.dofStrength()));
+    const focus = this.focusId();
+    if (focus && this.store.doc().items.some(i => i.id === focus)) url.searchParams.set('focus', focus);
+  }
+
+  /** F12 / the Render button: asks for the render dialog (ignored while a full-size render runs, like the button). */
+  requestOpen() {
+    if (!this.running() && !this.dialog()) this.openRequests.update(n => n + 1);
+  }
+
   /** The Render button: a quick picture (shown at once by the dialog). */
   openQuick(url: string) {
     this.dialog.set({ url, jobId: '' });
@@ -132,6 +203,7 @@ export class RenderService {
     this.toast.set(null);
     try {
       const url = new URL(quickUrl.replace('/render.png', '/render-jobs'), location.origin);
+      this.dofParams(url);
       url.searchParams.set('width', '1920');
       url.searchParams.set('samples', '96');
       const response = await fetch(url, { method: 'POST' });

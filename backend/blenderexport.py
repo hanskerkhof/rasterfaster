@@ -20,7 +20,7 @@ mmToMetre = 0.001
 toGltf = np.array([[1.0, 0, 0], [0, 0, 1.0], [0, -1.0, 0]])
 
 
-homeDirection = np.array([1.0, -1.0, 0.8]) / np.linalg.norm([1.0, -1.0, 0.8])  # the app's Home view
+homeDirection = np.array([1.0, -1.0, 0.5]) / np.linalg.norm([1.0, -1.0, 0.5])  # the app's Home view (from the front right, about 20° above the horizon)
 
 
 def parse_view(text: str) -> dict:
@@ -230,10 +230,11 @@ import sys
 import bpy
 from mathutils import Vector
 
+DOF_BLUR_SHARES = [0.003, 0.006, 0.012, 0.025, 0.05]  # the five strengths: how blurred the part farthest from the focus is, as a share of the picture width (the third: unsharp, still recognizable)
 SUN_STRENGTH = 6.0  # W/m² (a clear day is ~ 5 in Blender; stronger washes the colours out)
 SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lights are turned down to this share so the key light shows
 
-source, target, studio, light_spec, render_spec = sys.argv[sys.argv.index("--") + 1:]  # render_spec: "width,samples" to render a PNG to `target` instead of saving the .blend, or ""  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
+source, target, studio, light_spec, render_spec, dof_spec = sys.argv[sys.argv.index("--") + 1:]  # dof_spec: "0" (none), "1" (focus on what is in front) or "1:<item id>" (focus on that part)  # render_spec: "width,samples" to render a PNG to `target` instead of saving the .blend, or ""  # light_spec: "dx,dy,dz;tx,ty,tz" (the app's light, target in mm) or ""
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
@@ -247,6 +248,39 @@ for obj in bpy.data.objects:
             scene.frame_start, scene.frame_end = int(first), int(last)
     if obj.name == "Camera path":
         obj.hide_render = True  # a guide line, not part of the picture
+
+if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERSP":  # depth of field (an orthographic camera has none)
+    from bpy_extras.object_utils import world_to_camera_view
+
+    _, strength_text, chosen = (dof_spec.split("|") + ["", ""])[:3]
+    strength = min(max(int(strength_text or 3), 1), 5)
+    camera = scene.camera
+    camera_position = camera.matrix_world.translation
+    looking = -(camera.matrix_world.to_3x3() @ Vector((0, 0, 1)))
+    candidates = []  # (is the chosen part, is in the picture, distance, middle of its box, depth along the view)
+    for o in bpy.data.objects:
+        if o.type != "MESH" or o.name == "Camera path" or o.hide_render:
+            continue
+        corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
+        middle = sum(corners, Vector()) / len(corners)
+        view = world_to_camera_view(scene, camera, middle)
+        candidates.append((chosen != "" and o.get("itemId") == chosen, 0 <= view.x <= 1 and 0 <= view.y <= 1 and view.z > 0, (middle - camera_position).length, middle, view.z))
+    pool = [c for c in candidates if c[0]] or [c for c in candidates if c[1]] or candidates  # the chosen part, else what is in the picture, else everything
+    if pool:
+        focus_target = min(pool, key=lambda c: c[2])  # the nearest of them
+        focus = max((focus_target[3] - camera_position).dot(looking), 0.01)
+        camera.data.dof.use_dof = True
+        camera.data.dof.focus_distance = focus
+        # The lens opening is chosen so that the part farthest from the focus (of what is in the picture) is blurred by a set share of the picture
+        # width: from barely soft to very soft. Thin lens: blur = f^2 * |d - s| / (N * d * (s - f)).
+        in_picture = [c[4] for c in candidates if c[1]] or [focus]
+        far = max(in_picture, key=lambda depth: abs(depth - focus))
+        f = camera.data.lens / 1000
+        sensor = camera.data.sensor_width / 1000
+        share = DOF_BLUR_SHARES[strength - 1]
+        blur = share * sensor
+        n = f * f * abs(far - focus) / (blur * max(far, 0.01) * max(focus - f, 0.001)) if abs(far - focus) > 1e-4 else 8.0
+        camera.data.dof.aperture_fstop = min(max(n, 0.1), 22.0)
 
 if studio == "1":
     parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name != "Camera path"]
@@ -369,7 +403,7 @@ def find_blender() -> str | None:
 
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None) -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0") -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -387,7 +421,7 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         script.write_text(blenderScript)
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
-                               f"{render[0]},{render[1]}" if render else ""], capture_output=True, text=True, timeout=timeout)
+                               f"{render[0]},{render[1]}" if render else "", dof], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -433,14 +467,14 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         return picture.read_bytes()
 
 
-def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | None = None) -> bytes:
+def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, dof: str = "0") -> bytes:
     """Runs Blender in the background to turn the glTF into a real .blend (camera set as the scene camera, 1080p;
     with `studio` also a floor, a dark gradient world and three area lights, rendered with Cycles; with `light` (see parse_light) the key
     light is a sun like the app's light source instead of the warm area light)."""
-    return _run_blender(glb, blender, studio, light, None, 120)
+    return _run_blender(glb, blender, studio, light, None, 120, dof=dof)
 
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180) -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0") -> bytes:
     """A PNG of the scene (16:9, `width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof)

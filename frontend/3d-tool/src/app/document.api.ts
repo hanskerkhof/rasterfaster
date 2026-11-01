@@ -46,7 +46,7 @@ export class DocumentApi {
   /** `baseModified`: the `modified` this client last saw; the API refuses with 409 when the document changed since. */
   update(id: string, doc: RfDocument, baseModified?: number) {
     const params = baseModified === undefined ? undefined : new HttpParams().set('baseModified', baseModified);
-    return this.http.put<StoredDocument>(`/api/documents/${id}`, { name: doc.name, items: doc.items, light: doc.light ?? null }, { params });
+    return this.http.put<StoredDocument>(`/api/documents/${id}`, { name: doc.name, items: doc.items, light: doc.light ?? null, view: doc.view ?? null, render: doc.render ?? null }, { params });
   }
 
   versions(id: string) {

@@ -458,6 +458,10 @@ export class App {
       event.preventDefault();
       this.store.toggleFineStep();
     }
+    if (event.key === 'F12' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && this.store.doc().items.length) { // F12: render (as in Blender)
+      event.preventDefault();
+      this.render.requestOpen();
+    }
     if (event.code === 'KeyS' && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
       event.preventDefault(); // not the browser's "save page": ⌘S saves a new version of the document
       void this.store.saveVersion();

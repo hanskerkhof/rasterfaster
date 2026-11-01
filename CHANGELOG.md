@@ -2,6 +2,25 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Depth of field in renders, PLA colours, document view saved, rotation and Home refinements (0.10.58)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): a **Depth of field** checkbox in the Render dialog puts a real depth of field into the Blender scene (quick preview, full-size render and the Blender button; API `dof=true`). A **Focus** menu (or the *Selected* button) chooses the sharp part, by default the nearest part that is in the picture (API `focus=<item id>`); a **Blur** menu has five presets, *Subtle, Soft, Medium, Strong, Extreme* (API `strength=1…5`): the lens opening is worked out so the part farthest from the focus is blurred by 0.3%, 0.6%, 1.2% (Medium: unsharp but still recognizable), 2.5% or 5% of the picture width. The settings are remembered in local storage and per document in the file (`render.depthOfField`, `render.focusId`, `render.dofStrength`).
+- **FE** + **BE** (`stl-viewer.ts`, `document.store.ts`, `main.py`): the **view** of a document (camera position, target, zoom, projection) is kept in the document file (`view`) and in local storage, so a reload shows it as it was left. Only the user's own camera moves are saved (not the automatic fit on opening); it is not an undo step and does not light the version diamond.
+- **FE** (`object-menu.ts`, new `pla-colors.ts`): the Color flyout of the object menu has a separate **PLA** section with the 30 colours of Bambu Lab PLA Basic next to the app's own colours (which new parts still get in turn).
+- **FE** (`app.ts`): **F12** opens the Render dialog.
+- **FE** (`document-scene.ts`): the rotate tool draws the **X, Y and Z axes** (red, green, blue bars with an arrow head) through the pivot.
+
+### Changed
+- **FE** (`stl-viewer.ts`): **Fit all** fills the view much more closely: it projects the real parts through the camera, centres their outline and zooms to about 95% of the view, from the angle the user has set.
+- **FE** + **BE**: the **Home view** is lower (about 20° above the horizon instead of 30°), also the default camera of the Blender export without a view.
+- **FE** (`document-scene.ts`): **Option** (fine steps) now also works for rotating: on the rings of the rotate tool, on the − / + buttons of the rotate panel, with ⌥X / ⌥Y / ⌥Z and ⌥⇧← / ⌥⇧→ (1° or 0.1°, like the fine step for moving).
+- **FE**: the *Move to…* hint in the object menu says ⇧M.
+
+### Fixed
+- **FE** (`document-scene.ts`): a part with *Center on grid* on could not be moved with Option (fine steps): it was put back on the cell middle after every move. Option moves now leave the cell middle until the next ordinary move.
+- **FE** (`document-scene.ts`): grabbing a ring of the rotate tool made the selection jump to the 20 mm grid before it turned; the tool now rotates without snapping to the grid.
+
 ## 2026-11-01 - Render dialog, full-size render in the background, Fit all (0.10.57)
 
 ### Added
