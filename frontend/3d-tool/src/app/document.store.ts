@@ -63,6 +63,8 @@ export interface DocItem {
   centered?: boolean;
   /** A mock part (e.g. a component model) that is not printed: left out of the 3MF / SVG exports and the BOM. */
   noExport?: boolean;
+  /** Stays in the Blender scene (to focus the render or aim the lamp at) but is not drawn there: no picture, shadow or reflection. */
+  noRender?: boolean;
   /** The origin point the user set, in the part's own STL coordinates; none (or null) means the STL's own 0, 0, 0. Kept in the document file. */
   origin?: Vec3 | null;
 }
@@ -108,6 +110,11 @@ export interface DocRenderSettings {
   ambient?: number;
   /** The strength of the lamp pointed at the part, 0 to 60 on the slider; 40 (the default) is the normal strength. */
   lamp?: number;
+  /** The colour of the background and of the ground disc in the Blender scene (0xRRGGBB); none: the studio's own dark ones. */
+  /** The lamp type, 0 (spot) to 4 (flood): how soft the shadows are; 1 (the default) is the normal one. */
+  beam?: number;
+  background?: number | null;
+  ground?: number | null;
 }
 
 export interface RfDocument {
@@ -597,7 +604,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'origin' | 'scale'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'noRender' | 'origin' | 'scale'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -913,6 +920,11 @@ export class DocumentStore {
       changes.set(item.id, { position, ...(item.centered ? { centered: false } : {}) });
     }
     this.updateItems('Snap to grid', changes);
+  }
+
+  /** Marks parts as "Do not render" (in the Blender scene, but invisible) or puts them back; one undo step. */
+  setNoRender(ids: readonly string[], noRender: boolean) {
+    this.updateItems(noRender ? 'Do not render' : 'Render again', new Map(ids.map(id => [id, { noRender }])));
   }
 
   /** Marks parts as "Do not export" (mock models that are not printed) or puts them back; one undo step. */

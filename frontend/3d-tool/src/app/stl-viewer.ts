@@ -627,7 +627,7 @@ export class StlViewer implements OnDestroy {
       const host = this.host().nativeElement.getBoundingClientRect();
       const menuWidth = 300; // keep the menu inside the view when the cube is at the right edge
       this.cubeMenu.set({ x: Math.min(clientX - host.left, host.width - menuWidth), y: clientY - host.top });
-    }, () => this.startPivot());
+    }); // a press on the cube does not recentre the view on the selection: it only turns the view about where it is
     this.renderer.domElement.addEventListener('contextmenu', this.onLightContext, true); // the light's own menu: capture phase, so the parts' menu does not open
     this.renderer.domElement.addEventListener('pointerdown', this.onPointAtDown, true);
     this.renderer.domElement.addEventListener('pointermove', this.onPointAtMove);

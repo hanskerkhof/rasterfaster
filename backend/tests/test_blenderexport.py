@@ -200,7 +200,7 @@ def test_render_endpoint_returns_a_png_and_checks_the_size(tmp_path, monkeypatch
     created = client.post("/api/documents", json={"name": "Render me", "items": [item], "light": {"direction": [0, 0, 1], "targetId": "a"}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = {}
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, dof="0", crop=False: seen.update(light=light, width=width, samples=samples) or b"\x89PNG-fake")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, dof="0", crop=False, phase=None: seen.update(light=light, width=width, samples=samples) or b"\x89PNG-fake")
     response = client.get(f"/api/documents/{created['id']}/render.png", params={"width": 640, "samples": 8})
     assert response.status_code == 200 and response.headers["content-type"] == "image/png" and response.content.startswith(b"\x89PNG")
     assert seen["width"] == 640 and seen["samples"] == 8 and seen["light"]["part"] == "a"  # the light saved in the document is the key light
@@ -220,7 +220,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     created = client.post("/api/documents", json={"name": "Job", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
         progress(0.5)
         time.sleep(0.2)
         return b"\x89PNG-hd"
@@ -236,7 +236,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     assert status["state"] == "done" and status["progress"] == 1.0
     assert client.get(f"/api/render-jobs/{job['id']}/image.png").content == b"\x89PNG-hd"
 
-    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False):
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
         time.sleep(0.3)
         raise RuntimeError("killed")
 
@@ -260,7 +260,7 @@ def test_render_state_reaches_the_page_over_the_websocket_and_only_one_render_ru
     created = client.post("/api/documents", json={"name": "Socket", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
         progress(0.5)
         time.sleep(0.4)
         return b"\x89PNG-hd"
@@ -287,15 +287,15 @@ def test_depth_of_field_focus_comes_from_the_call_or_the_document(tmp_path, monk
     created = client.post("/api/documents", json={"name": "Focus", "items": [item], "render": {"depthOfField": True, "focusId": "a"}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False: seen.append(dof) or b"\x89PNG")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40"  # what the document says
+    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40,,,1"  # what the document says
     client.get(url, params={"dof": "false"})
-    assert seen[-1] == "0#0,40"
+    assert seen[-1] == "0#0,40,,,1"
     client.get(url, params={"dof": "true", "focus": "other-part"})
-    assert seen[-1] == "1|3|other-part#0,40"
+    assert seen[-1] == "1|3|other-part#0,40,,,1"
     client.get(url, params={"dof": "true", "strength": 5})
-    assert seen[-1] == "1|5|a#0,40"
+    assert seen[-1] == "1|5|a#0,40,,,1"
     assert client.get(url, params={"dof": "true", "strength": 6}).status_code == 422
     assert client.get(url, params={"dof": "true", "focus": "not a part"}).status_code == 422
 
@@ -309,12 +309,12 @@ def test_ambient_preset_comes_from_the_call_or_the_document(tmp_path, monkeypatc
     created = client.post("/api/documents", json={"name": "Amb", "items": [item], "render": {"ambient": 2}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False: seen.append(dof) or b"\x89PNG")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40"  # what the document says
-    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40"
+    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40,,,1"  # what the document says
+    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40,,,1"
     assert client.get(url + "?ambient=6").status_code == 422
-    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20"
+    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20,,,1"
     assert client.get(url + "?lamp=61").status_code == 422
 
 
@@ -323,3 +323,25 @@ def test_render_job_reports_the_size_of_its_picture():
     assert job.view()["size"] is None
     job.png = b"\x89PNG\r\n\x1a\n" + b"\x00\x00\x00\rIHDR" + (1920).to_bytes(4, "big") + (1080).to_bytes(4, "big")
     assert job.view()["size"] == [1920, 1080]
+
+
+def test_render_job_tracks_its_steps_and_learns_how_long_they_take():
+    job = main.RenderJob("Steps", 1920, 96)
+    assert [p["name"] for p in job.view()["phases"]] == ["prepare", "load", "render", "finish"]
+    assert job.view()["phase"] == "prepare" and job.view()["phases"][0]["start"] is not None and job.view()["phases"][1]["start"] is None
+    job.enter("load")
+    job.enter("render")
+    job.enter("finish")
+    job.state = "done"
+    job.close()
+    phases = job.view()["phases"]
+    assert all(p["start"] is not None and p["end"] is not None for p in phases)
+    assert phases[0]["end"] <= phases[1]["start"] + 1e-6
+
+
+def test_part_marked_do_not_render_stays_in_the_scene_with_a_marker():
+    items, stls = items_and_stls()
+    items[1]["noRender"] = True
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False))
+    marked = {node["extras"]["itemId"]: node["extras"].get("noRender", False) for node in gltf["nodes"] if "extras" in node}
+    assert marked == {items[0]["id"]: False, items[1]["id"]: True, items[2]["id"]: False}

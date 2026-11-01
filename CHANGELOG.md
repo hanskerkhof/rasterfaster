@@ -2,6 +2,17 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Do not render, lamp types, background and ground colours, render steps (0.10.63)
+
+### Added
+- **FE** + **BE** (`object-menu.ts`, `blenderexport.py`, `main.py`): **Do not render** in the part menu (below Do not export): the part stays in the Blender scene, to focus the render or aim the lamp on, but is not drawn: no picture, shadows or reflections (document field `noRender`).
+- **FE** + **BE** (`render-dialog.ts`, `blenderexport.py`, `main.py`): a **Lamp** type menu in the Lighting row (Spot, Direct, Soft, Diffuse, Flood: how soft the shadows are), and **Background** and **Ground** colour buttons (the generic colour flyout, with *Studio default*).
+- **FE** + **BE** (`app.html`, `render.service.ts`, `main.py`): the render toasts show every step of a full-size render (preparing, loading, rendering, denoising and saving) as a segmented bar with one overall percentage and time left; the "ready" toast keeps the bar with the time of each step.
+- **FE** (`render-dialog.ts`): a size menu next to Render HD placed before the button, the dialog can be opened while a full-size render runs, and a placeholder keeps its height the same.
+
+### Changed
+- **FE** (`stl-viewer.ts`): pressing the view cube no longer recentres the view on the selection.
+
 ## 2026-11-02 - Render sizes, richer render toasts (0.10.62)
 
 ### Added

@@ -183,7 +183,7 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
             position, indices = accessors[item["path"]]
             gltfMeshes.append({"name": item["path"].rsplit("/", 1)[-1], "primitives": [{
                 "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[(colour, dimmed)]}]})  # no normals: faces shade flat
-        nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement), "extras": {"itemId": item["id"]}})  # the id lets a light find its part
+        nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement), "extras": {"itemId": item["id"], **({"noRender": True} if item.get("noRender") else {})}})  # the id lets a light find its part; a part marked "Do not render" stays in the scene (to focus or aim on) but is not drawn
         partNodes.append(len(nodes) - 1)
 
     sceneNodes = list(partNodes)
@@ -230,6 +230,9 @@ import sys
 import bpy
 from mathutils import Vector
 
+# the lamp types, from a spotlight (razor-sharp shadows) to a flood (very soft ones): the angle of the sun in degrees, and the size of the warm key light
+BEAM_ANGLES = [0.5, 3, 10, 25, 60]
+BEAM_SIZES = [0.15, 1, 2.5, 5, 10]
 # the ambient light presets (Soft glow, Overcast, Softbox, Daylight, Bright studio): the power of the softbox above the scene (per square metre of its
 # distance above the parts), its colour and how much brighter the world gets
 AMBIENT_PRESETS = [(2, (0.85, 0.9, 1.0), 0.15), (4, (0.92, 0.95, 1.0), 0.3), (7, (1.0, 0.98, 0.95), 0.45), (11, (1.0, 0.95, 0.88), 0.7), (16, (1.0, 1.0, 1.0), 1.1)]
@@ -242,7 +245,19 @@ SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lig
 # instead of saving the .blend (or ""), the depth of field ("0", "1" or "1|strength|part id") and "1" to crop the picture to the parts
 source, target, studio, light_spec, render_spec, dof_spec, crop_flag = sys.argv[sys.argv.index("--") + 1:]
 dof_spec, _, extra_text = dof_spec.partition("#")  # the depth of field spec may end in "#<ambient light preset, 0 to 5>,<lamp, 0 to 60>"
-ambient_text, _, lamp_text = extra_text.partition(",")
+ambient_text, _, rest_text = extra_text.partition(",")
+lamp_text, _, rest_text = rest_text.partition(",")
+background_text, _, rest_text = rest_text.partition(",")
+ground_text, _, beam_text = rest_text.partition(",")
+beam = min(max(int(beam_text or 1), 0), 4)  # the lamp type: 0 spot, 1 direct (the studio's own), 2 soft, 3 diffuse, 4 flood  # the colours of the background and of the ground disc, as hex (empty: the studio's own)
+
+def srgb_colour(text):
+    if not text:
+        return None
+    value = int(text, 16)
+    return tuple(((c / 12.92) if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4) for c in (((value >> shift) & 255) / 255 for shift in (16, 8, 0))) + (1,)
+
+background_colour, ground_colour = srgb_colour(background_text), srgb_colour(ground_text)
 ambient = min(max(int(ambient_text or 0), 0), 5)
 lamp = 2 ** ((min(max(int(lamp_text or 40), 0), 60) - 40) / 10)  # the lamp slider: 40 is the normal strength, every 10 steps double or halve it (from 1/16 to 4 times)
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -271,6 +286,8 @@ if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERS
     for o in bpy.data.objects:
         if o.type != "MESH" or o.name == "Camera path" or o.hide_render:
             continue
+        if o.get("noRender") and (chosen == "" or o.get("itemId") != chosen):
+            continue  # a part that is not rendered can only be the focus when it was chosen
         corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
         middle = sum(corners, Vector()) / len(corners)
         view = world_to_camera_view(scene, camera, middle)
@@ -286,7 +303,7 @@ if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERS
         # distance that makes them fill the picture, then look about equally blurred. Thin lens: blur = f^2 * |d - s| / (N * d * (s - f)).
         points = []
         for o in bpy.data.objects:
-            if o.type != "MESH" or o.name == "Camera path" or o.hide_render:
+            if o.type != "MESH" or o.name == "Camera path" or o.hide_render or o.get("noRender"):
                 continue
             corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
             middle = sum(corners, Vector()) / len(corners)
@@ -326,6 +343,8 @@ if studio == "1":
     surface = tree.nodes["Principled BSDF"]
     surface.inputs["Base Color"].default_value = (0.05, 0.055, 0.065, 1)
     surface.inputs["Roughness"].default_value = 0.55
+    if ground_colour:
+        surface.inputs["Base Color"].default_value = ground_colour
     # Solid seen from above, invisible seen from below: a camera under the floor looks straight through it (it still catches the shadows from above).
     clear, back, mix, material_output = (tree.nodes.new(n) for n in ("ShaderNodeBsdfTransparent", "ShaderNodeNewGeometry", "ShaderNodeMixShader", "ShaderNodeOutputMaterial"))
     tree.links.new(back.outputs["Backfacing"], mix.inputs["Fac"])
@@ -355,6 +374,17 @@ if studio == "1":
     ramp.color_ramp.elements[0].color = (0.01, 0.012, 0.02, 1)
     ramp.color_ramp.elements[1].color = (0.10, 0.14, 0.22, 1)
     bg.inputs["Strength"].default_value = 0.12
+    if background_colour:  # what the camera sees is the chosen colour; the gradient keeps lighting the scene
+        seen = nt.nodes.new("ShaderNodeBackground")
+        seen.inputs["Color"].default_value = background_colour
+        seen.inputs["Strength"].default_value = 1.6  # AgX and the -0.3 exposure darken what the camera sees: this brings the colour back to about the one chosen
+        path, mixer = nt.nodes.new("ShaderNodeLightPath"), nt.nodes.new("ShaderNodeMixShader")
+        nt.links.new(path.outputs["Is Camera Ray"], mixer.inputs["Fac"])
+        nt.links.new(bg.outputs[0], mixer.inputs[1])
+        nt.links.new(seen.outputs[0], mixer.inputs[2])
+        for link in list(out.inputs[0].links):
+            nt.links.remove(link)
+        nt.links.new(mixer.outputs[0], out.inputs[0])
 
     def light(name, location, energy, color, size):
         data = bpy.data.lights.new(name, "AREA")
@@ -381,7 +411,7 @@ if studio == "1":
         elif aim_text:
             aim_point = Vector(float(v) for v in aim_text.split(",")) * 0.001
         sun_data = bpy.data.lights.new("Key (sun)", "SUN")
-        sun_data.energy, sun_data.color, sun_data.angle = SUN_STRENGTH * lamp, (1.0, 0.94, 0.86), math.radians(3)  # a little soft, like the app's shadows
+        sun_data.energy, sun_data.color, sun_data.angle = SUN_STRENGTH * lamp, (1.0, 0.94, 0.86), math.radians(BEAM_ANGLES[beam])  # how soft the shadows are; 3 degrees, a little soft like the app's shadows, is the normal one
         sun = bpy.data.objects.new("Key (sun)", sun_data)
         sun.location = aim_point + direction.normalized() * d
         scene.collection.objects.link(sun)
@@ -393,7 +423,7 @@ if studio == "1":
         support = SUPPORT_SCALE
     else:
         support = 1.0
-        light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7 * lamp, (1.0, 0.86, 0.7), r * 2.2)
+        light("Key (warm)", centre + Vector((d * 0.8, -d, d * 0.9)), 7 * lamp, (1.0, 0.86, 0.7), r * 2.2 * BEAM_SIZES[beam])
     light("Fill (cool)", centre + Vector((-d, -d * 0.5, d * 0.4)), 2.2 * support, (0.6, 0.75, 1.0), r * 3)
     light("Under fill (cool)", centre + Vector((d * 0.3, -d * 0.3, -d)), 3 * support, (0.55, 0.7, 1.0), r * 3)  # soft light for views from below the floor
     light("Rim (magenta)", centre + Vector((-d * 0.3, d, d * 0.6)), 4 * support, (1.0, 0.45, 0.8), r * 1.5)
@@ -430,6 +460,10 @@ if studio == "1":
             scene.view_settings.exposure += max(stops, -3.0)
         scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising, scene.render.filepath, scene.render.image_settings.file_format = saved
 
+for o in bpy.data.objects:  # parts marked "Do not render": there, but neither drawn nor casting shadows or showing in reflections
+    if o.get("noRender"):
+        o.hide_render = True
+        o.display_type = "WIRE"
 if render_spec:  # a picture of this size and with this many samples: the settings go into the .blend, which is then rendered (see _run_blender)
     width, samples = (int(v) for v in render_spec.split(","))
     scene.render.resolution_x, scene.render.resolution_y = width, round(width * 9 / 16)
@@ -480,7 +514,8 @@ def find_blender() -> str | None:
 
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False) -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
+                 phase: "Callable[[str], None] | None" = None) -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -503,6 +538,9 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
             return target.read_bytes()
+        if phase:
+            phase("load")  # the second Blender run: opening the .blend and building what it renders from
+        seen = set()
 
         # Rendering the saved file prints its progress ("Sample 24/96"); Blender buffers that when it writes to a pipe, so a pseudo-terminal is used.
         master, slave = pty.openpty()
@@ -529,7 +567,13 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
                     found = sample.findall(buffer)
                     if found:
                         done, total = (int(v) for v in found[-1])
+                        if phase and "render" not in seen:
+                            seen.add("render")
+                            phase("render")
                         progress(min(done / max(total, 1), 1.0))
+                        if phase and done >= total and "finish" not in seen:
+                            seen.add("finish")
+                            phase("finish")  # all samples are in: denoising and saving the picture
                 if time.monotonic() > deadline:
                     process.kill()
                     raise RuntimeError("Blender took too long")
@@ -552,6 +596,7 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
-                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False) -> bytes:
+                 progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False,
+                 phase: "Callable[[str], None] | None" = None) -> bytes:
     """A PNG of the scene (16:9, `width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase)

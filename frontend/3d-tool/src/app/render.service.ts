@@ -6,6 +6,18 @@ const cropStorageKey = 'rasterfaster.renderCrop';
 const dofStrengthStorageKey = 'rasterfaster.renderDofStrength';
 const ambientStorageKey = 'rasterfaster.renderAmbient';
 const lampStorageKey = 'rasterfaster.renderLamp';
+const beamStorageKey = 'rasterfaster.renderBeam';
+const backgroundStorageKey = 'rasterfaster.renderBackground';
+const groundStorageKey = 'rasterfaster.renderGround';
+
+function readColour(key: string): number | null {
+  try {
+    const stored = localStorage.getItem(key);
+    const value = stored === null || stored === '' ? NaN : Number(stored);
+    if (Number.isInteger(value) && value >= 0 && value <= 0xffffff) return value;
+  } catch { /* storage unavailable */ }
+  return null;
+}
 const hdWidthStorageKey = 'rasterfaster.renderHdWidth';
 /** The widths the full-size render can be made at (16:9): the first is the default. */
 export const hdWidths = [{ width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
@@ -60,6 +72,11 @@ function readDepthOfField(): boolean {
   try { return localStorage.getItem(depthOfFieldStorageKey) === 'true'; } catch { return false; }
 }
 
+const stepLabels: Record<string, string> = { prepare: 'Preparing the scene', load: 'Loading the scene', render: 'Rendering', finish: 'Denoising and saving' };
+
+/** One step of a render in the progress bar: how long it takes (or is expected to) and how much of it is done (0 to 1). */
+export interface RenderStep { name: string; label: string; duration: number; fill: number; started: boolean; done: boolean }
+
 export interface RenderState {
   id: string;
   name: string;
@@ -70,6 +87,9 @@ export interface RenderState {
   elapsed: number;
   /** Width and height of the finished picture. */
   size?: [number, number] | null;
+  /** The steps of the render (seconds since it began; `start` is null before a step has begun, `end` while it runs). */
+  phases?: { name: string; start: number | null; end: number | null; estimate: number }[];
+  phase?: string | null;
   error: string;
 }
 
@@ -82,8 +102,32 @@ export class RenderService {
   /** The render the API told us about last: running, or done and not yet looked at. Null when there is none. */
   readonly state = signal<RenderState | null>(null);
   readonly running = computed(() => this.state()?.state === 'running');
-  /** The percentage of the running render, for the tooltip of the button. */
-  readonly percent = computed(() => Math.round((this.state()?.progress ?? 0) * 100));
+  /**
+   * The steps of the render for the progress bar. A step that is over has the time it took, the one running is estimated from the
+   * samples done (or from the last render), the ones to come from the last render too.
+   */
+  readonly steps = computed<RenderStep[]>(() => {
+    const r = this.state();
+    if (!r?.phases) return [];
+    const elapsed = r.state === 'running' ? this.elapsed() : r.elapsed;
+    return r.phases.map(p => {
+      const label = stepLabels[p.name] ?? p.name;
+      if (p.start !== null && p.end !== null) return { name: p.name, label, duration: Math.max(p.end - p.start, 0.1), fill: 1, started: true, done: true };
+      if (p.start === null) return { name: p.name, label, duration: Math.max(p.estimate, 0.1), fill: 0, started: false, done: false };
+      const inStep = Math.max(elapsed - p.start, 0);
+      const duration = Math.max(p.name === 'render' && r.progress > 0.03 ? inStep / r.progress : Math.max(p.estimate, inStep + 1), inStep, 0.1);
+      return { name: p.name, label, duration, fill: p.name === 'render' ? r.progress : Math.min(inStep / duration, 0.97), started: true, done: false };
+    });
+  });
+  /** The step that is running, for the toast. */
+  readonly currentStep = computed(() => this.steps().find(s => s.started && !s.done) ?? null);
+  /** The percentage of the whole render, all steps together. */
+  readonly percent = computed(() => {
+    const steps = this.steps();
+    if (!steps.length) return Math.round((this.state()?.progress ?? 0) * 100);
+    const total = steps.reduce((sum, s) => sum + s.duration, 0);
+    return Math.round((steps.reduce((sum, s) => sum + s.duration * s.fill, 0) / Math.max(total, 1e-6)) * 100);
+  });
   /** The clock of the progress toast: the time now, ticking every second while a render runs. */
   private readonly now = signal(Date.now());
   /** When the running render started (this page's clock), and the progress reports so far: the estimate comes from how fast they came in. */
@@ -97,6 +141,8 @@ export class RenderService {
    * the speed between the first and the latest report, applied to what is left, minus the time since the latest report.
    */
   readonly eta = computed(() => {
+    const steps = this.steps();
+    if (this.running() && steps.length) return Math.max(0, steps.reduce((sum, s) => sum + s.duration * (1 - s.fill), 0));
     const now = this.now();
     const first = this.reports[0], last = this.reports.at(-1);
     if (!this.running() || !first || !last || last.progress <= first.progress) return null;
@@ -120,6 +166,11 @@ export class RenderService {
   readonly ambient = signal(readAmbient());
   /** The lamp slider, 0 to 60; 40 is the normal strength (two thirds of the way). */
   readonly lamp = signal(readLamp());
+  /** The colour of the background and of the ground disc in the render; null is the studio's own. */
+  /** The lamp type: 0 spot, 1 direct, 2 soft, 3 diffuse, 4 flood. */
+  readonly beam = signal((() => { try { const v = Number(localStorage.getItem(beamStorageKey)); return Number.isInteger(v) && v >= 0 && v <= 4 && localStorage.getItem(beamStorageKey) !== null ? v : 1; } catch { return 1; } })());
+  readonly background = signal<number | null>(readColour(backgroundStorageKey));
+  readonly ground = signal<number | null>(readColour(groundStorageKey));
   /** The width of the full-size render (its height follows at 16:9). */
   readonly hdWidth = signal(readHdWidth());
   /** The Crop checkbox: the picture is as wide as the parts. */
@@ -134,8 +185,8 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); } // a document without render settings starts with the normal lamp (100%)
     });
     this.connect();
     void this.poll(); // the WebSocket may be unavailable (a proxy that does not pass it on): the same messages can be asked for
@@ -248,6 +299,24 @@ export class RenderService {
     try { localStorage.setItem(hdWidthStorageKey, String(width)); } catch { /* storage unavailable */ }
   }
 
+  setBeam(type: number) {
+    this.beam.set(type);
+    try { localStorage.setItem(beamStorageKey, String(type)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
+  setBackground(colour: number | null) {
+    this.background.set(colour);
+    try { colour === null ? localStorage.removeItem(backgroundStorageKey) : localStorage.setItem(backgroundStorageKey, String(colour)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
+  setGround(colour: number | null) {
+    this.ground.set(colour);
+    try { colour === null ? localStorage.removeItem(groundStorageKey) : localStorage.setItem(groundStorageKey, String(colour)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
   setLamp(value: number) {
     this.lamp.set(value);
     try { localStorage.setItem(lampStorageKey, String(value)); } catch { /* storage unavailable */ }
@@ -255,7 +324,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -263,15 +332,18 @@ export class RenderService {
     url.searchParams.set('crop', String(this.crop()));
     url.searchParams.set('ambient', String(this.ambient()));
     url.searchParams.set('lamp', String(this.lamp()));
+    url.searchParams.set('beam', String(this.beam()));
+    if (this.background() !== null) url.searchParams.set('bg', String(this.background()));
+    if (this.ground() !== null) url.searchParams.set('floor', String(this.ground()));
     url.searchParams.set('dof', String(this.depthOfField()));
     url.searchParams.set('strength', String(this.dofStrength()));
     const focus = this.focusId();
     if (focus && this.store.doc().items.some(i => i.id === focus)) url.searchParams.set('focus', focus);
   }
 
-  /** F12 / the Render button: asks for the render dialog (ignored while a full-size render runs, like the button). */
+  /** F12 / the Render button: asks for the render dialog. */
   requestOpen() {
-    if (!this.running() && !this.dialog()) this.openRequests.update(n => n + 1);
+    if (!this.dialog()) this.openRequests.update(n => n + 1);
   }
 
   /** The Render button: a quick picture (shown at once by the dialog). */

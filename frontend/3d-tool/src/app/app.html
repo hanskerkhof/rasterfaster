@@ -101,10 +101,13 @@
     @if (render.state(); as r) {
       @if (r.state === 'running') {
         <div class="notice render-progress" role="status" aria-label="Render in progress">
-          <div class="bar"><span [style.width.%]="render.percent()"></span></div>
+          <div class="step">{{ render.currentStep()?.label ?? 'Rendering' }}…</div>
+          <div class="bar steps">
+            @for (s of render.steps(); track s.name) { <span class="seg" [class]="'seg ' + s.name" [style.flex-grow]="s.duration" [title]="s.label"><i [style.width.%]="s.fill * 100"></i></span> }
+          </div>
           <div class="line">
             <span class="spinner"></span>
-            <span>Rendering {{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ render.eta() === null ? ' · estimating…' : ' · about ' + time(render.eta()!) + ' left' }}</span>
+            <span>{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}</span>
             <button type="button" (click)="render.cancel()">Cancel</button>
           </div>
         </div>
@@ -115,7 +118,13 @@
         @if ('id' in t) {
           <img class="thumb" [src]="'/api/render-jobs/' + t.id + '/image.png'" alt="" />
           <span class="text"><span>Render of {{ t.name }} is ready: click to view</span>
-            <small>{{ t.size ? t.size[0] + ' × ' + t.size[1] : t.width }} px{{ render.sizeSuffix(t.width) }} · {{ t.samples }} samples · rendered in {{ time(t.elapsed) }}</small></span>
+            <small>{{ t.size ? t.size[0] + ' × ' + t.size[1] : t.width }} px{{ render.sizeSuffix(t.width) }} · {{ t.samples }} samples · rendered in {{ time(t.elapsed) }}</small>
+            @if (render.steps().length) {
+              <span class="bar steps done">
+                @for (s of render.steps(); track s.name) { <span class="seg" [class]="'seg ' + s.name" [style.flex-grow]="s.duration" [title]="s.label + ': ' + time(s.duration)"><i style="width: 100%"></i></span> }
+              </span>
+              <small class="legend">@for (s of render.steps(); track s.name) { <span class="key"><b [class]="s.name"></b>{{ s.label }} {{ time(s.duration) }}</span> }</small>
+            }</span>
         } @else { {{ t.error }} }
       </button>
     }

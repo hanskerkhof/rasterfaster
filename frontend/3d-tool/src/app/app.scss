@@ -93,6 +93,15 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress { bottom: 84px; min-width: 340px; padding: 8px 12px; }
 .notice.render-progress .bar { height: 4px; margin-bottom: 7px; background: #14161a; border-radius: 2px; overflow: hidden; }
 .notice.render-progress .bar span { display: block; height: 100%; background: #2f6fed; transition: width .6s linear; }
+.notice .bar.steps { display: flex; gap: 2px; height: 6px; background: transparent; overflow: visible; }
+.notice .bar.steps .seg { display: block; min-width: 3px; height: 100%; background: #14161a; border-radius: 2px; overflow: hidden; }
+.notice .bar.steps .seg i { display: block; height: 100%; transition: width .6s linear; }
+.notice .seg.prepare i, .notice .key b.prepare { background: #9a82e8; } .notice .seg.load i, .notice .key b.load { background: #3aa6c9; }
+.notice .seg.render i, .notice .key b.render { background: #4ec27a; } .notice .seg.finish i, .notice .key b.finish { background: #e0a23a; }
+.notice.render-progress .step { margin-bottom: 5px; font-weight: 600; font-size: 12px; }
+.notice .bar.steps.done { display: flex; margin-top: 4px; width: 100%; }
+.notice .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; } .notice .legend .key { display: inline-flex; align-items: center; gap: 4px; }
+.notice .legend .key b { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .notice.render-progress .line { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .notice.render-progress .spinner { flex: none; width: 10px; height: 10px; border: 2px solid rgba(255,255,255,.3); border-top-color: #2f6fed; border-radius: 50%; animation: render-spin .8s linear infinite; }
 .notice.render-progress button { margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }

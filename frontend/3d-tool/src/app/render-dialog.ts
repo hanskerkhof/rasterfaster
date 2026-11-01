@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, input, output, signal } from '@an
 import { closeOnEscape } from './escape-close';
 import { RenderService, hdWidths } from './render.service';
 import { DocumentStore } from './document.store';
+import { ColorPalette } from './color-palette';
 
 /**
  * A Cycles render of the scene (what the Blender file would render), made by the API through Blender in the background. Either a quick one
@@ -10,6 +11,7 @@ import { DocumentStore } from './document.store';
  */
 @Component({
   selector: 'app-render-dialog',
+  imports: [ColorPalette],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <section class="dialog" role="dialog" aria-label="Render">
@@ -36,10 +38,27 @@ import { DocumentStore } from './document.store';
         <select class="focus strength" [value]="render.ambient()" title="Ambient light: a big soft light above the scene that lightens the shadows." (change)="chooseAmbient(+$any($event.target).value)">
           @for (level of ambients; track level.value) { <option [value]="level.value" [selected]="level.value === render.ambient()">Ambient: {{ level.label }}</option> }
         </select>
+        <select class="focus strength" [value]="render.beam()" title="The type of the lamp: from a spotlight (razor-sharp shadows) to a flood (very soft shadows)" (change)="chooseBeam(+$any($event.target).value)">
+          @for (type of beams; track type.value) { <option [value]="type.value" [selected]="type.value === render.beam()">Lamp: {{ type.label }}</option> }
+        </select>
         <label class="lamp" title="The strength of the lamp pointed at the parts: left is darker, right is brighter. Two thirds of the way is the normal strength (double-click to go back to it).">Lamp
           <input type="range" min="0" max="60" step="1" [value]="render.lamp()" (input)="render.setLamp(+$any($event.target).value)" (change)="lampChanged()" (dblclick)="resetLamp()" />
           <output class="lamp-value">{{ lampText() }}</output>
         </label>
+        @for (target of colourTargets; track target.key) {
+          <span class="colour">
+            <button type="button" class="swatch-button" [title]="target.title" (click)="colourOpen.set(colourOpen() === target.key ? null : target.key)">
+              <i class="chip" [style.background]="hex(colourOf(target.key))"></i>{{ target.label }}
+            </button>
+            @if (colourOpen() === target.key) {
+              <div class="colour-backdrop" (click)="colourOpen.set(null)"></div>
+              <div class="flyout" role="menu" [attr.aria-label]="target.label + ' colour'">
+                <app-color-palette [isOn]="isColour(target.key)" (picked)="chooseColour(target.key, $event)" />
+                <button type="button" class="studio" (click)="chooseColour(target.key, null)">Studio default</button>
+              </div>
+            }
+          </span>
+        }
       </div>
       <div class="actions">
         @if (url()) {
@@ -48,12 +67,12 @@ import { DocumentStore } from './document.store';
           </button>
         }
         @if (url()) {
-          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, 96 samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
-            @if (render.running()) { <span class="spinner small"></span> }Render HD
-          </button>
           <select class="focus size" [disabled]="render.running()" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
             @for (size of hdSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.hdWidth()">{{ size.label }}</option> }
           </select>
+          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, 96 samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
+            @if (render.running()) { <span class="spinner small"></span> }Render HD
+          </button>
         }
         @if (picture()) {
           <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
@@ -62,14 +81,11 @@ import { DocumentStore } from './document.store';
           </a>
         }
       </div>
-      @if (busy() && !picture()) { <div class="busy"><span class="spinner"></span>{{ busyText() }}</div> }
       @if (error()) { <p class="error">{{ error() }}</p> }
-      @if (picture()) {
-        <div class="frame">
-          <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" />
-          @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
-        </div>
-      }
+      <div class="frame">
+        @if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" /> } @else { <div class="placeholder"></div> }
+        @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
+      </div>
     </section>
   `,
   styles: `
@@ -81,6 +97,11 @@ import { DocumentStore } from './document.store';
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
     .lighting { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; } .bar-title { font-weight: 600; opacity: .7; }
     .lamp-value { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; opacity: .85; }
+    .colour { position: relative; display: inline-block; }
+    .swatch-button .chip { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,.35); }
+    .colour-backdrop { position: fixed; inset: 0; z-index: 12; background: transparent; }
+    .flyout { position: absolute; z-index: 13; top: calc(100% + 4px); left: 0; padding: 8px; background: #2b2f38; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+    .flyout .studio { display: block; margin-top: 8px; width: 100%; justify-content: center; }
     .lamp { display: inline-flex; align-items: center; gap: 6px; } .lamp input { width: 130px; margin: 0; accent-color: #2f6fed; }
     .focus.strength { max-width: 150px; } .focus.size { max-width: 200px; }
     .focus:disabled { opacity: .45; cursor: default; }
@@ -89,7 +110,7 @@ import { DocumentStore } from './document.store';
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
     button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
     img { display: block; width: 100%; height: auto; border-radius: 4px; background: #000; }
-    .frame { position: relative; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
+    .frame { position: relative; } .placeholder { width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0c0f; border: 1px dashed rgba(255,255,255,.12); box-sizing: border-box; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
     .over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-shadow: 0 1px 4px #000; }
     .spinner.big { width: 44px; height: 44px; border-width: 4px; }
     .busy { display: flex; align-items: center; gap: 10px; padding: 24px 4px; opacity: .85; }
@@ -125,7 +146,31 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected readonly strengths = [{ value: 1, label: 'Subtle' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Medium' }, { value: 4, label: 'Strong' }, { value: 5, label: 'Extreme' }];
   protected readonly ambients = [{ value: 0, label: 'None' }, { value: 1, label: 'Soft glow' }, { value: 2, label: 'Overcast' }, { value: 3, label: 'Softbox' }, { value: 4, label: 'Daylight' }, { value: 5, label: 'Bright studio' }];
   /** The lamp as a share of its normal strength: every 10 steps of the slider double or halve it. */
+  protected readonly beams = [{ value: 0, label: 'Spot' }, { value: 1, label: 'Direct' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Diffuse' }, { value: 4, label: 'Flood' }];
+  protected chooseBeam(type: number) {
+    this.render.setBeam(type);
+    if (this.url() && !this.busy()) void this.quick();
+  }
   protected readonly hdSizes = hdWidths;
+  protected readonly colourTargets = [
+    { key: 'background' as const, label: 'Background', title: 'The colour of the background behind the parts (the studio default is dark)' },
+    { key: 'ground' as const, label: 'Ground', title: 'The colour of the round ground the parts stand on (the studio default is dark)' },
+  ];
+  protected readonly colourOpen = signal<'background' | 'ground' | null>(null);
+  protected colourOf(key: 'background' | 'ground') {
+    return key === 'background' ? this.render.background() : this.render.ground();
+  }
+  protected hex(colour: number | null) {
+    return colour === null ? '#1b1d23' : '#' + colour.toString(16).padStart(6, '0'); // the studio's own colours are about this dark
+  }
+  protected isColour(key: 'background' | 'ground') {
+    return (colour: number) => this.colourOf(key) === colour;
+  }
+  protected chooseColour(key: 'background' | 'ground', colour: number | null) {
+    key === 'background' ? this.render.setBackground(colour) : this.render.setGround(colour);
+    this.colourOpen.set(null);
+    if (this.url() && !this.busy()) void this.quick();
+  }
   protected lampText() {
     const share = 2 ** ((this.render.lamp() - 40) / 10) * 100;
     return `${share >= 100 ? Math.round(share) : Math.round(share * 10) / 10} %`;

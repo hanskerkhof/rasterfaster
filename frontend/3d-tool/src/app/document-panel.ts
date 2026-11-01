@@ -94,7 +94,7 @@ function readGeometry(): PanelGeometry | null {
       <span>Export</span>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Parts exactly as assembled, centred on the plate" (click)="export3mf()">Assembly</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Blender file (.blend): Black PLA parts as placed, studio lighting, and a camera where the 3D view is now" (click)="exportBlender()">Blender</button>
-      <button type="button" [disabled]="!store.doc().items.length || exporting() || render.running()" [title]="render.running() ? 'A full-size render is running in the background: ' + render.percent() + '%' : 'A picture of how Blender renders the scene: the colours, the camera of the 3D view and the light. Quick (a few seconds) or full size in the background'" (click)="openRender()">@if (render.running()) { <span class="spinner"></span> }Render</button>
+      <button type="button" [disabled]="!store.doc().items.length || exporting()" [title]="render.running() ? 'A full-size render is running in the background (' + render.percent() + '%): you can still open the dialog for quick renders' : 'A picture of how Blender renders the scene: the colours, the camera of the 3D view and the light. Quick (a few seconds) or full size in the background'" (click)="openRender()">@if (render.running()) { <span class="spinner"></span> }Render</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="Top / front / right drawing with 20 mm grid and legend" (click)="exportSvg()">SVG</button>
       <button type="button" [disabled]="!store.doc().items.length || exporting()" title="SVG of the 3D view as it is now, in the display mode that is selected (solid is a picture, the others are line drawings)" (click)="exportViewSvg()">SVG view</button>
       <button type="button" [disabled]="!store.doc().items.length" title="Bill of materials" (click)="bomOpen.set(true)">BOM</button>
@@ -151,6 +151,7 @@ function readGeometry(): PanelGeometry | null {
           @if (store.missingPaths().has(item.path) || item.path.startsWith('embedded:')) { <button type="button" class="relink" title="Relink: pick another library file for this part" (click)="relink($event, item.id)">⇄</button> }
           @if (item.path.startsWith('embedded:')) { <span class="badge warn" title="This geometry comes from an imported 3MF: there is no file for it in the library. Right-click ▸ Export STL (original) saves it as an STL.">⚠</span> }
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
+          @if (item.noRender) { <span class="badge" title="Do not render: in the Blender scene (to focus or aim the lamp at) but not drawn">◌</span> }
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
         </div>
@@ -412,7 +413,7 @@ export class DocumentPanel {
 
   /** The URL of the Blender export: the camera of the 3D view and, in the shaded view, its light. */
   private blenderEndpoint() {
-    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()], ['dof', this.render.depthOfField() ? 'true' : ''], ['focus', this.render.depthOfField() && this.store.doc().items.some(i => i.id === this.render.focusId()) ? this.render.focusId() : ''], ['strength', this.render.depthOfField() ? String(this.render.dofStrength()) : ''], ['ambient', this.render.ambient() ? String(this.render.ambient()) : ''], ['lamp', this.render.lamp() !== 40 ? String(this.render.lamp()) : '']].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
+    const params = [['view', this.viewProvider()()], ['light', this.lightProvider()()], ['dof', this.render.depthOfField() ? 'true' : ''], ['focus', this.render.depthOfField() && this.store.doc().items.some(i => i.id === this.render.focusId()) ? this.render.focusId() : ''], ['strength', this.render.depthOfField() ? String(this.render.dofStrength()) : ''], ['ambient', this.render.ambient() ? String(this.render.ambient()) : ''], ['lamp', this.render.lamp() !== 40 ? String(this.render.lamp()) : ''], ['beam', this.render.beam() !== 1 ? String(this.render.beam()) : ''], ['bg', this.render.background() !== null ? String(this.render.background()) : ''], ['floor', this.render.ground() !== null ? String(this.render.ground()) : '']].filter(([, value]) => value).map(([key, value]) => `${key}=${encodeURIComponent(value!)}`);
     return params.length ? `export.blend?${params.join('&')}` : 'export.blend';
   }
   protected readonly bomOpen = signal(false);

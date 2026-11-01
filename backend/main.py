@@ -346,6 +346,7 @@ class DocumentItem(BaseModel):
     rotation: tuple[float, float, float, float]
     muted: bool = False  # dimmed in the editor and ignored by clicks; still part of BOM and exports
     centered: bool = False  # keep the footprint centre on the middle of a grid cell when moved
+    noRender: bool = False  # kept in the Blender scene (to focus or aim a light on) but not drawn there
     noExport: bool = False  # mock part (e.g. a component model): left out of the 3MF and SVG exports
     scale: tuple[float, float, float] | None = None  # scale along the part's own X, Y and Z axes, applied before the rotation (None: 1, 1, 1)
     origin: tuple[float, float, float] | None = None  # origin point set by the user, in the part's own STL coordinates (None: the STL's own 0, 0, 0)
@@ -372,6 +373,9 @@ class DocumentRenderSettings(BaseModel):
     depthOfField: bool = False  # the Blender scene gets a depth of field
     focusId: str | None = Field(default=None, max_length=64)  # the part it is focused on; none: the part nearest to the camera in the picture
     crop: bool = False  # the picture is as wide as the parts (the height stays)
+    background: int | None = Field(default=None, ge=0, le=0xFFFFFF)  # colour of the background in the Blender scene; none: the studio's dark gradient
+    ground: int | None = Field(default=None, ge=0, le=0xFFFFFF)  # colour of the ground disc; none: the studio's dark floor
+    beam: int = Field(default=1, ge=0, le=4)  # the lamp type: 0 spot ... 4 flood (how soft its shadows are); 1 is the normal one
     lamp: int = Field(default=40, ge=0, le=60)  # strength of the lamp pointed at the part: 40 normal, 10 steps double or halve it
     ambient: int = Field(default=0, ge=0, le=5)  # ambient light preset: 0 none, 1 Soft glow ... 5 Bright studio
     dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
@@ -709,7 +713,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
-def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None):
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -730,14 +734,19 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
     level = strength if strength is not None else (document.render.dofStrength if document.render else 3)
     cropped = crop if crop is not None else bool(document.render and document.render.crop)
     lamp_level = lamp if lamp is not None else (document.render.lamp if document.render else 40)
+    saved_bg = background if background is not None else (document.render.background if document.render else None)
+    saved_floor = ground if ground is not None else (document.render.ground if document.render else None)
+    bg_text = f"{saved_bg:06x}" if saved_bg is not None else ""
+    floor_text = f"{saved_floor:06x}" if saved_floor is not None else ""
+    beam_level = beam if beam is not None else (document.render.beam if document.render else 1)
     light_level = ambient if ambient is not None else (document.render.ambient if document.render else 0)
-    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level}", cropped  # the ambient preset rides along after the "#"
+    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level}", cropped  # the ambient preset rides along after the "#"
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60)) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4)) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
-    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp)
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam)
     try:
         data = blenderexport.build_blend(glb, blender, studio, sun, depthOfField)
     except ValueError as error:
@@ -749,10 +758,10 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 
 @app.get("/api/documents/{documentId}/render.png")
-def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60),
+def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
                         width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128)) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
     try:
         data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped)
     except ValueError as error:
@@ -761,6 +770,12 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".png"
     return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+# What the steps of a full-size render took the last time (seconds; the render step per megapixel and sample, the last step per megapixel),
+# to estimate the steps that have not started. The first guesses are for a typical machine.
+phaseHistory = {"prepare": 12.0, "load": 4.0, "render": 0.45, "finish": 1.5}
+renderPhases = ["prepare", "load", "render", "finish"]  # making the scene, opening it again, the samples, denoising and saving
 
 
 class RenderJob:
@@ -776,6 +791,41 @@ class RenderJob:
         self.png: bytes | None = None
         self.error = ""
         self.process: object | None = None
+        self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
+        self.step: str | None = None
+        self.megapixels = width * width * 9 / 16 / 1e6
+        self.enter("prepare")
+
+    def enter(self, name: str) -> None:
+        """The next step of the render begins (the one before it ends)."""
+        now = time.time() - self.started
+        if self.step and self.marks[self.step][1] is None:
+            self.marks[self.step][1] = now
+        self.step = name
+        self.marks.setdefault(name, [now, None])
+
+    def close(self) -> None:
+        """The job is over: the last step ends, and what the steps took becomes the estimate for the next job."""
+        now = time.time() - self.started
+        if self.step and self.marks[self.step][1] is None:
+            self.marks[self.step][1] = now
+        if self.state == "done":
+            took = {name: (mark[1] - mark[0]) for name, mark in self.marks.items() if mark[1] is not None and mark[0] is not None}
+            if "prepare" in took: phaseHistory["prepare"] = took["prepare"]
+            if "load" in took: phaseHistory["load"] = took["load"]
+            if "render" in took: phaseHistory["render"] = took["render"] / max(self.megapixels * self.samples, 1e-6)
+            if "finish" in took: phaseHistory["finish"] = took["finish"] / max(self.megapixels, 1e-6)
+
+    def estimate(self, name: str) -> float:
+        """How long a step is expected to take, in seconds."""
+        if name == "render":
+            return phaseHistory["render"] * self.megapixels * self.samples
+        if name == "finish":
+            return phaseHistory["finish"] * self.megapixels
+        return phaseHistory[name]
+
+    def phases(self) -> list[dict]:
+        return [{"name": name, "start": (self.marks.get(name) or [None, None])[0], "end": (self.marks.get(name) or [None, None])[1], "estimate": round(self.estimate(name), 1)} for name in renderPhases]
 
     def size(self) -> list[int] | None:
         """Width and height of the finished picture (read from the PNG header)."""
@@ -784,7 +834,7 @@ class RenderJob:
         return None
 
     def view(self) -> dict:
-        return {"size": self.size(), "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
+        return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error}
 
 
@@ -849,22 +899,27 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
             last[0] = value
             notifier.notify({"type": "render", **job.view()})
 
+    def phase(name: str) -> None:
+        job.enter(name)
+        notifier.notify({"type": "render", **job.view()})
+
     try:
-        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof, crop=crop)
+        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof, crop=crop, phase=phase)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
         if job.state == "running":
             job.state, job.error = "error", str(error)
     finally:
         job.finished = time.time()
+        job.close()
         notifier.notify({"type": "render", **job.view()})
 
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
-def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60),
+def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
     if any(j.state == "running" for j in renderJobs.values()):
         raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
     renderJobs.clear()  # an older picture nobody collected is dropped

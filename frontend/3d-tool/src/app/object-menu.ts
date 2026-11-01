@@ -72,6 +72,10 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
           <span class="hint">{{ allNoExport() ? 'on: not in 3MF / SVG, own BOM section' : 'mock part: leave out of the exports' }}</span>
         </button>
+        <button type="button" role="menuitem" (click)="toggleNoRender()">
+          <span class="icon">{{ allNoRender() ? '✓' : '◌' }}</span>Do not render
+          <span class="hint">{{ allNoRender() ? 'on: in the Blender scene, but not drawn' : 'invisible in renders: focus or aim the lamp on it' }}</span>
+        </button>
         <div class="sep"></div>
         <button type="button" role="menuitem" (click)="findInBrowser()">
           <span class="icon">⌕</span>Find in browser
@@ -177,6 +181,7 @@ export class ObjectMenu {
     return this.items().length > 0 && Math.min(...this.items().map(i => i.position[2])) === height;
   }
 
+  protected readonly allNoRender = computed(() => this.items().length > 0 && this.items().every(i => i.noRender));
   protected readonly allNoExport = computed(() => this.items().length > 0 && this.items().every(i => i.noExport));
   protected readonly allCentered = computed(() => this.items().length > 0 && this.items().every(i => i.centered));
   protected readonly title = computed(() => {
@@ -228,6 +233,9 @@ export class ObjectMenu {
   }
 
 
+  protected toggleNoRender() {
+    this.store.setNoRender(this.items().map(i => i.id), !this.allNoRender());
+  }
   protected toggleNoExport() {
     this.store.setNoExport(this.items().map(i => i.id), !this.allNoExport());
     this.close();
