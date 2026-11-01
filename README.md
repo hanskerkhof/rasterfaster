@@ -163,7 +163,7 @@ Like in the Finder: a plain click selects one row; **⌘-click** adds or removes
 
 Right-click a row → **Move to Trash**, or **⌘⌫** on a focused row (a file or a directory): no question is asked, the row goes to the Trash and an **Undo** bar (10 seconds) offers to put it back. When documents use it, you are asked first: those parts keep their path and show as missing until the file is put back (documents are not rewritten). The **🗑 Trash** button under the file list (with the number of items) opens the Trash: **Put Back** (a directory comes back whole, missing folders are made again; if something sits in the old place you can put it back as `name (restored).stl`), **Delete Immediately** and **Empty Trash…** (both remove for good, Empty asks once more). The Trash lives in the backup folder as `_TRASH/<id>/<name>` with an index in `.rasterfaster/trash.json` (original place, time, size, the registry entries of renamed files so they stay registered); everything is in the log (`trash-file`, `trash-directory`, `put-back`, `delete-immediately`, `empty-trash`). API: `POST /api/library/trash` (`{path}`, `?dryRun=true` lists the documents that use it), `GET /api/library/trash`, `POST /api/library/trash/{id}/put-back[?onConflict=rename]`, `DELETE /api/library/trash/{id}`, `DELETE /api/library/trash`.
 
-An STL that is overwritten on disk shows up after a reload: `/api/file` is sent with `Cache-Control: no-cache` and the app loads STLs with fetch's `no-cache`, so the browser revalidates the ETag every time. The file list's reload button spins for at least 2 seconds.
+An STL that is overwritten on disk shows up after a reload: `/api/file` is sent with `Cache-Control: no-cache` and the app loads STLs with fetch's `no-cache`, so the browser revalidates the ETag every time. The file list's reload button spins for at least 1 second.
 
 ## Looking at a library file
 
@@ -209,7 +209,9 @@ Shift+↑↓ / PgUp PgDn move the selection one level (the lowest selected part 
 
 ## Work area
 
-Parts stay inside a 100 × 100 cell area (±1000 mm in X/Y, −200…1000 mm in Z); drags, keys, rotations and typed values are clamped to it, and the grid never draws beyond it. Documents with corrupt or out-of-range positions are repaired when opened.
+Parts added from the file list go to the position saved in their STL (so a set exported from one Fusion assembly comes back in place); parts with similar names get the same colour.
+
+Parts stay inside a 100 × 100 cell area (±1000 mm in X/Y, −200…2500 mm in Z); drags, keys, rotations and typed values are clamped to it, and the grid never draws beyond it. Documents with corrupt or out-of-range positions are repaired when opened.
 
 ## Blender export
 

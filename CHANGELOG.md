@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-01 - Added STLs keep their exported place, also outside the work area (0.10.53)
+
+### Fixed
+- **FE** (`document-scene.ts`): adding STLs saved from Fusion put them all next to each other. Their exported positions (x about 1776-2076 mm) lie outside the work area (±1000 mm), so every part was treated as out of range. The set now moves as a whole by one common offset until it fits, so the parts keep their places relative to each other; a part whose exact spot is already taken by the same file still goes to the first free spot along +X.
+
+## 2026-11-01 - Shorter reload spinner (0.10.52)
+
+### Changed
+- **FE** (`app.ts`): the spinner of the file list's reload button shows for at least 1 second instead of 2.
+
 ## 2026-11-01 - Fusion add-in: the Save dialog uses the name of the active document (0.10.51)
 
 ### Changed
@@ -9,6 +19,15 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 
 ### Fixed
 - **Fusion add-in**: with several documents open, the Save Local Copy dialog could show the file name of another document (`RF16_STROZZI_v340` for `RF5 Various models`). The add-in told documents apart by the entityToken of their root component, which is the same string in every document, so one document's remembered file and fingerprint applied to all. Documents are now told apart by the document itself.
+
+## 2026-11-01 - Parts keep their STL position, similar names share a colour, taller work area (0.10.51)
+
+### Changed
+- **FE** (`document-scene.ts`): a part added from the file list goes to the position saved in its STL (the lowest corner of the mesh, as Fusion keeps it on import) instead of the first free spot along X. It still goes to a free spot when that position is outside the work area or another copy of the same file already sits exactly there.
+- **FE** (`document.store.ts`): the work area is 2500 mm high (Z −200…2500 mm, was 1000 mm).
+
+### Added
+- **FE** (new `name-similarity.ts`, `document.store.ts`): parts with similar names get the same colour when they are added (at least 85% of the name the same, after dropping the extension, `(2)` copy numbers and trailing digits): `BOLT_S2` and `BOLT_S20`, or `RF7 CONNECTOR OUT (2)` and `RF7 CONNECTOR OUT`, share a colour; `…MID` and `…OUT` do not.
 
 ## 2026-11-01 - Zip all: the whole export set in one file (0.10.50)
 

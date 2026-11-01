@@ -1,3 +1,4 @@
+import { similarNames } from './name-similarity';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ZGridMode, nearestZLevel } from './z-levels';
 import { Injectable, computed, inject, signal } from '@angular/core';
@@ -19,7 +20,7 @@ export type Vec3 = [number, number, number];
  * Safety limits for the document: parts can't leave this box (mm). 100 × 100 cells of the 20 mm grid, centred on the origin,
  * which keeps a runaway drag from flinging a part (and the grid) off to infinity.
  */
-export const workArea = { min: [-1000, -1000, -200] as Vec3, max: [1000, 1000, 1000] as Vec3 };
+export const workArea = { min: [-1000, -1000, -200] as Vec3, max: [1000, 1000, 2500] as Vec3 };
 
 /** Clamps a bounding-box min corner so the whole box (of `size`) stays inside the work area. */
 /**
@@ -559,7 +560,12 @@ export class DocumentStore {
   /** Adds several parts as one undo step and selects them all (their colours continue the cycle). */
   addParts(items: Omit<DocItem, 'id' | 'color'>[]) {
     const base = this.doc().items.length;
-    const created: DocItem[] = items.map((item, i) => ({ ...item, color: itemColors[(base + i) % itemColors.length], id: crypto.randomUUID() }));
+    const created: DocItem[] = [];
+    let fresh = 0; // parts that need a colour of their own
+    for (const item of items) {
+      const alike = [...this.doc().items, ...created].find(other => similarNames(other.name, item.name)); // similar names share a colour
+      created.push({ ...item, color: alike?.color ?? itemColors[(base + fresh++) % itemColors.length], id: crypto.randomUUID() });
+    }
     if (!created.length) return created;
     this.mutate(created.length === 1 ? 'Add part' : 'Add parts', d => ({ ...d, items: [...d.items, ...created] }));
     this.selectedIds.set(created.map(c => c.id));

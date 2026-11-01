@@ -504,10 +504,10 @@ export class App {
     try { localStorage.setItem(panelWidthStorageKey, String(this.panelWidthPx())); } catch { /* the width just is not remembered */ }
   }
 
-  /** Reload button: re-read the file list from disk and the STLs of the document's parts (and redo the search when a filter is active). The spinner shows for at least 2 s, so a quick reload is still visible. */
+  /** Reload button: re-read the file list from disk and the STLs of the document's parts (and redo the search when a filter is active). The spinner shows for at least 1 s, so a quick reload is still visible. */
   protected async reloadFiles() {
     this.reloading.set(true);
-    const minimumShown = new Promise(resolve => setTimeout(resolve, 2000));
+    const minimumShown = new Promise(resolve => setTimeout(resolve, 1000));
     try {
       const text = this.filterText();
       if (text.trim()) this.runSearch(text);

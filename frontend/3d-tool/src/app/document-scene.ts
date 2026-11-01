@@ -614,23 +614,32 @@ export class DocumentScene {
     return this.addObjects([path]);
   }
 
-  /** Loads the files and drops them next to each other into the first free spots along +X at ground level, as one undo step. */
+  /** Loads the files and puts them where their STLs say (see below), as one undo step. */
   async addObjects(paths: string[]) {
     const { store } = this.ctx;
     const taken = store.doc().items
       .map(item => { const entry = this.entryFor(item); return entry && new THREE.Box3(new THREE.Vector3(...item.position), new THREE.Vector3(...item.position).add(entry.size)); })
       .filter((b): b is THREE.Box3 => !!b);
     const created: Omit<DocItem, 'id' | 'color'>[] = [];
-    for (const path of paths) {
-      const base = await this.loadBase(path);
-      const size = this.orient(base, [0, 0, 0, 1]).size;
-      // An STL keeps the place it was exported from (Fusion does too): the part goes there, unless that spot lies outside the work area or
-      // another copy of the same file already sits exactly there. Then it goes to the first free spot along +X.
+    // An STL keeps the place it was exported from (Fusion does too), so a set of parts saved together lands as it was assembled. When that
+    // place lies outside the work area the whole set moves by one common offset (the relative positions stay), so it just fits. A part goes to
+    // the first free spot along +X instead when another copy of the same file already sits exactly there.
+    const bases = await Promise.all(paths.map(path => this.loadBase(path)));
+    const spots = bases.map(base => {
       base.computeBoundingBox();
-      const saved = clampToWorkArea(base.boundingBox!.min.toArray().map(v => Math.round(v * 1000) / 1000) as Vec3, size.toArray() as Vec3);
-      const exact = (a: Vec3, b: Vec3) => a.every((v, i) => Math.abs(v - b[i]) < 0.001);
+      const box = base.boundingBox!;
+      return { min: box.min.clone(), size: this.orient(base, [0, 0, 0, 1]).size };
+    });
+    const whole = new THREE.Box3();
+    for (const spot of spots) whole.union(new THREE.Box3(spot.min, spot.min.clone().add(spot.size)));
+    const wholeMin = whole.min.toArray() as Vec3;
+    const shift = clampToWorkArea(wholeMin, whole.getSize(new THREE.Vector3()).toArray() as Vec3).map((v, i) => v - wholeMin[i]);
+    const exact = (a: Vec3, b: Vec3) => a.every((v, i) => Math.abs(v - b[i]) < 0.001);
+    for (const [index, path] of paths.entries()) {
+      const size = spots[index].size;
+      const saved = spots[index].min.toArray().map((v, i) => Math.round((v + shift[i]) * 1000) / 1000) as Vec3;
       const duplicate = [...store.doc().items, ...created].some(i => i.path === path && exact(i.position, saved));
-      if (!duplicate && exact(saved, base.boundingBox!.min.toArray() as Vec3)) {
+      if (!duplicate) {
         created.push({ path, name: path.split('/').pop()!.replace(/\.stl$/i, ''), position: saved, rotation: [0, 0, 0, 1] });
         continue;
       }
