@@ -1,0 +1,387 @@
+{
+  "version": 1,
+  "savedAt": 1793527766.0221949,
+  "name": "MODULATION_MACHINE",
+  "items": [
+    {
+      "id": "baf0ab98-a212-4a44-a106-fa4eb9d2dfd4",
+      "path": "RF7.10 MODULATION MACHINE/RF7 SPEAKERS.stl",
+      "name": "RF7 SPEAKERS",
+      "color": 16167531,
+      "position": [
+        340.0,
+        0.0,
+        666.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "058392a2-4bc8-4bdf-b322-afad049340cc",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT (5).stl",
+      "name": "RF7 CONNECTOR OUT (5)",
+      "color": 9338051,
+      "position": [
+        470.801,
+        48.0,
+        1125.807
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "6ce64911-141a-46c2-8f4e-ba8d3d9b3e8d",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT (4).stl",
+      "name": "RF7 CONNECTOR OUT (4)",
+      "color": 9338051,
+      "position": [
+        395.801,
+        48.0,
+        928.121
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "8c512d1d-15f1-4665-a311-6e9be90b4cf6",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT (3).stl",
+      "name": "RF7 CONNECTOR OUT (3)",
+      "color": 9338051,
+      "position": [
+        470.801,
+        48.0,
+        730.434
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "7345cff0-74e2-46d1-b252-bfda993a1c29",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT (2).stl",
+      "name": "RF7 CONNECTOR OUT (2)",
+      "color": 9338051,
+      "position": [
+        738.206,
+        48.0,
+        730.434
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "da45991e-a5da-44c4-bafd-7a5f24618251",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT (1).stl",
+      "name": "RF7 CONNECTOR OUT (1)",
+      "color": 9338051,
+      "position": [
+        813.205,
+        48.0,
+        928.121
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "08c61509-e533-478c-87e4-cdd93a3cf68a",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR OUT.stl",
+      "name": "RF7 CONNECTOR OUT",
+      "color": 9338051,
+      "position": [
+        738.206,
+        48.0,
+        1125.807
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "0a950808-8bdd-485c-84a5-435b3ce5da83",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID CIRCLE.stl",
+      "name": "RF7 CONNECTOR MID CIRCLE",
+      "color": 16767334,
+      "position": [
+        623.405,
+        50.0,
+        956.104
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "014d80fa-f088-4840-80d0-745f4584a817",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID (3).stl",
+      "name": "RF7 CONNECTOR MID (3)",
+      "color": 9338051,
+      "position": [
+        513.205,
+        50.0,
+        995.904
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "5b13c477-3c69-47fa-9549-e6dca0eb0731",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID (2).stl",
+      "name": "RF7 CONNECTOR MID (2)",
+      "color": 9338051,
+      "position": [
+        513.205,
+        50.0,
+        866.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "1b6e4352-41b5-4a91-a234-ff0566789302",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID (5).stl",
+      "name": "RF7 CONNECTOR MID (5)",
+      "color": 9338051,
+      "position": [
+        588.205,
+        50.0,
+        866.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "b4292be6-a0cf-4951-b1e1-ffc6a1c2434c",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID (4).stl",
+      "name": "RF7 CONNECTOR MID (4)",
+      "color": 9338051,
+      "position": [
+        683.205,
+        50.0,
+        866.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "841fe5fb-c746-41b6-a8d1-161acf405acb",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID (1).stl",
+      "name": "RF7 CONNECTOR MID (1)",
+      "color": 9338051,
+      "position": [
+        683.205,
+        50.0,
+        995.904
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "9b8e05c9-0618-4a4c-bc7e-c6156f0fcbd0",
+      "path": "RF7.10 MODULATION MACHINE/RF7 CONNECTOR MID.stl",
+      "name": "RF7 CONNECTOR MID",
+      "color": 9338051,
+      "position": [
+        588.205,
+        50.0,
+        1030.545
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "786f932c-a84e-482c-8fc6-bc05beffa532",
+      "path": "RF7.10 MODULATION MACHINE/RF7 V-TWIN  SPEAKER R.stl",
+      "name": "RF7 V-TWIN  SPEAKER R",
+      "color": 16767334,
+      "position": [
+        71.888,
+        0.0,
+        887.212
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "c296bf13-8be2-4700-b029-e655e5c432ae",
+      "path": "RF7.10 MODULATION MACHINE/RF7 V-TWIN  SPEAKER L.stl",
+      "name": "RF7 V-TWIN  SPEAKER L",
+      "color": 16767334,
+      "position": [
+        -115.935,
+        0.0,
+        887.316
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "23c7f6c7-f9e7-47a2-8580-74b031c24aa3",
+      "path": "RF7.10 MODULATION MACHINE/RF7 V-TWIN STRAP RATCHET.stl",
+      "name": "RF7 V-TWIN STRAP RATCHET",
+      "color": 7317724,
+      "position": [
+        -118.495,
+        31.752,
+        886.087
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "bf8d53d5-8ca6-4926-9bdd-fae9dad34385",
+      "path": "RF7.10 MODULATION MACHINE/RF7 V-TWIN BOTTOM.stl",
+      "name": "RF7 V-TWIN BOTTOM",
+      "color": 16167531,
+      "position": [
+        -25.474,
+        20.0,
+        887.371
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "100c9365-ce67-401d-8574-b941bca03561",
+      "path": "RF7.10 MODULATION MACHINE/RF7 V-TWIN TOP.stl",
+      "name": "RF7 V-TWIN TOP",
+      "color": 16167531,
+      "position": [
+        -19.848,
+        40.0,
+        940.908
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "version": 7,
+  "savedAt": 1793553897.7924638,
+  "name": "STROZZI_OBJECT",
+  "items": [
+    {
+      "id": "4119ab96-f7c0-473f-9d8b-2304a3fa384c",
+      "path": "RF16_STROZZI/RF16_STROZZI_DISC v1.stl",
+      "name": "RF16_STROZZI_DISC v1",
+      "color": 0,
+      "position": [
+        100.0,
+        24.3,
+        169.698
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "5e9f0f40-de16-43a5-bc74-d05f53797d1b",
+      "path": "RF16_STROZZI/RF16_STROZZI_BOTTOM 7deg v1.stl",
+      "name": "RF16_STROZZI_BOTTOM 7deg v1",
+      "color": 0,
+      "position": [
+        108.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "6063a4df-3d14-48a5-8c38-a7403bbc6623",
+      "path": "RF16_STROZZI/RF16_SPEAKER BOX v1.stl",
+      "name": "RF16_SPEAKER BOX v1",
+      "color": 9586739,
+      "position": [
+        100.0,
+        -17.0,
+        8.519
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "10f77ff1-ded1-4024-a451-facfc641b849",
+      "path": "RF16_STROZZI/RF16_SPEAKER CYLINDER v1.stl",
+      "name": "RF16_SPEAKER CYLINDER v1",
+      "color": 9586739,
+      "position": [
+        92.0,
+        -3.0,
+        176.7
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "65dbefb1-611d-43e5-b58d-905bd468f5ef",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES SPHERE 20mm.stl",
+      "name": "RF1.11 PRIMITIVES SPHERE 20mm",
+      "color": 9338051,
+      "position": [
+        149.0,
+        33.0,
+        324.005
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.3826834323650898,
+        0.9238795325112867
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": true,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "36d2e2a1-ca53-4c83-85b3-18222454739b",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES TEAPOT 20mm.stl",
+      "name": "RF1.11 PRIMITIVES TEAPOT 20mm",
+      "color": 14706278,
+      "position": [
+        119.005,
+        29.061,
+        417.612
+      ],
+      "rotation": [
+        0.0,
+        -0.0610485395348569,
+        -0.998134798421867,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": [
+        3.1,
+        3.1,
+        3.1
+      ],
+      "origin": null
+    },
+    {
+      "id": "2c4a30ee-a3ec-478e-a8d3-fec7c369ec23",
+      "path": "RF1.11 PRIMITIVES/Utah Teapot.stl",
+      "name": "Utah Teapot",
+      "color": 9586739,
+      "position": [
+        21.193,
+        -116.078,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    }
+  ]
+}

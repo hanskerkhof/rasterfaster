@@ -419,7 +419,7 @@
       ],
       "muted": true,
       "centered": false,
-      "noExport": false
+      "noExport": true
     },
     {
       "id": "2d92b43a-e0fa-48b0-9e53-785a28c3bd14",
@@ -1223,8 +1223,8 @@
     },
     {
       "id": "d11abe70-14c8-4c9b-a714-cd5c60834b34",
-      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 - COVER 6x2 FLAT.stl",
-      "name": "5.25 - COVER 6x2 FLAT",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V COVER.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V COVER",
       "color": 7775663,
       "position": [
         140.0,
@@ -1401,5 +1401,28 @@
       "centered": true,
       "noExport": false
     }
-  ]
+  ],
+  "light": {
+    "direction": [
+      0.666,
+      -0.007,
+      0.746
+    ],
+    "targetId": "d11abe70-14c8-4c9b-a714-cd5c60834b34"
+  },
+  "view": {
+    "projection": "ortho",
+    "position": [
+      745.262,
+      -535.261,
+      487.209
+    ],
+    "target": [
+      190.0,
+      20.0,
+      42.999
+    ],
+    "zoom": 0.987,
+    "radius": 225.548
+  }
 }

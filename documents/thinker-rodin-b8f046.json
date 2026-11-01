@@ -1,0 +1,156 @@
+{
+  "name": "THINKER_RODIN",
+  "items": [
+    {
+      "id": "cfb98f73-9664-41e6-85e4-715ddce04a3c",
+      "path": "RODIN_THINKER_00.stl",
+      "name": "RODIN_THINKER_00",
+      "color": 7775663,
+      "position": [
+        -8.608,
+        140.178,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "908fc3d4-5a4a-4cf4-85e9-a66e90d0081e",
+      "path": "RODIN_THINKER_02.stl",
+      "name": "RODIN_THINKER_02",
+      "color": 12745632,
+      "position": [
+        -20.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
+      "path": "RODIN_THINKER_01.stl",
+      "name": "RODIN_THINKER_01",
+      "color": 6967608,
+      "position": [
+        160.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    },
+    {
+      "id": "dc6c67f1-a941-43de-90ca-fca3cb42fff3",
+      "path": "BOLTS/BOLT_S2.stl",
+      "name": "BOLT_S2",
+      "color": 12745632,
+      "position": [
+        162.345,
+        22.349,
+        -6.0
+      ],
+      "rotation": [
+        0.0,
+        1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "89be197f-a9a3-4807-a36d-aa179bb76593",
+      "path": "BOLTS/BOLT_S2.stl",
+      "name": "BOLT_S2",
+      "color": 12745632,
+      "position": [
+        222.345,
+        42.349,
+        -6.0
+      ],
+      "rotation": [
+        0.0,
+        1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noExport": false
+    },
+    {
+      "id": "171955d2-a8e6-414d-9a17-c8ef09ae2cd0",
+      "path": "BASEPLATES/8x6_BASEPLATE.stl",
+      "name": "8x6_BASEPLATE",
+      "color": 14706278,
+      "position": [
+        80.0,
+        0.0,
+        -6.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false
+    }
+  ],
+  "light": {
+    "direction": [
+      0.746,
+      -0.48,
+      -0.461
+    ],
+    "targetId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c"
+  },
+  "view": {
+    "projection": "persp",
+    "position": [
+      820.499,
+      -338.202,
+      210.547
+    ],
+    "target": [
+      200.381,
+      48.003,
+      63.66
+    ],
+    "zoom": 2.747,
+    "radius": 180.731
+  },
+  "render": {
+    "depthOfField": true,
+    "focusId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
+    "crop": false,
+    "lamp": 40,
+    "ambient": 0,
+    "dofStrength": 3
+  }
+}

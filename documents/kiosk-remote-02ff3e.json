@@ -5,7 +5,7 @@
       "id": "420d18d4-c5e1-4411-a2e8-f70c9f7c8be8",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
-      "color": 12745632,
+      "color": 0,
       "position": [
         171.108,
         100.0,
@@ -19,13 +19,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "5d4a4b29-6e4a-4fbf-a877-afd4aa8aa1ed",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
-      "color": 9338051,
+      "color": 0,
       "position": [
         171.108,
         100.0,
@@ -39,13 +40,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "9386a8c9-b997-4653-b6d8-8dbf5c3a764f",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II",
-      "color": 14706278,
+      "color": 0,
       "position": [
         280.0,
         100.0,
@@ -59,17 +61,18 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "7147850b-6c20-4574-90be-6dec808a000c",
       "path": "BOLTS/BOLT_S9.stl",
       "name": "BOLT_S9",
-      "color": 7775663,
+      "color": 0,
       "position": [
         202.349,
         122.345,
-        2.0
+        0.0
       ],
       "rotation": [
         0.7071067811865477,
@@ -79,17 +82,18 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "6087c5cd-09c5-4ce7-b731-165e0bd38ce7",
       "path": "BOLTS/BOLT_S9.stl",
       "name": "BOLT_S9",
-      "color": 7775663,
+      "color": 0,
       "position": [
         202.349,
         102.345,
-        2.0
+        0.0
       ],
       "rotation": [
         0.7071067811865477,
@@ -99,13 +103,14 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "733f6af5-0723-4617-8dbf-277d56dc9927",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE BASE.stl",
       "name": "15.1 KIOSK REMOTE BASE",
-      "color": 7775663,
+      "color": 0,
       "position": [
         100.0,
         80.0,
@@ -119,6 +124,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -139,13 +145,14 @@
       ],
       "muted": true,
       "centered": false,
+      "noRender": true,
       "noExport": false
     },
     {
       "id": "4a931944-c994-4baa-aa72-d0d942c2b36b",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
       "name": "15.1 KIOSK REMOTE FRONT",
-      "color": 7317724,
+      "color": 0,
       "position": [
         100.0,
         40.0,
@@ -159,13 +166,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "af86ba3d-8c2d-4ce5-8e92-c5ebad121c72",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II",
-      "color": 14706278,
+      "color": 0,
       "position": [
         280.0,
         80.0,
@@ -179,13 +187,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "6acc62aa-f519-4743-8ff4-ffa4ecde3b62",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 12745632,
+      "color": 0,
       "position": [
         302.55,
         42.55,
@@ -199,13 +208,14 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "a4f15c9d-3062-458c-94c8-386dce635fb5",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 12745632,
+      "color": 0,
       "position": [
         282.55,
         42.55,
@@ -219,13 +229,14 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "ca298c8c-4ee7-4a9e-9a20-d583ab358b0a",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 12745632,
+      "color": 0,
       "position": [
         302.55,
         22.55,
@@ -239,13 +250,14 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "c99bdfe8-745e-4170-886d-cb626a36a7d0",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 12745632,
+      "color": 0,
       "position": [
         282.55,
         22.55,
@@ -259,13 +271,14 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "6470b3c2-f350-4d0d-9cd5-a0c836c54730",
       "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/models/rotary-encoders-1.snapshot.1/rotary+encoder_14mm_hole_spc.stl",
       "name": "rotary+encoder_14mm_hole_spc",
-      "color": 16767334,
+      "color": 10987946,
       "position": [
         173.4,
         46.8,
@@ -279,13 +292,14 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": true
+      "noRender": false,
+      "noExport": false
     },
     {
       "id": "26fb9ea5-6af8-4156-9c82-2bf65008588d",
       "path": "MOUNTS/2.12.TM1637 - I2C-7Segment display/i2c-7segment-1.snapshot.1/TM1637.stp.stl",
       "name": "TM1637.stp",
-      "color": 14706278,
+      "color": 11680554,
       "position": [
         114.5,
         51.5,
@@ -299,13 +313,14 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": true
+      "noRender": false,
+      "noExport": false
     },
     {
       "id": "5c7c0cda-350d-4e0b-8168-5a3b20e60501",
       "path": "MOUNTS/3.9.PCB & NEEDLES/3w 6x1 needles BOTTOM  - 3.9.stl",
       "name": "3w 6x1 needles BOTTOM  - 3.9",
-      "color": 16167531,
+      "color": 0,
       "position": [
         120.0,
         100.0,
@@ -319,13 +334,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "68f48eb3-90e7-4145-82d7-bd1e26d0c157",
       "path": "MOUNTS/3.9.PCB & NEEDLES/3w 6x1 needles TOP - 3.9.stl",
       "name": "3w 6x1 needles TOP - 3.9",
-      "color": 16167531,
+      "color": 0,
       "position": [
         120.0,
         100.0,
@@ -339,16 +355,17 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "faf346bf-0c1c-4b98-9152-b0f1ad7b48b5",
       "path": "BOLTS/BOLT_S1.stl",
       "name": "BOLT_S1",
-      "color": 12745632,
+      "color": 0,
       "position": [
         282.345,
-        -17.651,
+        122.349,
         1.997
       ],
       "rotation": [
@@ -359,16 +376,17 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "aca65f79-d516-47bc-847a-ae30dd0ecf47",
       "path": "BOLTS/BOLT_S1.stl",
       "name": "BOLT_S1",
-      "color": 12745632,
+      "color": 0,
       "position": [
-        302.345,
-        -17.651,
+        282.345,
+        142.349,
         1.997
       ],
       "rotation": [
@@ -379,7 +397,39 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     }
-  ]
+  ],
+  "light": {
+    "direction": [
+      0.534,
+      0.704,
+      0.468
+    ],
+    "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+  },
+  "view": {
+    "projection": "persp",
+    "position": [
+      -293.231,
+      -199.916,
+      288.029
+    ],
+    "target": [
+      161.313,
+      105.46,
+      37.048
+    ],
+    "zoom": 5.007,
+    "radius": 146.099
+  },
+  "render": {
+    "depthOfField": true,
+    "focusId": "420d18d4-c5e1-4411-a2e8-f70c9f7c8be8",
+    "crop": false,
+    "lamp": 40,
+    "ambient": 3,
+    "dofStrength": 4
+  }
 }

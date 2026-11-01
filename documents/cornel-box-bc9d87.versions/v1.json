@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "savedAt": 1793555967.981535,
+  "name": "CORNEL BOX",
+  "items": [
+    {
+      "id": "15a8da8d-167f-47b7-85e2-8bf40ebf215f",
+      "path": "RF1.11 PRIMITIVES/cornell-box-model_files/cornell-box-back.stl",
+      "name": "cornell-box-back",
+      "color": 7317724,
+      "position": [
+        -67.0,
+        58.868,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "a7f504ca-67b8-4597-b503-7ccf7ae6a12b",
+      "path": "RF1.11 PRIMITIVES/cornell-box-model_files/cornell-box-bottom.stl",
+      "name": "cornell-box-bottom",
+      "color": 9684093,
+      "position": [
+        -67.0,
+        -67.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "f6783538-84dc-4b5a-978a-a929ec8332c2",
+      "path": "RF1.11 PRIMITIVES/cornell-box-model_files/cornell-box-side.stl",
+      "name": "cornell-box-side",
+      "color": 9338051,
+      "position": [
+        -67.0,
+        -67.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "17c27513-f8f1-424e-a2f4-23db084f0f52",
+      "path": "RF1.11 PRIMITIVES/cornell-box-model_files/cornell-box-top.stl",
+      "name": "cornell-box-top",
+      "color": 14706278,
+      "position": [
+        -67.0,
+        -67.0,
+        127.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null
+    },
+    {
+      "id": "17f9993e-7af2-4602-847a-1bf6436c4da9",
+      "path": "RF1.11 PRIMITIVES/Utah Teapot.stl",
+      "name": "Utah Teapot",
+      "color": 9338051,
+      "position": [
+        -39.998,
+        -0.002,
+        79.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.008726535498373935,
+        0.9999619230641713
+      ],
+      "muted": false,
+      "centered": false,
+      "noExport": false,
+      "scale": [
+        0.41,
+        0.41,
+        0.41
+      ],
+      "origin": null
+    }
+  ]
+}

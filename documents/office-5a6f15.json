@@ -19,6 +19,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -39,6 +40,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -59,6 +61,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -79,6 +82,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -99,6 +103,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -119,13 +124,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "a65ecadb-e4e7-48f7-b537-6e583669ecff",
       "path": "office-dell_optiplex_micro_7010.stl",
       "name": "office-dell_optiplex_micro_7010",
-      "color": 7775663,
+      "color": 0,
       "position": [
         -860.0,
         -160.0,
@@ -139,16 +145,17 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "4026dc66-eb47-4680-a864-df05b9c3749c",
       "path": "office-uperfect_monitor.stl",
       "name": "office-uperfect_monitor",
-      "color": 16767334,
+      "color": 0,
       "position": [
         -720.0,
-        -740.0,
+        -700.0,
         701.995
       ],
       "rotation": [
@@ -159,13 +166,14 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
       "path": "office-optiplex_3060_micro.stl",
       "name": "office-optiplex_3060_micro",
-      "color": 7775663,
+      "color": 0,
       "position": [
         -855.0,
         -159.5,
@@ -179,7 +187,59 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "b550f785-bbc3-47a6-b091-674c3b226d0d",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES CUBE 20mm.stl",
+      "name": "RF1.11 PRIMITIVES CUBE 20mm",
+      "color": 9684093,
+      "position": [
+        240.0,
+        -500.0,
+        638.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": true,
       "noExport": false
     }
-  ]
+  ],
+  "light": {
+    "direction": [
+      -0.104,
+      -0.079,
+      0.991
+    ]
+  },
+  "view": {
+    "projection": "persp",
+    "position": [
+      2310.02,
+      -2905.04,
+      1240.144
+    ],
+    "target": [
+      -230.869,
+      -364.151,
+      477.877
+    ],
+    "zoom": 1.716,
+    "radius": 890.918
+  },
+  "render": {
+    "depthOfField": true,
+    "focusId": "b550f785-bbc3-47a6-b091-674c3b226d0d",
+    "crop": false,
+    "lamp": 40,
+    "ambient": 3,
+    "dofStrength": 5
+  }
 }
