@@ -346,6 +346,9 @@ export class RenderService {
     if (!this.dialog()) this.openRequests.update(n => n + 1);
   }
 
+  /** The last quick picture with what it was made from: while that is unchanged (view, light, parts, render settings) the dialog shows it again instead of rendering. */
+  lastQuick: { key: string; blob: Blob; detail: string } | null = null;
+
   /** The Render button: a quick picture (shown at once by the dialog). */
   openQuick(url: string) {
     this.dialog.set({ url, jobId: '' });

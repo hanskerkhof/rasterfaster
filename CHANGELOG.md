@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Quick render reuses its picture, Find in browser opens the panel (0.10.65)
+
+### Added
+- **FE** (`render-dialog.ts`, `render.service.ts`): opening the render dialog shows the last quick picture again when nothing changed (view, light, parts, render settings); the Quick render button always renders again.
+- **FE** (`render-dialog.ts`): a note "needs a perspective view" next to Depth of field when the quick render was made from an orthographic view.
+
+### Changed
+- **FE** (`app.ts`): **Find in browser** opens the file panel when it is hidden.
+
+### Fixed
+- **FE** (`stl-viewer.ts`): switching from the orthographic to the perspective camera refreshes the camera frame first.
+
 ## 2026-11-02 - Version in the 3MF filename, dimensions in the preview, no black copies (0.10.64)
 
 ### Added

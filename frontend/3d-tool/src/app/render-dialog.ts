@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, input, output, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { RenderService, hdWidths } from './render.service';
 import { DocumentStore } from './document.store';
@@ -23,6 +23,7 @@ import { ColorPalette } from './color-palette';
         <label class="check" title="Blurs what is in front of and behind the part nearest to the camera, like a real lens (needs the perspective camera: an orthographic view has no depth of field)">
           <input type="checkbox" [checked]="render.depthOfField()" (change)="toggleDepthOfField($any($event.target).checked)" /> Depth of field
         </label>
+        @if (render.depthOfField() && orthographic()) { <span class="dofnote" title="An orthographic view has no depth of field: switch the 3D view to the perspective camera">⚠ needs a perspective view</span> }
           <select class="focus" [disabled]="!render.depthOfField()" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture." (change)="chooseFocus($any($event.target).value)">
             <option value="" [selected]="!focusValue()">Focus: nearest in the picture</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === focusValue()">Focus: {{ part.label }}</option> }
@@ -62,7 +63,7 @@ import { ColorPalette } from './color-palette';
       </div>
       <div class="actions">
         @if (url()) {
-          <button type="button" [disabled]="busy()" title="800 px, 24 samples: a few seconds" (click)="quick()">
+          <button type="button" [disabled]="busy()" title="800 px, 24 samples: a few seconds" (click)="quick(true)">
             @if (busy()) { <span class="spinner small"></span> } @else if (quickReady()) { <svg class="tick" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-label="The quick render is ready"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> }Quick render
           </button>
         }
@@ -107,6 +108,7 @@ import { ColorPalette } from './color-palette';
     .focus:disabled { opacity: .45; cursor: default; }
     .focus { max-width: 230px; padding: 3px 6px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; }
     .check { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; cursor: pointer; user-select: none; } .check input { margin: 0; }
+    .dofnote { font-size: 12px; color: #f0b429; white-space: nowrap; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
     button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
     img { display: block; width: 100%; height: auto; border-radius: 4px; background: #000; }
@@ -124,6 +126,8 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected readonly render = inject(RenderService);
   /** The API address of the quick picture (`…/render.png?…`), with the camera and the light of the 3D view; empty when a finished render is shown. */
   readonly url = input('');
+  /** The quick render's view is orthographic (the URL carries `view=…;ortho`): no depth of field then. */
+  protected readonly orthographic = computed(() => /view=[^&]*%3Bortho/.test(this.url()));
   /** A finished full-size render to show. */
   readonly jobId = input('');
   readonly name = input('document');
@@ -240,17 +244,28 @@ export class RenderDialog implements OnInit, OnDestroy {
     }
   }
 
-  protected async quick() {
+  protected async quick(force = false) {
+    const quickUrl = new URL(this.url(), location.origin);
+    this.render.dofParams(quickUrl);
+    const key = quickUrl.href + '\n' + JSON.stringify(this.store.doc().items); // clean (nothing changed since the last picture) or dirty (render again)
+    const last = this.render.lastQuick;
+    if (!force && last?.key === key) {
+      this.error.set('');
+      this.show(last.blob, last.detail);
+      this.quickReady.set(true);
+      return;
+    }
     this.quickReady.set(false);
     this.busyText.set('Rendering a preview with Blender (800 px, a few seconds)…');
     this.busy.set(true);
     this.error.set('');
     try {
-      const quickUrl = new URL(this.url(), location.origin);
-      this.render.dofParams(quickUrl);
       const response = await fetch(quickUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
-      this.show(await response.blob(), `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`);
+      const blob = await response.blob();
+      const detail = `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`;
+      this.render.lastQuick = { key, blob, detail };
+      this.show(blob, detail);
       this.quickReady.set(true);
     } catch (error) {
       this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);

@@ -149,6 +149,7 @@ export class App {
       const request = this.store.browserRequest();
       if (!request) return;
       untracked(() => {
+        if (this.panelHidden()) this.togglePanel(); // the file panel is closed: open it to show the file
         const show = () => {
           this.findRequest.set(request);
           if (request.paths.length === 1) this.open(request.paths[0]); // the file is the selected one of the browser, like after a click

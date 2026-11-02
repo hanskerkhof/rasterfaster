@@ -1304,6 +1304,7 @@ export class StlViewer implements OnDestroy {
     const target = this.controls.target;
     const offset = this.camera.position.clone().sub(target);
     const direction = offset.lengthSq() > 1e-6 ? offset.clone().normalize() : this.homeDirection.clone();
+    this.resize(); // the frustum follows the model's size (the radius): after a document or view was loaded it can be stale, which would distort the switch
     const halfHeight = this.viewHeight() / 2;
     const next = kind === 'persp' ? this.perspectiveCamera : this.orthoCamera;
     next.up.copy(this.camera.up);
