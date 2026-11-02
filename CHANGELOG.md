@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Version in the 3MF filename, dimensions in the preview, no black copies (0.10.64)
+
+### Added
+- **FE** (`document-panel.ts`): the assembly 3MF is named with the latest saved version, e.g. `STROZZI_DY_PLAYERS-assembly_v19.3mf`.
+- **FE** (`quick-look.ts`): the preview shows the STL dimensions above the footer.
+
+### Fixed
+- **FE** (`document.store.ts`): a new part similar in name to a black part gets one of the 8 base colours instead of copying black.
+
 ## 2026-11-02 - Do not render, lamp types, background and ground colours, render steps (0.10.63)
 
 ### Added

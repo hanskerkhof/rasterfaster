@@ -447,7 +447,8 @@ export class DocumentPanel {
   protected readonly step = snapStepMm;
 
   protected export3mf() {
-    return this.download('export.3mf', 'assembly.3mf');
+    const version = this.store.version();
+    return this.download('export.3mf', 'assembly.3mf', `${this.store.doc().name.replace(/[^\w.-]+/g, '_')}-assembly${version ? `_v${version}` : ''}.3mf`);
   }
 
   protected exportBlender() {
@@ -586,7 +587,7 @@ export class DocumentPanel {
   }
 
   /** Saves pending edits, asks the API for the file and hands it to the browser as a download. */
-  private async download(endpoint: string, fallbackName: string) {
+  private async download(endpoint: string, fallbackName: string, filenameOverride?: string) {
     const id = this.store.docId();
     if (!id) return;
     this.exporting.set(true);
@@ -595,7 +596,7 @@ export class DocumentPanel {
       await this.store.flush();
       const response = await fetch(`/api/documents/${id}/${endpoint}`);
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
-      const filename = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `${id}-${fallbackName}`;
+      const filename = filenameOverride ?? /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? `${id}-${fallbackName}`;
       const link = document.createElement('a');
       link.href = URL.createObjectURL(await response.blob());
       link.download = filename;

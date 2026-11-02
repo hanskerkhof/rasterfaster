@@ -183,6 +183,19 @@ describe('DocumentStore.addParts', () => {
     expect(store.doc().items.length).toBe(before);
     expect(store.addParts([])).toEqual([]);
   });
+
+  it('gives similar names one colour, but never copies black: a part like a black one gets a base colour', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    store.addItem({ ...part(), name: 'BOLT_S1', color: 0 });
+    const [bolt, again] = store.addParts([
+      { path: 'x.stl', name: 'BOLT_S9', position: [20, 0, 0], rotation: [0, 0, 0, 1] },
+      { path: 'y.stl', name: 'BOLT_S2', position: [40, 0, 0], rotation: [0, 0, 0, 1] },
+    ]);
+    expect(bolt.color).not.toBe(0);
+    expect(again.color).toBe(bolt.color); // similar to the part just added
+  });
 });
 
 

@@ -53,8 +53,11 @@ function readMode(): ViewMode {
           <button type="button" [class.on]="mode() === m.id" [title]="m.title" (click)="setMode(m.id)">{{ m.label }}</button>
         }
       </div>
-      <div #host class="host"></div>
-      @if (state()) { <div class="state">{{ state() }}</div> }
+      <div class="stage">
+        <div #host class="host"></div>
+        @if (state()) { <div class="state">{{ state() }}</div> }
+        @if (info()) { <div class="dims" title="Width × depth × height of the STL">{{ info() }}</div> }
+      </div>
       <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ add to document (closes this) · drag to orbit · drag the corner to resize</footer>
     </div>
   `,
@@ -70,9 +73,10 @@ function readMode(): ViewMode {
     .modes button { padding: 3px 9px; background: #31353f; opacity: 1; border: 1px solid #000; border-radius: 4px; font-size: 11px; }
     .modes button.on { background: #2f6fed; color: #fff; }
     .modes button:hover:not(.on) { background: #3b404c; }
-    .host { position: relative; flex: 1; min-height: 0; background: #1b1d22; }
+    .stage { position: relative; flex: 1; min-height: 0; display: flex; } .host { position: relative; flex: 1; min-width: 0; min-height: 0; background: #1b1d22; }
     .state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: .6; font-style: italic; }
     footer { padding: 5px 10px; opacity: .45; font-size: 11px; border-top: 1px solid #000; }
+    .dims { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 13px; font-weight: 600; opacity: .8; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 3px #000; }
   `,
 })
 export class QuickLook implements OnDestroy {

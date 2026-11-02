@@ -650,7 +650,7 @@ export class DocumentStore {
     const created: DocItem[] = [];
     let fresh = 0; // parts that need a colour of their own
     for (const item of items) {
-      const alike = [...this.doc().items, ...created].find(other => similarNames(other.name, item.name)); // similar names share a colour
+      const alike = [...this.doc().items, ...created].find(other => other.color !== 0 && similarNames(other.name, item.name)); // similar names share a colour (black is not copied: new parts get one of the base colours)
       created.push({ ...item, color: alike?.color ?? itemColors[(base + fresh++) % itemColors.length], id: crypto.randomUUID() });
     }
     if (!created.length) return created;
