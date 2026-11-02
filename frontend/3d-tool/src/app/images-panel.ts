@@ -2,7 +2,7 @@ import { Component, DestroyRef, ElementRef, HostListener, computed, effect, inje
 import { closeOnEscape } from './escape-close';
 import { DocumentStore } from './document.store';
 import { ImageNote, ImagesService } from './images.service';
-import { RenderService, ambientNames, beamNames, hdWidths, strengthNames } from './render.service';
+import { RenderService, ambientNames, aspectRatio, beamNames, hdWidths, strengthNames } from './render.service';
 import { ReleaseFocus } from './release-focus';
 
 const storageKey = 'rasterfaster.imagesPanel';
@@ -291,15 +291,18 @@ export class ImagesPanel {
     if (s.ambient !== undefined) lines.push({ label: 'Ambient', value: ambientNames[s.ambient] ?? String(s.ambient) });
     if (s.beam !== undefined) lines.push({ label: 'Lamp type', value: beamNames[s.beam] ?? String(s.beam) });
     if (s.lamp !== undefined) { const share = 2 ** ((s.lamp - 40) / 10) * 100; lines.push({ label: 'Lamp', value: `${share >= 100 ? Math.round(share) : Math.round(share * 10) / 10} %` }); }
-    if (s.background !== undefined) lines.push(s.background === null ? { label: 'Background', value: 'studio' } : { label: 'Background', value: hex(s.background), swatch: hex(s.background) });
-    if (s.ground !== undefined) lines.push(s.ground === null ? { label: 'Ground', value: 'studio' } : { label: 'Ground', value: hex(s.ground), swatch: hex(s.ground) });
+    if (s.transparent) lines.push({ label: 'Background', value: 'transparent (the ground shows its shadows only)' });
+    else if (s.background !== undefined) lines.push(s.background === null ? { label: 'Background', value: 'studio' } : { label: 'Background', value: hex(s.background), swatch: hex(s.background) });
+    if (s.ground !== undefined && !s.transparent) lines.push(s.ground === null ? { label: 'Ground', value: 'studio' } : { label: 'Ground', value: hex(s.ground), swatch: hex(s.ground) });
+    if (s.aspect && s.aspect !== '16:9') lines.push({ label: 'Shape', value: s.aspect });
     if (s.crop !== undefined) lines.push({ label: 'Crop', value: s.crop ? 'on' : 'off' });
     return lines;
   }
   /** The tag on a thumbnail: the resolution's name (HD, QHD, 4K UHD …, found by the height, which a cropped picture keeps), or Quick. */
   protected badge(note: ImageNote) {
     if (note.kind !== 'hd') return 'Quick';
-    const size = hdWidths.find(w => Math.round(w.width * 9 / 16) === note.height);
+    const ratio = aspectRatio(note.settings?.aspect);
+    const size = hdWidths.find(w => Math.round(w.width / ratio) === note.height);
     const name = size?.label.split(' · ')[1];
     return name === 'Full HD' ? 'HD' : name ?? 'HD';
   }

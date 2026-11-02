@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Picture shapes and a transparent background (0.11.6)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): a **Shape** menu in the Render dialog (16:9 wide, 1:1 square, 4:5 portrait, 9:16 tall): the size menu gives the width, the height follows the shape, and the picture shows the same width of the scene as the 16:9 one. A **Transparent** checkbox removes the background (a PNG with alpha; the ground stays invisible but its soft shadows show). Saved with the document (`render.aspect`, `render.transparent`) and with each picture of the image library; API: `aspect` (`16:9`, `1:1`, `4:5`, `9:16`) and `transparent` on `render.png`, `render-jobs` and `export.blend`.
+
 ## 2026-11-02 - A picture keeps its view, a steadier Render dialog (0.11.5)
 
 ### Added

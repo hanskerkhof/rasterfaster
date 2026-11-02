@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { RenderService, ambientNames, beamNames, hdQualities, hdWidths, strengthNames } from './render.service';
+import { Aspect, RenderService, ambientNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -61,6 +61,9 @@ import { ColorPalette } from './color-palette';
             }
           </span>
         }
+        <label class="check" title="Transparent background: no background in the picture (a PNG with alpha). The ground stays invisible but its soft shadows show, like a product photo">
+          <input type="checkbox" [checked]="render.transparent()" (change)="toggleTransparent($any($event.target).checked)" /> Transparent
+        </label>
       </div>
       <div class="actions">
         @if (url()) {
@@ -69,6 +72,9 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url()) {
+          <select class="focus shape" [value]="render.aspect()" title="The shape of the picture: the size menu gives its width, the height follows the shape" (change)="chooseAspect($any($event.target).value)">
+            @for (a of shapes; track a.id) { <option [value]="a.id" [selected]="a.id === render.aspect()">{{ a.label }}</option> }
+          </select>
           <select class="focus size" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
             @for (size of hdSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.hdWidth()">{{ size.label }}</option> }
           </select>
@@ -91,7 +97,7 @@ import { ColorPalette } from './color-palette';
       </div>
       @if (error()) { <p class="error">{{ error() }}</p> }
       <div class="frame">
-        @if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" /> } @else { <div class="placeholder"></div> }
+        @if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" [class.checker]="render.transparent()" [style.width]="frameWidth()" /> } @else { <div class="placeholder" [style.aspect-ratio]="frameRatio()" [style.width]="frameWidth()"></div> }
         @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
       </div>
     </section>
@@ -119,8 +125,9 @@ import { ColorPalette } from './color-palette';
     .dofnote { font-size: 12px; color: #f0b429; white-space: nowrap; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
     button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
-    img { display: block; width: 100%; height: auto; border-radius: 4px; background: #000; }
-    .frame { position: relative; } .placeholder { width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0c0f; border: 1px dashed rgba(255,255,255,.12); box-sizing: border-box; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
+    img { display: block; margin: 0 auto; width: 100%; height: auto; border-radius: 4px; background: #000; }
+    img.checker { background: repeating-conic-gradient(#2a2d34 0 25%, #1e2026 0 50%) 0 / 20px 20px; } /* a transparent picture shows its transparency */
+    .frame { position: relative; } .placeholder { margin: 0 auto; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0c0f; border: 1px dashed rgba(255,255,255,.12); box-sizing: border-box; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
     .over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-shadow: 0 1px 4px #000; }
     .spinner.big { width: 44px; height: 44px; border-width: 4px; }
     .busy { display: flex; align-items: center; gap: 10px; padding: 24px 4px; opacity: .85; }
@@ -164,6 +171,23 @@ export class RenderDialog implements OnInit, OnDestroy {
     if (this.url() && !this.busy()) void this.quick();
   }
   protected readonly hdSizes = hdWidths;
+  protected readonly shapes = aspects;
+  protected chooseAspect(id: Aspect) {
+    this.render.setAspect(id);
+    if (this.url() && !this.busy()) void this.quick();
+  }
+  protected toggleTransparent(on: boolean) {
+    this.render.setTransparent(on);
+    if (this.url() && !this.busy()) void this.quick();
+  }
+  /** The frame of the picture keeps the chosen shape, so the dialog is as large before the picture is there as after. */
+  protected frameRatio() {
+    return aspectRatio(this.render.aspect());
+  }
+  /** As wide as the dialog allows, but never so tall that the picture does not fit the window (a portrait picture is narrower). */
+  protected frameWidth() {
+    return `min(100%, calc((92vh - 230px) * ${this.frameRatio()}))`;
+  }
   protected readonly hdQualities = hdQualities;
   protected readonly colourTargets = [
     { key: 'background' as const, label: 'Background', title: 'The colour of the background behind the parts (the studio default is dark)' },

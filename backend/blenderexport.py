@@ -270,7 +270,12 @@ dof_spec, _, extra_text = dof_spec.partition("#")  # the depth of field spec may
 ambient_text, _, rest_text = extra_text.partition(",")
 lamp_text, _, rest_text = rest_text.partition(",")
 background_text, _, rest_text = rest_text.partition(",")
-ground_text, _, beam_text = rest_text.partition(",")
+ground_text, _, rest_text = rest_text.partition(",")
+beam_text, _, rest_text = rest_text.partition(",")
+aspect_text, _, transparent_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...) and "1" for a transparent background
+aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
+aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
+transparent_background = transparent_text == "1"
 beam = min(max(int(beam_text or 1), 0), 4)  # the lamp type: 0 spot, 1 direct (the studio's own), 2 soft, 3 diffuse, 4 flood  # the colours of the background and of the ground disc, as hex (empty: the studio's own)
 
 def srgb_colour(text):
@@ -373,11 +378,16 @@ def smooth_shiny_parts():
         other.select_set(False)
 
 smooth_shiny_parts()
-scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
+scene.render.resolution_x, scene.render.resolution_y = 1920, round(1920 / aspect_ratio)
 scene.unit_settings.system = "METRIC"
 for obj in bpy.data.objects:
     if obj.type == "CAMERA":
         scene.camera = obj
+        if abs(aspect_ratio - 16 / 9) > 1e-6:  # another shape: what the 16:9 picture shows across stays the same, the height follows the shape
+            if obj.data.type == "PERSP":
+                obj.data.angle_x, obj.data.sensor_fit = 2 * math.atan(math.tan(obj.data.angle_y / 2) * 16 / 9), "HORIZONTAL"
+            else:
+                obj.data.sensor_fit = "HORIZONTAL"  # the orthographic scale is the width
         if obj.animation_data and obj.animation_data.action:
             first, last = obj.animation_data.action.frame_range
             scene.frame_start, scene.frame_end = int(first), int(last)
@@ -446,6 +456,7 @@ if studio == "1":
     bpy.ops.mesh.primitive_circle_add(vertices=96, radius=r * 6, fill_type="NGON", location=(centre.x, centre.y, low.z - 0.0005))
     floor = bpy.context.active_object
     floor.name = "Studio floor"
+    floor.is_shadow_catcher = transparent_background  # with a transparent background the floor is invisible but still shows the shadows of the parts
     floor.visible_shadow = False  # the floor receives shadows but casts none: a light below the ground (the app allows it) still reaches the parts
     mat = bpy.data.materials.new("Studio floor")
     mat.use_nodes = True
@@ -547,6 +558,9 @@ if studio == "1":
         scene.collection.objects.link(top_object)
         bg.inputs["Strength"].default_value += world_extra
     scene.render.engine = "CYCLES"
+    scene.render.film_transparent = transparent_background  # no background in the picture (the lighting stays)
+    if transparent_background:
+        scene.render.image_settings.color_mode = "RGBA"
     scene.cycles.samples = 96
     scene.cycles.use_denoising = True
     scene.cycles.glossy_bounces = 8  # mirrors facing each other (and a mirror in a mirror) stay bright for a few more reflections
@@ -560,7 +574,7 @@ if studio == "1":
         import numpy
         saved = (scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising, scene.render.filepath, scene.render.image_settings.file_format)
         probe = os.path.join(tempfile.mkdtemp(), "probe.png")
-        scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising = 96, 54, 12, False
+        scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising = 96, max(2, round(96 / aspect_ratio)), 12, False
         scene.render.filepath, scene.render.image_settings.file_format = probe, "PNG"
         bpy.ops.render.render(write_still=True)
         image = bpy.data.images.load(probe)
@@ -578,7 +592,7 @@ for o in bpy.data.objects:  # parts marked "Do not render": there, but neither d
         o.display_type = "WIRE"
 if render_spec:  # a picture of this size and with this many samples: the settings go into the .blend, which is then rendered (see _run_blender)
     width, samples = (int(v) for v in render_spec.split(","))
-    scene.render.resolution_x, scene.render.resolution_y = width, round(width * 9 / 16)
+    scene.render.resolution_x, scene.render.resolution_y = width, round(width / aspect_ratio)
     scene.render.resolution_percentage = 100
     if crop_flag == "1" and scene.camera:  # as wide as the parts: the height (and with it the framing) stays, the width follows the parts
         from bpy_extras.object_utils import world_to_camera_view
@@ -600,7 +614,7 @@ if render_spec:  # a picture of this size and with this many samples: the settin
             height = scene.render.resolution_y
             padding = 1 + 2 * CROP_PADDING
             fraction = min(max((high - low) * padding, 0.2), 1.0)  # the share of the 16:9 frame the parts take (a frame never gets wider)
-            scene.render.resolution_x = max(2, round(height * 16 / 9 * fraction / 2) * 2)
+            scene.render.resolution_x = max(2, round(height * aspect_ratio * fraction / 2) * 2)
             camera.data.shift_x = 0.0
             for _ in range(8):  # the parts in the middle of the narrower frame: shift the lens until their middle is the middle of the picture
                 low, high = horizontal_extent()

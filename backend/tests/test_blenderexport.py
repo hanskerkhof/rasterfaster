@@ -327,13 +327,13 @@ def test_depth_of_field_focus_comes_from_the_call_or_the_document(tmp_path, monk
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40,,,1"  # what the document says
+    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40,,,1,16:9,0"  # what the document says
     client.get(url, params={"dof": "false"})
-    assert seen[-1] == "0#0,40,,,1"
+    assert seen[-1] == "0#0,40,,,1,16:9,0"
     client.get(url, params={"dof": "true", "focus": "other-part"})
-    assert seen[-1] == "1|3|other-part#0,40,,,1"
+    assert seen[-1] == "1|3|other-part#0,40,,,1,16:9,0"
     client.get(url, params={"dof": "true", "strength": 5})
-    assert seen[-1] == "1|5|a#0,40,,,1"
+    assert seen[-1] == "1|5|a#0,40,,,1,16:9,0"
     assert client.get(url, params={"dof": "true", "strength": 6}).status_code == 422
     assert client.get(url, params={"dof": "true", "focus": "not a part"}).status_code == 422
 
@@ -349,10 +349,10 @@ def test_ambient_preset_comes_from_the_call_or_the_document(tmp_path, monkeypatc
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40,,,1"  # what the document says
-    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40,,,1"
+    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40,,,1,16:9,0"  # what the document says
+    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40,,,1,16:9,0"
     assert client.get(url + "?ambient=6").status_code == 422
-    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20,,,1"
+    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20,,,1,16:9,0"
     assert client.get(url + "?lamp=61").status_code == 422
 
 
@@ -418,3 +418,22 @@ def test_pei_finish_is_a_matte_material_named_for_the_grain_in_blender():
     material = blenderexport.colour_material(0x336699, False, "pei")
     assert material["name"].endswith("_pei") and material["pbrMetallicRoughness"]["metallicFactor"] == 0.0 and material["pbrMetallicRoughness"]["roughnessFactor"] > 0.5
     assert "extensions" not in material  # no clear coat on a powder-coated plate
+
+
+def test_picture_shape_and_transparent_background_reach_the_blender_script(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Shape", "items": [item], "render": {"aspect": "4:5", "transparent": True}}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = []
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
+    url = f"/api/documents/{created['id']}/render.png"
+    assert client.get(url).status_code == 200 and seen[-1].endswith(",4:5,1")  # what the document says
+    client.get(url, params={"aspect": "1:1", "transparent": "false"})
+    assert seen[-1].endswith(",1:1,0")
+    assert client.get(url, params={"aspect": "7:3"}).status_code == 422
+    assert main.aspect_ratio("9:16") == 9 / 16 and abs(main.RenderJob("S", 1920, 96, aspect=1.0).megapixels - 3.6864) < 1e-6
+    assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"aspect": "2:1"}}).status_code == 422

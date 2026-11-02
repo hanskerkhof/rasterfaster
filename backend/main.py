@@ -407,6 +407,8 @@ class DocumentRenderSettings(BaseModel):
     lamp: int = Field(default=40, ge=0, le=60)  # strength of the lamp pointed at the part: 40 normal, 10 steps double or halve it
     ambient: int = Field(default=0, ge=0, le=5)  # ambient light preset: 0 none, 1 Soft glow ... 5 Bright studio
     dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
+    aspect: Literal["16:9", "1:1", "4:5", "9:16"] = "16:9"  # the shape of the picture (its width comes from the size, the height follows)
+    transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
 
 class DocumentBody(BaseModel):
@@ -757,7 +759,8 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
 
 
 def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None,
-                            lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None) -> dict:
+                            lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None,
+                            aspect: str | None = None, transparent: bool | None = None) -> dict:
     """The render settings of a call: what it brings, else what the document remembers, else the defaults."""
     render = document.render
     focusId = focus if focus is not None else (render.focusId if render else None)
@@ -773,6 +776,8 @@ def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focu
         "ground": ground if ground is not None else (render.ground if render else None),
         "beam": beam if beam is not None else (render.beam if render else 1),
         "ambient": ambient if ambient is not None else (render.ambient if render else 0),
+        "aspect": aspect if aspect is not None else (render.aspect if render else "16:9"),
+        "transparent": transparent if transparent is not None else bool(render and render.transparent),
     }
 
 
@@ -798,7 +803,7 @@ def render_note(document: DocumentOut, view: str | None, settings: dict, light: 
     return {**settings, "focus": focus, "projection": projection, "view": view, "light": light, **({"savedView": saved_view} if saved_view else {})}
 
 
-def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None):
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None, aspect: str | None = None, transparent: bool | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -812,18 +817,18 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
             ",".join(str(v) for v in saved.direction) + ";" + (f"part:{saved.targetId}" if saved.targetId else ",".join(str(v) for v in saved.target) if saved.target else "")) if saved else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
-    settings = resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, background, ground, beam)
+    settings = resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, background, ground, beam, aspect, transparent)
     on, focusId, level, cropped = settings["depthOfField"], settings["focusId"], settings["dofStrength"], settings["crop"]
     lamp_level, beam_level, light_level = settings["lamp"], settings["beam"], settings["ambient"]
     bg_text = f"{settings['background']:06x}" if settings["background"] is not None else ""
     floor_text = f"{settings['ground']:06x}" if settings["ground"] is not None else ""
-    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level}", cropped  # the ambient preset rides along after the "#"
+    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level},{settings['aspect']},{1 if settings['transparent'] else 0}", cropped  # the ambient preset rides along after the "#"
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4)) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
-    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam)
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam, aspect, transparent)
     try:
         data = blenderexport.build_blend(glb, blender, studio, sun, depthOfField)
     except ValueError as error:
@@ -835,10 +840,10 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 
 @app.get("/api/documents/{documentId}/render.png")
-def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
+def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128)) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent)
     try:
         data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped)
     except ValueError as error:
@@ -846,7 +851,7 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".png"
-    note = render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light)
+    note = render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent), light)
     return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
@@ -856,10 +861,16 @@ phaseHistory = {"prepare": 12.0, "load": 4.0, "render": 0.45, "finish": 1.5}
 renderPhases = ["prepare", "load", "render", "finish"]  # making the scene, opening it again, the samples, denoising and saving
 
 
+def aspect_ratio(text: str) -> float:
+    """"16:9" as a number."""
+    width, height = text.split(":")
+    return int(width) / int(height)
+
+
 class RenderJob:
     """A full-size render running in the background: Blender runs in a thread, its progress is read from its output."""
 
-    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True, settings: dict | None = None):
+    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True, settings: dict | None = None, aspect: float = 16 / 9):
         self.id = uuid.uuid4().hex[:12]
         self.name, self.width, self.samples = name, width, samples
         self.settings = settings or {}  # the render settings, kept with the picture
@@ -875,7 +886,7 @@ class RenderJob:
         self.process: object | None = None
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
         self.step: str | None = None
-        self.megapixels = width * width * 9 / 16 / 1e6
+        self.megapixels = width * width / aspect / 1e6
 
     def begin(self) -> None:
         """The job leaves the queue: the clock starts and the first step begins."""
@@ -1046,17 +1057,18 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
-def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
+def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent)
     with renderLock:
         if (1 if running_render() else 0) + len(renderQueue) >= renderQueueMax:
             raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light, parse_saved_view(savedView)))
+                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent), light, parse_saved_view(savedView)),
+                        aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")))
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})

@@ -32,6 +32,9 @@ export interface RenderSettingsNote {
   /** The view of the 3D view the picture was made from, as the Views panel would save it. */
   savedView?: Record<string, unknown> | null;
   crop?: boolean;
+  /** The shape of the picture and whether its background is transparent. */
+  aspect?: string;
+  transparent?: boolean;
   ambient?: number;
   lamp?: number;
   beam?: number;

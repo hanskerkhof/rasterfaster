@@ -19,6 +19,18 @@ function readColour(key: string): number | null {
   return null;
 }
 const hdWidthStorageKey = 'rasterfaster.renderHdWidth';
+const aspectStorageKey = 'rasterfaster.renderAspect';
+const transparentStorageKey = 'rasterfaster.renderTransparent';
+
+/** The shapes of a picture: the width comes from the size menu, the height follows the shape. */
+export type Aspect = '16:9' | '1:1' | '4:5' | '9:16';
+export const aspects: { id: Aspect; label: string }[] = [{ id: '16:9', label: '16:9 wide' }, { id: '1:1', label: '1:1 square' }, { id: '4:5', label: '4:5 portrait' }, { id: '9:16', label: '9:16 tall' }];
+
+/** "16:9" as a number (width over height). */
+export function aspectRatio(aspect: string | null | undefined): number {
+  const [w, h] = (aspect ?? '16:9').split(':').map(Number);
+  return w > 0 && h > 0 ? w / h : 16 / 9;
+}
 const hdSamplesStorageKey = 'rasterfaster.renderHdSamples';
 
 /** The quality of a full-size render: the samples Cycles takes per pixel (more is cleaner, mirrors and glass especially, and slower). */
@@ -206,6 +218,8 @@ export class RenderService {
   readonly hdSamples = signal(readHdSamples());
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
+  readonly aspect = signal<Aspect>((() => { try { const v = localStorage.getItem(aspectStorageKey); return aspects.some(a => a.id === v) ? (v as Aspect) : '16:9'; } catch { return '16:9'; } })());
+  readonly transparent = signal((() => { try { return localStorage.getItem(transparentStorageKey) === 'true'; } catch { return false; } })());
   private socket?: WebSocket;
   private reconnect?: ReturnType<typeof setTimeout>;
   private wait = 3000;
@@ -216,8 +230,8 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); } // a document without render settings starts with the normal lamp (100%)
     });
     this.connect();
     void this.poll(); // the WebSocket may be unavailable (a proxy that does not pass it on): the same messages can be asked for
@@ -336,6 +350,18 @@ export class RenderService {
     try { localStorage.setItem(hdWidthStorageKey, String(width)); } catch { /* storage unavailable */ }
   }
 
+  setAspect(aspect: Aspect) {
+    this.aspect.set(aspect);
+    try { localStorage.setItem(aspectStorageKey, aspect); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
+  setTransparent(on: boolean) {
+    this.transparent.set(on);
+    try { localStorage.setItem(transparentStorageKey, String(on)); } catch { /* storage unavailable */ }
+    this.saveSettings();
+  }
+
   setBeam(type: number) {
     this.beam.set(type);
     try { localStorage.setItem(beamStorageKey, String(type)); } catch { /* storage unavailable */ }
@@ -361,7 +387,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -370,6 +396,8 @@ export class RenderService {
     url.searchParams.set('ambient', String(this.ambient()));
     url.searchParams.set('lamp', String(this.lamp()));
     url.searchParams.set('beam', String(this.beam()));
+    url.searchParams.set('aspect', this.aspect());
+    url.searchParams.set('transparent', String(this.transparent()));
     if (this.background() !== null) url.searchParams.set('bg', String(this.background()));
     if (this.ground() !== null) url.searchParams.set('floor', String(this.ground()));
     url.searchParams.set('dof', String(this.depthOfField()));
@@ -436,7 +464,7 @@ export class RenderService {
       put('view', settings['view']); put('light', settings['light']);
       put('dof', settings['depthOfField']); put('strength', settings['dofStrength']); put('focus', settings['focusId']);
       put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
-      put('bg', settings['background']); put('floor', settings['ground']);
+      put('bg', settings['background']); put('floor', settings['ground']); put('aspect', settings['aspect']); put('transparent', settings['transparent']);
       if (settings['savedView']) url.searchParams.set('savedView', JSON.stringify(settings['savedView']));
       url.searchParams.set('width', String(width));
       url.searchParams.set('samples', String(this.hdSamples()));

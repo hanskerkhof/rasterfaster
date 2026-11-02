@@ -153,6 +153,9 @@ export interface DocRenderSettings {
   beam?: number;
   background?: number | null;
   ground?: number | null;
+  /** The shape of the picture (its width comes from the size menu) and a transparent background (the ground's shadows stay). */
+  aspect?: '16:9' | '1:1' | '4:5' | '9:16';
+  transparent?: boolean;
 }
 
 export interface RfDocument {
