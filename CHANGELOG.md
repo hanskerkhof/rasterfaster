@@ -2,6 +2,17 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Picture frame, Transform panel, Reflects None (0.11.11)
+
+### Added
+- **FE** (`app.html`, `stl-viewer.ts`, `render.service.ts`): in Render mode the toolbar has the **shape of the picture** menu (the same setting as in the Render dialog), a **Frame** checkbox (a dashed frame over the view: what the render contains, plus a thin cross on the middle of the objects, which you can click to make it the centre of the view) and a **Box** checkbox (an outline round all the objects). A **Render** button (F12, fn + F12 on a Mac) opens the Render dialog.
+- **FE** + **BE**: **Reflects: None** (shiny parts reflect nothing); the depth of field can **focus on the centre of the objects** (`focus=_centre`).
+- **FE** (`views-panel.ts`): the Views panel always lists slots 1 – 9; the empty ones are placeholders, the first one saves the current view.
+- **FE** (`stl-viewer.ts`): Rotate, Move and Scale are one collapsible **Transform** panel.
+
+### Changed
+- **FE** + **BE** (`stl-viewer.ts`, `blenderexport.py`): the render is exactly what the frame shows, for every shape (the picture is as high as the frame; the width follows the shape; a perspective view keeps its camera and narrows the angle). A turntable in another shape fits the circle the parts can reach.
+
 ## 2026-11-02 - Reflections, fitted shapes, Quick draft video (0.11.10)
 
 ### Added

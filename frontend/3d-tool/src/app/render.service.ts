@@ -47,6 +47,10 @@ function readTurntable(): TurntableChoice {
     };
   } catch { return fallback; }
 }
+const boxStorageKey = 'rasterfaster.renderBox';
+/** The focus of the depth of field on the middle of all the objects, instead of a part. */
+export const focusCentre = '_centre';
+const frameStorageKey = 'rasterfaster.renderFrame';
 const transparentStorageKey = 'rasterfaster.renderTransparent';
 
 /** The shapes of a picture: the width comes from the size menu, the height follows the shape. */
@@ -133,7 +137,7 @@ export const ambientNames = ['None', 'Soft glow', 'Overcast', 'Softbox', 'Daylig
 export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
 export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
 /** What metal, mirror and glass reflect (the dark studio is what renders always had). */
-export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral grey'];
+export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral grey', 'None'];
 
 /** A render that waits in the queue. */
 export interface QueuedRender {
@@ -275,7 +279,7 @@ export class RenderService {
   readonly trackPivot = signal<'part' | 'all' | 'view'>('all');
   /** What Camera circles keeps looking at: the tracked part, the middle of all the objects, or nothing in particular (it keeps its angle). */
   readonly lookAt = signal<'part' | 'all' | 'view'>('view');
-  /** What metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey (in the 3D view and in renders). */
+  /** What metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey, 4 none (in the 3D view and in renders). */
   readonly reflections = signal(0);
 
   setReflections(preset: number) {
@@ -481,6 +485,22 @@ export class RenderService {
     this.saveSettings();
   }
 
+  /** Whether the dashed frame (what the render contains) is drawn over the view in Render mode. */
+  readonly showFrame = signal((() => { try { return localStorage.getItem(frameStorageKey) !== 'false'; } catch { return true; } })());
+
+  setShowFrame(on: boolean) {
+    this.showFrame.set(on);
+    try { localStorage.setItem(frameStorageKey, String(on)); } catch { /* storage unavailable */ }
+  }
+
+  /** Whether the outline round all the objects is drawn in the view in Render mode. */
+  readonly showBox = signal((() => { try { return localStorage.getItem(boxStorageKey) !== 'false'; } catch { return true; } })());
+
+  setShowBox(on: boolean) {
+    this.showBox.set(on);
+    try { localStorage.setItem(boxStorageKey, String(on)); } catch { /* storage unavailable */ }
+  }
+
   setTransparent(on: boolean) {
     this.transparent.set(on);
     try { localStorage.setItem(transparentStorageKey, String(on)); } catch { /* storage unavailable */ }
@@ -529,7 +549,7 @@ export class RenderService {
     url.searchParams.set('dof', String(this.depthOfField()));
     url.searchParams.set('strength', String(this.dofStrength()));
     const focus = this.focusId();
-    if (focus && this.store.doc().items.some(i => i.id === focus)) url.searchParams.set('focus', focus);
+    if (focus === focusCentre || (focus && this.store.doc().items.some(i => i.id === focus))) url.searchParams.set('focus', focus);
   }
 
   /** F12 / the Render button: asks for the render dialog. */

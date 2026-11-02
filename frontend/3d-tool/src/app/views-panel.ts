@@ -38,7 +38,12 @@ function read(): { spot: Spot | null; collapsed: boolean } {
             <button type="button" class="x replace" title="Replace this view by what you see now (⇧ + its number)" (click)="update($event, view.id)">⟳</button>
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
           </div>
-        } @empty { <div class="empty">No views yet. Set up the camera and display you like, then save it.</div> }
+        }
+        @for (slot of freeSlots(); track slot; let first = $first) {
+          <div class="view slot" [class.next]="first" [attr.title]="first ? 'Empty: click to save the current view here (key ' + slot + ' then goes to it)' : 'Empty'" (click)="first && save()">
+            <span class="num">{{ slot }}</span><span class="label">empty</span>
+          </div>
+        }
       </div>
       <details class="keys"><summary>Keys and mouse</summary>
         <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ (or ⇧ and its number) replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views, ⇧1 – ⇧9 replace them by the current view (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file</div>
@@ -65,7 +70,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .replace { font-size: 17px; line-height: 1; padding: 0 4px; }
     .keys { flex: none; padding: 0 6px 6px; } .keys summary { cursor: pointer; opacity: .6; font-size: 11px; user-select: none; } .keys summary:hover { opacity: 1; } .keys[open] .hint { margin-top: 4px; }
     .keys .hint { font-size: 11px; line-height: 1.45; opacity: .75; }
-    .empty { padding: 4px 6px; color: #8a93a2; }
+    .slot { cursor: default; color: #6b7382; font-style: italic; } .slot:hover { background: transparent; } .slot.next { cursor: pointer; } .slot.next:hover { background: rgba(255,255,255,.08); color: #dde1e8; }
   `,
 })
 export class ViewsPanel {
@@ -98,6 +103,9 @@ export class ViewsPanel {
     const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
     return this.store.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
   });
+
+  /** The numbers of the keys 1 – 9 that have no view yet: shown as placeholders. */
+  protected readonly freeSlots = computed(() => Array.from({ length: Math.max(0, 9 - (this.store.doc().views?.length ?? 0)) }, (_, i) => (this.store.doc().views?.length ?? 0) + i + 1));
 
   /** The view whose name is being edited in place. */
   protected readonly editing = signal<string | null>(null);

@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { RenderService, beamNames, turntableLengths } from './render.service';
+import { RenderService, aspectRatio, beamNames, turntableLengths } from './render.service';
 import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
@@ -138,7 +138,16 @@ function readShowPath() {
   imports: [ReleaseFocus, ColorPalette],
   template: `
     <div #host class="host" tabindex="0"></div>
-    <div class="panels">
+    <div #cross class="centre-cross" hidden><button type="button" class="hit" releaseFocus title="Make the middle of the objects the centre of the view" aria-label="Centre the view on the objects" (click)="centreOnObjects()"></button></div>
+    @if (pictureFrame(); as frame) {
+      <div class="picture-frame" [style.left.px]="frame.x" [style.top.px]="frame.y" [style.width.px]="frame.w" [style.height.px]="frame.h" title="What the render will show ({{ renderSettings.aspect() }})"></div>
+    }
+    <div class="panels" [class.grouped]="documentMode()" [class.closed]="transformClosed()">
+    @if (documentMode()) {
+      <div class="tf-head">
+        <button type="button" class="tf-fold" releaseFocus [attr.aria-expanded]="!transformClosed()" [title]="transformClosed() ? 'Show Rotate, Move and Scale' : 'Hide Rotate, Move and Scale'" (click)="toggleTransform()">{{ transformClosed() ? '▸' : '▾' }} Transform</button>
+      </div>
+    }
     <div class="rotate" aria-label="Rotate object">
       <div class="axis head">
         <span class="title">{{ documentMode() ? 'Rotate' : 'Rotate object' }}</span>
@@ -368,6 +377,16 @@ function readShowPath() {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
   styles: `
+    .centre-cross { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 1; }
+    .centre-cross .hit { position: absolute; left: -11px; top: -11px; width: 23px; height: 23px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
+    .centre-cross .hit:hover { border-radius: 50%; background: rgba(255, 214, 10, 0.22); box-shadow: 0 0 0 1.5px #ffd60a; }
+    .centre-cross:has(.hit:hover)::before, .centre-cross:has(.hit:hover)::after { background: #ffd60a; mix-blend-mode: normal; }
+    .centre-cross:has(.hit:hover)::before { left: -14px; width: 29px; height: 2px; top: -0.5px; }
+    .centre-cross:has(.hit:hover)::after { top: -14px; height: 29px; width: 2px; left: -0.5px; }
+    .centre-cross::before, .centre-cross::after { content: ''; position: absolute; background: rgba(255, 255, 255, 0.85); mix-blend-mode: difference; }
+    .centre-cross::before { left: -10px; top: 0; width: 21px; height: 1px; }
+    .centre-cross::after { left: 0; top: -10px; width: 1px; height: 21px; }
+    .picture-frame { position: absolute; pointer-events: none; box-sizing: border-box; border: 1.5px dashed rgba(255, 255, 255, 0.85); box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.38); z-index: 1; }
     :host, .host { display: block; width: 100%; height: 100%; } .host { position: relative; overflow: hidden; }
     :host { position: relative; }
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
@@ -384,6 +403,11 @@ function readShowPath() {
     .home.fly { right: 110px; } .home.fly.zoom-reset { right: 76px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .panels { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .panels.grouped { width: 180px; padding: 4px 8px 8px; box-sizing: border-box; gap: 0; background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
+    .panels.grouped .rotate { width: auto; padding: 8px 0 6px; background: none; border: 0; border-top: 1px solid rgba(255,255,255,.1); border-radius: 0; }
+    .panels.grouped.closed .rotate { display: none; }
+    .tf-head { display: flex; align-items: center; padding-bottom: 4px; }
+    .tf-fold { background: transparent; border: 0; color: inherit; font: inherit; font-weight: 600; padding: 2px 0; cursor: pointer; opacity: .85; } .tf-fold:hover { opacity: 1; color: #fff; background: transparent; }
     .rotate { width: 164px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
               background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; font-size: 12px; color: #dde1e8; }
     .title { font-weight: 600; opacity: .8; }
@@ -776,6 +800,7 @@ export class StlViewer implements OnDestroy {
       this.stepFlight();
       this.stepTurntablePreview();
       this.updatePathLine();
+      this.updateCentreCross();
       this.updateAutoProjection();
       this.documentScene.tick();
       this.controls.update();
@@ -795,9 +820,11 @@ export class StlViewer implements OnDestroy {
     const direction = this.camera.position.clone().sub(this.controls.target).normalize();
     const target = this.controls.target;
     const round = (v: number) => Math.round(v * 1000) / 1000;
-    // A zoomed-in perspective view has a narrower field of view than the camera's own: send the effective one so the picture looks the same.
-    const fov = this.camera instanceof THREE.PerspectiveCamera ? `;${round((2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / this.camera.zoom)) * (180 / Math.PI))}` : '';
-    return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.viewHeight())};${this.projection}${fov}`;
+    // A zoomed-in perspective view has a narrower field of view than the camera's own, and so has a picture that is only the framed part of the view:
+    // send the effective one (the camera stays where it is, only the angle narrows), so the picture looks the same.
+    const share = this.pictureHeight() / this.viewHeight();
+    const fov = this.camera instanceof THREE.PerspectiveCamera ? `;${round((2 * Math.atan((Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)) / this.camera.zoom) * share)) * (180 / Math.PI))}` : '';
+    return `${[direction.x, direction.y, direction.z].map(round)};${[target.x, target.y, target.z].map(round)};${round(this.pictureHeight())};${this.projection}${fov}`;
   };
 
   /** The light of the "Shaded with light" view for the Blender export: `dx,dy,dz;tx,ty,tz` (direction towards the light, the point it shines at, mm); null in the other views. */
@@ -1465,6 +1492,12 @@ export class StlViewer implements OnDestroy {
   }
 
   /** Centres the view on a document item (double-click in the document list). */
+  /** The cross on the middle of the objects was clicked: that point becomes the centre of the view (the direction and the zoom stay). */
+  protected centreOnObjects() {
+    const box = this.documentScene.bounds();
+    if (box) this.panTo(box.getCenter(new THREE.Vector3()));
+  }
+
   centerOnItem(id: string) {
     const center = this.documentScene.itemCenter(id);
     if (center) this.panTo(center);
@@ -1502,10 +1535,64 @@ export class StlViewer implements OnDestroy {
     this.camera.position.copy(this.controls.target).add(offset);
   }
 
+  private readonly cross = viewChild<ElementRef<HTMLElement>>('cross');
+  private readonly crossPoint = new THREE.Vector3();
+
+  /** A thin cross on the middle of the box round all the objects (what Camera circles goes round by default): drawn with the picture frame in Render mode. */
+  private objectsBox: THREE.Box3Helper | null = null;
+
+  private updateCentreCross() {
+    const element = this.cross()?.nativeElement;
+    if (!element) return;
+    const box = this.documentMode() && this.store.appMode() === 'render' ? this.documentScene.bounds() : null;
+    const outline = box && this.renderSettings.showBox();
+    const mark = box && this.renderSettings.showFrame() ? box : null; // the cross goes with the frame, the outline has its own switch
+    if (outline && !this.objectsBox) { // the outline round the sum of all the objects
+      this.objectsBox = new THREE.Box3Helper(new THREE.Box3(), 0xffffff);
+      const material = this.objectsBox.material as THREE.LineBasicMaterial;
+      Object.assign(material, { transparent: true, opacity: 0.55, depthTest: false });
+      this.objectsBox.renderOrder = 10;
+      this.scene.add(this.objectsBox);
+    }
+    if (this.objectsBox) {
+      this.objectsBox.visible = !!outline;
+      if (outline) this.objectsBox.box.copy(box!);
+    }
+    element.hidden = !mark;
+    if (!mark) return;
+    this.crossPoint.copy(mark.getCenter(this.crossPoint)).project(this.camera);
+    const { w, h } = this.viewSize();
+    element.style.transform = `translate(${((this.crossPoint.x + 1) / 2) * w}px, ${((1 - this.crossPoint.y) / 2) * h}px)`;
+    element.hidden = this.crossPoint.z > 1; // behind the camera
+  }
+
+  protected readonly transformClosed = signal((() => { try { return localStorage.getItem('rasterfaster.transformPanel') === 'closed'; } catch { return false; } })());
+
+  protected toggleTransform() {
+    const closed = !this.transformClosed();
+    this.transformClosed.set(closed);
+    try { localStorage.setItem('rasterfaster.transformPanel', closed ? 'closed' : 'open'); } catch { /* storage unavailable */ }
+  }
+
+  private readonly viewSize = signal({ w: 0, h: 0 });
+
+  /** The picture the render makes, as a rectangle in the view: the largest one of the chosen shape that fits with a little room around it. */
+  private frameRect(): { x: number; y: number; w: number; h: number } | null {
+    const { w, h } = this.viewSize();
+    if (!w || !h) return null;
+    const ratio = aspectRatio(this.renderSettings.aspect());
+    const fit = Math.min((w * 0.94) / ratio, h * 0.94);
+    return { x: (w - fit * ratio) / 2, y: (h - fit) / 2, w: fit * ratio, h: fit };
+  }
+
+  /** Drawn over the view in Render mode: what part of the view is in the picture. */
+  protected readonly pictureFrame = computed(() => this.documentMode() && this.store.appMode() === 'render' && this.renderSettings.showFrame() ? this.frameRect() : null);
+
   private resize() {
     const el = this.host().nativeElement;
     const w = el.clientWidth, h = el.clientHeight;
     if (!w || !h) return;
+    this.viewSize.set({ w, h });
     this.renderer.setSize(w, h, false);
     const aspect = w / h, s = this.radius * 1.3;
     if (this.camera instanceof THREE.PerspectiveCamera) {
@@ -1538,6 +1625,12 @@ export class StlViewer implements OnDestroy {
     const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
     const needed = Math.max(halfHeight, halfWidth / aspect, 1) * margin;
     return Math.min(Math.max((this.radius * 1.3) / needed, 0.05), 60); // the frustum at zoom 1 is radius * 1.3 high
+  }
+
+  /** How high the picture of the render is in the world, in mm: the height of the frame drawn over the view. */
+  private pictureHeight() {
+    const frame = this.frameRect(), { h } = this.viewSize();
+    return frame && h ? this.viewHeight() * (frame.h / h) : this.viewHeight();
   }
 
   /** Height of the world that is visible at the view centre, in mm (the same measure for both cameras). */
@@ -1846,6 +1939,7 @@ export class StlViewer implements OnDestroy {
   private environmentRoom(preset: number): THREE.Scene {
     if (preset === 0) return new RoomEnvironment();
     const room = new THREE.Scene();
+    if (preset === 4) return room; // None: nothing to reflect
     const shell = (colour: number) => new THREE.MeshBasicMaterial({ color: colour, side: THREE.BackSide });
     const panel = (w: number, h: number, intensity: number, x: number, y: number, z: number) => {
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(intensity, intensity, intensity), side: THREE.DoubleSide }));

@@ -31,6 +31,7 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
 .modes button:only-child { border-radius: 5px; }
+.shape { padding: 5px 8px; background: #2b2f3a; color: #e8eaf0; border: 1px solid #000; border-radius: 5px; font: inherit; cursor: pointer; }
 .step-mode { padding: 5px 12px; background: #1f6f5c; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .step-mode:hover { background: #26856e; }
 .step-mode kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .65; }
@@ -124,3 +125,11 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-ready .close, .notice.undo.render-ready button.close { flex: none; align-self: flex-start; margin: -2px -6px 0 0; padding: 0 5px; background: transparent; border: 0; color: inherit; opacity: .6; font-size: 13px; line-height: 1.2; cursor: pointer; }
 .notice.render-ready .close:hover { opacity: 1; background: rgba(0,0,0,.25); }
 .notice.undo button { margin-left: 8px; padding: 1px 8px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
+
+.picture-tools { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.picture-tools + .update { margin-left: 0; }
+.frame-toggle { display: flex; align-items: center; gap: 5px; color: #e8eaf0; cursor: pointer; white-space: nowrap; }
+.open-render { margin-left: auto; padding: 5px 12px; background: #2b2f3a; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
+.open-render:hover { background: #3a3f4e; }
+.open-render + .picture-tools { margin-left: auto; }
+.open-render kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .65; }

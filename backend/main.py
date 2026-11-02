@@ -411,7 +411,7 @@ class DocumentRenderSettings(BaseModel):
     trackId: str | None = Field(default=None, max_length=64)  # a part the camera follows in a turntable (Camera circles)
     trackPivot: Literal["part", "all", "view"] = "all"  # what Camera circles goes round: the middle of all the objects, the middle of the view, or the tracked part
     lookAt: Literal["part", "all", "view"] | None = None  # what it looks at: the tracked part, the middle of all the objects, or where the view points (none: the part when one is tracked, else the view)
-    reflections: int = Field(default=0, ge=0, le=3)  # what metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey
+    reflections: int = Field(default=0, ge=0, le=4)  # what metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey
     transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
 
@@ -802,7 +802,7 @@ def parse_saved_view(text: str | None) -> dict | None:
 
 def render_note(document: DocumentOut, view: str | None, settings: dict, light: str | None = None, saved_view: dict | None = None) -> dict:
     """What is kept with a picture in the image library: the render settings in words a person can read back, with the focus part's name."""
-    focus = next((item.name for item in document.items if item.id == settings["focusId"]), None) if settings["depthOfField"] else None
+    focus = ("centre of the objects" if settings["focusId"] == "_centre" else next((item.name for item in document.items if item.id == settings["focusId"]), None)) if settings["depthOfField"] else None
     try:
         projection = blenderexport.parse_view(view)["projection"] if view else "persp"
     except (ValueError, KeyError, TypeError):
@@ -835,7 +835,7 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None, reflections: int | None = Query(default=None, ge=0, le=3)) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None, reflections: int | None = Query(default=None, ge=0, le=4)) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
     document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections)
     try:
@@ -850,7 +850,7 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 @app.get("/api/documents/{documentId}/render.png")
 def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
-                        width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128), reflections: int | None = Query(default=None, ge=0, le=3)) -> Response:
+                        width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128), reflections: int | None = Query(default=None, ge=0, le=4)) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections)
     try:
@@ -867,7 +867,7 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
 @app.get("/api/documents/{documentId}/render.mp4")
 def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
-                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=3)) -> Response:
+                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4)) -> Response:
     """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
     document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, reflections=reflections)
     try:
@@ -1104,7 +1104,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000),
-                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=3)) -> dict:
+                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, reflections=reflections)

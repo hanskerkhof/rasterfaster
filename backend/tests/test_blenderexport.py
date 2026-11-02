@@ -600,5 +600,5 @@ def test_reflections_preset_comes_from_the_call_or_the_document(tmp_path, monkey
     client.get(url)
     assert seen[-1].endswith(",16:9,0,1")  # the document's
     client.get(url, params={"reflections": 3})
-    assert seen[-1].endswith(",16:9,0,3") and client.get(url, params={"reflections": 4}).status_code == 422
+    assert seen[-1].endswith(",16:9,0,3") and client.get(url, params={"reflections": 5}).status_code == 422
     assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"reflections": 9}}).status_code == 422

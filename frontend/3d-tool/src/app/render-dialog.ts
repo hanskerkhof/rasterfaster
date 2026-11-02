@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
+import { Aspect, RenderService, focusCentre, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -25,8 +25,9 @@ import { ColorPalette } from './color-palette';
           <input type="checkbox" [checked]="render.depthOfField()" (change)="toggleDepthOfField($any($event.target).checked)" /> Depth of field
         </label>
         @if (render.depthOfField() && orthographic()) { <span class="dofnote" title="An orthographic view has no depth of field: switch the 3D view to the perspective camera">⚠ needs a perspective view</span> }
-          <select class="focus" [disabled]="!render.depthOfField()" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture." (change)="chooseFocus($any($event.target).value)">
+          <select class="focus" [disabled]="!render.depthOfField()" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture. Or the middle of the box round all the objects." (change)="chooseFocus($any($event.target).value)">
             <option value="" [selected]="!focusValue()">Focus: nearest in the picture</option>
+            <option [value]="focusCentre" [selected]="focusValue() === focusCentre">Focus: centre of the objects</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === focusValue()">Focus: {{ part.label }}</option> }
           </select>
           <button type="button" [disabled]="!render.depthOfField() || !selected()" [title]="selected() ? 'Focus on the part that is selected in the document' : 'Select a part in the document before you open the Render dialog: it is then focused on that part with one click'" (click)="chooseFocus(selected()!)">Selected</button>
@@ -291,7 +292,8 @@ export class RenderDialog implements OnInit, OnDestroy {
     if (this.url() && !this.busy()) void this.quick();
   }
   protected selected() { return this.store.selectedId(); }
-  protected focusValue() { const id = this.render.focusId(); return id && this.store.doc().items.some(i => i.id === id) ? id : ''; }
+  protected readonly focusCentre = focusCentre;
+  protected focusValue() { const id = this.render.focusId(); return id === focusCentre ? id : id && this.store.doc().items.some(i => i.id === id) ? id : ''; }
   protected chooseFocus(id: string) {
     this.render.setFocus(id || null);
     if (this.url() && !this.busy()) void this.quick();

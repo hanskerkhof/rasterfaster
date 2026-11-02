@@ -86,6 +86,16 @@
       }
     </div>
     <button class="step-mode" type="button" releaseFocus [title]="'Moving with Option held steps ' + store.fineStepMm() + ' mm (⌥M or click: ' + (store.fineStepMm() === 1 ? '0.1' : '1') + ' mm)'" (click)="store.toggleFineStep()">Move {{ store.fineStepMm() }} mm <kbd>⌥M</kbd></button>
+    <button class="open-render" type="button" releaseFocus title="Open the render dialog (F12; on a Mac fn + F12)" (click)="render.requestOpen()">Render <kbd>fn F12</kbd></button>
+    @if (store.appMode() === 'render') {
+      <div class="picture-tools">
+        <label class="frame-toggle" title="Show the dashed frame in the view: what the render will contain"><input type="checkbox" releaseFocus [checked]="render.showFrame()" (change)="render.setShowFrame($any($event.target).checked)" /> Frame</label>
+        <label class="frame-toggle" title="Show an outline round all the objects"><input type="checkbox" releaseFocus [checked]="render.showBox()" (change)="render.setShowBox($any($event.target).checked)" /> Box</label>
+        <select class="shape" releaseFocus title="The shape of the picture: the dashed frame in the view is what the render shows (the same setting as in the Render dialog)" aria-label="Shape of the picture" [value]="render.aspect()" (change)="render.setAspect($any($event.target).value)">
+          @for (a of aspects; track a.id) { <option [value]="a.id" [selected]="a.id === render.aspect()">{{ a.label }}</option> }
+        </select>
+      </div>
+    }
     @if (updateAvailable()) {
       <button class="update" type="button" title="A newer version of Rasterfaster is ready: click to reload into it" (click)="applyUpdate()">Update available{{ updateVersion() ? ' v' + updateVersion() : '' }} · reload</button>
     }

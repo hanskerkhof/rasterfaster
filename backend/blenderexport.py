@@ -273,8 +273,8 @@ background_text, _, rest_text = rest_text.partition(",")
 ground_text, _, rest_text = rest_text.partition(",")
 beam_text, _, rest_text = rest_text.partition(",")
 aspect_text, _, rest_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...)
-transparent_text, _, reflections_text = rest_text.partition(",")  # "1" for a transparent background, and what metal, mirror and glass reflect (0 to 3)
-reflections = min(max(int(reflections_text or 0), 0), 3)
+transparent_text, _, reflections_text = rest_text.partition(",")  # "1" for a transparent background, and what metal, mirror and glass reflect (0 to 4)
+reflections = min(max(int(reflections_text or 0), 0), 4)
 aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
 aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
 transparent_background = transparent_text == "1"
@@ -385,50 +385,20 @@ scene.unit_settings.system = "METRIC"
 for obj in bpy.data.objects:
     if obj.type == "CAMERA":
         scene.camera = obj
-        if abs(aspect_ratio - 16 / 9) > 1e-6:  # another shape: what the 16:9 picture shows across stays the same, the height follows the shape
-            if obj.data.type == "PERSP":
-                obj.data.angle_x, obj.data.sensor_fit = 2 * math.atan(math.tan(obj.data.angle_y / 2) * 16 / 9), "HORIZONTAL"
+        if abs(aspect_ratio - 16 / 9) > 1e-6:  # another shape: the picture is as high as the 16:9 one (the frame drawn in the view), the width follows the shape
+            if obj.data.type == "PERSP":  # the glTF importer gives the vertical angle (the sensor fits the height): keep it, whatever the width
+                vertical = obj.data.angle_y
+                obj.data.sensor_fit = "VERTICAL"
+                obj.data.angle_y = vertical
             else:
-                obj.data.sensor_fit = "HORIZONTAL"  # the orthographic scale is the width
+                obj.data.ortho_scale = obj.data.ortho_scale * aspect_ratio / (16 / 9)  # the importer's scale is the width of the 16:9 picture
+                obj.data.sensor_fit = "HORIZONTAL"
         if obj.animation_data and obj.animation_data.action:
             first, last = obj.animation_data.action.frame_range
             scene.frame_start, scene.frame_end = int(first), int(last)
     if obj.name == "Camera path":
         obj.hide_render = True  # a guide line, not part of the picture
 
-if abs(aspect_ratio - 16 / 9) > 1e-6 and crop_flag != "1" and not turntable_spec and scene.camera:  # another shape: zoom (and shift) so the parts fill the picture, the direction of the view stays
-    from bpy_extras.object_utils import world_to_camera_view
-    camera = scene.camera
-    shown = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and not o.hide_render and not o.get("noRender")]
-
-    def extent():
-        xs, ys = [], []
-        for o in shown:
-            for corner in o.bound_box:
-                view = world_to_camera_view(scene, camera, o.matrix_world @ Vector(corner))
-                if view.z > 0:
-                    xs.append(view.x)
-                    ys.append(view.y)
-        return xs, ys
-
-    xs, ys = extent()
-    if xs:
-        height_share = scene.render.resolution_y / scene.render.resolution_x  # a share of the height, in units of the width (the lens is fitted to the width)
-        span = max(max(xs) - min(xs), (max(ys) - min(ys)) * height_share)
-        factor = min(max(0.92 / max(span, 1e-3), 0.3), 4.0)
-        if camera.data.type == "PERSP":
-            camera.data.lens *= factor
-        else:
-            camera.data.ortho_scale /= factor
-        for _ in range(6):  # the parts in the middle of the picture
-            xs, ys = extent()
-            if not xs:
-                break
-            dx, dy = (min(xs) + max(xs)) / 2 - 0.5, (min(ys) + max(ys)) / 2 - 0.5
-            if abs(dx) < 0.002 and abs(dy) < 0.002:
-                break
-            camera.data.shift_x += dx
-            camera.data.shift_y += dy * height_share
 if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERSP":  # depth of field (an orthographic camera has none)
     from bpy_extras.object_utils import world_to_camera_view
 
@@ -447,6 +417,11 @@ if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERS
         middle = sum(corners, Vector()) / len(corners)
         view = world_to_camera_view(scene, camera, middle)
         candidates.append((chosen != "" and o.get("itemId") == chosen, 0 <= view.x <= 1 and 0 <= view.y <= 1 and view.z > 0, (middle - camera_position).length, middle, view.z))
+    if chosen == "_centre":  # the middle of the box round all the parts that are drawn
+        drawn = [corner for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and not o.hide_render and not o.get("noRender") for corner in (o.matrix_world @ Vector(c) for c in o.bound_box)]
+        if drawn:
+            middle_all = (Vector(map(min, *[tuple(c) for c in drawn])) + Vector(map(max, *[tuple(c) for c in drawn]))) / 2
+            candidates = [(True, True, (middle_all - camera_position).length, middle_all, 0.0)]
     pool = [c for c in candidates if c[0]] or [c for c in candidates if c[1]] or candidates  # the chosen part, else what is in the picture, else everything
     if pool:
         focus_target = min(pool, key=lambda c: c[2])  # the nearest of them
@@ -615,7 +590,7 @@ if studio == "1":
         panel("Softbox top", Vector((centre.x, centre.y, high.z + r * 3)), r * 6, r * 4, 5)
         panel("Softbox left", centre + Vector((-r * 3.5, -r * 0.5, r * 0.8)), r * 1.6, r * 5, 3)
         panel("Softbox right", centre + Vector((r * 3.5, -r * 0.5, r * 0.8)), r * 1.6, r * 5, 3)
-    elif reflections in (2, 3):  # Daylight (a sky) or a neutral grey room: only what shiny and see-through parts reflect and refract; the camera and the lighting of everything else stay as they are
+    elif reflections in (2, 3, 4):  # Daylight (a sky), a neutral grey room or nothing at all (black): only what shiny and see-through parts reflect and refract; the camera and the lighting of everything else stay as they are
         env = nt.nodes.new("ShaderNodeBackground")
         if reflections == 2:
             sky = nt.nodes.new("ShaderNodeTexSky")
@@ -627,9 +602,12 @@ if studio == "1":
                 pass
             nt.links.new(sky.outputs[0], env.inputs["Color"])
             env.inputs["Strength"].default_value = 0.45
-        else:
+        elif reflections == 3:
             env.inputs["Color"].default_value = (0.5, 0.5, 0.5, 1)
             env.inputs["Strength"].default_value = 1.0
+        else:  # None: shiny parts reflect nothing of the surroundings
+            env.inputs["Color"].default_value = (0, 0, 0, 1)
+            env.inputs["Strength"].default_value = 0.0
         studio_source = out.inputs[0].links[0].from_node
         shiny_path, shiny, environment_mix = nt.nodes.new("ShaderNodeLightPath"), nt.nodes.new("ShaderNodeMath"), nt.nodes.new("ShaderNodeMixShader")
         shiny.operation = "MAXIMUM"  # a reflection ray or a ray through glass sees the environment, every other ray the studio
