@@ -626,6 +626,7 @@ if render_spec:  # a picture of this size and with this many samples: the settin
         fields = turntable_spec.split(",")
         frames_text, motion, fps_text = fields[:3]
         track_id = fields[3] if len(fields) > 3 else ""  # the item id of the part the camera tracks
+        track_pivot = fields[4] if len(fields) > 4 else "view"  # "part": the camera goes round that part; "view": round the middle of the view, looking at the part
         frames, fps = int(frames_text), int(fps_text)
         scene.frame_start, scene.frame_end = 1, frames
         scene.render.fps = fps
@@ -652,9 +653,11 @@ if render_spec:  # a picture of this size and with this many samples: the settin
             tracked = [o for o in shown if track_id and o.get("itemId") == track_id]
             if tracked:  # the camera goes round this part and keeps it in the middle of the picture
                 points = [o.matrix_world @ Vector(c) for o in tracked for c in o.bound_box]
-                looked_at = (Vector(map(min, *points)) + Vector(map(max, *points))) / 2 if len(points) > 1 else points[0]
-                aim = bpy.data.objects.new("Track target", None)
-                aim.location = looked_at
+                part_centre = (Vector(map(min, *points)) + Vector(map(max, *points))) / 2 if len(points) > 1 else points[0]
+                if track_pivot == "part":
+                    looked_at = part_centre  # round the part itself
+                aim = bpy.data.objects.new("Track target", None)  # either way the camera keeps looking at the part
+                aim.location = part_centre
                 scene.collection.objects.link(aim)
                 follow = camera.constraints.new("TRACK_TO")
                 follow.target, follow.track_axis, follow.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
@@ -696,7 +699,7 @@ def find_blender() -> str | None:
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "view") -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -715,7 +718,7 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
                                f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0",
-                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
+                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track},{track_pivot}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -782,7 +785,7 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "view") -> bytes:
     """A PNG of the scene (`width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours. With `turntable` = (frames, "orbit" | "spin", fps)
     an MP4 of that many frames instead: the camera circles the scene once, or the parts turn once in front of the camera."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track, track_pivot)

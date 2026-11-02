@@ -331,7 +331,10 @@ function readShowPath() {
             <button type="button" role="menuitem" (click)="startTurntablePreview('orbit'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'orbit' ? '✓' : '' }}</span>Camera circles<span class="hint">once around, looping</span></button>
             <button type="button" role="menuitem" (click)="startTurntablePreview('spin'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'spin' ? '✓' : '' }}</span>Objects turn<span class="hint">in front of the camera</span></button>
             <button type="button" role="menuitem" (click)="startTrackPick(); flyMenuOpen.set(false)"><span class="tick">{{ renderSettings.tracked() ? '✓' : '' }}</span>Track an object…<span class="hint">{{ renderSettings.tracked()?.name ?? 'Camera circles: the centre of the view' }}</span></button>
-            @if (renderSettings.tracked()) { <button type="button" role="menuitem" (click)="renderSettings.setTrack(null); flyMenuOpen.set(false)"><span class="tick"></span>Stop tracking<span class="hint">go round the centre of the view</span></button> }
+            @if (renderSettings.tracked()) {
+              <button type="button" role="menuitem" (click)="renderSettings.setTrackPivot(renderSettings.trackPivot() === 'view' ? 'part' : 'view')"><span class="tick">{{ renderSettings.trackPivot() === 'view' ? '✓' : '' }}</span>Go round the view, look at the part<span class="hint">{{ renderSettings.trackPivot() === 'view' ? 'on (like a drone)' : 'off: round the part' }}</span></button>
+              <button type="button" role="menuitem" (click)="renderSettings.setTrack(null); flyMenuOpen.set(false)"><span class="tick"></span>Stop tracking<span class="hint">go round the centre of the view</span></button>
+            }
             @if (turntablePreview()) {
               <button type="button" role="menuitem" (click)="pauseTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>{{ turntablePaused() ? 'Go on' : 'Pause' }}<span class="hint">Space</span></button>
               <button type="button" role="menuitem" (click)="stopTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>End the preview<span class="hint">Esc</span></button>
@@ -614,7 +617,7 @@ export class StlViewer implements OnDestroy {
   protected readonly turntablePreview = signal<{ motion: 'orbit' | 'spin' } | null>(null);
   /** The preview is paused (Space): the camera or the parts stay where they are, Space goes on from there. */
   protected readonly turntablePaused = signal(false);
-  private previewState: { last: number; angle: number; pivot: THREE.Vector3 } | null = null;
+  private previewState: { last: number; angle: number; pivot: THREE.Vector3; aim: THREE.Vector3 | null } | null = null;
   private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
   private readonly pickRaycaster = new THREE.Raycaster();
@@ -822,8 +825,11 @@ export class StlViewer implements OnDestroy {
     let pivot = motion === 'spin' ? new THREE.Vector3(middle.x, middle.y, bounds.min.z) : lookedAt;
     const tracked = motion === 'orbit' ? this.renderSettings.tracked() : null;
     const centre = tracked ? this.documentScene.itemCenter(tracked.id) : null;
-    if (centre) { pivot = centre; this.controls.target.copy(centre); } // the camera goes round the tracked part and looks at it
-    this.previewState = { last: performance.now(), angle: 0, pivot };
+    if (centre) {
+      if (this.renderSettings.trackPivot() === 'part') pivot = centre; // round the part itself ...
+      this.controls.target.copy(centre); // ... or round the middle of the view: either way the camera looks at the tracked part
+    }
+    this.previewState = { last: performance.now(), angle: 0, pivot, aim: centre && motion === 'orbit' ? centre.clone() : null };
     this.turntablePaused.set(false);
     this.turntablePreview.set({ motion });
   }
@@ -862,11 +868,13 @@ export class StlViewer implements OnDestroy {
     state.angle += step;
     if (preview.motion === 'orbit') {
       const cos = Math.cos(step), sin = Math.sin(step), pivot = state.pivot;
-      for (const point of [this.camera.position, this.controls.target]) {
+      const points = state.aim ? [this.camera.position] : [this.camera.position, this.controls.target];
+      for (const point of points) {
         const x = point.x - pivot.x, y = point.y - pivot.y;
         point.x = pivot.x + cos * x - sin * y;
         point.y = pivot.y + sin * x + cos * y;
       }
+      if (state.aim) this.controls.target.copy(state.aim); // the tracked part stays what the camera looks at
     } else {
       const angle = -state.angle; // the parts turn clockwise: the scene then appears to go round the same way as when the camera circles counter-clockwise
       const cos = Math.cos(angle), sin = Math.sin(angle);

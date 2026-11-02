@@ -106,6 +106,10 @@ import { ColorPalette } from './color-palette';
             <option value="" [selected]="!render.tracked()">Track: the view's centre</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === render.tracked()?.id">Track: {{ part.label }}</option> }
           </select>
+          <select class="focus size" [disabled]="render.turntable().motion !== 'orbit' || !render.tracked()" [value]="render.trackPivot()" title="What the camera goes round while it tracks a part: the middle of the view, looking at the part (like a drone), or the part itself" (change)="render.setTrackPivot($any($event.target).value)">
+            <option value="view" [selected]="render.trackPivot() === 'view'">Goes round: the view's centre</option>
+            <option value="part" [selected]="render.trackPivot() === 'part'">Goes round: the part</option>
+          </select>
           <button type="button" [disabled]="render.turntable().motion !== 'orbit'" title="Click a part in the 3D view to track it (the dialog closes and comes back)" (click)="pickTrack()">Pick…</button>
           <select class="focus size" [value]="render.turntable().seconds" title="How long one turn takes (30 frames per second)" (change)="render.setTurntable({ seconds: +$any($event.target).value })">
             @for (n of lengths; track n) { <option [value]="n" [selected]="n === render.turntable().seconds">{{ n }} seconds · {{ n * render.turntableSpec().fps }} frames</option> }
@@ -364,7 +368,7 @@ export class RenderDialog implements OnInit, OnDestroy {
       const choice = this.render.turntable();
       quickUrl.searchParams.set('motion', choice.motion);
       quickUrl.searchParams.set('seconds', String(Math.min(choice.seconds, 5)));
-      if (choice.motion === 'orbit' && this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
+      if (choice.motion === 'orbit' && this.render.tracked()) { quickUrl.searchParams.set('track', this.render.tracked()!.id); quickUrl.searchParams.set('trackPivot', this.render.trackPivot()); }
       const response = await fetch(quickUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();

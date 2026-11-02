@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Drone-style tracking (0.11.8)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `stl-viewer.ts`, `blenderexport.py`, `main.py`): while a turntable with **Camera circles** tracks a part, the camera now goes round the **middle of the view** at its own height and distance and keeps looking at the part, like a drone (the new default); *Goes round: the part* (the *Goes round* menu of the Turntable row, or *Go round the view, look at the part* in the play button's menu) keeps the earlier behaviour of circling the part itself. Saved with the document (`render.trackPivot`); API: `trackPivot=view|part` on `render.mp4` and `render-jobs`. The live preview follows the same setting.
+
 ## 2026-11-02 - Turntable videos, Gallery, tracking (0.11.7)
 
 ### Added

@@ -158,6 +158,8 @@ export interface DocRenderSettings {
   transparent?: boolean;
   /** The part a turntable with Camera circles goes round and keeps in the middle (an item id); none: the point the view looks at. */
   trackId?: string | null;
+  /** What the camera goes round while it tracks: the middle of the view (it looks at the part, like a drone) or the part itself. */
+  trackPivot?: 'part' | 'view';
 }
 
 export interface RfDocument {
