@@ -103,7 +103,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noRender": false,
+      "noRender": true,
       "noExport": true
     }
   ],
@@ -116,24 +116,25 @@
     "targetId": "65dbefb1-611d-43e5-b58d-905bd468f5ef"
   },
   "view": {
-    "projection": "ortho",
+    "projection": "persp",
     "position": [
-      848.873,
-      -591.537,
-      417.618
+      69.783,
+      -923.886,
+      273.386
     ],
     "target": [
       159.0,
       98.336,
       210.657
     ],
-    "zoom": 1.031,
+    "zoom": 1.106,
     "radius": 249.334
   },
   "render": {
     "depthOfField": true,
     "focusId": "2c4a30ee-a3ec-478e-a8d3-fec7c369ec23",
     "crop": false,
+    "beam": 1,
     "lamp": 40,
     "ambient": 1,
     "dofStrength": 3

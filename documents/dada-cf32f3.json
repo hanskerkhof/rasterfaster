@@ -341,7 +341,7 @@
       "id": "77395ac9-8e55-45c1-aba8-dec226053e9a",
       "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
       "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
-      "color": 9586739,
+      "color": 6967608,
       "position": [
         54.0,
         186.0,
@@ -362,7 +362,7 @@
       "id": "28cea2aa-8c78-430d-96d5-56f08af0fb5d",
       "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
       "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
-      "color": 9586739,
+      "color": 6967608,
       "position": [
         54.0,
         266.0,
@@ -383,7 +383,7 @@
       "id": "3ec664ac-097e-44d9-ad16-b1c04d51cd80",
       "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
       "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
-      "color": 9586739,
+      "color": 6967608,
       "position": [
         54.0,
         266.0,
@@ -404,7 +404,7 @@
       "id": "3f7102ba-d6af-4383-8fc1-f9e3a58a6a6c",
       "path": "4.1.BAUKLANK DADA/4.1.BAUKLANK DADA_RF4 v168_BOLT_S8.stl",
       "name": "4.1.BAUKLANK DADA_RF4 v168_BOLT_S8",
-      "color": 9586739,
+      "color": 6967608,
       "position": [
         54.0,
         186.0,
@@ -663,24 +663,25 @@
   "view": {
     "projection": "persp",
     "position": [
-      1861.113,
-      -1387.465,
-      1221.088
+      1633.206,
+      -1623.218,
+      885.201
     ],
     "target": [
-      288.334,
-      -81.784,
-      973.406
+      263.679,
+      5.268,
+      989.484
     ],
-    "zoom": 2.656,
-    "radius": 843.027
+    "zoom": 1.821,
+    "radius": 895.171
   },
   "render": {
     "depthOfField": true,
-    "focusId": "21fc501f-017c-4e3c-b6a7-8e8d9cfc11b9",
+    "focusId": "d806e4b6-18dd-4229-afe4-054f90c38146",
     "crop": false,
+    "beam": 1,
     "lamp": 40,
-    "ambient": 0,
-    "dofStrength": 4
+    "ambient": 2,
+    "dofStrength": 5
   }
 }

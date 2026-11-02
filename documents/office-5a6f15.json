@@ -26,10 +26,10 @@
       "id": "b51be9c5-df91-4517-989c-7e598d54d432",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE COVER.stl",
       "name": "15.1 KIOSK REMOTE COVER",
-      "color": 9684093,
+      "color": 0,
       "position": [
         -248.1,
-        -240.0,
+        -200.0,
         624.8
       ],
       "rotation": [
@@ -47,10 +47,10 @@
       "id": "7b4369d7-3644-421f-a98e-cda60dc43a4e",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
       "name": "15.1 KIOSK REMOTE FRONT",
-      "color": 16167531,
+      "color": 0,
       "position": [
         -124.0,
-        -240.0,
+        -200.0,
         624.8
       ],
       "rotation": [
@@ -70,8 +70,8 @@
       "name": "rotary+encoder_14mm_hole_spc",
       "color": 12745632,
       "position": [
-        -118.7,
-        -154.6,
+        -120.0,
+        -126.0,
         650.4
       ],
       "rotation": [
@@ -92,7 +92,7 @@
       "color": 14706278,
       "position": [
         -120.0,
-        -223.1,
+        -183.1,
         655.3
       ],
       "rotation": [
@@ -121,27 +121,6 @@
         0.09229595564125725,
         0.09229595564125728,
         -0.701057384649978
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "a65ecadb-e4e7-48f7-b537-6e583669ecff",
-      "path": "office-dell_optiplex_micro_7010.stl",
-      "name": "office-dell_optiplex_micro_7010",
-      "color": 0,
-      "position": [
-        -860.0,
-        -160.0,
-        698.0
-      ],
-      "rotation": [
-        -0.7071067811865475,
-        -1.1102230246251565e-16,
-        -0.7071067811865476,
-        -5.551115123125783e-17
       ],
       "muted": false,
       "centered": false,
@@ -196,9 +175,9 @@
       "name": "RF1.11 PRIMITIVES CUBE 20mm",
       "color": 9684093,
       "position": [
-        240.0,
-        -500.0,
-        638.0
+        -680.0,
+        -60.0,
+        750.0
       ],
       "rotation": [
         0.0,
@@ -210,36 +189,59 @@
       "centered": false,
       "noRender": true,
       "noExport": false
+    },
+    {
+      "id": "f5a03ced-ea78-4c4b-8c19-94fee8e25ce4",
+      "path": "office-optiplex_3060_micro.stl",
+      "name": "office-optiplex_3060_micro",
+      "color": 0,
+      "position": [
+        -856.0,
+        -160.0,
+        706.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5000000000000001,
+        0.4999999999999999,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
     }
   ],
   "light": {
     "direction": [
-      -0.104,
-      -0.079,
-      0.991
-    ]
+      0.278,
+      -0.253,
+      0.927
+    ],
+    "targetId": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e"
   },
   "view": {
     "projection": "persp",
     "position": [
-      2310.02,
-      -2905.04,
-      1240.144
+      2560.383,
+      1792.056,
+      1510.686
     ],
     "target": [
-      -230.869,
-      -364.151,
-      477.877
+      -312.792,
+      -350.116,
+      694.848
     ],
-    "zoom": 1.716,
-    "radius": 890.918
+    "zoom": 3.193,
+    "radius": 891.457
   },
   "render": {
     "depthOfField": true,
-    "focusId": "b550f785-bbc3-47a6-b091-674c3b226d0d",
+    "focusId": "6e0fb7e1-9552-467c-b329-e37563566be9",
     "crop": false,
+    "beam": 1,
     "lamp": 40,
-    "ambient": 3,
-    "dofStrength": 5
+    "ambient": 1,
+    "dofStrength": 4
   }
 }

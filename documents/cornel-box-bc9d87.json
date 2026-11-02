@@ -178,6 +178,32 @@
         0.9067,
         0.9067
       ]
+    },
+    {
+      "id": "60cd4035-ab9d-4ef3-9e22-d1ad56e8c5e2",
+      "path": "RF1.11 PRIMITIVES/Stanford dragon.stl",
+      "name": "Stanford dragon",
+      "color": 7317724,
+      "position": [
+        3.002,
+        -38.995,
+        42.999
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.3826834323650898,
+        0.9238795325112867
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": [
+        0.3026,
+        0.3026,
+        0.3026
+      ]
     }
   ],
   "light": {
@@ -191,16 +217,16 @@
   "view": {
     "projection": "persp",
     "position": [
-      15.02,
-      -875.648,
-      68.483
+      12.272,
+      -461.418,
+      62.843
     ],
     "target": [
-      14.989,
-      -96.5,
-      68.493
+      6.509,
+      -90.036,
+      40.827
     ],
-    "zoom": 2.555,
+    "zoom": 1.209,
     "radius": 188.972
   },
   "render": {

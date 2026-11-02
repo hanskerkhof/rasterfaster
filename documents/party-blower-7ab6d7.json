@@ -2,26 +2,6 @@
   "name": "PARTY-BLOWER",
   "items": [
     {
-      "id": "ce5f65cc-3ec9-4cac-a15c-7e1330dc6f22",
-      "path": "MOUNTS/MP3 DY-PLAYERS - 5.16/SV5W MOUNT SCREWS ALT III.stl",
-      "name": "SV5W MOUNT SCREWS ALT III",
-      "color": 0,
-      "position": [
-        0.0,
-        20.0,
-        22.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": false,
-      "noExport": false
-    },
-    {
       "id": "4e7dda92-1587-4841-955f-e709ec45e442",
       "path": "MOUNTS/2.3 XY-MOS/MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS BOTTOM.stl",
       "name": "MOSFET XY-MOS_RF2 MNTS v737_MOUNT JZ-MOS BOTTOM",
@@ -39,6 +19,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -59,6 +40,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -79,6 +61,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -99,6 +82,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -119,6 +103,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -139,6 +124,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -159,6 +145,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -179,6 +166,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -199,6 +187,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -219,6 +208,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -239,6 +229,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -259,6 +250,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -279,6 +271,7 @@
       ],
       "muted": true,
       "centered": false,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -299,6 +292,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -319,6 +313,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -339,6 +334,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -359,6 +355,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -368,7 +365,7 @@
       "color": 16050143,
       "position": [
         1.1,
-        106.2,
+        114.2,
         22.0
       ],
       "rotation": [
@@ -379,6 +376,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -399,6 +397,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -419,6 +418,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -439,6 +439,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -459,6 +460,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -479,6 +481,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -499,6 +502,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -519,6 +523,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -539,6 +544,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -559,6 +565,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -579,6 +586,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -599,6 +607,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -619,6 +628,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -639,6 +649,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -659,6 +670,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -679,6 +691,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -699,6 +712,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -719,6 +733,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -739,6 +754,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -759,6 +775,175 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "65658fb6-9b3e-4587-a525-15f190890975",
+      "path": "MOUNTS/5.28 MP3 PLAYERS/HV20T_model VERTICAL  CARD RIGHT.stl",
+      "name": "HV20T_model VERTICAL  CARD RIGHT",
+      "color": 7775663,
+      "position": [
+        4.597,
+        55.143,
+        27.259
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "2ca1dcc7-ad63-4eac-809f-85c064701d97",
+      "path": "MOUNTS/5.28 MP3 PLAYERS/5.28 MP3 HV20T VERTICAL CARD RIGHT SCREWS.stl",
+      "name": "5.28 MP3 HV20T VERTICAL CARD RIGHT SCREWS",
+      "color": 16767334,
+      "position": [
+        0.0,
+        40.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "4023fcb0-3b05-4c8d-8cb6-2b0355eb42dd",
+      "path": "BOLTS/BOLT_S11.stl",
+      "name": "BOLT_S11",
+      "color": 16767334,
+      "position": [
+        122.345,
+        22.349,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "c6f1bd9a-e4ab-4466-a183-edd99272bd88",
+      "path": "BOLTS/BOLT_S10.stl",
+      "name": "BOLT_S10",
+      "color": 16767334,
+      "position": [
+        142.345,
+        22.349,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "dc61ca70-b17f-4c78-b08e-eb10dd99c5f9",
+      "path": "BOLTS/BOLT_S11.stl",
+      "name": "BOLT_S11",
+      "color": 16767334,
+      "position": [
+        142.345,
+        122.349,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "56044b41-abbb-47c0-95fa-8e2a4a4ed3d8",
+      "path": "BOLTS/BOLT_S10.stl",
+      "name": "BOLT_S10",
+      "color": 16767334,
+      "position": [
+        122.345,
+        122.349,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "90a7d140-1d0b-499e-b41d-d560b1582cd0",
+      "path": "SPACERS/spacers_RF1 v236_32.stl",
+      "name": "spacers_RF1 v236_32",
+      "color": 0,
+      "position": [
+        143.251,
+        23.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "1f5e5e72-516a-4084-845c-d2a54bfd4521",
+      "path": "SPACERS/spacers_RF1 v236_32.stl",
+      "name": "spacers_RF1 v236_32",
+      "color": 0,
+      "position": [
+        123.251,
+        123.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
       "noExport": false
     }
   ],
@@ -773,23 +958,25 @@
   "view": {
     "projection": "persp",
     "position": [
-      -305.327,
-      456.93,
-      179.526
+      343.104,
+      -391.546,
+      80.121
     ],
     "target": [
-      73.109,
-      85.617,
-      41.295
+      80.0,
+      88.283,
+      52.999
     ],
-    "zoom": 2.043,
+    "zoom": 2.178,
     "radius": 132.886
   },
   "render": {
     "depthOfField": true,
     "focusId": "21b141a2-0563-4656-ab2b-20fcafbdbd0c",
     "crop": false,
+    "beam": 1,
+    "lamp": 40,
     "ambient": 1,
-    "dofStrength": 3
+    "dofStrength": 5
   }
 }
