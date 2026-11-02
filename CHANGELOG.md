@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Groups (0.10.66)
+
+### Added
+- **FE** + **BE** (`document.store.ts`, `document-panel.ts`, `object-menu.ts`, `document-scene.ts`, `main.py`): **groups**. ⌘G (or **Group** in the part menu) gathers the selected parts, ⌘⇧G (or **Ungroup**) dissolves it; one undo step each. A group is selected, moved, turned, scaled and coloured as one. The part list shows a group row (count, ▾ fold, double-click renames) above its indented members. Groups are saved with the document, its versions and the document file; one level only; a group left with fewer than two parts is dissolved; pasted parts are not grouped.
+- **FE**: to act on one part of a group, click it again or Option-click it; right-clicking a part that is not selected opens the menu for that part alone (Option + right-click in the list does so with the group selected).
+
 ## 2026-11-02 - Quick render reuses its picture, Find in browser opens the panel (0.10.65)
 
 ### Added

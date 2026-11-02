@@ -68,6 +68,17 @@ import { baseThicknessMm } from './z-levels';
           <span class="hint">{{ lowestAt(baseMm) ? 'already on the base' : 'lowest point to z = ' + baseMm }}</span>
         </button>
         <div class="sep"></div>
+        <button type="button" role="menuitem" [disabled]="items().length < 2" (click)="group()">
+          <span class="icon">▣</span>Group
+          <span class="hint">{{ items().length < 2 ? 'needs two parts or more' : 'move, turn and scale them as one' }}</span><span class="hint key">⌘G</span>
+        </button>
+        @if (anyGrouped()) {
+          <button type="button" role="menuitem" (click)="ungroup()">
+            <span class="icon">▢</span>Ungroup
+            <span class="hint">back to separate parts</span><span class="hint key">⌘⇧G</span>
+          </button>
+        }
+        <div class="sep"></div>
         <button type="button" role="menuitem" (click)="toggleNoExport()">
           <span class="icon">{{ allNoExport() ? '✓' : '⊘' }}</span>Do not export
           <span class="hint">{{ allNoExport() ? 'on: not in 3MF / SVG, own BOM section' : 'mock part: leave out of the exports' }}</span>
@@ -242,6 +253,20 @@ export class ObjectMenu {
   }
 
   /** Shows the parts' files in the file list: opens their folders, selects them and scrolls to the first. */
+  protected anyGrouped() {
+    return this.items().some(i => i.groupId);
+  }
+
+  protected group() {
+    this.store.groupSelected();
+    this.close();
+  }
+
+  protected ungroup() {
+    this.store.ungroupSelected();
+    this.close();
+  }
+
   protected findInBrowser() {
     this.store.findInBrowser(this.items().map(i => i.id));
     this.close();

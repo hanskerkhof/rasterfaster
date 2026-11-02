@@ -144,7 +144,14 @@ function readGeometry(): PanelGeometry | null {
     @if (exportError()) { <div class="export-error">{{ exportError() }}</div> }
     <div class="list" tabindex="0" (mousedown)="lastListPointer = performance.now()"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
-        <div class="item" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range">
+       @if (groupHeader(item); as group) {
+        <div class="item group" [class.sel]="groupSelected(group.id)" (click)="onGroupClick($event, group.id)" (dblclick)="renameGroupPrompt(group.id)" title="Group: click selects all its parts · double-click renames · ▾ folds it">
+          <button type="button" class="fold" [title]="folded(group.id) ? 'Unfold the group' : 'Fold the group'" (click)="foldGroup($event, group.id)">{{ folded(group.id) ? '▸' : '▾' }}</button>
+          <span class="label">{{ group.name }}</span><span class="badge" title="Parts in this group">{{ store.membersOf(group.id).length }}</span>
+        </div>
+       }
+       @if (!item.groupId || !folded(item.groupId)) {
+        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · in a group: click again (or Option-click) for this part alone">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
@@ -155,6 +162,7 @@ function readGeometry(): PanelGeometry | null {
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
         </div>
+       }
       } @empty {
         <div class="empty">Empty. Select an .stl in the list and press ⌘↓ (or double-click it).</div>
       }
@@ -214,6 +222,8 @@ function readGeometry(): PanelGeometry | null {
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
     .item.sel { background: #d9822b; color: #fff; }
+    .item.group { font-weight: 600; background: rgba(255,255,255,.04); } .item.group.sel { background: #d9822b; } .item.group .fold { border: 0; background: transparent; color: inherit; padding: 0 2px; cursor: pointer; font-size: 11px; }
+    .item.grouped { padding-left: 20px; box-shadow: inset 3px 0 0 rgba(217,130,43,.6); }
     .sums { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
     .dim-sum { padding: 2px 8px; background: #2b2f38; color: #aeb6c4; border: 1px solid #4a5160; border-radius: 4px; font: inherit; cursor: pointer; }
     .dim-sum:hover { background: #363b46; }
@@ -645,6 +655,7 @@ export class DocumentPanel {
 
   protected onItemContextMenu(event: MouseEvent, id: string) {
     event.preventDefault();
+    if (event.altKey) this.store.selectPart(id); // Option + right-click: the menu acts on this part alone, out of its group
     this.store.openContextMenu(event.clientX, event.clientY, id);
   }
 
@@ -667,7 +678,29 @@ export class DocumentPanel {
    * Like the file list (and the Finder): a plain click selects only the item, ⌘/Ctrl-click adds or removes it, Shift-click selects the range
    * from the anchor to the clicked item (⌘⇧ adds the range to what is selected). Shift-click does not move the anchor.
    */
+  /** The group whose header goes above this part: the part is the first of its group in the list. */
+  protected groupHeader(item: DocItem) {
+    if (!item.groupId) return null;
+    const first = this.store.doc().items.find(i => i.groupId === item.groupId);
+    return first?.id === item.id ? this.store.doc().groups?.find(g => g.id === item.groupId) ?? null : null;
+  }
+  protected folded(id: string) { return this.store.collapsedGroups().has(id); }
+  protected groupSelected(id: string) { return this.store.membersOf(id).every(i => this.store.selectedIds().includes(i.id)); }
+  protected foldGroup(event: Event, id: string) { event.stopPropagation(); this.store.toggleGroupFolded(id); }
+  protected onGroupClick(event: MouseEvent, id: string) {
+    const first = this.store.membersOf(id)[0];
+    if (!first) return;
+    if (event.metaKey || event.ctrlKey) this.store.toggleSelect(first.id);
+    else this.store.select(first.id);
+  }
+  protected renameGroupPrompt(id: string) {
+    const current = this.store.doc().groups?.find(g => g.id === id)?.name ?? '';
+    const name = prompt('Group name', current);
+    if (name !== null) this.store.renameGroup(id, name);
+  }
+
   protected onItemClick(event: MouseEvent, id: string) {
+    if (event.altKey && !event.shiftKey && !event.metaKey && !event.ctrlKey) { this.anchorId = id; this.store.selectPart(id); return; } // Option-click: this part alone, out of its group
     if (event.shiftKey) {
       const ids = this.store.doc().items.map(item => item.id);
       this.store.selectMany(rangeEndingAt(ids, this.anchorId ?? this.store.selectedId(), id), event.metaKey || event.ctrlKey);
@@ -675,6 +708,7 @@ export class DocumentPanel {
     }
     this.anchorId = id;
     if (event.metaKey || event.ctrlKey) this.store.toggleSelect(id);
+    else if (this.store.selectedIds().length > 1 && this.store.selectedIds().includes(id)) this.store.selectPart(id); // a second click inside a selected group (or multi-selection) narrows it to this part
     else this.store.select(id);
   }
 

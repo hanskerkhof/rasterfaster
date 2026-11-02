@@ -67,6 +67,14 @@ export interface DocItem {
   noRender?: boolean;
   /** The origin point the user set, in the part's own STL coordinates; none (or null) means the STL's own 0, 0, 0. Kept in the document file. */
   origin?: Vec3 | null;
+  /** The group this part belongs to (an id in the document's `groups`); none means it is on its own. */
+  groupId?: string | null;
+}
+
+/** A named set of parts that is selected, moved, turned and scaled as one. */
+export interface DocGroup {
+  id: string;
+  name: string;
 }
 
 /** Measured from a part's STL as stored in the library (unrotated). */
@@ -120,6 +128,7 @@ export interface DocRenderSettings {
 export interface RfDocument {
   name: string;
   items: DocItem[];
+  groups?: DocGroup[];
   light?: DocLight | null;
   view?: DocView | null;
   render?: DocRenderSettings | null;
@@ -158,6 +167,21 @@ function sanitize(doc: RfDocument): boolean {
     if (!item.rotation.every(Number.isFinite)) { item.rotation = [0, 0, 0, 1]; changed = true; }
     if (item.scale && !item.scale.every(v => Number.isFinite(v) && v >= 0.01 && v <= 100)) { item.scale = null; changed = true; }
   }
+  if (tidyGroups(doc)) changed = true;
+  return changed;
+}
+
+/** Groups need two parts or more: smaller ones (and parts pointing at a group that is gone) are dissolved. Returns whether anything changed. */
+function tidyGroups(doc: RfDocument): boolean {
+  const counts = new Map<string, number>();
+  for (const item of doc.items) if (item.groupId) counts.set(item.groupId, (counts.get(item.groupId) ?? 0) + 1);
+  const known = new Set((doc.groups ?? []).map(g => g.id));
+  let changed = false;
+  for (const item of doc.items) {
+    if (item.groupId && (!known.has(item.groupId) || (counts.get(item.groupId) ?? 0) < 2)) { item.groupId = null; changed = true; }
+  }
+  const kept = (doc.groups ?? []).filter(g => (counts.get(g.id) ?? 0) >= 2);
+  if (kept.length !== (doc.groups ?? []).length) { doc.groups = kept; changed = true; }
   return changed;
 }
 
@@ -294,7 +318,7 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+    this.resetTo(stored.id, { name: stored.name, items: stored.items, groups: stored.groups, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
     this.takeVersionInfo(stored);
   }
 
@@ -360,7 +384,7 @@ export class DocumentStore {
       if (this.dirty) {
         this.conflict.set(stored);
       } else {
-        this.resetTo(id, { name: stored.name, items: stored.items, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+        this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
         this.takeVersionInfo(stored);
         this.say('Updated from another window');
       }
@@ -371,7 +395,7 @@ export class DocumentStore {
   useRemoteVersion() {
     const remote = this.conflict();
     if (!remote) return;
-    this.resetTo(remote.id, { name: remote.name, items: remote.items, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
+    this.resetTo(remote.id, { name: remote.name, items: remote.items, groups: remote.groups, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
     this.takeVersionInfo(remote);
   }
 
@@ -420,7 +444,7 @@ export class DocumentStore {
     await this.flush();
     const stored = await firstValueFrom(this.api.getVersion(id, version));
     const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
-    this.resetTo(id, { name: stored.name, items: stored.items, light: this.doc().light, view: this.doc().view, render: this.doc().render });
+    this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, light: this.doc().light, view: this.doc().view, render: this.doc().render });
     clearTimeout(this.saveTimer);
     this.dirty = false;
     this.saveState.set('saved');
@@ -469,7 +493,7 @@ export class DocumentStore {
     const id = this.docId();
     if (!id || version === null) return;
     const promoted = await firstValueFrom(this.api.promote(id, version));
-    this.resetTo(id, { name: promoted.name, items: promoted.items, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
+    this.resetTo(id, { name: promoted.name, items: promoted.items, groups: promoted.groups, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
     this.takeVersionInfo(promoted);
     this.say(`Promoted v${version} to v${promoted.version}`);
     await this.refreshVersions();
@@ -596,7 +620,11 @@ export class DocumentStore {
     if (this.viewing() !== null) return false; // an older version is read-only
     if (this.gestureLabel && Date.now() - this.gestureStartedAt > gestureStaleMs) this.endGesture(); // a drag that never got its end
     const current = this.doc();
-    const next = change(current);
+    let next = change(current);
+    if (next !== current && next.items.some(i => i.groupId)) {
+      const probe = { ...next, items: next.items.map(i => ({ ...i })), groups: [...(next.groups ?? [])] };
+      if (tidyGroups(probe)) next = probe; // a group that lost parts (deleted, regrouped) is dissolved when fewer than two are left
+    }
     if (next === current || historyOf(next) === historyOf(current)) return false;
     this.doc.set(next);
     if (!this.gestureLabel) this.commit();
@@ -651,7 +679,7 @@ export class DocumentStore {
     let fresh = 0; // parts that need a colour of their own
     for (const item of items) {
       const alike = [...this.doc().items, ...created].find(other => other.color !== 0 && similarNames(other.name, item.name)); // similar names share a colour (black is not copied: new parts get one of the base colours)
-      created.push({ ...item, color: alike?.color ?? itemColors[(base + fresh++) % itemColors.length], id: crypto.randomUUID() });
+      created.push({ ...item, groupId: null, color: alike?.color ?? itemColors[(base + fresh++) % itemColors.length], id: crypto.randomUUID() });
     }
     if (!created.length) return created;
     this.mutate(created.length === 1 ? 'Add part' : 'Add parts', d => ({ ...d, items: [...d.items, ...created] }));
@@ -673,8 +701,66 @@ export class DocumentStore {
     this.selectedIds.set([]);
   }
 
+  /** Selects the part, and with it the rest of its group (the part stays the one whose numbers are shown). */
   select(id: string | null) {
-    this.selectedIds.set(id ? [id] : []);
+    this.selectedIds.set(id ? this.withGroup([id]) : []);
+  }
+
+  /** Selects this one part only, also when it belongs to a group (Option-click). */
+  selectPart(id: string) {
+    this.selectedIds.set([id]);
+  }
+
+  /** The ids plus every part that shares a group with one of them; the order keeps the given ids last, so the last one stays the primary. */
+  withGroup(ids: readonly string[]): string[] {
+    const items = this.doc().items;
+    const groups = new Set(items.filter(i => ids.includes(i.id) && i.groupId).map(i => i.groupId));
+    if (!groups.size) return [...ids];
+    const others = items.filter(i => i.groupId && groups.has(i.groupId) && !ids.includes(i.id)).map(i => i.id);
+    return [...others, ...ids];
+  }
+
+  /** The parts of a group, in document order. */
+  membersOf(groupId: string) {
+    return this.doc().items.filter(i => i.groupId === groupId);
+  }
+
+  /** Gathers the selected parts (two or more) into a new group, one undo step; parts leave the group they were in. Returns whether it grouped. */
+  groupSelected(): boolean {
+    const ids = new Set(this.selectedIds());
+    if (ids.size < 2) return false;
+    const id = crypto.randomUUID();
+    const changed = this.mutate('Group', d => {
+      const members = d.items.filter(i => ids.has(i.id));
+      const first = d.items.findIndex(i => ids.has(i.id));
+      const rest = d.items.filter(i => !ids.has(i.id));
+      const number = (d.groups ?? []).reduce((max, g) => Math.max(max, Number(/^Group (\d+)$/.exec(g.name)?.[1] ?? 0)), 0) + 1;
+      const before = d.items.slice(0, first).filter(i => !ids.has(i.id)).length; // members move together to where the first one was
+      const items = [...rest.slice(0, before), ...members.map(i => ({ ...i, groupId: id })), ...rest.slice(before)];
+      return { ...d, items, groups: [...(d.groups ?? []), { id, name: `Group ${number}` }] };
+    });
+    return changed;
+  }
+
+  /** Dissolves the groups of the selected parts (the parts stay selected), one undo step. */
+  ungroupSelected(): boolean {
+    const groups = new Set(this.doc().items.filter(i => this.selectedIds().includes(i.id) && i.groupId).map(i => i.groupId));
+    if (!groups.size) return false;
+    return this.mutate('Ungroup', d => ({ ...d, items: d.items.map(i => (i.groupId && groups.has(i.groupId) ? { ...i, groupId: null } : i)), groups: (d.groups ?? []).filter(g => !groups.has(g.id)) }));
+  }
+
+  /** Renames a group. */
+  renameGroup(id: string, name: string) {
+    const clean = name.trim().slice(0, 80);
+    if (!clean) return;
+    this.mutate('Rename group', d => ({ ...d, groups: (d.groups ?? []).map(g => (g.id === id ? { ...g, name: clean } : g)) }));
+  }
+
+  /** Groups that are folded in the part list (not saved: folding is not an edit). */
+  readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
+
+  toggleGroupFolded(id: string) {
+    this.collapsedGroups.update(set => { const next = new Set(set); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
   /** Library paths of document parts whose file is not in the library (trashed, renamed or deleted elsewhere); the app keeps it up to date. */
@@ -706,12 +792,14 @@ export class DocumentStore {
 
   /** Shift-click in the document list: select these items, the last of them is the one whose numbers are shown; `add` (⌘⇧) keeps what is selected. */
   selectMany(ids: readonly string[], add = false) {
-    this.selectedIds.set(add ? [...this.selectedIds().filter(id => !ids.includes(id)), ...ids] : [...ids]);
+    const all = this.withGroup(ids);
+    this.selectedIds.set(add ? [...this.selectedIds().filter(id => !all.includes(id)), ...all] : all);
   }
 
   /** ⌘-click: add the item to the selection, or take it out when it is already selected. */
   toggleSelect(id: string) {
-    this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id]));
+    const group = this.withGroup([id]);
+    this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => !group.includes(x)) : [...ids.filter(x => !group.includes(x)), ...group]));
   }
 
   /** Selects everything that reacts to clicks (muted items stay out of it). */
@@ -937,7 +1025,7 @@ export class DocumentStore {
 
   /** Opens the object menu; a right-click inside the selection acts on all of it, otherwise on that item alone. */
   openContextMenu(x: number, y: number, id: string) {
-    if (!this.selectedIds().includes(id)) this.select(id);
+    if (!this.selectedIds().includes(id)) this.selectPart(id); // right-click on a part that is not selected: the menu is for that part alone (also out of a group; select the group first to act on all of it)
     this.contextMenu.set({ x, y, ids: [...this.selectedIds()] });
   }
 

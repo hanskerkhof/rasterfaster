@@ -350,6 +350,12 @@ class DocumentItem(BaseModel):
     noExport: bool = False  # mock part (e.g. a component model): left out of the 3MF and SVG exports
     scale: tuple[float, float, float] | None = None  # scale along the part's own X, Y and Z axes, applied before the rotation (None: 1, 1, 1)
     origin: tuple[float, float, float] | None = None  # origin point set by the user, in the part's own STL coordinates (None: the STL's own 0, 0, 0)
+    groupId: str | None = Field(default=None, max_length=64)  # the group of the document this part belongs to (moved, turned and scaled together)
+
+
+class DocumentGroup(BaseModel):
+    id: str = Field(max_length=64)
+    name: str = Field(max_length=120)
 
 
 class DocumentLight(BaseModel):
@@ -384,6 +390,7 @@ class DocumentRenderSettings(BaseModel):
 class DocumentBody(BaseModel):
     name: str = Field(default="Untitled", min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+    groups: list[DocumentGroup] = Field(default_factory=list, max_length=500)
     light: DocumentLight | None = None  # none: the default light
     view: DocumentView | None = None  # the camera of the 3D view; none: the document is fitted into the view
     render: DocumentRenderSettings | None = None  # the settings of the Render dialog; none: the defaults
@@ -409,6 +416,7 @@ class VersionOut(VersionSummary):
 
 class VersionDetail(VersionSummary):
     items: list[DocumentItem]
+    groups: list[DocumentGroup] = Field(default_factory=list)
 
 
 class DocumentSummary(BaseModel):
@@ -520,7 +528,7 @@ def get_version(documentId: str, number: int) -> dict:
     data = versions.read(versions.versions_dir(documentsRoot, documentId), number)
     if not data:
         raise HTTPException(status_code=404, detail="version not found")
-    return {**versions.summary(data), "items": data["items"]}
+    return {**versions.summary(data), "items": data["items"], "groups": data.get("groups", [])}
 
 
 @app.delete("/api/documents/{documentId}/versions/{number}", status_code=204)
@@ -557,7 +565,7 @@ def promote_version(documentId: str, number: int) -> DocumentOut:
         data = versions.read(directory, number)
         if not data:
             raise HTTPException(status_code=404, detail="version not found")
-        body = DocumentBody(name=data["name"], items=data["items"])
+        body = DocumentBody(name=data["name"], items=data["items"], groups=data.get("groups", []))
         write_document(documentId, body)
         versions.save(directory, body.model_dump())
         return read_document(documentId)
@@ -582,6 +590,7 @@ class DocumentFile(BaseModel):
     id: str = Field(max_length=81)
     name: str = Field(min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
+    groups: list[DocumentGroup] = Field(default_factory=list, max_length=500)
     light: DocumentLight | None = None
     view: DocumentView | None = None
     render: DocumentRenderSettings | None = None
@@ -595,7 +604,7 @@ def export_document_file(documentId: str) -> Response:
     directory = versions.versions_dir(documentsRoot, documentId)
     history = [data for number in versions.numbers(directory) if (data := versions.read(directory, number))]
     payload = DocumentFile(format=documentFileFormat, formatVersion=1, exportedAt=time.time(), id=documentId, name=document.name,
-                           items=document.items, light=document.light, view=document.view, render=document.render, versions=history)
+                           items=document.items, groups=document.groups, light=document.light, view=document.view, render=document.render, versions=history)
     label = (f"-v{document.version}" + ("-edited" if document.changedSinceVersion else "")) if document.version else ""  # e.g. Name-v3 (or Name-v3-edited: the working copy is ahead of v3)
     filename = re.sub(r"[^\w.-]+", "_", document.name) + label + ".rasterfaster.json"
     return Response(payload.model_dump_json(indent=2), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -617,7 +626,7 @@ def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "c
         stored = [{"version": v.version, "savedAt": v.savedAt, "name": v.name, "items": [i.model_dump() for i in v.items]} for v in sorted(file.versions, key=lambda v: v.version)]
         if len({v["version"] for v in stored}) != len(stored):
             raise HTTPException(status_code=422, detail="the file has duplicate version numbers")
-        write_document(documentId, DocumentBody(name=file.name, items=file.items, light=file.light, view=file.view, render=file.render))
+        write_document(documentId, DocumentBody(name=file.name, items=file.items, groups=file.groups, light=file.light, view=file.view, render=file.render))
         versions.replace_all(versions.versions_dir(documentsRoot, documentId), stored)
         return read_document(documentId)
 

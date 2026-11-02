@@ -199,6 +199,70 @@ describe('DocumentStore.addParts', () => {
 });
 
 
+describe('Groups', () => {
+  let store: DocumentStore;
+  let ids: string[];
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+    ids = [0, 20, 40, 60].map(x => store.addItem({ ...part([x, 0, 0]), name: `p${x}` }).id);
+  });
+
+  it('groups the selection in one undo step; selecting one member selects the group, Option-click only the part', () => {
+    store.selectMany([ids[0], ids[2]]);
+    expect(store.groupSelected()).toBe(true);
+    expect(store.doc().groups?.length).toBe(1);
+    expect(store.doc().items.slice(0, 2).map(i => i.id)).toEqual([ids[0], ids[2]]); // members are listed together, where the first was
+    store.select(ids[2]);
+    expect([...store.selectedIds()].sort()).toEqual([ids[0], ids[2]].sort());
+    expect(store.selectedId()).toBe(ids[2]);
+    store.selectPart(ids[2]);
+    expect(store.selectedIds()).toEqual([ids[2]]);
+    store.undo();
+    expect(store.doc().groups?.length ?? 0).toBe(0);
+    expect(store.doc().items.every(i => !i.groupId)).toBe(true);
+  });
+
+  it('the context menu of an unselected group member is for that part alone; with the group selected it is for the group', () => {
+    store.selectMany([ids[0], ids[1]]);
+    store.groupSelected();
+    store.select(null);
+    store.openContextMenu(0, 0, ids[1]);
+    expect(store.contextMenu()?.ids).toEqual([ids[1]]);
+    store.select(ids[1]);
+    store.openContextMenu(0, 0, ids[1]);
+    expect([...store.contextMenu()!.ids].sort()).toEqual([ids[0], ids[1]].sort());
+  });
+
+  it('needs two parts, ungroups, and dissolves a group that is left with one part', () => {
+    store.select(ids[0]);
+    expect(store.groupSelected()).toBe(false);
+    store.selectMany([ids[0], ids[1], ids[2]]);
+    store.groupSelected();
+    store.remove(ids[0]);
+    expect(store.doc().groups?.length).toBe(1); // two left: still a group
+    store.remove(ids[1]);
+    expect(store.doc().groups?.length).toBe(0); // one left: dissolved
+    expect(store.doc().items.every(i => !i.groupId)).toBe(true);
+    store.selectMany([ids[2], ids[3]]);
+    store.groupSelected();
+    expect(store.ungroupSelected()).toBe(true);
+    expect(store.doc().groups?.length).toBe(0);
+  });
+
+  it('regrouping moves parts out of their old group, ⌘-click toggles a whole group, pasted parts are not grouped', () => {
+    store.selectMany([ids[0], ids[1]]);
+    store.groupSelected();
+    store.toggleSelect(ids[2]);
+    store.toggleSelect(ids[0]);
+    expect(store.selectedIds()).toEqual([ids[2]]); // the whole group left the selection
+    const [copy] = store.addParts([{ ...part(), groupId: store.doc().items[0].groupId }]);
+    expect(copy.groupId).toBeNull();
+  });
+});
+
 describe('Center on grid (X, Y and Z)', () => {
   const upright: Vec3 = [15.31, 15.301, 44];    // BOLT_S8 standing up
   const lying: Vec3 = [44, 15.31, 15.301];      // the same bolt on its side

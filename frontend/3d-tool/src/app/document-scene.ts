@@ -1804,8 +1804,8 @@ export class DocumentScene {
     if (!hit) { this.emptyDown = { x: e.clientX, y: e.clientY }; return; } // let OrbitControls orbit
     e.stopImmediatePropagation();
     const { store } = this.ctx;
-    const wasInGroup = store.selectedIds().includes(hit.id) && store.selectedIds().length > 1;
-    if (!wasInGroup) store.select(hit.id); // dragging a member of a multi-selection moves the whole selection
+    const wasInGroup = store.selectedIds().includes(hit.id) && store.selectedIds().length > 1 && !e.altKey;
+    if (!wasInGroup) { if (e.altKey) store.selectPart(hit.id); else store.select(hit.id); } // Option-click picks one part of a group; dragging a member of a multi-selection moves the whole selection
     const starts = new Map(store.selectedItems().map(i => [i.id, [...i.position] as Vec3]));
     const item = store.doc().items.find(i => i.id === hit.id)!;
     const vertical = e.shiftKey;
@@ -1873,7 +1873,7 @@ export class DocumentScene {
     if (this.marquee) { this.finishMarquee(e); return; }
     if (this.drag) {
       this.ctx.store.endGesture(); // writes the single undo step (nothing when the part never moved)
-      if (!this.drag.moved && this.drag.wasInGroup) this.ctx.store.select(this.drag.id); // plain click inside a multi-selection narrows it, like Finder
+      if (!this.drag.moved && this.drag.wasInGroup) this.ctx.store.selectPart(this.drag.id); // plain click inside a multi-selection (or a selected group) narrows it to that part, like Finder
       this.drag = null;
       this.ctx.canvas.releasePointerCapture(e.pointerId);
     } else if (this.emptyDown) {
@@ -1924,6 +1924,7 @@ export class DocumentScene {
       const selected = store.selectedItems();
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
+    else if (command && !e.altKey && e.code === 'KeyG') { if (e.shiftKey) store.ungroupSelected(); else store.groupSelected(); } // ⌘G groups the selection, ⌘⇧G ungroups it
     else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) this.toggleRotateTool(); // R: the rotate tool
     else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 's' && !e.repeat) this.toggleScaleTool(); // S: the scale tool
     else if (!command && /^Key[XYZ]$/.test(e.code)) { // X / Y / Z: turn about that axis (Shift: the other way, Option: in fine steps; e.code because Option changes the typed letter)
