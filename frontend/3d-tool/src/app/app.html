@@ -80,7 +80,9 @@
     </div>
     <div class="modes">
       @for (m of modes; track m.id; let i = $index) {
+       @if (store.appMode() === 'design' || m.id === 'shaded') { <!-- Render mode shows "Shaded with light" only, still on its own key -->
         <button releaseFocus [class.on]="mode() === m.id" [title]="m.label + ' (⌥' + (i + 1) + ')'" (click)="setMode(m.id)">{{ m.label }} <kbd>⌥{{ i + 1 }}</kbd></button>
+       }
       }
     </div>
     <button class="step-mode" type="button" releaseFocus [title]="'Moving with Option held steps ' + store.fineStepMm() + ' mm (⌥M or click: ' + (store.fineStepMm() === 1 ? '0.1' : '1') + ' mm)'" (click)="store.toggleFineStep()">Move {{ store.fineStepMm() }} mm <kbd>⌥M</kbd></button>

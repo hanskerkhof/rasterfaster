@@ -283,6 +283,31 @@ lamp = 2 ** ((min(max(int(lamp_text or 40), 0), 60) - 40) / 10)  # the lamp slid
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=source)
 scene = bpy.context.scene
+
+def let_light_through_glass():
+    # Cycles blocks the shadow rays of lights at glass, so a glass panel (a diffuser in a ceiling, a window) would stay dark behind it.
+    # The glass parts let most of the light of the lamps through (shadow rays see a transparent surface); the camera and the reflections still see glass.
+    for material in bpy.data.materials:
+        if "_glass" not in material.name or not material.use_nodes:
+            continue
+        tree = material.node_tree
+        output = next((n for n in tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+        if output is None or not output.inputs["Surface"].links:
+            continue
+        glass = output.inputs["Surface"].links[0].from_node
+        light_path = tree.nodes.new("ShaderNodeLightPath")
+        scale = tree.nodes.new("ShaderNodeMath")
+        scale.operation = "MULTIPLY"
+        scale.inputs[1].default_value = 0.92  # a trace of shadow stays
+        tree.links.new(light_path.outputs["Is Shadow Ray"], scale.inputs[0])
+        clear = tree.nodes.new("ShaderNodeBsdfTransparent")
+        mix = tree.nodes.new("ShaderNodeMixShader")
+        tree.links.new(scale.outputs[0], mix.inputs[0])
+        tree.links.new(glass.outputs[0], mix.inputs[1])
+        tree.links.new(clear.outputs[0], mix.inputs[2])
+        tree.links.new(mix.outputs[0], output.inputs["Surface"])
+
+let_light_through_glass()
 scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
 scene.unit_settings.system = "METRIC"
 for obj in bpy.data.objects:

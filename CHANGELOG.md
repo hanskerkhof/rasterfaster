@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Light through glass, light type menu, one display mode in Render mode (0.11.1)
+
+### Added
+- **FE** (`stl-viewer.ts`): **Type of light** in the right-click menu of the light (Spot, Direct, Soft, Diffuse, Flood), the same setting as the Lamp menu of the Render dialog.
+
+### Changed
+- **FE** (`app.ts`, `app.html`): Render mode shows only the **Shaded with light** display mode (still on ⌥6); Design mode comes back with the display mode it had.
+
+### Fixed
+- **BE** (`blenderexport.py`): parts with the **Transparent** finish let the light of the lamps through in renders (Cycles blocked it), so a glass light diffuser lights a closed box.
+- **FE** (`model-render.ts`): a transparent part casts no shadow in the Shaded with light view.
+
 ## 2026-11-02 - Design and Render mode (0.11.0)
 
 ### Added

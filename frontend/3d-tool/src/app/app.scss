@@ -30,6 +30,7 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .modes button { padding: 5px 12px; background: #31353f; color: inherit; border: 1px solid #000; cursor: pointer; }
 .modes button:first-child { border-radius: 5px 0 0 5px; } .modes button:last-child { border-radius: 0 5px 5px 0; }
 .modes button.on { background: #2f6fed; color: #fff; }
+.modes button:only-child { border-radius: 5px; }
 .step-mode { padding: 5px 12px; background: #1f6f5c; color: #fff; border: 1px solid #000; border-radius: 5px; cursor: pointer; white-space: nowrap; }
 .step-mode:hover { background: #26856e; }
 .step-mode kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .65; }

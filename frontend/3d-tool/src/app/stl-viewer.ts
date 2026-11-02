@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { RenderService } from './render.service';
+import { RenderService, beamNames } from './render.service';
 import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
@@ -221,6 +221,20 @@ function readShowPath() {
       <div class="menu-backdrop" (mousedown)="lightMenu.set(null)" (contextmenu)="$event.preventDefault(); lightMenu.set(null)"></div>
       <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
         <button type="button" role="menuitem" (click)="startPointAtObject()"><span class="tick"></span>Point at object</button>
+        <div class="submenu-host" (mouseenter)="beamMenuOpen.set(true)" (mouseleave)="beamMenuOpen.set(false)">
+          <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="beamMenuOpen()" (click)="beamMenuOpen.set(!beamMenuOpen())">
+            <span class="tick"></span>Type of light<span class="hint">{{ beamName() }} ◂</span>
+          </button>
+          @if (beamMenuOpen()) {
+            <div class="flyout" role="menu">
+              @for (b of beamTypes; track b.id) {
+                <button type="button" role="menuitemradio" [attr.aria-checked]="renderSettings.beam() === b.id" (click)="chooseBeam(b.id)">
+                  <span class="tick">{{ renderSettings.beam() === b.id ? '✓' : '' }}</span>{{ b.label }}<span class="hint">{{ b.hint }}</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
         <button type="button" role="menuitem" (click)="resetLight(); lightMenu.set(null)"><span class="tick"></span>Reset the light</button>
       </div>
     }
@@ -521,6 +535,16 @@ export class StlViewer implements OnDestroy {
   protected readonly zGridMode = signal(readZGridMode());
   protected readonly zGridModes = zGridModes;
   protected readonly gridModeOpen = signal(false);
+  /** The light's own menu: the type of light (how soft its shadows are), the same setting as the Lamp menu of the Render dialog. */
+  protected readonly beamMenuOpen = signal(false);
+  protected readonly beamTypes = beamNames.map((label, id) => ({ id, label, hint: ['razor-sharp shadows', 'sharp shadows (the studio\'s own)', 'soft shadows', 'very soft shadows', 'hardly any shadow'][id] }));
+  protected beamName() { return beamNames[this.renderSettings.beam()] ?? ''; }
+  protected chooseBeam(id: number) {
+    this.renderSettings.setBeam(id);
+    this.beamMenuOpen.set(false);
+    this.lightMenu.set(null);
+    this.store.announce(`Type of light: ${beamNames[id]}`, 2500);
+  }
   /** Rotating the view (drag, or dragging the view cube) pivots around the selected parts instead of the current view centre. */
   protected readonly pivotOnSelection = signal(readPivotOnSelection());
   private pivotGoal: THREE.Vector3 | null = null;
@@ -1238,8 +1262,8 @@ export class StlViewer implements OnDestroy {
     this.flying.set(false);
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.touchView();
+    if (view.appMode === 'design' || view.appMode === 'render') this.store.setAppMode(view.appMode); // first: Render mode takes no other display mode
     if (view.mode && view.mode !== this.mode()) this.modeRequest.emit(view.mode as ViewMode);
-    if (view.appMode === 'design' || view.appMode === 'render') this.store.setAppMode(view.appMode);
     if (view.light !== undefined && JSON.stringify(view.light ?? null) !== JSON.stringify(this.store.doc().light ?? null)) this.store.setLight(view.light ?? null);
     if (view.ground) this.groundMode.set(view.ground);
     if (typeof view.groundColor === 'number') this.groundColor.set(view.groundColor);

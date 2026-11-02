@@ -61,7 +61,7 @@ export function buildParts(geometry: THREE.BufferGeometry, mode: ViewMode, style
   }
   if (mode === 'shaded') { // a glossy material, smooth normals, and it casts and receives the shadows of the light source (see the viewer)
     const mesh = new THREE.Mesh(creasedCopy(geometry), finishMaterial(style, () => new THREE.MeshPhysicalMaterial({ color: style.solid, roughness: 0.38, metalness: 0.12, clearcoat: 0.3, clearcoatRoughness: 0.35 })));
-    mesh.castShadow = true;
+    mesh.castShadow = style.finish !== 'glass'; // a transparent part lets the light of the lamp through (no shadow of its own)
     mesh.receiveShadow = true;
     return [mesh];
   }

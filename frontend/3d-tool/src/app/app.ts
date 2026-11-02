@@ -119,6 +119,11 @@ export class App {
   ];
 
   constructor() {
+    // Render mode shows the scene one way only, "Shaded with light"; Design mode comes back with the display mode it had.
+    effect(() => {
+      const render = this.store.appMode() === 'render';
+      untracked(() => this.mode.set(render ? 'shaded' : this.designMode));
+    });
     document.addEventListener('keydown', this.onTabKey, true);
     inject(DestroyRef).onDestroy(() => document.removeEventListener('keydown', this.onTabKey, true));
     void this.store.init();
@@ -254,9 +259,16 @@ export class App {
     else if (event.key === 'Enter' && !typing && this.relinkFile() && (event.target as HTMLElement | null)?.closest('.tree')) { event.preventDefault(); this.doRelink(); }
   }
 
+  /** The display mode of Design mode, kept while Render mode shows only "Shaded with light". */
+  private designMode: ViewMode = this.readViewMode();
+
   protected setMode(mode: ViewMode) {
+    if (this.store.appMode() === 'render' && mode !== 'shaded') return; // Render mode has the one display mode
     this.mode.set(mode);
-    try { localStorage.setItem(viewModeStorageKey, mode); } catch { /* storage unavailable */ }
+    if (this.store.appMode() === 'design') {
+      this.designMode = mode;
+      try { localStorage.setItem(viewModeStorageKey, mode); } catch { /* storage unavailable */ }
+    }
   }
 
   /** A file or directory was renamed: follow it with the selection, refresh the search and let open documents pick up their new paths. */
@@ -467,7 +479,7 @@ export class App {
       this.togglePanel();
     }
     const digit = /^Digit([1-9])$/.exec(event.code); // ⌥1 … ⌥5: the view modes in the order of the buttons (event.code: ⌥ changes the typed character)
-    if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && this.modes[+digit[1] - 1]) {
+    if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && this.modes[+digit[1] - 1] && (this.store.appMode() === 'design' || this.modes[+digit[1] - 1].id === 'shaded')) {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);
     }
