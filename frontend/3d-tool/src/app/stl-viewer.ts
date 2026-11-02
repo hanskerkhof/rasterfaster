@@ -382,9 +382,6 @@ function readShowPath() {
       </button>
     }
     @if (documentMode()) {
-      <button class="home look" type="button" [class.on]="lookMode()" [title]="lookMode() ? 'Look around is on: drag turns the view from where the camera is, scroll walks forward and back, ⌥-scroll zooms. Click to go back to orbiting' : 'Look around from here: the camera stays where it is and you turn the view (to stand between two mirrors, for example)'" aria-label="Look around from here" [attr.aria-pressed]="lookMode()" releaseFocus (click)="toggleLookMode()">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
-      </button>
       <button class="home fit" type="button" title="Fit all: zoom and move the view so every object of the document is in it (the viewing angle stays)" aria-label="Fit all objects in view" [disabled]="!store.doc().items.length" releaseFocus (click)="fitAll()">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V6a2 2 0 0 1 2-2h3M20 9V6a2 2 0 0 0-2-2h-3M4 15v3a2 2 0 0 0 2 2h3M20 15v3a2 2 0 0 1-2 2h-3"/><path d="M12 7.6l4 2.3v4.2l-4 2.3-4-2.3V9.9z"/><path d="M8 9.9l4 2.3 4-2.3M12 12.2v4.2"/></svg>
       </button>
@@ -419,7 +416,6 @@ function readShowPath() {
     .fly-menu .tick { width: 14px; text-align: center; } .fly-menu .hint { margin-left: auto; padding-left: 14px; opacity: .55; font-size: 11px; }
     .fly-menu .sep { height: 1px; margin: 4px 2px; background: rgba(255,255,255,.12); } .fly-menu .head { padding: 3px 8px; opacity: .6; font-size: 11px; }
     .fly-menu .row { display: flex; align-items: center; gap: 4px; padding: 2px 8px 4px; } .fly-menu .row .label { margin-right: auto; opacity: .75; } .fly-menu .row button { padding: 2px 8px; background: #3a3f4b; } .fly-menu .row button.on { background: #2f6fed; color: #fff; }
-    .home.look { right: 212px; } .home.look.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home.fit { right: 178px; } .home.fit:disabled { opacity: .3; pointer-events: none; }
     .fly-host { position: absolute; top: 12px; right: 110px; width: 30px; height: 30px; z-index: 6; }
     .fly-host .home.fly { position: static; right: auto; top: auto; }
@@ -805,7 +801,6 @@ export class StlViewer implements OnDestroy {
     this.stageEl.addEventListener('keydown', this.onFlightKey);
     this.stageEl.addEventListener('keydown', this.onViewKey);
     this.renderer.domElement.addEventListener('pointerdown', this.stopFlight); // grabbing the view takes over from the fly-around
-    this.renderer.domElement.addEventListener('pointerdown', this.onLookDown); // after the parts (they keep their clicks), before OrbitControls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.addEventListener('change', () => this.scheduleSaveView());
@@ -881,65 +876,6 @@ export class StlViewer implements OnDestroy {
    * parts turn about the middle of their footprint in front of the camera. One turn takes the length of the video; it loops until something is clicked.
    */
   protected readonly turnDirections = turnDirections;
-
-  /** "Look around from here": the camera stays where it is, a drag turns the view about the camera, the scroll walks forward and back. */
-  protected readonly lookMode = signal(false);
-
-  protected toggleLookMode() {
-    const on = !this.lookMode();
-    this.lookMode.set(on);
-    if (!on) return;
-    this.flying.set(false);
-    if (this.projection !== 'persp') { this.cameraMode.set('perspective'); this.rememberCameraMode(); this.applyCameraMode(); } // an orthographic camera has no place in the scene
-    this.store.announce('Look around: drag to turn the view from where the camera is · scroll walks forward and back · ⌥-scroll zooms', 6000);
-  }
-
-  private readonly onLookDown = (e: PointerEvent) => {
-    if (!this.lookMode() || e.button !== 0 || e.metaKey || e.shiftKey || !this.documentMode()) return;
-    e.stopImmediatePropagation(); // not OrbitControls: nothing that was hit before reached here
-    e.preventDefault();
-    this.touchView();
-    this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
-    const canvas = this.renderer.domElement;
-    canvas.setPointerCapture(e.pointerId);
-    let last = { x: e.clientX, y: e.clientY };
-    const move = (ev: PointerEvent) => {
-      this.touchView();
-      this.lookBy((ev.clientX - last.x) * 0.005, (ev.clientY - last.y) * 0.005);
-      last = { x: ev.clientX, y: ev.clientY };
-    };
-    const up = () => {
-      canvas.removeEventListener('pointermove', move);
-      canvas.removeEventListener('pointerup', up);
-      canvas.removeEventListener('pointercancel', up);
-      this.scheduleSaveView();
-    };
-    canvas.addEventListener('pointermove', move);
-    canvas.addEventListener('pointerup', up);
-    canvas.addEventListener('pointercancel', up);
-  };
-
-  /** Turns the view about the camera: the centre of the view (the target) swings round the camera at the same distance. */
-  private lookBy(yaw: number, pitch: number) {
-    const offset = this.controls.target.clone().sub(this.camera.position);
-    const length = offset.length();
-    if (length < 1e-6) return;
-    const limit = Math.PI / 2 - 0.02;
-    const azimuth = Math.atan2(offset.y, offset.x) - yaw;
-    const elevation = Math.max(-limit, Math.min(limit, Math.asin(THREE.MathUtils.clamp(offset.z / length, -1, 1)) + pitch));
-    offset.set(Math.cos(elevation) * Math.cos(azimuth), Math.cos(elevation) * Math.sin(azimuth), Math.sin(elevation)).multiplyScalar(length);
-    this.controls.target.copy(this.camera.position).add(offset);
-  }
-
-  /** The scroll in "Look around": forward and back along the view, sideways with a sideways scroll. */
-  private walkBy(dx: number, dy: number) {
-    const forward = this.controls.target.clone().sub(this.camera.position).normalize();
-    const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 0, 1)).normalize();
-    const speed = Math.max(this.radius, 100) * 0.0015;
-    const step = forward.multiplyScalar(-dy * speed).addScaledVector(right, dx * speed);
-    this.camera.position.add(step);
-    this.controls.target.add(step);
-  }
 
   protected startTurntablePreview(motion: 'orbit' | 'spin') {
     if (!this.documentMode() || !this.documentScene.bounds()) return;
@@ -1397,7 +1333,6 @@ export class StlViewer implements OnDestroy {
     const lineHeight = e.deltaMode === 1 ? 16 : 1; // Firefox reports mouse wheels in lines
     const dx = e.deltaX * lineHeight, dy = e.deltaY * lineHeight;
     if (e.ctrlKey || e.altKey) this.zoomAt(e.clientX, e.clientY, Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.002)));
-    else if (this.lookMode()) { this.walkBy(dx, dy); this.scheduleSaveView(); }
     else this.panByPixels(dx, dy);
   };
 

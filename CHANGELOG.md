@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Look around removed (0.11.14)
+
+### Removed
+- **FE** (`stl-viewer.ts`): **Look around from here** (the eye button of 0.11.13) is gone again: placing the camera inside a scene is 3D animation work, which Rasterfaster is not meant for.
+
 ## 2026-11-02 - Look around from here (0.11.13)
 
 ### Added
