@@ -6,7 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { RenderService, beamNames } from './render.service';
+import { RenderService, beamNames, turntableLengths } from './render.service';
 import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
@@ -315,13 +315,36 @@ function readShowPath() {
       </div>
     }
     @if (documentMode()) {
-      <button class="home fly" type="button" [class.on]="flying()" [title]="flying() ? 'Stop the fly-around (Space)' : 'Fly-around: slowly circle the assembly (Space)'" aria-label="Fly-around (Space)" aria-keyshortcuts="Space" [attr.aria-pressed]="flying()" releaseFocus (click)="toggleFlight()">
-        @if (flying()) {
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
-        } @else {
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+      <div class="fly-host" (mouseenter)="flyMenuOpen.set(true)" (mouseleave)="flyMenuOpen.set(false)">
+        <button class="home fly" type="button" [class.on]="flying() || turntablePreview()" [title]="turntablePreview() ? (turntablePaused() ? 'Go on with the turntable (Space; Esc ends it)' : 'Pause the turntable (Space; Esc ends it)') : flying() ? 'Stop the fly-around (Space)' : 'Fly-around: slowly circle the assembly (Space). Hover for the turntable preview'" aria-label="Fly-around (Space)" aria-keyshortcuts="Space" [attr.aria-pressed]="flying() || !!turntablePreview()" aria-haspopup="menu" releaseFocus (click)="toggleFlight()">
+          @if ((flying() || turntablePreview()) && !turntablePaused()) {
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+          } @else {
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+          }
+        </button>
+        @if (flyMenuOpen()) {
+          <div class="fly-menu" role="menu">
+            <button type="button" role="menuitem" (click)="toggleFlight(); flyMenuOpen.set(false)"><span class="tick">{{ flying() ? '✓' : '' }}</span>Fly-around<span class="hint">slowly wandering · Space</span></button>
+            <div class="sep"></div>
+            <div class="head">Turntable preview (the video, live; steer meanwhile; Space pauses)</div>
+            <button type="button" role="menuitem" (click)="startTurntablePreview('orbit'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'orbit' ? '✓' : '' }}</span>Camera circles<span class="hint">once around, looping</span></button>
+            <button type="button" role="menuitem" (click)="startTurntablePreview('spin'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'spin' ? '✓' : '' }}</span>Objects turn<span class="hint">in front of the camera</span></button>
+            <button type="button" role="menuitem" (click)="startTrackPick(); flyMenuOpen.set(false)"><span class="tick">{{ renderSettings.tracked() ? '✓' : '' }}</span>Track an object…<span class="hint">{{ renderSettings.tracked()?.name ?? 'Camera circles: the centre of the view' }}</span></button>
+            @if (renderSettings.tracked()) { <button type="button" role="menuitem" (click)="renderSettings.setTrack(null); flyMenuOpen.set(false)"><span class="tick"></span>Stop tracking<span class="hint">go round the centre of the view</span></button> }
+            @if (turntablePreview()) {
+              <button type="button" role="menuitem" (click)="pauseTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>{{ turntablePaused() ? 'Go on' : 'Pause' }}<span class="hint">Space</span></button>
+              <button type="button" role="menuitem" (click)="stopTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>End the preview<span class="hint">Esc</span></button>
+            }
+            <div class="row">
+              <span class="label">One turn takes</span>
+              @for (n of turnLengths; track n) { <button type="button" role="menuitemradio" [attr.aria-checked]="renderSettings.turntable().seconds === n" [class.on]="renderSettings.turntable().seconds === n" (click)="renderSettings.setTurntable({ seconds: n })">{{ n }} s</button> }
+            </div>
+            <div class="sep"></div>
+            <button type="button" role="menuitem" (click)="renderSettings.requestOpen(); flyMenuOpen.set(false)"><span class="tick"></span>Render this as a video…<span class="hint">opens the Render dialog (F12)</span></button>
+          </div>
         }
-      </button>
+      </div>
     }
     @if (documentMode() && flying()) {
       <button class="home fly zoom-reset" type="button" title="Reset the zoom of the fly-around" aria-label="Reset fly-around zoom" releaseFocus (click)="resetFlightZoom()">
@@ -342,7 +365,14 @@ function readShowPath() {
     /* Fusion-style: a small house icon in the top-left corner of the view cube's area (the cube is 150 px wide, 12 px from the edges) */
     .home { position: absolute; top: 12px; right: 144px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
             background: transparent; color: #d5d9e2; border: 1px solid transparent; border-radius: 6px; cursor: pointer; opacity: .8; }
+    .fly-menu { position: absolute; top: 28px; right: 0; width: max-content; min-width: 260px; padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; display: flex; flex-direction: column; }
+    .fly-menu button { display: flex; align-items: center; gap: 8px; text-align: left; padding: 5px 8px; background: transparent; border: 0; border-radius: 4px; color: inherit; font: inherit; cursor: pointer; } .fly-menu button:hover { background: #2f6fed; color: #fff; }
+    .fly-menu .tick { width: 14px; text-align: center; } .fly-menu .hint { margin-left: auto; padding-left: 14px; opacity: .55; font-size: 11px; }
+    .fly-menu .sep { height: 1px; margin: 4px 2px; background: rgba(255,255,255,.12); } .fly-menu .head { padding: 3px 8px; opacity: .6; font-size: 11px; }
+    .fly-menu .row { display: flex; align-items: center; gap: 4px; padding: 2px 8px 4px; } .fly-menu .row .label { margin-right: auto; opacity: .75; } .fly-menu .row button { padding: 2px 8px; background: #3a3f4b; } .fly-menu .row button.on { background: #2f6fed; color: #fff; }
     .home.fit { right: 178px; } .home.fit:disabled { opacity: .3; pointer-events: none; }
+    .fly-host { position: absolute; top: 12px; right: 110px; width: 30px; height: 30px; z-index: 6; }
+    .fly-host .home.fly { position: static; right: auto; top: auto; }
     .home.fly { right: 110px; } .home.fly.zoom-reset { right: 76px; } .home.fly.on { background: #2f6fed; color: #fff; opacity: 1; }
     .home:hover { background: #2f6fed; color: #fff; opacity: 1; }
     .panels { position: absolute; top: 12px; left: 12px; display: flex; flex-direction: column; gap: 8px; }
@@ -571,12 +601,20 @@ export class StlViewer implements OnDestroy {
     if (dir) this.snapTo(new THREE.Vector3(...dir)); else this.goHome();
   };
   private readonly onFlightKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' && this.turntablePreview() && !e.metaKey && !e.ctrlKey && !e.altKey) { this.stopTurntablePreview(); return; } // Esc ends the turntable preview (the parts stand as before)
     if (e.key !== ' ' || e.repeat || e.metaKey || e.ctrlKey || e.altKey || !this.documentMode()) return;
     if ((e.target as HTMLElement | null)?.closest('button, input, textarea, select, [contenteditable], [role=menu]')) return;
     e.preventDefault();
     this.toggleFlight();
   };
-  private readonly stopFlight = () => this.flying.set(false);
+  private readonly stopFlight = () => this.flying.set(false); // (the turntable preview goes on while you steer: it stops with the play button or Space)
+  protected readonly flyMenuOpen = signal(false);
+  protected readonly turnLengths = turntableLengths;
+  /** The live turntable preview: how it moves; null when it is not running. */
+  protected readonly turntablePreview = signal<{ motion: 'orbit' | 'spin' } | null>(null);
+  /** The preview is paused (Space): the camera or the parts stay where they are, Space goes on from there. */
+  protected readonly turntablePaused = signal(false);
+  private previewState: { last: number; angle: number; pivot: THREE.Vector3 } | null = null;
   private lastGrid: { min: THREE.Vector3; max: THREE.Vector3; zTop: number } | null = null;
   private panAnimation: { offset: THREE.Vector3; from: THREE.Vector3; to: THREE.Vector3; start: number } | null = null;
   private readonly pickRaycaster = new THREE.Raycaster();
@@ -586,6 +624,14 @@ export class StlViewer implements OnDestroy {
   private readonly homeDirection = new THREE.Vector3(1, -1, 0.3).normalize();
 
   constructor() {
+    effect(() => { // picking the part a turntable tracks: a cross-hair, and a hint until a part is clicked
+      const picking = this.store.trackPick();
+      untracked(() => {
+        if (this.renderer) this.renderer.domElement.style.cursor = picking ? 'crosshair' : '';
+        if (picking) this.store.announce('Click the part the turntable should track (Esc cancels)', 600000);
+        else if (this.store.notice().startsWith('Click the part the turntable')) this.store.notice.set('');
+      });
+    });
     afterNextRender(() => { this.init(); this.ready.set(true); });
     effect(() => {
       const d = this.data();
@@ -709,6 +755,7 @@ export class StlViewer implements OnDestroy {
       this.stepViewAnimation();
       this.stepPivot();
       this.stepFlight();
+      this.stepTurntablePreview();
       this.updatePathLine();
       this.updateAutoProjection();
       this.documentScene.tick();
@@ -744,6 +791,7 @@ export class StlViewer implements OnDestroy {
   };
 
   protected toggleFlight() {
+    if (this.turntablePreview()) { this.pauseTurntablePreview(); return; } // Space: pause, and again: go on
     if (this.flying()) { this.flying.set(false); return; }
     if (!this.documentMode() || !this.documentScene.bounds()) return;
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
@@ -754,6 +802,77 @@ export class StlViewer implements OnDestroy {
     this.flightZoomSet = this.camera.zoom;
     this.flightLast = performance.now();
     this.flying.set(true);
+  }
+
+  /**
+   * The turntable of the video, live in the 3D view: the camera circles the point it looks at (about the upright line through it, at its own height), or the
+   * parts turn about the middle of their footprint in front of the camera. One turn takes the length of the video; it loops until something is clicked.
+   */
+  protected startTurntablePreview(motion: 'orbit' | 'spin') {
+    if (!this.documentMode()) return;
+    const bounds = this.documentScene.bounds();
+    if (!bounds) return;
+    this.stopTurntablePreview();
+    this.flying.set(false);
+    this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
+    this.controls.update();
+    const middle = bounds.getCenter(new THREE.Vector3());
+    const forward = this.controls.target.clone().sub(this.camera.position).normalize();
+    const lookedAt = this.camera.position.clone().addScaledVector(forward, Math.max(middle.clone().sub(this.camera.position).dot(forward), 1));
+    let pivot = motion === 'spin' ? new THREE.Vector3(middle.x, middle.y, bounds.min.z) : lookedAt;
+    const tracked = motion === 'orbit' ? this.renderSettings.tracked() : null;
+    const centre = tracked ? this.documentScene.itemCenter(tracked.id) : null;
+    if (centre) { pivot = centre; this.controls.target.copy(centre); } // the camera goes round the tracked part and looks at it
+    this.previewState = { last: performance.now(), angle: 0, pivot };
+    this.turntablePaused.set(false);
+    this.turntablePreview.set({ motion });
+  }
+
+  /** Click a part to make the camera of Camera circles go round it and keep it in the middle (the part under the pointer is outlined; Esc cancels). */
+  protected startTrackPick() {
+    this.store.trackPickFromDialog = false;
+    this.store.trackPick.set(true);
+  }
+
+  protected pauseTurntablePreview() {
+    if (!this.previewState) return;
+    const paused = !this.turntablePaused();
+    this.turntablePaused.set(paused);
+    if (!paused) this.previewState.last = performance.now(); // going on from where it stood: no jump for the time it was paused
+  }
+
+  protected stopTurntablePreview() {
+    if (!this.previewState) return;
+    this.previewState = null;
+    this.turntablePaused.set(false);
+    this.turntablePreview.set(null);
+    this.documentScene.group.rotation.set(0, 0, 0); // the parts that turned stand as they did; a camera that circled stays where you left it
+    this.documentScene.group.position.set(0, 0, 0);
+  }
+
+  /** Every frame the camera (or the parts) turns a little further; what you change meanwhile (the view cube, dragging, zooming) stays, and the turning goes on from there. */
+  private stepTurntablePreview() {
+    const state = this.previewState, preview = this.turntablePreview();
+    if (!state || !preview) return;
+    if (!this.documentMode()) { this.stopTurntablePreview(); return; }
+    if (this.turntablePaused()) return;
+    const now = performance.now();
+    const step = Math.min((now - state.last) / 1000, 0.1) / this.renderSettings.turntable().seconds * Math.PI * 2;
+    state.last = now;
+    state.angle += step;
+    if (preview.motion === 'orbit') {
+      const cos = Math.cos(step), sin = Math.sin(step), pivot = state.pivot;
+      for (const point of [this.camera.position, this.controls.target]) {
+        const x = point.x - pivot.x, y = point.y - pivot.y;
+        point.x = pivot.x + cos * x - sin * y;
+        point.y = pivot.y + sin * x + cos * y;
+      }
+    } else {
+      const angle = -state.angle; // the parts turn clockwise: the scene then appears to go round the same way as when the camera circles counter-clockwise
+      const cos = Math.cos(angle), sin = Math.sin(angle);
+      this.documentScene.group.rotation.z = angle;
+      this.documentScene.group.position.set(state.pivot.x - (cos * state.pivot.x - sin * state.pivot.y), state.pivot.y - (sin * state.pivot.x + cos * state.pivot.y), 0);
+    }
   }
 
   /** The fly-around path: where the camera wants to be `t` seconds into the flight (viewing direction, view centre, zoom relative to the fit). */

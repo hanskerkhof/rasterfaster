@@ -2,6 +2,18 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Turntable videos, Gallery, tracking (0.11.7)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): **turntable videos**. The Render dialog's **Turntable video** row renders an MP4 of one turn in the background (through the queue): **Camera circles** (the camera goes once round the scene at its height) or **Objects turn** (the parts turn in front of the camera; both go round the same way), **One turn takes** 3, 5, 10 or 30 seconds, and a quality: **Draft** (960 px, 12 samples, 24 frames per second: a few minutes), Standard (48 samples) or Fine (96); a rough time estimate is shown (`GET /api/render-estimate`). The turn is at a constant speed (a driver on the frame number, not keyframes), so the video loops. API: `turntable=orbit|spin`, `seconds`, `fps` on `POST …/render-jobs`; `GET /api/render-jobs/{id}/video.mp4`.
+- **FE** + **BE**: **Quick video**, a small turntable (640 px, 8 samples, at most 5 seconds) made at once and shown in the dialog like the quick render (`GET /api/documents/{id}/render.mp4`), with *Save quick video to gallery*.
+- **FE**: the play button above the view cube has a menu with a **live turntable preview** in the 3D view (Camera circles or Objects turn, one turn takes 3 to 30 s): you can steer meanwhile, **Space** pauses and goes on, **Esc** ends it; the view's progress message lists **Up next** (the queue) with ✕ per waiting render.
+- **FE** + **BE**: **Track an object** for Camera circles: the camera goes round a chosen part and keeps it in the middle (*Track* menu and *Pick…* in the Turntable row, or *Track an object…* in the play button's menu; while picking, the part under the pointer gets the outline of a selected part; `render.trackId`, `track` on the render calls).
+- **FE** + **BE**: the image library is now the **Gallery** and holds videos too (turntable videos arrive by themselves, with thumbnails and a looping player); **Add file…** (or drop files on the panel) puts a PNG or an MP4 of your own in it.
+
+### Fixed
+- **FE**: *One turn takes*, the motion and the quality are remembered one by one; the Gallery's right-click menu stays inside the window; the play button menu's hints are no longer raw template text.
+
 ## 2026-11-02 - Picture shapes and a transparent background (0.11.6)
 
 ### Added

@@ -20,6 +20,33 @@ function readColour(key: string): number | null {
 }
 const hdWidthStorageKey = 'rasterfaster.renderHdWidth';
 const aspectStorageKey = 'rasterfaster.renderAspect';
+const turntableStorageKey = 'rasterfaster.renderTurntable';
+
+/** The turntable video: how long (seconds, at 30 frames per second), how good (samples per frame: each frame is cheaper than a still) and how it moves. */
+export const turntableLengths = [3, 5, 10, 30];
+export const turntableQualities = [
+  { samples: 12, label: 'Draft · 960 px, 12 samples', draft: true }, // small and quick: a few minutes, to see the motion; the other two use the size menu's width
+  { samples: 48, label: 'Standard · 48 samples', draft: false },
+  { samples: 96, label: 'Fine · 96 samples', draft: false },
+];
+export const turntableMotions: { id: 'orbit' | 'spin'; label: string; title: string }[] = [
+  { id: 'orbit', label: 'Camera circles', title: 'The camera goes once around the scene at its height; the light stays where it is' },
+  { id: 'spin', label: 'Objects turn', title: 'The parts turn once in front of the camera, which stays where it is; the light stays too, like a photo turntable' },
+];
+interface TurntableChoice { seconds: number; samples: number; motion: 'orbit' | 'spin' }
+
+function readTurntable(): TurntableChoice {
+  const fallback: TurntableChoice = { seconds: 5, samples: 48, motion: 'orbit' };
+  try {
+    const stored = JSON.parse(localStorage.getItem(turntableStorageKey) ?? 'null') ?? {};
+    // each setting on its own: one that is no longer on offer (the Draft replaced a quality) must not make the others forgotten
+    return {
+      seconds: turntableLengths.includes(stored.seconds) ? stored.seconds : fallback.seconds,
+      samples: turntableQualities.some(q => q.samples === stored.samples) ? stored.samples : fallback.samples,
+      motion: stored.motion === 'orbit' || stored.motion === 'spin' ? stored.motion : fallback.motion,
+    };
+  } catch { return fallback; }
+}
 const transparentStorageKey = 'rasterfaster.renderTransparent';
 
 /** The shapes of a picture: the width comes from the size menu, the height follows the shape. */
@@ -101,10 +128,22 @@ const stepLabels: Record<string, string> = { prepare: 'Preparing the scene', loa
 /** One step of a render in the progress bar: how long it takes (or is expected to) and how much of it is done (0 to 1). */
 export interface RenderStep { name: string; label: string; duration: number; fill: number; started: boolean; done: boolean }
 
-/** The names of the render menus, also used to describe a picture of the image library. */
+/** The names of the render menus, also used to describe a picture of the gallery. */
 export const ambientNames = ['None', 'Soft glow', 'Overcast', 'Softbox', 'Daylight', 'Bright studio'];
 export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
 export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
+
+/** A render that waits in the queue. */
+export interface QueuedRender {
+  id: string;
+  name: string;
+  kind: 'picture' | 'turntable';
+  width: number;
+  samples: number;
+  frames: number;
+  motion: 'orbit' | 'spin' | null;
+  size: string;
+}
 
 export interface RenderState {
   id: string;
@@ -120,11 +159,17 @@ export interface RenderState {
   phases?: { name: string; start: number | null; end: number | null; estimate: number }[];
   phase?: string | null;
   error: string;
-  /** The document it was made from, the version of that document, and the picture's id in the document's image library once it is done. */
+  /** The document it was made from, the version of that document, and the picture's id in the document's gallery once it is done. */
   documentId?: string;
   version?: number;
   imageId?: string | null;
   /** How many renders wait behind the running one, this one's place in the queue (0: not waiting), and how many renders the queue takes. */
+  /** A picture or a turntable video, the frames of the video, and how it moves (the camera circles, or the parts turn). */
+  kind?: 'picture' | 'turntable';
+  frames?: number;
+  motion?: 'orbit' | 'spin' | null;
+  /** The renders that wait, in order (the API says it with every message). */
+  queue?: QueuedRender[];
   waiting?: number;
   position?: number;
   queueMax?: number;
@@ -141,6 +186,8 @@ export class RenderService {
   readonly running = computed(() => this.state()?.state === 'running');
   /** Renders waiting behind the running one, and how many the queue takes (running one included); the API says both with every message. */
   readonly waiting = signal(0);
+  /** Who waits, in order. */
+  readonly queue = signal<QueuedRender[]>([]);
   private readonly queueMax = signal(10);
   /** No room for another render in the queue. */
   readonly queueFull = computed(() => (this.running() ? 1 : 0) + this.waiting() >= this.queueMax());
@@ -216,6 +263,50 @@ export class RenderService {
   /** The width of the full-size render (its height follows at 16:9). */
   readonly hdWidth = signal(readHdWidth());
   readonly hdSamples = signal(readHdSamples());
+  readonly turntable = signal<TurntableChoice>(readTurntable());
+  /** The part a turntable with Camera circles goes round (an item id of the open document); null: the point the view looks at. */
+  readonly trackId = signal<string | null>(null);
+  /** The tracked part, when it is still in the document. */
+  readonly tracked = computed(() => this.store.doc().items.find(i => i.id === this.trackId()) ?? null);
+
+  setTrack(id: string | null) {
+    this.trackId.set(id);
+    this.saveSettings();
+  }
+
+  setTurntable(change: Partial<TurntableChoice>) {
+    this.turntable.update(t => ({ ...t, ...change }));
+    try { localStorage.setItem(turntableStorageKey, JSON.stringify(this.turntable())); } catch { /* storage unavailable */ }
+  }
+
+  /** What a turntable video would be: its width (a draft is at most 960 px), frames per second, frames, and the samples. */
+  turntableSpec() {
+    const choice = this.turntable();
+    const draft = turntableQualities.find(q => q.samples === choice.samples)?.draft ?? false;
+    const fps = draft ? 24 : 30;
+    return { width: Math.min(this.hdWidth(), draft ? 960 : 3840), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion };
+  }
+
+  /** About how long the video takes (seconds), asked from the API (it knows what the last renders took); null while unknown. */
+  readonly turntableEstimate = signal<number | null>(null);
+  private estimateTimer?: ReturnType<typeof setTimeout>;
+
+  refreshTurntableEstimate() {
+    clearTimeout(this.estimateTimer);
+    this.estimateTimer = setTimeout(async () => {
+      const spec = this.turntableSpec();
+      try {
+        const response = await fetch(`/api/render-estimate?width=${spec.width}&samples=${spec.samples}&frames=${spec.frames}&aspect=${encodeURIComponent(this.aspect())}`, { cache: 'no-store' });
+        this.turntableEstimate.set(response.ok ? (await response.json()).seconds : null);
+      } catch { this.turntableEstimate.set(null); }
+    }, 250);
+  }
+
+  /** The frame the running turntable is on (1 to its frames). */
+  readonly frameNow = computed(() => {
+    const s = this.state();
+    return s?.kind === 'turntable' && s.frames ? Math.min(s.frames, Math.floor((this.percent() / 100) * s.frames) + 1) : 0;
+  });
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
   readonly aspect = signal<Aspect>((() => { try { const v = localStorage.getItem(aspectStorageKey); return aspects.some(a => a.id === v) ? (v as Aspect) : '16:9'; } catch { return '16:9'; } })());
@@ -230,9 +321,13 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); } // a document without render settings starts with the normal lamp (100%)
     });
+    this.store.onTrackChosen = id => { // the 3D view's pick of the part a turntable tracks is over
+      if (id) { this.setTrack(id); this.store.announce(`The turntable tracks "${this.tracked()?.name ?? ''}"`, 4000); }
+      if (this.store.trackPickFromDialog) { this.store.trackPickFromDialog = false; this.requestOpen(); } // the Render dialog comes back
+    };
     this.connect();
     void this.poll(); // the WebSocket may be unavailable (a proxy that does not pass it on): the same messages can be asked for
   }
@@ -271,10 +366,11 @@ export class RenderService {
     try { message = JSON.parse(String(data)); } catch { return; }
     if (message.type !== 'render') return;
     if (typeof message.waiting === 'number') this.waiting.set(message.waiting);
+    if (Array.isArray(message.queue)) this.queue.set(message.queue);
     if (typeof message.queueMax === 'number') this.queueMax.set(message.queueMax);
     if (message.state === 'queued') return; // a render joined the queue: only the count changes
     if (message.state === 'cancelled' && this.running() && message.id !== this.state()?.id) return; // a waiting render was cancelled: the running one goes on
-    if (message.state === ('idle' as string)) this.waiting.set(0);
+    if (message.state === ('idle' as string)) { this.waiting.set(0); this.queue.set([]); }
     const before = this.state();
     this.track(message as RenderState);
     const next = message.state && message.state !== ('idle' as string) ? (message as RenderState) : null;
@@ -387,7 +483,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -438,24 +534,45 @@ export class RenderService {
     }
   }
 
+  /** A turntable video of the quick picture's view: one turn in the chosen length at 30 frames per second, at most 4K wide. */
+  async startTurntable(quickUrl: string) {
+    this.toast.set(null);
+    try {
+      const url = new URL(quickUrl.replace('/render.png', '/render-jobs'), location.origin);
+      this.dofParams(url);
+      const spec = this.turntableSpec();
+      url.searchParams.set('width', String(spec.width));
+      url.searchParams.set('samples', String(spec.samples));
+      url.searchParams.set('turntable', spec.motion);
+      url.searchParams.set('seconds', String(spec.seconds));
+      url.searchParams.set('fps', String(spec.fps));
+      if (spec.motion === 'orbit' && this.tracked()) url.searchParams.set('track', this.tracked()!.id);
+      if (this.quickView) url.searchParams.set('savedView', JSON.stringify(this.quickView));
+      await this.launch(url);
+    } catch (error) {
+      this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });
+    }
+  }
+
   /** Starts the job a render-jobs address describes and follows it. */
   private async launch(url: URL) {
     const response = await fetch(url, { method: 'POST' });
     if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
     const started = await response.json() as RenderState;
     if (typeof started.waiting === 'number') this.waiting.set(started.waiting);
+    if (Array.isArray(started.queue)) this.queue.set(started.queue);
     if (typeof started.queueMax === 'number') this.queueMax.set(started.queueMax);
     if (started.state === 'queued') { // another render runs: this one waits its turn (the running one stays on show)
-      this.store.announce(`Render queued: ${started.position === 1 ? 'next' : 'number ' + started.position} in line. It is saved to the image library when it is done`, 6000);
+      this.store.announce(`Render queued: ${started.position === 1 ? 'next' : 'number ' + started.position} in line. It is saved to the gallery when it is done`, 6000);
     } else {
       this.track(started);
       this.state.set(started); // the WebSocket keeps it up to date from here
-      this.store.announce('Full-size render started in the background: you get a message when it is ready', 6000);
+      this.store.announce(started.kind === 'turntable' ? 'Turntable video started in the background: you get a message when it is ready' : 'Full-size render started in the background: you get a message when it is ready', 6000);
     }
     void this.poll(); // and the polling does when there is no WebSocket
   }
 
-  /** Renders a picture of the image library again at full size, with the camera, light and settings it was made with (the document as it is now). */
+  /** Renders a picture of the gallery again at full size, with the camera, light and settings it was made with (the document as it is now). */
   async startFromNote(documentId: string, settings: Record<string, unknown>, width: number) {
     this.toast.set(null);
     try {
@@ -486,11 +603,19 @@ export class RenderService {
     try { await fetch(`/api/render-jobs/${jobId}`, { method: 'DELETE' }); } catch { /* it is dropped with the next render */ }
   }
 
+  /** Takes one waiting render out of the queue. */
+  async cancelWaiting(id: string) {
+    this.queue.update(list => list.filter(q => q.id !== id));
+    this.waiting.update(n => Math.max(0, n - 1));
+    try { await fetch(`/api/render-jobs/${id}`, { method: 'DELETE' }); } catch { /* it is dropped with the queue */ }
+  }
+
   /** "Cancel all": the running render stops and the queue is emptied. */
   async cancelAll() {
     this.track({ state: 'cancelled' });
     this.state.set(null);
     this.waiting.set(0);
+    this.queue.set([]);
     this.store.announce('All renders cancelled');
     try { await fetch('/api/render-jobs', { method: 'DELETE' }); } catch { /* they end on their own */ }
   }

@@ -192,6 +192,8 @@ export class DocumentScene {
   private readonly failed = new Set<string>();
   private readonly raycaster = new THREE.Raycaster();
   private readonly selectionBoxes = new THREE.Group();
+  /** The outline of the part under the pointer while one is being picked (the same outline as a selected part). */
+  private hoverBox: THREE.Box3Helper | null = null;
   private readonly snapHandles = new THREE.Group();
   private hoveredHandle: THREE.Mesh | null = null;
   private drag: DragState | null = null;
@@ -695,6 +697,31 @@ export class DocumentScene {
     this.hoveredHandle = handle;
     if (handle) (handle.material as THREE.MeshBasicMaterial).color.setHex(handleHoverColor);
     this.ctx.canvas.style.cursor = handle ? 'pointer' : this.picking() ? 'crosshair' : '';
+  }
+
+  /** Outlines this part, or none (null): while picking, the part under the pointer is shown with the outline of a selected one. */
+  setHover(id: string | null) {
+    if (this.hoverBox) {
+      this.ctx.scene.remove(this.hoverBox);
+      this.hoverBox.geometry.dispose();
+      (this.hoverBox.material as THREE.Material).dispose();
+      this.hoverBox = null;
+    }
+    const item = id ? this.ctx.store.doc().items.find(i => i.id === id) : null;
+    const entry = item && this.entryFor(item);
+    if (!item || !entry) return;
+    const min = new THREE.Vector3(...item.position);
+    this.hoverBox = new THREE.Box3Helper(new THREE.Box3(min, min.clone().add(entry.size)), selectedColor);
+    this.hoverBox.renderOrder = 5;
+    (this.hoverBox.material as THREE.Material).depthTest = false;
+    this.ctx.scene.add(this.hoverBox);
+  }
+
+  /** The pick of the part a turntable tracks ends: a click on a part chooses it, a click elsewhere or Esc cancels. */
+  private finishTrackPick(id: string | null) {
+    this.ctx.store.trackPick.set(false);
+    this.setHover(null);
+    this.ctx.store.onTrackChosen?.(id);
   }
 
   private clearSelectionBoxes() {
@@ -1778,6 +1805,7 @@ export class DocumentScene {
 
   private onPointerDown(e: PointerEvent) {
     if (!this.active || e.button !== 0) return;
+    if (this.ctx.store.trackPick()) { e.stopImmediatePropagation(); this.finishTrackPick(this.pickItem(e)?.id ?? null); return; } // the part to track
     this.moveTool.camera = this.ctx.camera;
     this.rotateTool.camera = this.ctx.camera;
     this.scaleTool.camera = this.ctx.camera;
@@ -1834,6 +1862,7 @@ export class DocumentScene {
   }
 
   private onPointerMove(e: PointerEvent) {
+    if (this.active && this.ctx.store.trackPick()) this.setHover(this.pickItem(e)?.id ?? null);
     this.rotateTool.camera = this.ctx.camera;
     this.moveTool.camera = this.ctx.camera;
     if (this.scaleToolOn && !this.cornerDrag) this.hoverCorner(this.cornerAt(e));
@@ -1919,6 +1948,7 @@ export class DocumentScene {
       if (!Number.isFinite(lowest)) return false;
       return move(0, 0, fine ? direction * fineStep : nextZLevel(lowest, direction, this.ctx.zGridMode()) - lowest);
     };
+    if (store.trackPick() && e.key === 'Escape') { e.preventDefault(); this.finishTrackPick(null); return; } // Esc: no part chosen
     let handled = true;
     if (command && e.key.toLowerCase() === 'z') (e.shiftKey ? store.redo() : store.undo());
     else if (command && e.key.toLowerCase() === 'c') store.copySelection();
@@ -1936,7 +1966,7 @@ export class DocumentScene {
       const selected = store.selectedItems();
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
-    else if (!command && !e.altKey && !e.shiftKey && e.code === 'KeyI' && !e.repeat) store.toggleImages(); // I: show or hide the image library panel
+    else if (!command && !e.altKey && !e.shiftKey && e.code === 'KeyI' && !e.repeat) store.toggleImages(); // I: show or hide the gallery panel
     else if (!command && !e.altKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) store.goToSavedView(+e.code.slice(5)); // 1 … 9: the saved views
     else if (!command && !e.altKey && e.shiftKey && /^Digit[1-9]$/.test(e.code) && !e.repeat) store.updateSavedViewNumber(+e.code.slice(5)); // ⇧1 … ⇧9: replace that saved view by the current one
     else if (command && !e.altKey && e.code === 'KeyG') { if (e.shiftKey) store.ungroupSelected(); else store.groupSelected(); } // ⌘G groups the selection, ⌘⇧G ungroups it

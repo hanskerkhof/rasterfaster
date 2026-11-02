@@ -408,6 +408,7 @@ class DocumentRenderSettings(BaseModel):
     ambient: int = Field(default=0, ge=0, le=5)  # ambient light preset: 0 none, 1 Soft glow ... 5 Bright studio
     dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
     aspect: Literal["16:9", "1:1", "4:5", "9:16"] = "16:9"  # the shape of the picture (its width comes from the size, the height follows)
+    trackId: str | None = Field(default=None, max_length=64)  # a part the camera follows in a turntable (Camera circles)
     transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
 
@@ -760,7 +761,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
 
 def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None,
                             lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None,
-                            aspect: str | None = None, transparent: bool | None = None) -> dict:
+                            aspect: str | None = None, transparent: bool | None = None, track: str | None = None) -> dict:
     """The render settings of a call: what it brings, else what the document remembers, else the defaults."""
     render = document.render
     focusId = focus if focus is not None else (render.focusId if render else None)
@@ -778,6 +779,7 @@ def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focu
         "ambient": ambient if ambient is not None else (render.ambient if render else 0),
         "aspect": aspect if aspect is not None else (render.aspect if render else "16:9"),
         "transparent": transparent if transparent is not None else bool(render and render.transparent),
+        "trackId": track if track is not None else (render.trackId if render else None),
     }
 
 
@@ -800,7 +802,8 @@ def render_note(document: DocumentOut, view: str | None, settings: dict, light: 
     except (ValueError, KeyError, TypeError):
         projection = None
     # the camera and light of the call ride along, so the picture can be rendered again at another size
-    return {**settings, "focus": focus, "projection": projection, "view": view, "light": light, **({"savedView": saved_view} if saved_view else {})}
+    tracked = next((item.name for item in document.items if item.id == settings.get("trackId")), None)
+    return {**settings, "focus": focus, "track": tracked, "projection": projection, "view": view, "light": light, **({"savedView": saved_view} if saved_view else {})}
 
 
 def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None, aspect: str | None = None, transparent: bool | None = None):
@@ -855,6 +858,24 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
     return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
+@app.get("/api/documents/{documentId}/render.mp4")
+def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
+                        width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
+                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$")) -> Response:
+    """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False)
+    try:
+        tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track)["trackId"] or ""
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        raise HTTPException(status_code=500, detail=str(error))
+    filename = re.sub(r"[^\w.-]+", "_", document.name) + "-quick.mp4"
+    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps}}
+    return Response(data, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
+
+
 # What the steps of a full-size render took the last time (seconds; the render step per megapixel and sample, the last step per megapixel),
 # to estimate the steps that have not started. The first guesses are for a typical machine.
 phaseHistory = {"prepare": 12.0, "load": 4.0, "render": 0.45, "finish": 1.5}
@@ -870,7 +891,7 @@ def aspect_ratio(text: str) -> float:
 class RenderJob:
     """A full-size render running in the background: Blender runs in a thread, its progress is read from its output."""
 
-    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True, settings: dict | None = None, aspect: float = 16 / 9):
+    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True, settings: dict | None = None, aspect: float = 16 / 9, turntable: tuple[int, str, int] | None = None):
         self.id = uuid.uuid4().hex[:12]
         self.name, self.width, self.samples = name, width, samples
         self.settings = settings or {}  # the render settings, kept with the picture
@@ -886,7 +907,11 @@ class RenderJob:
         self.process: object | None = None
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
         self.step: str | None = None
-        self.megapixels = width * width / aspect / 1e6
+        self.track = ""  # the item id of the part a turntable follows
+        self.turntable = turntable  # (frames, "orbit" | "spin", fps) for a turntable video, else None
+        self.aspect = aspect
+        self.dimensions = (width, round(width / aspect))  # of one picture or video frame
+        self.megapixels = width * width / aspect / 1e6 * (turntable[0] if turntable else 1)  # all the frames of a turntable: the time estimate scales with them
 
     def begin(self) -> None:
         """The job leaves the queue: the clock starts and the first step begins."""
@@ -927,6 +952,8 @@ class RenderJob:
 
     def size(self) -> list[int] | None:
         """Width and height of the finished picture (read from the PNG header)."""
+        if self.turntable:
+            return [self.dimensions[0] - self.dimensions[0] % 2, self.dimensions[1] - self.dimensions[1] % 2] if self.png else None
         if self.png and len(self.png) >= 24 and self.png[:8] == b"\x89PNG\r\n\x1a\n":
             return [int.from_bytes(self.png[16:20], "big"), int.from_bytes(self.png[20:24], "big")]
         return None
@@ -935,6 +962,9 @@ class RenderJob:
         return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error,
                 "documentId": self.documentId, "imageId": self.imageId, "version": self.version,
+                "kind": "turntable" if self.turntable else "picture", "frames": self.turntable[0] if self.turntable else 1, "motion": self.turntable[1] if self.turntable else None,
+                "queue": [{"id": q.id, "name": q.name, "kind": "turntable" if q.turntable else "picture", "width": q.width, "samples": q.samples, "frames": q.turntable[0] if q.turntable else 1,
+                           "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}"} for q, _ in renderQueue],
                 "waiting": len(renderQueue), "position": next((i + 1 for i, (queued, _) in enumerate(renderQueue) if queued is self), 0), "queueMax": renderQueueMax}
 
 
@@ -1038,14 +1068,21 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         notifier.notify({"type": "render", **job.view()})
 
     try:
-        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof, crop=crop, phase=phase)
+        job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=4 * 3600 if job.turntable else 1800, dof=dof, crop=crop, phase=phase,
+                                             turntable=job.turntable, track=job.track)  # (job.png holds the MP4 of a turntable)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
         if job.state == "done" and job.documentId:
             try:  # a finished full-size render goes into the document's image library
-                job.imageId = images.add(images.images_dir(documentsRoot, job.documentId), job.png, name=job.name, kind="hd", samples=job.samples,
-                                         elapsed=time.time() - job.started, version=job.version, edited=job.edited, settings=job.settings)["id"]
-            except (OSError, ValueError):
-                pass  # the library is a bonus: the render itself is still delivered
+                directory = images.images_dir(documentsRoot, job.documentId)
+                if job.turntable:
+                    width, height = job.size() or job.dimensions
+                    job.imageId = images.add_video(directory, job.png, name=job.name, width=width, height=height, samples=job.samples, elapsed=time.time() - job.started,
+                                                   version=job.version, edited=job.edited, settings=job.settings)["id"]
+                else:
+                    job.imageId = images.add(directory, job.png, name=job.name, kind="hd", samples=job.samples,
+                                             elapsed=time.time() - job.started, version=job.version, edited=job.edited, settings=job.settings)["id"]
+            except (OSError, ValueError) as error:
+                print(f"image library: could not keep the render: {error}", file=sys.stderr)  # the library is a bonus: the render itself is still delivered
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
         if job.state == "running":
             job.state, job.error = "error", str(error)
@@ -1058,17 +1095,24 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
-                     width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000)) -> dict:
+                     width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000),
+                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$")) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent)
+    if turntable and fps not in (24, 30):
+        raise HTTPException(status_code=422, detail="fps must be 24 or 30")
+    if turntable and width > 3840:
+        raise HTTPException(status_code=422, detail="a turntable video is at most 3840 px wide (4K)")
     with renderLock:
         if (1 if running_render() else 0) + len(renderQueue) >= renderQueueMax:
             raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent), light, parse_saved_view(savedView)),
-                        aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")))
+                        {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track), light, parse_saved_view(savedView)),
+                           **({"turntable": {"motion": turntable, "seconds": seconds, "fps": fps}} if turntable else {})},
+                        aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")), (seconds * fps, turntable, fps) if turntable else None)
+        job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track)["trackId"] or "") if turntable else ""
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})
@@ -1083,6 +1127,14 @@ def render_job(jobId: str) -> RenderJob:
     return job
 
 
+@app.get("/api/render-estimate")
+def render_estimate(width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), frames: int = Query(default=1, ge=1, le=2000),
+                    aspect: Literal["16:9", "1:1", "4:5", "9:16"] = "16:9") -> dict:
+    """About how long a full-size render (frames = 1) or a turntable video takes on this machine, from what the last renders took."""
+    job = RenderJob("estimate", width, samples, aspect=aspect_ratio(aspect), turntable=(frames, "orbit", 30) if frames > 1 else None)
+    return {"seconds": round(sum(job.estimate(name) for name in renderPhases))}
+
+
 @app.get("/api/render-jobs/latest")
 def latest_render_job() -> dict:
     """The newest render, or `{state: "idle"}`: what the WebSocket says on connecting, for a page that cannot use it."""
@@ -1095,9 +1147,20 @@ def get_render_job(jobId: str) -> dict:
     return render_job(jobId).view()
 
 
+@app.get("/api/render-jobs/{jobId}/video.mp4")
+def get_render_job_video(jobId: str) -> Response:
+    job = render_job(jobId)
+    if not job.turntable or job.state != "done" or job.png is None:
+        raise HTTPException(status_code=409, detail="there is no finished video")
+    filename = re.sub(r"[^\w.-]+", "_", job.name) + f"-{job.width}px.mp4"
+    return Response(job.png, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+
+
 @app.get("/api/render-jobs/{jobId}/image.png")
 def get_render_job_image(jobId: str) -> Response:
     job = render_job(jobId)
+    if job.turntable:
+        raise HTTPException(status_code=409, detail="this render is a video: see video.mp4")
     if job.state != "done" or job.png is None:
         raise HTTPException(status_code=409, detail=f"the render is {job.state}")
     filename = re.sub(r"[^\w.-]+", "_", job.name) + f"-{job.width}px.png"
@@ -1147,7 +1210,8 @@ def cancel_all_render_jobs() -> dict:
 class ImageNote(BaseModel):
     id: str
     name: str
-    kind: Literal["hd", "quick"]
+    kind: Literal["hd", "quick", "turntable", "file"]  # "file": a picture or video the user added
+    media: Literal["png", "mp4"] = "png"
     created: float
     width: int
     height: int
@@ -1176,19 +1240,26 @@ def list_images(documentId: str) -> list[dict]:
 
 
 @app.post("/api/documents/{documentId}/images", response_model=ImageNote, status_code=201)
-async def add_image(documentId: str, request: Request, kind: Literal["hd", "quick"] = "quick", name: str | None = Query(default=None, max_length=120),
-                    samples: int = Query(default=24, ge=1, le=4096), elapsed: float = Query(default=0, ge=0), settings: str | None = Query(default=None, max_length=4000)) -> dict:
-    """Keeps a picture (the body is the PNG), e.g. a quick render, in the document's image library; it carries the document's version."""
+async def add_image(documentId: str, request: Request, kind: Literal["hd", "quick", "file"] = "quick", name: str | None = Query(default=None, max_length=120),
+                    samples: int = Query(default=24, ge=0, le=4096), elapsed: float = Query(default=0, ge=0), settings: str | None = Query(default=None, max_length=4000),
+                    width: int | None = Query(default=None, ge=1, le=16384), height: int | None = Query(default=None, ge=1, le=16384)) -> dict:
+    """Keeps a picture (the body is the PNG) or a video (the body is an MP4; `width` and `height` say its size) in the document's gallery; it carries the document's version."""
     directory = image_library(documentId)
     document = read_document(documentId)
     data = await request.body()
-    if len(data) > 200_000_000:
-        raise HTTPException(status_code=413, detail="the picture is too large")
+    if len(data) > 1_000_000_000:
+        raise HTTPException(status_code=413, detail="the file is too large")
     try:
         kept = json.loads(settings) if settings else {}
         if not isinstance(kept, dict):
             raise ValueError("settings must be an object")
-        note = images.add(directory, data, name=name or document.name, kind=kind, samples=samples, elapsed=elapsed, version=document.version, edited=document.changedSinceVersion, settings=kept)
+        if data[4:8] == b"ftyp":  # an MP4
+            if not width or not height:
+                raise ValueError("a video needs its width and height")
+            note = images.add_video(directory, data, name=name or document.name, width=width, height=height, samples=samples, elapsed=elapsed, version=document.version,
+                                    edited=document.changedSinceVersion, settings=kept, kind="file" if kind == "file" else "turntable")
+        else:
+            note = images.add(directory, data, name=name or document.name, kind=kind, samples=samples, elapsed=elapsed, version=document.version, edited=document.changedSinceVersion, settings=kept)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     return images.read_note(directory, note["id"]) or note
@@ -1202,9 +1273,21 @@ def image_note(documentId: str, imageId: str) -> tuple[Path, dict]:
     return directory, note
 
 
+@app.get("/api/documents/{documentId}/images/{imageId}.mp4")
+def get_video(documentId: str, imageId: str, download: bool = False) -> Response:
+    directory, note = image_note(documentId, imageId)
+    if note.get("media") != "mp4":
+        raise HTTPException(status_code=404, detail="this is not a video")
+    filename = re.sub(r"[^\w.-]+", "_", note["name"]) + f"-{note['width']}px-v{note['version']}.mp4"
+    return FileResponse(images.media_file(directory, note), media_type="video/mp4",  # a file response answers range requests, which a video player needs to seek
+                        headers={"Content-Disposition": f'{"attachment" if download else "inline"}; filename="{filename}"', "Cache-Control": "no-cache"})
+
+
 @app.get("/api/documents/{documentId}/images/{imageId}.png")
 def get_image(documentId: str, imageId: str, download: bool = False) -> Response:
     directory, note = image_note(documentId, imageId)
+    if note.get("media") == "mp4":
+        raise HTTPException(status_code=404, detail="this is a video")
     filename = re.sub(r"[^\w.-]+", "_", note["name"]) + f"-{note['width']}px-v{note['version']}.png"
     return Response((directory / f"{imageId}.png").read_bytes(), media_type="image/png",
                     headers={"Content-Disposition": f'{"attachment" if download else "inline"}; filename="{filename}"', "Cache-Control": "no-cache"})

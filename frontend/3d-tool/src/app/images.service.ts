@@ -2,11 +2,13 @@ import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { DocumentStore } from './document.store';
 import { RenderService } from './render.service';
 
-/** One picture of a document's image library. */
+/** One picture or video of a document's gallery. */
 export interface ImageNote {
   id: string;
   name: string;
-  kind: 'hd' | 'quick';
+  kind: 'hd' | 'quick' | 'turntable' | 'file';
+  /** A picture (png) or a turntable video (mp4). */
+  media?: 'png' | 'mp4';
   created: number;
   width: number;
   height: number;
@@ -29,6 +31,8 @@ export interface RenderSettingsNote {
   /** The camera and light of the render (the address parameters), to render the picture again at another size. */
   view?: string | null;
   light?: string | null;
+  /** A turntable video: how it moves, how long and at what frame rate. */
+  turntable?: { motion: 'orbit' | 'spin'; seconds: number; fps: number };
   /** The view of the 3D view the picture was made from, as the Views panel would save it. */
   savedView?: Record<string, unknown> | null;
   crop?: boolean;
@@ -45,7 +49,7 @@ export interface RenderSettingsNote {
 
 const thumbWidth = 320;
 
-/** The image library of the open document: finished full-size renders arrive by themselves, quick renders are kept on request. */
+/** The gallery of the open document: finished full-size renders arrive by themselves, quick renders are kept on request. */
 @Injectable({ providedIn: 'root' })
 export class ImagesService {
   private readonly store = inject(DocumentStore);
@@ -96,10 +100,10 @@ export class ImagesService {
   }
 
   src(note: ImageNote) {
-    return `${this.base()}/${note.id}.png`;
+    return `${this.base()}/${note.id}.${note.media === 'mp4' ? 'mp4' : 'png'}`;
   }
   downloadSrc(note: ImageNote) {
-    return `${this.base()}/${note.id}.png?download=true`;
+    return `${this.src(note)}?download=true`;
   }
   thumbSrc(note: ImageNote) {
     return `${this.base()}/${note.id}/thumb.jpg`;
@@ -115,12 +119,54 @@ export class ImagesService {
       const note = await response.json() as ImageNote;
       this.images.update(list => [note, ...list]);
       void this.thumbFromBlob(note.id, blob);
-      this.store.announce(`Saved to the image library (v${note.version}${note.edited ? ', edited' : ''})`, 4000);
+      this.store.announce(`Saved to the gallery (v${note.version}${note.edited ? ', edited' : ''})`, 4000);
       return note;
     } catch (error) {
       this.error.set(`Saving failed: ${error instanceof Error ? error.message : error}`);
       return null;
     }
+  }
+
+  /** Puts a PNG picture or an MP4 video of your own in the gallery (it gets the document's current version). Returns whether it went in. */
+  async addFile(file: File, extra: { kind?: 'file' | 'quick'; settings?: string } = {}) {
+    const base = this.base();
+    if (!base) return false;
+    const isVideo = /\.mp4$/i.test(file.name) || file.type === 'video/mp4';
+    if (!isVideo && !/\.png$/i.test(file.name) && file.type !== 'image/png') {
+      this.error.set(`"${file.name}" is not a PNG picture or an MP4 video`);
+      return false;
+    }
+    try {
+      let size = '';
+      if (isVideo) { // the API does not read videos: the browser tells how big it is
+        const { width, height } = await this.videoSize(file);
+        size = `&width=${width}&height=${height}`;
+      }
+      const name = file.name.replace(/\.(png|mp4)$/i, '');
+      const response = await fetch(`${base}?kind=${extra.kind ?? 'file'}&samples=0&name=${encodeURIComponent(name)}${size}${extra.settings ? `&settings=${encodeURIComponent(extra.settings)}` : ''}`, { method: 'POST', body: file });
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
+      const note = await response.json() as ImageNote;
+      this.images.update(list => [note, ...list]);
+      if (extra.kind === 'quick') this.store.announce('Saved to the gallery', 3000);
+      this.error.set('');
+      this.thumbQueue.push(note.id);
+      void this.makeThumbs();
+      return true;
+    } catch (error) {
+      this.error.set(`Adding "${file.name}" failed: ${error instanceof Error ? error.message : error}`);
+      return false;
+    }
+  }
+
+  private videoSize(file: File): Promise<{ width: number; height: number }> {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      const url = URL.createObjectURL(file);
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => { URL.revokeObjectURL(url); video.videoWidth ? resolve({ width: video.videoWidth, height: video.videoHeight }) : reject(new Error('the browser cannot read this video')); };
+      video.onerror = () => { URL.revokeObjectURL(url); reject(new Error('the browser cannot read this video')); };
+      video.src = url;
+    });
   }
 
   async rename(note: ImageNote, name: string) {
@@ -161,12 +207,47 @@ export class ImagesService {
         const base = this.base();
         if (!base || base !== this.loadedFor) break;
         try {
-          const response = await fetch(`${base}/${id}.png`);
-          if (response.ok) await this.thumbFromBlob(id, await response.blob());
+          const note = this.images().find(n => n.id === id);
+          if (note?.media === 'mp4') await this.thumbFromVideo(id, `${base}/${id}.mp4`);
+          else {
+            const response = await fetch(`${base}/${id}.png`);
+            if (response.ok) await this.thumbFromBlob(id, await response.blob());
+          }
         } catch { /* the picture stays without a thumbnail; it is tried again next time */ }
       }
     } finally {
       this.thumbBusy = false;
+    }
+  }
+
+  /** The small picture of a video: one of its first frames. */
+  private async thumbFromVideo(id: string, src: string) {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'auto';
+    video.src = src;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        video.onloadeddata = () => { video.currentTime = Math.min(0.1, (video.duration || 1) / 2); };
+        video.onseeked = () => resolve();
+        video.onerror = () => reject(new Error('video'));
+        setTimeout(() => reject(new Error('timeout')), 15000);
+      });
+      const frame = await createImageBitmap(video);
+      const canvas = document.createElement('canvas');
+      const scale = Math.min(1, thumbWidth / frame.width);
+      canvas.width = Math.max(1, Math.round(frame.width * scale));
+      canvas.height = Math.max(1, Math.round(frame.height * scale));
+      canvas.getContext('2d')?.drawImage(frame, 0, 0, canvas.width, canvas.height);
+      frame.close();
+      const thumb = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+      const base = this.base();
+      if (!thumb || !base) return;
+      const response = await fetch(`${base}/${id}/thumb.jpg`, { method: 'PUT', body: thumb });
+      if (response.ok) this.images.update(list => list.map(n => (n.id === id ? { ...n, thumb: true } : n)));
+    } finally {
+      video.removeAttribute('src');
+      video.load();
     }
   }
 

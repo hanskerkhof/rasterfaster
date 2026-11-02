@@ -363,3 +363,16 @@ def test_saved_view_of_a_picture_is_checked_and_kept_in_its_note():
     document = main.DocumentOut(id="d", modified=0, name="N", items=[])
     note = main.render_note(document, None, main.resolve_render_settings(document), None, kept)
     assert note["savedView"] == kept and "savedView" not in main.render_note(document, None, main.resolve_render_settings(document))
+
+
+def test_a_file_of_your_own_goes_into_the_gallery(client):
+    document = client.post("/api/documents", json={"name": "Mine", "items": []}).json()["id"]
+    base = f"/api/documents/{document}/images"
+    png = client.post(base, content=PNG, params={"kind": "file", "name": "my picture", "samples": 0})
+    assert png.status_code == 201 and png.json()["kind"] == "file" and png.json()["media"] == "png"
+    mp4 = b"\x00\x00\x00\x18ftypisom" + b"\x00" * 40
+    assert client.post(base, content=mp4, params={"kind": "file", "name": "clip"}).status_code == 422  # a video needs its size
+    video = client.post(base, content=mp4, params={"kind": "file", "name": "clip", "width": 960, "height": 540, "samples": 0})
+    assert video.status_code == 201 and video.json()["kind"] == "file" and video.json()["media"] == "mp4" and (video.json()["width"], video.json()["height"]) == (960, 540)
+    assert client.get(f"{base}/{video.json()['id']}.mp4").status_code == 200
+    assert [n["name"] for n in client.get(base).json()] == ["clip", "my picture"]

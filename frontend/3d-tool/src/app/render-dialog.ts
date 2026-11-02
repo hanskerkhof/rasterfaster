@@ -1,7 +1,7 @@
-import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, ambientNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames } from './render.service';
+import { Aspect, RenderService, ambientNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -72,6 +72,7 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url()) {
+          <button type="button" [disabled]="busy()" [title]="'A small turntable video to see the motion: ' + quickVideoText() + '. It is not queued; use Render turntable for the real one'" (click)="quickVideo()">Quick video</button>
           <select class="focus shape" [value]="render.aspect()" title="The shape of the picture: the size menu gives its width, the height follows the shape" (change)="chooseAspect($any($event.target).value)">
             @for (a of shapes; track a.id) { <option [value]="a.id" [selected]="a.id === render.aspect()">{{ a.label }}</option> }
           </select>
@@ -86,18 +87,40 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url()) { <!-- always there, so the row does not change when the picture arrives -->
-          <button type="button" [disabled]="savedToLibrary() || busy() || !picture() || !render.lastQuick" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Quick render saved to library' : 'Save quick render to library' }}</button>
+          <button type="button" [disabled]="savedToLibrary() || busy() || !picture() || (!isVideo() && !render.lastQuick)" title="Keep this quick render in the document's gallery (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? (isVideo() ? '✓ Quick video saved to gallery' : '✓ Quick render saved to gallery') : (isVideo() ? 'Save quick video to gallery' : 'Save quick render to gallery') }}</button>
         }
         @if (picture() || url()) {
           <a class="button download" [class.off]="!picture()" [attr.href]="picture() || null" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>
-            {{ url() ? 'Download quick render PNG' : 'Download HD render PNG' }}
+            {{ isVideo() ? (url() ? 'Download quick video' : 'Download turntable video') : url() ? 'Download quick render PNG' : 'Download HD render PNG' }}
           </a>
         }
       </div>
+      @if (url()) {
+        <div class="actions turntable">
+          <span class="bar-title">Turntable video</span>
+          <select class="focus size" [value]="render.turntable().motion" title="How it moves" (change)="render.setTurntable({ motion: $any($event.target).value })">
+            @for (m of motions; track m.id) { <option [value]="m.id" [selected]="m.id === render.turntable().motion" [title]="m.title">{{ m.label }}</option> }
+          </select>
+          <select class="focus size" [disabled]="render.turntable().motion !== 'orbit'" [value]="render.tracked()?.id ?? ''" [title]="render.turntable().motion === 'orbit' ? 'The part the camera goes round and keeps in the middle of the picture (none: the point the view looks at)' : 'Only Camera circles follows a part'" (change)="render.setTrack($any($event.target).value || null)">
+            <option value="" [selected]="!render.tracked()">Track: the view's centre</option>
+            @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === render.tracked()?.id">Track: {{ part.label }}</option> }
+          </select>
+          <button type="button" [disabled]="render.turntable().motion !== 'orbit'" title="Click a part in the 3D view to track it (the dialog closes and comes back)" (click)="pickTrack()">Pick…</button>
+          <select class="focus size" [value]="render.turntable().seconds" title="How long one turn takes (30 frames per second)" (change)="render.setTurntable({ seconds: +$any($event.target).value })">
+            @for (n of lengths; track n) { <option [value]="n" [selected]="n === render.turntable().seconds">{{ n }} seconds · {{ n * render.turntableSpec().fps }} frames</option> }
+          </select>
+          <select class="focus size" [value]="render.turntable().samples" title="Samples per frame: more is cleaner and takes longer (every frame is rendered)" (change)="render.setTurntable({ samples: +$any($event.target).value })">
+            @for (q of turntableQualities; track q.samples) { <option [value]="q.samples" [selected]="q.samples === render.turntable().samples">{{ q.label }}</option> }
+          </select>
+          <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full: wait for a render to finish' : 'Render an MP4 of one turn in the background, as wide as the size menu (4K at most) and in the chosen shape. It joins the queue and is kept in the gallery'" (click)="startTurntable()">Render turntable</button>
+          <span class="estimate" [title]="'A rough guess from what the last renders took. A draft is small (960 px, 12 samples, 24 frames per second) and quick: use it to see the motion first'">{{ turntableText() }}</span>
+        </div>
+      }
       @if (error()) { <p class="error">{{ error() }}</p> }
       <div class="frame">
-        @if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" [class.checker]="render.transparent()" [style.width]="frameWidth()" /> } @else { <div class="placeholder" [style.aspect-ratio]="frameRatio()" [style.width]="frameWidth()"></div> }
+        @if (picture() && isVideo()) { <video [src]="picture()" controls autoplay loop muted playsinline [style.width]="frameWidth()"></video> }
+        @else if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" [class.checker]="render.transparent()" [style.width]="frameWidth()" /> } @else { <div class="placeholder" [style.aspect-ratio]="frameRatio()" [style.width]="frameWidth()"></div> }
         @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
       </div>
     </section>
@@ -107,6 +130,7 @@ import { ColorPalette } from './color-palette';
     .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1180px, 96vw); max-height: 92vh; overflow: auto;
               padding: 14px; background: #23262d; color: #dde1e8; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
     header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 34px; }
+    .estimate { opacity: .7; font-size: 12px; }
     .actions .download.off { opacity: .4; pointer-events: none; }
     .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; } .actions button, .actions select, .actions .button { white-space: nowrap; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
@@ -125,6 +149,7 @@ import { ColorPalette } from './color-palette';
     .dofnote { font-size: 12px; color: #f0b429; white-space: nowrap; }
     button, .button { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; text-decoration: none; }
     button:hover:not(:disabled), .button:hover { background: #2f6fed; color: #fff; } button:disabled { opacity: .5; cursor: default; } .x { position: absolute; top: 10px; right: 10px; padding: 2px 8px; background: transparent; border: 0; }
+    video { display: block; margin: 0 auto; width: 100%; height: auto; border-radius: 4px; background: #000; }
     img { display: block; margin: 0 auto; width: 100%; height: auto; border-radius: 4px; background: #000; }
     img.checker { background: repeating-conic-gradient(#2a2d34 0 25%, #1e2026 0 50%) 0 / 20px 20px; } /* a transparent picture shows its transparency */
     .frame { position: relative; } .placeholder { margin: 0 auto; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0c0f; border: 1px dashed rgba(255,255,255,.12); box-sizing: border-box; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
@@ -171,6 +196,25 @@ export class RenderDialog implements OnInit, OnDestroy {
     if (this.url() && !this.busy()) void this.quick();
   }
   protected readonly hdSizes = hdWidths;
+  protected readonly motions = turntableMotions;
+  protected readonly lengths = turntableLengths;
+  protected readonly turntableQualities = turntableQualities;
+  /** "about 4 min" for the video as it is set up now; nothing while the API has no guess. */
+  protected turntableText() {
+    const seconds = this.render.turntableEstimate();
+    if (seconds === null) return '';
+    const spec = this.render.turntableSpec();
+    return `${spec.width} px, ${spec.frames} frames · about ${seconds >= 5400 ? `${(seconds / 3600).toFixed(1)} h` : seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${seconds} s`}`;
+  }
+  /** Closes the dialog so the 3D view can be clicked: the part under the pointer is outlined, a click chooses it, and the dialog comes back. */
+  protected pickTrack() {
+    this.store.trackPickFromDialog = true;
+    this.store.trackPick.set(true);
+    this.close.emit();
+  }
+  protected startTurntable() {
+    void this.render.startTurntable(this.url());
+  }
   protected readonly shapes = aspects;
   protected chooseAspect(id: Aspect) {
     this.render.setAspect(id);
@@ -236,19 +280,28 @@ export class RenderDialog implements OnInit, OnDestroy {
   /** The quick render is on show (it turns the button's spinner into a tick). */
   protected readonly quickReady = signal(false);
   private readonly images = inject(ImagesService);
-  /** The quick render on show is in the image library. */
+  /** The quick render on show is in the gallery. */
   protected readonly savedToLibrary = signal(false);
 
   protected async saveToLibrary() {
+    if (this.isVideo() && this.videoQuick) {
+      let settings = this.videoQuick.settings;
+      try { settings = JSON.stringify({ ...JSON.parse(settings || '{}'), ...(this.render.quickView ? { savedView: this.render.quickView } : {}) }); } catch { /* keep what the API said */ }
+      this.savedToLibrary.set(await this.images.addFile(new File([this.videoQuick.blob], `${this.name()} quick.mp4`, { type: 'video/mp4' }), { kind: 'quick', settings }));
+      return;
+    }
     const last = this.render.lastQuick;
     if (!last) return;
     let settings = last.settings;
     try { settings = JSON.stringify({ ...JSON.parse(last.settings || '{}'), ...(this.render.quickView ? { savedView: this.render.quickView } : {}) }); } catch { /* keep what the API said */ }
     this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24, settings)));
   }
-  protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render-${this.url() ? 'quick' : 'hd'}.png`;
+  protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-${this.isVideo() ? 'turntable.mp4' : `render-${this.url() ? 'quick' : 'hd'}.png`}`;
+  /** The finished render on show is a turntable video. */
+  protected readonly isVideo = signal(false);
 
   constructor() {
+    effect(() => { this.render.turntable(); this.render.hdWidth(); this.render.aspect(); untracked(() => this.render.refreshTurntableEstimate()); }); // the estimate follows what is chosen
     closeOnEscape(() => this.close.emit());
   }
 
@@ -277,7 +330,8 @@ export class RenderDialog implements OnInit, OnDestroy {
     try {
       const id = this.jobId();
       const status = await (await fetch(`/api/render-jobs/${id}`, { cache: 'no-store' })).json();
-      const response = await fetch(`/api/render-jobs/${id}/image.png`, { cache: 'no-store' });
+      this.isVideo.set(status.kind === 'turntable');
+      const response = await fetch(`/api/render-jobs/${id}/${status.kind === 'turntable' ? 'video.mp4' : 'image.png'}`, { cache: 'no-store' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       this.show(await response.blob(), `${status.width} px · ${status.samples} samples · ${Math.floor(status.elapsed / 60)}:${String(Math.round(status.elapsed % 60)).padStart(2, '0')}`);
       void this.render.collect(id); // looked at: the API can forget it (the picture stays here until the dialog closes)
@@ -288,7 +342,44 @@ export class RenderDialog implements OnInit, OnDestroy {
     }
   }
 
+  /** The quick video on show, with what the API said it was made with. */
+  private videoQuick: { blob: Blob; settings: string } | null = null;
+
+  /** What the quick video is: a few seconds of the chosen motion, small and with few samples. */
+  protected quickVideoText() {
+    const seconds = Math.min(this.render.turntable().seconds, 5);
+    return `${seconds} s at 24 frames per second, 640 px wide, ${this.render.turntable().motion === 'spin' ? 'objects turn' : 'camera circles'}`;
+  }
+
+  /** A small turntable video of this view, made at once (not queued) and shown here like the quick render. */
+  protected async quickVideo() {
+    this.quickReady.set(false);
+    this.savedToLibrary.set(false);
+    this.busyText.set('Rendering a quick turntable video (small, up to a minute)…');
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      const quickUrl = new URL(this.url().replace('/render.png', '/render.mp4'), location.origin);
+      this.render.dofParams(quickUrl);
+      const choice = this.render.turntable();
+      quickUrl.searchParams.set('motion', choice.motion);
+      quickUrl.searchParams.set('seconds', String(Math.min(choice.seconds, 5)));
+      if (choice.motion === 'orbit' && this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
+      const response = await fetch(quickUrl, { cache: 'no-store' });
+      if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
+      const blob = await response.blob();
+      this.videoQuick = { blob, settings: response.headers.get('X-Render-Settings') ?? '' };
+      this.isVideo.set(true);
+      this.show(blob, `640 px · quick video · ${this.quickVideoText()}`);
+    } catch (error) {
+      this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
   protected async quick(force = false) {
+    this.isVideo.set(false);
     const quickUrl = new URL(this.url(), location.origin);
     this.render.dofParams(quickUrl);
     const key = quickUrl.href + '\n' + JSON.stringify(this.store.doc().items); // clean (nothing changed since the last picture) or dirty (render again)

@@ -156,6 +156,8 @@ export interface DocRenderSettings {
   /** The shape of the picture (its width comes from the size menu) and a transparent background (the ground's shadows stay). */
   aspect?: '16:9' | '1:1' | '4:5' | '9:16';
   transparent?: boolean;
+  /** The part a turntable with Camera circles goes round and keeps in the middle (an item id); none: the point the view looks at. */
+  trackId?: string | null;
 }
 
 export interface RfDocument {
@@ -829,7 +831,14 @@ export class DocumentStore {
     return this.appMode() === 'render' && item.render?.color != null ? item.render.color : item.color;
   }
 
-  /** The image library panel is shown (the I key or the Images button); remembered per browser. */
+  /** Picking the part a turntable tracks: the 3D view outlines the part under the pointer, a click chooses it (Esc cancels). */
+  readonly trackPick = signal(false);
+  /** The Render dialog opened this pick and comes back with it. */
+  trackPickFromDialog = false;
+  /** Set by the render service: a part was chosen (or null: cancelled). */
+  onTrackChosen: ((id: string | null) => void) | null = null;
+
+  /** The gallery panel is shown (the I key or the Images button); remembered per browser. */
   readonly imagesOpen = signal(readImagesOpen());
 
   toggleImages() {
@@ -1062,7 +1071,7 @@ export class DocumentStore {
     this.mutate('Delete view', d => ({ ...d, views: (d.views ?? []).filter(v => v.id !== id) }));
   }
 
-  /** Goes to a view that is not in the list (the one a picture of the image library was made from): the camera, display, light and ground come back. */
+  /** Goes to a view that is not in the list (the one a picture of the gallery was made from): the camera, display, light and ground come back. */
   goToView(view: Omit<DocSavedView, 'id' | 'name'>) {
     this.setView(cameraOf(view));
     this.recallView?.({ ...view, id: '', name: '' });

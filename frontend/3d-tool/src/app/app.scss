@@ -91,7 +91,7 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .trash-button:hover { background: rgba(255,255,255,.08); opacity: 1; }
 .trash-button .count { margin-left: 6px; padding: 0 6px; font-size: 10px; background: #31353f; border-radius: 8px; }
 .notice.undo { bottom: 48px; }
-.notice.render-progress { bottom: 84px; min-width: 340px; padding: 8px 12px; }
+.notice.render-progress { bottom: 84px; min-width: 460px; max-width: 94vw; padding: 8px 12px; }
 .notice.render-progress .bar { height: 4px; margin-bottom: 7px; background: #14161a; border-radius: 2px; overflow: hidden; }
 .notice.render-progress .bar span { display: block; height: 100%; background: #2f6fed; transition: width .6s linear; }
 .notice .bar.steps { display: flex; gap: 2px; height: 6px; background: transparent; overflow: visible; }
@@ -108,6 +108,12 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress button { margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
 .notice.render-progress .queue { color: #e0a23a; font-weight: 600; }
 .notice.render-progress .line button + button { margin-left: 6px; }
+.notice.render-progress .queue-list { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.12); font-size: 11px; }
+.notice.render-progress .queue-title { opacity: .6; margin-bottom: 3px; }
+.notice.render-progress .queue-row { display: flex; align-items: center; gap: 8px; padding: 1px 0; } .notice.render-progress .queue-row .n { width: 12px; text-align: right; opacity: .55; }
+.notice.render-progress .queue-row .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notice.render-progress .queue-row .x { margin-left: 0; padding: 0 6px; background: transparent; border: 0; opacity: .6; } .notice.render-progress .queue-row .x:hover { opacity: 1; background: transparent; color: #fff; }
+.notice.render-progress .queue-more { opacity: .6; padding-left: 20px; }
 .notice.render-progress button:hover { background: #b03a3a; color: #fff; }
 @keyframes render-spin { to { transform: rotate(360deg); } }
 .notice.render-ready { color: inherit; font: inherit; font-size: 12px; cursor: pointer; background: rgba(35,38,45,.95); border: 1px solid #2f6fed; }

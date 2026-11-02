@@ -38,6 +38,24 @@ def add(directory: Path, png: bytes, *, name: str, kind: str, samples: int, elap
     return note
 
 
+def add_video(directory: Path, mp4: bytes, *, name: str, width: int, height: int, samples: int, elapsed: float, version: int, edited: bool, settings: dict | None = None, kind: str = "turntable") -> dict:
+    """Stores a video (a turntable, or a file the user adds) and returns its note (`media` "mp4")."""
+    if len(mp4) < 32 or mp4[4:8] != b"ftyp":
+        raise ValueError("not an MP4 video")
+    directory.mkdir(parents=True, exist_ok=True)
+    identifier = secrets.token_hex(6)
+    note = {"id": identifier, "name": name[:120] or "Video", "kind": kind, "media": "mp4", "created": time.time(), "width": width, "height": height,
+            "samples": samples, "elapsed": round(elapsed, 1), "version": version, "edited": edited, "settings": settings or {}}
+    (directory / f"{identifier}.mp4").write_bytes(mp4)
+    write_note(directory, note)
+    return note
+
+
+def media_file(directory: Path, note: dict) -> Path:
+    """The picture or video file of a note."""
+    return directory / f"{note['id']}.{note.get('media', 'png')}"
+
+
 def write_note(directory: Path, note: dict) -> None:
     temporary = directory / f"{note['id']}.json.tmp"
     temporary.write_text(json.dumps(note, indent=2), encoding="utf-8")
@@ -51,10 +69,12 @@ def read_note(directory: Path, identifier: str) -> dict | None:
         note = json.loads((directory / f"{identifier}.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    if not (directory / f"{identifier}.png").is_file():
+    media = media_file(directory, note)
+    if not media.is_file():
         return None
     note["thumb"] = (directory / f"{identifier}.thumb.jpg").is_file()
-    note["bytes"] = (directory / f"{identifier}.png").stat().st_size
+    note["bytes"] = media.stat().st_size
+    note.setdefault("media", "png")
     return note
 
 
@@ -69,7 +89,7 @@ def listing(directory: Path) -> list[dict]:
 def delete(directory: Path, identifier: str) -> bool:
     if not imageId.match(identifier) or not (directory / f"{identifier}.json").is_file():
         return False
-    for suffix in (".png", ".json", ".thumb.jpg"):
+    for suffix in (".png", ".mp4", ".json", ".thumb.jpg"):
         try:
             (directory / f"{identifier}{suffix}").unlink()
         except FileNotFoundError:

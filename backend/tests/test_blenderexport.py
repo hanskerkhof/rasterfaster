@@ -220,7 +220,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     created = client.post("/api/documents", json={"name": "Job", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track=""):
         progress(0.5)
         time.sleep(0.2)
         return b"\x89PNG-hd"
@@ -236,7 +236,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     assert status["state"] == "done" and status["progress"] == 1.0
     assert client.get(f"/api/render-jobs/{job['id']}/image.png").content == b"\x89PNG-hd"
 
-    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track=""):
         time.sleep(0.3)
         raise RuntimeError("killed")
 
@@ -263,7 +263,7 @@ def test_render_state_reaches_the_page_over_the_websocket_and_renders_queue_up(t
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     order = []
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track=""):
         order.append(width)
         progress(0.5)
         time.sleep(0.4)
@@ -300,7 +300,7 @@ def test_waiting_renders_can_be_cancelled_one_by_one_or_all_at_once(tmp_path, mo
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     release = threading.Event()
 
-    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track=""):
         release.wait(5)
         return b"\x89PNG-hd"
 
@@ -437,3 +437,100 @@ def test_picture_shape_and_transparent_background_reach_the_blender_script(tmp_p
     assert client.get(url, params={"aspect": "7:3"}).status_code == 422
     assert main.aspect_ratio("9:16") == 9 / 16 and abs(main.RenderJob("S", 1920, 96, aspect=1.0).megapixels - 3.6864) < 1e-6
     assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"aspect": "2:1"}}).status_code == 422
+
+
+def test_turntable_renders_a_video_into_the_library_and_is_checked(tmp_path, monkeypatch):
+    import time
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    main.renderJobs.clear()
+    main.renderQueue.clear()
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Turn", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = []
+
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track=""):
+        seen.append((width, samples, turntable, crop))
+        return b"\x00\x00\x00\x18ftypisom" + b"\x00" * 40 if turntable else b"\x89PNG-hd"
+
+    monkeypatch.setattr(blenderexport, "build_render", fake)
+    url = f"/api/documents/{created['id']}/render-jobs"
+    assert client.post(url, params={"turntable": "orbit", "width": 5000}).status_code == 422  # 4K at most
+    assert client.post(url, params={"turntable": "orbit", "fps": 25}).status_code == 422
+    assert client.post(url, params={"turntable": "sideways"}).status_code == 422
+    job = client.post(url, params={"turntable": "spin", "seconds": 3, "fps": 24, "width": 960, "samples": 16, "crop": "true", "transparent": "true"}).json()
+    assert job["kind"] == "turntable" and job["frames"] == 72 and job["motion"] == "spin"
+    for _ in range(100):
+        status = client.get(f"/api/render-jobs/{job['id']}").json()
+        if status["state"] == "done" and status["imageId"]:  # the library gets it a moment after the render is done
+            break
+        time.sleep(0.05)
+    assert status["state"] == "done" and seen[-1] == (960, 16, (72, "spin", 24), False)  # a video has no crop
+    assert client.get(f"/api/render-jobs/{job['id']}/video.mp4").headers["content-type"] == "video/mp4"
+    assert client.get(f"/api/render-jobs/{job['id']}/image.png").status_code == 409
+    note = client.get(f"/api/documents/{created['id']}/images").json()[0]
+    assert note["kind"] == "turntable" and note["media"] == "mp4" and note["settings"]["turntable"] == {"motion": "spin", "seconds": 3, "fps": 24} and note["width"] == 960
+    assert client.get(f"/api/documents/{created['id']}/images/{note['id']}.mp4").headers["content-type"] == "video/mp4"
+    assert client.get(f"/api/documents/{created['id']}/images/{note['id']}.png").status_code == 404
+    assert client.delete(f"/api/documents/{created['id']}/images/{note['id']}").status_code == 204
+
+
+def test_the_queue_is_listed_in_every_render_message():
+    main.renderQueue.clear()
+    running, first, second = main.RenderJob("Run", 1920, 96), main.RenderJob("Still", 2560, 256), main.RenderJob("Video", 1920, 48, aspect=1.0, turntable=(90, "spin", 30))
+    main.renderQueue.extend([(first, ()), (second, ())])
+    try:
+        view = running.view()
+        assert [(q["name"], q["kind"], q["samples"], q["size"]) for q in view["queue"]] == [("Still", "picture", 256, "2560 x 1440"), ("Video", "turntable", 48, "1920 x 1920")]
+        assert view["queue"][1]["frames"] == 90 and view["queue"][1]["motion"] == "spin" and view["waiting"] == 2 and second.view()["position"] == 2
+    finally:
+        main.renderQueue.clear()
+
+
+def test_render_estimate_scales_with_frames_samples_and_size(monkeypatch):
+    monkeypatch.setattr(main, "phaseHistory", {"prepare": 10.0, "load": 5.0, "render": 0.2, "finish": 1.0})
+    client = TestClient(main.app)
+    still = client.get("/api/render-estimate", params={"width": 1920, "samples": 96}).json()["seconds"]
+    video = client.get("/api/render-estimate", params={"width": 1920, "samples": 96, "frames": 100}).json()["seconds"]
+    cheaper = client.get("/api/render-estimate", params={"width": 960, "samples": 12, "frames": 100}).json()["seconds"]
+    assert still == round(10 + 5 + 0.2 * 1920 * 1080 / 1e6 * 96 + 1.0 * 1920 * 1080 / 1e6) and video > 50 * still and cheaper < video / 10
+    assert client.get("/api/render-estimate", params={"aspect": "2:1"}).status_code == 422
+
+
+def test_quick_video_is_a_small_synchronous_turntable(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Quick", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = []
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="": seen.append((width, samples, turntable, crop)) or b"\x00\x00\x00\x18ftypisom")
+    url = f"/api/documents/{created['id']}/render.mp4"
+    answer = client.get(url, params={"motion": "spin", "seconds": 2, "crop": "true", "transparent": "true"})
+    assert answer.status_code == 200 and answer.headers["content-type"] == "video/mp4" and seen[-1] == (640, 8, (48, "spin", 24), False)
+    assert json.loads(answer.headers["x-render-settings"])["turntable"] == {"motion": "spin", "seconds": 2, "fps": 24}
+    assert client.get(url, params={"seconds": 9}).status_code == 422 and client.get(url, params={"width": 2000}).status_code == 422
+
+
+def test_a_turntable_can_track_a_part_and_the_note_names_it(tmp_path, monkeypatch):
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    client = TestClient(main.app)
+    items = [{"id": "a", "path": "a.stl", "name": "Base", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}, {"id": "b", "path": "a.stl", "name": "Knob", "color": 255, "position": [30, 0, 0], "rotation": [0, 0, 0, 1]}]
+    created = client.post("/api/documents", json={"name": "Track", "items": items, "render": {"trackId": "b"}}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    seen = []
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="": seen.append(track) or b"\x00\x00\x00\x18ftypisom")
+    url = f"/api/documents/{created['id']}/render.mp4"
+    answer = client.get(url)
+    assert answer.status_code == 200 and seen[-1] == "b" and json.loads(answer.headers["x-render-settings"])["track"] == "Knob"  # the document's choice
+    client.get(url, params={"track": "a"})
+    assert seen[-1] == "a"  # the call's own
+    assert client.get(url, params={"track": "no good"}).status_code == 422
+    assert client.post("/api/documents", json={"name": "T", "items": items, "render": {"trackId": "x" * 100}}).status_code == 422

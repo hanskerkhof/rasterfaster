@@ -115,18 +115,32 @@
           </div>
           <div class="line">
             <span class="spinner"></span>
-            <span>{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}@if (render.waiting() > 0) { <b class="queue"> · {{ render.waiting() }} waiting</b> }</span>
+            <span>@if (r.kind === 'turntable') { <b>Turntable</b> · }{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · @if (r.kind === 'turntable') { frame {{ render.frameNow() }} of {{ r.frames }} · }{{ render.percent() }}% · {{ time(render.elapsed()) }}{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}@if (render.waiting() > 0) { <b class="queue"> · {{ render.waiting() }} waiting</b> }</span>
             <button type="button" (click)="render.cancel()" [title]="render.waiting() > 0 ? 'Stop this render; the next one in the queue starts' : 'Stop this render'">Cancel</button>
             @if (render.waiting() > 0) { <button type="button" (click)="render.cancelAll()" title="Stop this render and empty the queue">Cancel all</button> }
           </div>
+          @if (render.queue().length) {
+            <div class="queue-list" aria-label="Waiting renders">
+              <div class="queue-title">Up next</div>
+              @for (q of render.queue().slice(0, 5); track q.id; let i = $index) {
+                <div class="queue-row">
+                  <span class="n">{{ i + 1 }}</span>
+                  <span class="what">@if (q.kind === 'turntable') { <b>Turntable</b> · }{{ q.name }} · {{ q.size }}{{ render.sizeSuffix(q.width) }} · {{ q.samples }} samples@if (q.kind === 'turntable') { · {{ q.frames }} frames · {{ q.motion === 'spin' ? 'objects turn' : 'camera circles' }} }</span>
+                  <button type="button" class="x" title="Take this render out of the queue" (click)="render.cancelWaiting(q.id)">✕</button>
+                </div>
+              }
+              @if (render.queue().length > 5) { <div class="queue-more">and {{ render.queue().length - 5 }} more</div> }
+            </div>
+          }
         </div>
       }
     }
     @if (render.toast(); as t) {
       <div class="notice undo render-ready" role="status" tabindex="0" (click)="render.view()" (keydown.enter)="render.view()">
         @if ('id' in t) {
-          <img class="thumb" [src]="'/api/render-jobs/' + t.id + '/image.png'" alt="" />
-          <span class="text"><span>Render of {{ t.name }} is ready: click to view</span>
+          @if (t.kind === 'turntable') { <video class="thumb" [src]="'/api/render-jobs/' + t.id + '/video.mp4'" muted autoplay loop playsinline></video> }
+          @else { <img class="thumb" [src]="'/api/render-jobs/' + t.id + '/image.png'" alt="" /> }
+          <span class="text"><span>{{ t.kind === 'turntable' ? 'Turntable video' : 'Render' }} of {{ t.name }} is ready: click to view</span>
             <small>{{ t.size ? t.size[0] + ' × ' + t.size[1] : t.width }} px{{ render.sizeSuffix(t.width) }} · {{ t.samples }} samples · rendered in {{ time(t.elapsed) }}</small>
             @if (render.steps().length) {
               <span class="bar steps done">

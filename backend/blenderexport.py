@@ -265,7 +265,7 @@ SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lig
 
 # the arguments: the glTF, the .blend to write, "1" with the studio setup, the app's light ("dx,dy,dz;tx,ty,tz" in mm, or ""), "width,samples" to render a PNG
 # instead of saving the .blend (or ""), the depth of field ("0", "1" or "1|strength|part id") and "1" to crop the picture to the parts
-source, target, studio, light_spec, render_spec, dof_spec, crop_flag = sys.argv[sys.argv.index("--") + 1:]
+source, target, studio, light_spec, render_spec, dof_spec, crop_flag, turntable_spec = sys.argv[sys.argv.index("--") + 1:]
 dof_spec, _, extra_text = dof_spec.partition("#")  # the depth of field spec may end in "#<ambient light preset, 0 to 5>,<lamp, 0 to 60>"
 ambient_text, _, rest_text = extra_text.partition(",")
 lamp_text, _, rest_text = rest_text.partition(",")
@@ -622,9 +622,64 @@ if render_spec:  # a picture of this size and with this many samples: the settin
                 if abs(middle) < 0.002:
                     break
                 camera.data.shift_x += middle * (scene.render.resolution_x / max(scene.render.resolution_x, scene.render.resolution_y))
+    if turntable_spec and scene.camera:  # a turntable: "frames,motion,fps", motion "orbit" (the camera circles) or "spin" (the parts turn, the camera stays)
+        fields = turntable_spec.split(",")
+        frames_text, motion, fps_text = fields[:3]
+        track_id = fields[3] if len(fields) > 3 else ""  # the item id of the part the camera tracks
+        frames, fps = int(frames_text), int(fps_text)
+        scene.frame_start, scene.frame_end = 1, frames
+        scene.render.fps = fps
+        scene.render.resolution_x -= scene.render.resolution_x % 2  # H.264 wants even sizes
+        scene.render.resolution_y -= scene.render.resolution_y % 2
+        shown = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and not o.hide_render]
+        corners = [o.matrix_world @ Vector(c) for o in shown for c in o.bound_box] or [Vector((0, 0, 0))]
+        low = Vector(map(min, *corners)) if len(corners) > 1 else corners[0]
+        high = Vector(map(max, *corners)) if len(corners) > 1 else corners[0]
+        middle = (low + high) / 2
+        pivot = bpy.data.objects.new("Turntable pivot", None)
+        scene.collection.objects.link(pivot)
+        camera = scene.camera
+        if motion == "spin":  # the parts turn about the middle of their footprint; the camera, the lamps and the floor stay where they are
+            pivot.location = (middle.x, middle.y, low.z)
+            bpy.context.view_layer.update()
+            for o in bpy.data.objects:
+                if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and o.parent is None:
+                    o.parent = pivot
+                    o.matrix_parent_inverse = pivot.matrix_world.inverted()
+        else:  # the camera circles about the upright line through the point it looks at (or through the part it tracks), keeping its height and its distance
+            forward = camera.matrix_world.to_quaternion() @ Vector((0, 0, -1))
+            looked_at = camera.matrix_world.translation + forward * max((middle - camera.matrix_world.translation).dot(forward), 0.01)
+            tracked = [o for o in shown if track_id and o.get("itemId") == track_id]
+            if tracked:  # the camera goes round this part and keeps it in the middle of the picture
+                points = [o.matrix_world @ Vector(c) for o in tracked for c in o.bound_box]
+                looked_at = (Vector(map(min, *points)) + Vector(map(max, *points))) / 2 if len(points) > 1 else points[0]
+                aim = bpy.data.objects.new("Track target", None)
+                aim.location = looked_at
+                scene.collection.objects.link(aim)
+                follow = camera.constraints.new("TRACK_TO")
+                follow.target, follow.track_axis, follow.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
+            pivot.location = looked_at
+            bpy.context.view_layer.update()
+            camera.parent = pivot
+            camera.matrix_parent_inverse = pivot.matrix_world.inverted()
+        # One full turn over the frames, at a constant speed (the next frame would be the first again: the video loops). A driver on the frame number, not keyframes:
+        # keyframes ease in and out whatever interpolation is asked for, and a turntable that starts and ends slowly does not loop smoothly.
+        driver = pivot.driver_add("rotation_euler", 2).driver
+        driver.type = "SCRIPTED"
+        turn_sign = -1 if motion == "spin" else 1  # parts turning clockwise look the same as a camera circling counter-clockwise: switching the motion keeps the look of the turn
+        driver.expression = f"{turn_sign} * (frame - 1) / {frames} * {2 * math.pi!r}"
+        if hasattr(scene.render.image_settings, "media_type"):
+            scene.render.image_settings.media_type = "VIDEO"
+        scene.render.image_settings.file_format = "FFMPEG"
+        scene.render.ffmpeg.format = "MPEG4"
+        scene.render.ffmpeg.codec = "H264"
+        scene.render.ffmpeg.constant_rate_factor = "HIGH"
+        scene.render.ffmpeg.ffmpeg_preset = "GOOD"
+        scene.render.ffmpeg.audio_codec = "NONE"
     if scene.render.engine == "CYCLES":
         scene.cycles.samples = samples
-    scene.render.image_settings.file_format = "PNG"
+    if not turntable_spec:
+        scene.render.image_settings.file_format = "PNG"
 bpy.ops.wm.save_as_mainfile(filepath=target, compress=True)
 '''
 
@@ -641,7 +696,7 @@ def find_blender() -> str | None:
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None) -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "") -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -659,7 +714,8 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         script.write_text(blenderScript)
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
-                               f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0"], capture_output=True, text=True, timeout=timeout)
+                               f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0",
+                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -671,13 +727,15 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         # Rendering the saved file prints its progress ("Sample 24/96"); Blender buffers that when it writes to a pipe, so a pseudo-terminal is used.
         master, slave = pty.openpty()
         try:
-            process = subprocess.Popen([blender, "--background", str(target), "-o", str(Path(folder, "picture_####")), "-f", "1"], stdout=slave, stderr=slave, stdin=subprocess.DEVNULL, close_fds=True)
+            process = subprocess.Popen([blender, "--background", str(target), "-o", str(Path(folder, "picture_####")), *(["-a"] if turntable else ["-f", "1"])], stdout=slave, stderr=slave, stdin=subprocess.DEVNULL, close_fds=True)
         finally:
             os.close(slave)
         if started:
             started(process)
         tail = b""
         sample = re.compile(rb"Sample (\d+)/(\d+)")
+        frame = re.compile(rb"Fra:(\d+)")
+        frames = turntable[0] if turntable else 1
         try:
             buffer = b""
             while True:
@@ -693,13 +751,14 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
                     found = sample.findall(buffer)
                     if found:
                         done, total = (int(v) for v in found[-1])
+                        current = int((frame.findall(buffer) or [b"1"])[-1])  # the frame of a turntable (always 1 for a picture)
                         if phase and "render" not in seen:
                             seen.add("render")
                             phase("render")
-                        progress(min(done / max(total, 1), 1.0))
-                        if phase and done >= total and "finish" not in seen:
+                        progress(min(((current - 1) + min(done / max(total, 1), 1.0)) / frames, 1.0))
+                        if phase and current >= frames and done >= total and "finish" not in seen:
                             seen.add("finish")
-                            phase("finish")  # all samples are in: denoising and saving the picture
+                            phase("finish")  # all samples are in: denoising, saving the picture (or encoding the video)
                 if time.monotonic() > deadline:
                     process.kill()
                     raise RuntimeError("Blender took too long")
@@ -708,9 +767,9 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
             if process.poll() is None:
                 process.kill()
             os.close(master)
-        picture = Path(folder, "picture_0001.png")
-        if not picture.is_file():
-            raise RuntimeError(f"Blender could not render the picture: {tail.decode(errors='replace')[-300:]}")
+        picture = next(iter(sorted(Path(folder).glob("picture_*.mp4"))), None) if turntable else Path(folder, "picture_0001.png")
+        if picture is None or not picture.is_file():
+            raise RuntimeError(f"Blender could not render the {'video' if turntable else 'picture'}: {tail.decode(errors='replace')[-300:]}")
         return picture.read_bytes()
 
 
@@ -723,6 +782,7 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None) -> bytes:
-    """A PNG of the scene (16:9, `width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase)
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "") -> bytes:
+    """A PNG of the scene (`width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours. With `turntable` = (frames, "orbit" | "spin", fps)
+    an MP4 of that many frames instead: the camera circles the scene once, or the parts turn once in front of the camera."""
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track)

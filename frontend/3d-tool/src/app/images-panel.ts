@@ -22,7 +22,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
 }
 
 /**
- * The image library of the document in a floating panel: finished full-size renders arrive here by themselves, quick renders are kept from the
+ * The gallery of the document in a floating panel: finished full-size renders arrive here by themselves, quick renders are kept from the
  * render dialog. Every picture carries the document version it was made from, so the ones of old versions are easy to clear in one go.
  * Drag the title bar to move it, ▾ folds it, I (or ✕) closes and opens it.
  */
@@ -30,6 +30,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
   selector: 'app-images-panel',
   imports: [ReleaseFocus],
   host: {
+    '(dragover)': 'onDragOver($event)', '(dragleave)': 'dropping.set(false)', '(drop)': 'onDrop($event)', '[class.dropping]': 'dropping()',
     '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[style.width.px]': 'geom()?.width', '[style.height.px]': 'collapsed() ? null : geom()?.height',
     '[class.placed]': 'geom() !== null', '[class.sized]': 'geom()?.height !== undefined', '[class.collapsed]': 'collapsed()', '[style.max-height]': "geom()?.height !== undefined ? 'none' : null",
   },
@@ -42,9 +43,11 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
       <div class="edge se" (pointerdown)="startDrag($event, 'se')"></div>
     }
     <div class="head" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()" title="Drag to move the panel · double-click to put it back">
-      <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the images' : 'Collapse the images'" (pointerdown)="$event.stopPropagation()" (click)="toggle()">{{ collapsed() ? '▸' : '▾' }}</button>
-      <span class="title">Images</span>
+      <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the gallery' : 'Collapse the gallery'" (pointerdown)="$event.stopPropagation()" (click)="toggle()">{{ collapsed() ? '▸' : '▾' }}</button>
+      <span class="title">Gallery</span>
       @if (service.images().length) { <span class="count">{{ service.images().length }}</span> }
+      <button type="button" class="add" releaseFocus title="Put a PNG picture or an MP4 video of your own in the gallery (or drop files on the panel)" (pointerdown)="$event.stopPropagation()" (click)="fileInput.click()">Add file…</button>
+      <input #fileInput type="file" hidden multiple accept="image/png,video/mp4,.png,.mp4" (change)="addFiles($any($event.target).files); $any($event.target).value = ''" />
       <button type="button" class="x close" releaseFocus title="Close the panel (I)" (pointerdown)="$event.stopPropagation()" (click)="store.toggleImages()">✕</button>
     </div>
     @if (!collapsed()) {
@@ -66,10 +69,10 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
             </div>
             <div class="caption"><span class="name">{{ note.name }}</span><span class="ver" [class.current]="note.version === store.version()" [title]="'Made from version ' + note.version + (note.edited ? ' (with changes after it)' : '')">{{ versionLabel(note) }}</span></div>
           </div>
-        } @empty { <div class="empty">No pictures yet. Full-size renders are kept here by themselves; in the Render dialog, <b>Save quick render to library</b> keeps a quick render.</div> }
+        } @empty { <div class="empty">Nothing here yet. Full-size renders and turntable videos are kept here by themselves; in the Render dialog, <b>Save quick render to gallery</b> keeps a quick render; <b>Add file…</b> (or drop files on the panel) puts a PNG or MP4 of your own here.</div> }
       </div>
       <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">Full-size renders arrive here by themselves when they are done · Render dialog ▸ <b>Save quick render to library</b> keeps a quick render · right-click a picture for a menu (view, download, rename, render HD again, delete) · click a picture: view it large, Go to view brings the camera, display, light and ground it was made from back (to carry on working), Save as view puts that view in the Views panel, download, rename (double-click the name) or delete it (a second click confirms) · Esc closes the large view · ← and → (or the arrows on the picture) go through the pictures · every picture carries the document version it was made from: <b>v13</b>, <b>v13*</b> when the working copy was ahead of it · green: the current version · Clean up: delete the pictures of older versions, or the quick renders, in one go (a second click confirms) · I: show or hide this panel · drag the title bar: move it, drag an edge or corner: resize it, double-click the title bar: put it back · ▾: fold it · the pictures live next to the document and go with it when it is deleted</div>
+        <div class="hint">Full-size renders arrive here by themselves when they are done · Render dialog ▸ <b>Save quick render to gallery</b> keeps a quick render · right-click a picture for a menu (view, download, rename, render HD again, delete) · click a picture: view it large, Go to view brings the camera, display, light and ground it was made from back (to carry on working), Save as view puts that view in the Views panel, download, rename (double-click the name) or delete it (a second click confirms) · Esc closes the large view · ← and → (or the arrows on the picture) go through the pictures · every picture carries the document version it was made from: <b>v13</b>, <b>v13*</b> when the working copy was ahead of it · green: the current version · Clean up: delete the pictures of older versions, or the quick renders, in one go (a second click confirms) · I: show or hide this panel · drag the title bar: move it, drag an edge or corner: resize it, double-click the title bar: put it back · ▾: fold it · the pictures live next to the document and go with it when it is deleted</div>
       </details>
     }
     @if (menu(); as m) {
@@ -83,7 +86,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
           <button type="button" role="menuitem" (click)="menuGoToView(m.note)"><span class="icon">◎</span>Go to its view</button>
           <button type="button" role="menuitem" (click)="menuSaveAsView(m.note)"><span class="icon">+</span>Save its view in the Views panel</button>
         }
-        @if (m.note.settings?.view) {
+        @if (m.note.settings?.view && m.note.media !== 'mp4') {
           <div class="msep"></div>
           <div class="mhead" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings (it joins the queue when a render is running)'">Render HD again{{ render.queueFull() ? ' (queue full)' : (render.running() ? ' (joins the queue)' : '') }}</div>
           @for (size of hdSizes; track size.width) { <button type="button" role="menuitem" class="size" [disabled]="render.queueFull()" (click)="menuRenderHd(m.note, size.width)">{{ size.label }}</button> }
@@ -104,7 +107,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
             <button type="button" title="Go back to the view this picture was made from (camera, display, light, ground) and close this window: to carry on working on it" (click)="goToView(note)">Go to view</button>
             <button type="button" title="Save that view in the Views panel" (click)="saveAsView(note)">Save as view</button>
           }
-          @if (note.settings?.view) {
+          @if (note.settings?.view && note.media !== 'mp4') {
             <span class="hdmenu">
               <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings'" (click)="hdOpen.set(!hdOpen())">Render HD ▾</button>
               @if (hdOpen()) {
@@ -129,7 +132,8 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
             <button type="button" class="nav prev" title="Previous picture (←)" aria-label="Previous picture" (click)="step(-1)">‹</button>
             <button type="button" class="nav next" title="Next picture (→)" aria-label="Next picture" (click)="step(1)">›</button>
           }
-          <img [src]="service.src(note)" [alt]="note.name" />
+          @if (note.media === 'mp4') { <video [src]="service.src(note)" controls autoplay loop muted playsinline></video> }
+          @else { <img [src]="service.src(note)" [alt]="note.name" /> }
         </div>
       </section>
     }
@@ -155,6 +159,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .stage { position: relative; display: flex; justify-content: center; }
     .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 56px; padding: 0; font-size: 30px; line-height: 1; background: rgba(0,0,0,.45); border: 0; border-radius: 6px; opacity: .55; }
     .nav:hover { opacity: 1; background: rgba(47,111,237,.85); } .nav.prev { left: 6px; } .nav.next { right: 6px; } .pos { color: #dde1e8; }
+    .viewer video { max-width: 100%; max-height: calc(92vh - 130px); align-self: center; background: #16181d; border-radius: 4px; }
     .viewer img { max-width: 100%; max-height: calc(92vh - 130px); object-fit: contain; align-self: center; background: #16181d; border-radius: 4px; }
     .viewer .rename { font: inherit; font-size: 14px; color: inherit; background: #1b1d23; border: 1px solid #2f6fed; border-radius: 3px; padding: 1px 4px; outline: none; min-width: 200px; }
     .button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; text-decoration: none; } .button:hover { background: #2f6fed; color: #fff; }
@@ -170,7 +175,9 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55;
       background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); } .edge.se:hover::after { opacity: 1; }
     .head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: grab; user-select: none; touch-action: none; } .head:active { cursor: grabbing; }
-    .title { font-weight: 600; } .count { color: #8a93a2; font-size: 11px; } .close { margin-left: auto; }
+    :host(.dropping) { outline: 2px dashed #2f6fed; outline-offset: -3px; background: rgba(47,111,237,.18); }
+    .add { margin-left: auto; font-size: 11px; padding: 1px 8px; } .add + input + .close { margin-left: 0; }
+    .title { font-weight: 600; } .count { color: #8a93a2; font-size: 11px; } .close { margin-left: 0; }
     button { background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; padding: 2px 8px; cursor: pointer; } button:hover { background: #2f6fed; color: #fff; }
     .fold { padding: 0 4px; background: transparent; border: 0; } .fold:hover { background: transparent; color: #fff; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .7; } .x:hover { opacity: 1; background: transparent; color: #fff; }
@@ -236,8 +243,19 @@ export class ImagesPanel {
     event.preventDefault();
     event.stopPropagation();
     this.menuConfirm.set(false);
-    const width = 260, height = 380; // the menu stays inside the window
-    this.menu.set({ x: Math.max(8, Math.min(event.clientX, innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY, innerHeight - height - 8)), note });
+    this.menu.set({ x: event.clientX, y: event.clientY, note });
+    requestAnimationFrame(() => this.fitMenu()); // once it is drawn its real size is known: it is moved so that all of it is in the window
+  }
+
+  /** Moves the open menu up and to the left as far as it needs so that none of it is off the window (it scrolls when it is taller than the window). */
+  private fitMenu() {
+    const open = this.menu();
+    const element = this.element.nativeElement.querySelector<HTMLElement>('.menu');
+    if (!open || !element) return;
+    const box = element.getBoundingClientRect();
+    const x = Math.max(8, Math.min(open.x, innerWidth - box.width - 8));
+    const y = Math.max(8, Math.min(open.y, innerHeight - box.height - 8));
+    if (x !== open.x || y !== open.y) this.menu.set({ ...open, x, y });
   }
   protected goToView(note: ImageNote) {
     const view = note.settings?.savedView;
@@ -276,6 +294,21 @@ export class ImagesPanel {
     await this.render.startFromNote(documentId, note.settings as Record<string, unknown>, width);
   }
   protected readonly confirmDelete = signal(false);
+  protected readonly dropping = signal(false);
+
+  protected async addFiles(files: FileList | null) {
+    for (const file of Array.from(files ?? [])) await this.service.addFile(file);
+  }
+  protected onDragOver(event: DragEvent) {
+    if (!event.dataTransfer?.types.includes('Files')) return;
+    event.preventDefault();
+    this.dropping.set(true);
+  }
+  protected onDrop(event: DragEvent) {
+    event.preventDefault();
+    this.dropping.set(false);
+    void this.addFiles(event.dataTransfer?.files ?? null);
+  }
 
   protected toggle() { this.collapsed.update(v => !v); }
   /** v13, v13* when the working copy was ahead of it, and a dash when no version had been saved yet. */
@@ -295,11 +328,14 @@ export class ImagesPanel {
     else if (s.background !== undefined) lines.push(s.background === null ? { label: 'Background', value: 'studio' } : { label: 'Background', value: hex(s.background), swatch: hex(s.background) });
     if (s.ground !== undefined && !s.transparent) lines.push(s.ground === null ? { label: 'Ground', value: 'studio' } : { label: 'Ground', value: hex(s.ground), swatch: hex(s.ground) });
     if (s.aspect && s.aspect !== '16:9') lines.push({ label: 'Shape', value: s.aspect });
-    if (s.crop !== undefined) lines.push({ label: 'Crop', value: s.crop ? 'on' : 'off' });
+    if (s.turntable) lines.push({ label: 'Turntable', value: `${s.turntable.motion === 'spin' ? 'objects turn' : 'camera circles'} · ${s.turntable.seconds} s · ${s.turntable.fps} fps` });
+    if (s.crop !== undefined && !s.turntable) lines.push({ label: 'Crop', value: s.crop ? 'on' : 'off' });
     return lines;
   }
   /** The tag on a thumbnail: the resolution's name (HD, QHD, 4K UHD …, found by the height, which a cropped picture keeps), or Quick. */
   protected badge(note: ImageNote) {
+    if (note.media === 'mp4') return 'Video';
+    if (note.kind === 'file') return 'File';
     if (note.kind !== 'hd') return 'Quick';
     const ratio = aspectRatio(note.settings?.aspect);
     const size = hdWidths.find(w => Math.round(w.width / ratio) === note.height);
