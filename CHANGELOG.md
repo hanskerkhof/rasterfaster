@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - More FX styles and a cut-away section (0.11.16)
+
+### Added
+- **FE** + **BE** (`render.service.ts`, `render-dialog.ts`, `blenderexport.py`, `main.py`): four more **FX** styles. **Wireframe** (light parts with the triangles of the mesh drawn on them), **Thermal** (false colours by distance from the camera, warm near, cold far), **Clay rough** (hand-modelled clay: lumps, thumb prints and grain, mottled grey) and **Clay rough colour** (the same, in the colours of the parts).
+- **FE** + **BE**: **Cut-away**, a section view: a plane cuts through all the parts and one side is removed, the cut shows in orange (`fx=cutaway`, `cut=<axis>:<percent>:<side>`, for example `z:50:0`). With FX Cut-away the Render dialog's Lighting row has *Cut across X/Y/Z*, a *Cut at %* slider and *Other side*; saved with the document (`render.cut`) and shown in the Gallery notes.
+
 ## 2026-11-03 - FX styles and mirror reflections in the 3D view (0.11.15)
 
 ### Added

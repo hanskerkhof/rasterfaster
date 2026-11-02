@@ -411,7 +411,8 @@ class DocumentRenderSettings(BaseModel):
     trackId: str | None = Field(default=None, max_length=64)  # a part the camera follows in a turntable (Camera circles)
     trackPivot: Literal["part", "all", "view"] = "all"  # what Camera circles goes round: the middle of all the objects, the middle of the view, or the tracked part
     lookAt: Literal["part", "all", "view"] | None = None  # what it looks at: the tracked part, the middle of all the objects, or where the view points (none: the part when one is tracked, else the view)
-    fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly"] = "none"  # a style for the picture: none, cartoon, outline, sketch, clay or blueprint
+    fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour"] = "none"  # a style for the picture: none, cartoon, outline, sketch, clay or blueprint
+    cut: str = Field(default="z:50:0", pattern=r"^[xyz]:\d{1,3}:[01]$")  # the cut-away section: the axis, how far along the parts (percent) and which side goes (0 or 1)
     reflections: int = Field(default=0, ge=0, le=4)  # what metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey
     transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
@@ -773,7 +774,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
 
 def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None,
                             lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None,
-                            aspect: str | None = None, transparent: bool | None = None, track: str | None = None, track_pivot: str | None = None, look_at: str | None = None, reflections: int | None = None, fx: str | None = None) -> dict:
+                            aspect: str | None = None, transparent: bool | None = None, track: str | None = None, track_pivot: str | None = None, look_at: str | None = None, reflections: int | None = None, fx: str | None = None, cut: str | None = None) -> dict:
     """The render settings of a call: what it brings, else what the document remembers, else the defaults."""
     render = document.render
     focusId = focus if focus is not None else (render.focusId if render else None)
@@ -793,6 +794,7 @@ def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focu
         "transparent": transparent if transparent is not None else bool(render and render.transparent),
         "reflections": reflections if reflections is not None else (render.reflections if render else 0),
         "fx": fx if fx is not None else (render.fx if render else "none"),
+        "cut": cut if cut is not None else (render.cut if render else "z:50:0"),
         "trackId": track if track is not None else (render.trackId if render else None),
         "trackPivot": track_pivot if track_pivot is not None else (render.trackPivot if render else "all"),
         "lookAt": look_at if look_at is not None else ((render.lookAt if render and render.lookAt else None) or ("part" if (track if track is not None else (render.trackId if render else None)) else "view")),
@@ -822,7 +824,7 @@ def render_note(document: DocumentOut, view: str | None, settings: dict, light: 
     return {**settings, "focus": focus, "track": tracked, "projection": projection, "view": view, "light": light, **({"savedView": saved_view} if saved_view else {})}
 
 
-def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None, aspect: str | None = None, transparent: bool | None = None, reflections: int | None = None, fx: str | None = None):
+def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None, aspect: str | None = None, transparent: bool | None = None, reflections: int | None = None, fx: str | None = None, cut: str | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
     if not blender:
@@ -836,18 +838,18 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
             ",".join(str(v) for v in saved.direction) + ";" + (f"part:{saved.targetId}" if saved.targetId else ",".join(str(v) for v in saved.target) if saved.target else "")) if saved else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
-    settings = resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, background, ground, beam, aspect, transparent, reflections=reflections, fx=fx)
+    settings = resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, background, ground, beam, aspect, transparent, reflections=reflections, fx=fx, cut=cut)
     on, focusId, level, cropped = settings["depthOfField"], settings["focusId"], settings["dofStrength"], settings["crop"]
     lamp_level, beam_level, light_level = settings["lamp"], settings["beam"], settings["ambient"]
     bg_text = f"{settings['background']:06x}" if settings["background"] is not None else ""
     floor_text = f"{settings['ground']:06x}" if settings["ground"] is not None else ""
-    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level},{settings['aspect']},{1 if settings['transparent'] else 0},{settings['reflections']},{settings['fx']}", cropped  # the ambient preset rides along after the "#"
+    return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level},{settings['aspect']},{1 if settings['transparent'] else 0},{settings['reflections']},{settings['fx']},{settings['cut']}", cropped  # the ambient preset rides along after the "#"
 
 
 @app.get("/api/documents/{documentId}/export.blend")
-def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly"] | None = None) -> Response:
+def export_document_blend(documentId: str, colours: bool = True, studio: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$")) -> Response:
     """A native .blend (made by running Blender in the background): the glTF export with the camera set up as the scene camera. Needs Blender on this machine (set BLENDER to its path if it is not found)."""
-    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx)
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, None, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx, cut=cut)
     try:
         data = blenderexport.build_blend(glb, blender, studio, sun, depthOfField)
     except ValueError as error:
@@ -860,9 +862,9 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
 
 @app.get("/api/documents/{documentId}/render.png")
 def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
-                        width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128), reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly"] | None = None) -> Response:
+                        width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128), reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$")) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx, cut=cut)
     try:
         data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped)
     except ValueError as error:
@@ -870,25 +872,25 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".png"
-    note = render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx), light)
+    note = render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx, cut=cut), light)
     return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
 @app.get("/api/documents/{documentId}/render.mp4")
 def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
-                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly"] | None = None, direction: Literal["ccw", "cw"] = "ccw") -> Response:
+                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$"), direction: Literal["ccw", "cw"] = "ccw") -> Response:
     """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
-    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, reflections=reflections, fx=fx)
+    document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, reflections=reflections, fx=fx, cut=cut)
     try:
-        tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["trackId"] or ""
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["lookAt"], direction=direction)
+        tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackId"] or ""
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["lookAt"], direction=direction)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + "-quick.mp4"
-    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps, "direction": direction}}
+    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps, "direction": direction}}
     return Response(data, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
@@ -1115,10 +1117,10 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000),
-                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly"] | None = None, direction: Literal["ccw", "cw"] = "ccw") -> dict:
+                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$"), direction: Literal["ccw", "cw"] = "ccw") -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
-    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, reflections=reflections, fx=fx)
+    document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, reflections=reflections, fx=fx, cut=cut)
     if turntable and fps not in (24, 30):
         raise HTTPException(status_code=422, detail="fps must be 24 or 30")
     if turntable and width > 3840:
@@ -1128,13 +1130,13 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
             raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                        {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track, trackPivot, lookAt, reflections=reflections, fx=fx), light, parse_saved_view(savedView)),
+                        {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut), light, parse_saved_view(savedView)),
                            **({"turntable": {"motion": turntable, "seconds": seconds, "fps": fps, "direction": direction}} if turntable else {})},
                         aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")), (seconds * fps, turntable, fps) if turntable else None)
-        job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["trackId"] or "") if turntable else ""
-        job.track_pivot = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["trackPivot"]
+        job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackId"] or "") if turntable else ""
+        job.track_pivot = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackPivot"]
         job.direction = direction
-        job.look_at = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx)["lookAt"]
+        job.look_at = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["lookAt"]
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})

@@ -164,6 +164,8 @@ export interface DocRenderSettings {
   reflections?: number;
   /** A style for renders: none, cartoon, outline, sketch, clay or blueprint. */
   fx?: string;
+  /** The cut-away section: axis, percent along the parts, side ('z:50:0'). */
+  cut?: string;
   /** What it looks at: the tracked part, the middle of all the objects, or nothing in particular (the angle it has); none: the part when one is tracked, else the view. */
   lookAt?: 'part' | 'all' | 'view' | null;
 }

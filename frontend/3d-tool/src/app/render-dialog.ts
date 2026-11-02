@@ -47,6 +47,13 @@ import { ColorPalette } from './color-palette';
         <select class="focus strength" [value]="render.fx()" title="FX: a style for the picture (cartoon, outline, sketch, clay, blueprint). The same setting as in the toolbar" (change)="chooseFx($any($event.target).value)">
           @for (f of fxChoices; track f.id) { <option [value]="f.id" [selected]="f.id === render.fx()">FX: {{ f.label }}</option> }
         </select>
+        @if (render.fx() === 'cutaway') {
+          <select class="focus strength" [value]="render.cutParts().axis" title="The plane that cuts through the parts is across this axis" (change)="chooseCut({ axis: $any($event.target).value })">
+            @for (a of cutAxes; track a) { <option [value]="a" [selected]="a === render.cutParts().axis">Cut across {{ a.toUpperCase() }}</option> }
+          </select>
+          <label class="cutslider" title="Where the cut is, from one end of the parts (0 %) to the other (100 %)">Cut at <input type="range" min="0" max="100" step="1" [value]="render.cutParts().position" (input)="render.setCut({ position: +$any($event.target).value })" (change)="chooseCut({ position: +$any($event.target).value })" /> {{ render.cutParts().position }} %</label>
+          <label class="cutslider" title="Cut away the other side"><input type="checkbox" [checked]="render.cutParts().flip" (change)="chooseCut({ flip: $any($event.target).checked })" /> Other side</label>
+        }
         <select class="focus strength" [value]="render.beam()" title="The type of the lamp: from a spotlight (razor-sharp shadows) to a flood (very soft shadows)" (change)="chooseBeam(+$any($event.target).value)">
           @for (type of beams; track type.value) { <option [value]="type.value" [selected]="type.value === render.beam()">Lamp: {{ type.label }}</option> }
         </select>
@@ -147,6 +154,7 @@ import { ColorPalette } from './color-palette';
     </section>
   `,
   styles: `
+    .cutslider { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
     .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 10; }
     .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1180px, 96vw); max-height: 92vh; overflow: auto;
               padding: 14px; background: #23262d; color: #dde1e8; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
@@ -286,6 +294,11 @@ export class RenderDialog implements OnInit, OnDestroy {
     this.lampChanged();
   }
   protected readonly fxChoices = fxIds.map((id, i) => ({ id, label: fxNames[i] }));
+  protected readonly cutAxes = ['x', 'y', 'z'];
+  protected chooseCut(change: Partial<{ axis: string; position: number; flip: boolean }>) {
+    this.render.setCut(change);
+    if (this.url() && !this.busy()) void this.quick();
+  }
   protected chooseFx(id: string) {
     this.render.setFx(id);
     if (this.url() && !this.busy()) void this.quick();

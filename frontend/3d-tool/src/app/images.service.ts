@@ -44,6 +44,7 @@ export interface RenderSettingsNote {
   beam?: number;
   reflections?: number;
   fx?: string;
+  cut?: string;
   background?: number | null;
   ground?: number | null;
   projection?: 'persp' | 'ortho' | null;

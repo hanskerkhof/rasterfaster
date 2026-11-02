@@ -322,7 +322,7 @@ export class ImagesPanel {
     if (s.projection) lines.push({ label: 'Camera', value: s.projection === 'ortho' ? 'Orthographic' : 'Perspective' });
     if (s.depthOfField !== undefined) lines.push({ label: 'Depth of field', value: s.depthOfField && s.projection === 'ortho' ? 'off (an orthographic view has none)' : s.depthOfField ? `${strengthNames[(s.dofStrength ?? 3) - 1] ?? ''}${s.focus ? ' · focus: ' + s.focus : ' · nearest part'}` : 'off' });
     if (s.ambient !== undefined) lines.push({ label: 'Ambient', value: ambientNames[s.ambient] ?? String(s.ambient) });
-    if (s.fx && s.fx !== 'none') lines.push({ label: 'Style', value: fxNames[fxIds.indexOf(s.fx)] ?? s.fx });
+    if (s.fx && s.fx !== 'none') lines.push({ label: 'Style', value: (fxNames[fxIds.indexOf(s.fx)] ?? s.fx) + (s.fx === 'cutaway' && s.cut ? ` (${s.cut.split(':')[0].toUpperCase()} ${s.cut.split(':')[1]}%)` : '') });
     if (s.reflections) lines.push({ label: 'Reflects', value: reflectionNames[s.reflections] ?? String(s.reflections) });
     if (s.beam !== undefined) lines.push({ label: 'Lamp type', value: beamNames[s.beam] ?? String(s.beam) });
     if (s.lamp !== undefined) { const share = 2 ** ((s.lamp - 40) / 10) * 100; lines.push({ label: 'Lamp', value: `${share >= 100 ? Math.round(share) : Math.round(share * 10) / 10} %` }); }

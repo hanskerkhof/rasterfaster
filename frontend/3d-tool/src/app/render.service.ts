@@ -144,8 +144,8 @@ export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
 export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
 /** What metal, mirror and glass reflect (the dark studio is what renders always had). */
 /** The styles of a picture (FX): the ids the API takes and the names the toolbar shows. */
-export const fxIds = ['none', 'cartoon', 'outline', 'sketch', 'clay', 'blueprint', 'isometric', 'xray', 'lowpoly'];
-export const fxNames = ['None', 'Cartoon', 'Outline', 'Sketch', 'Clay', 'Blueprint', 'Isometric', 'X-ray', 'Low poly'];
+export const fxIds = ['none', 'cartoon', 'outline', 'sketch', 'clay', 'blueprint', 'isometric', 'xray', 'lowpoly', 'wireframe', 'thermal', 'cutaway', 'clayrough', 'clayroughcolour'];
+export const fxNames = ['None', 'Cartoon', 'Outline', 'Sketch', 'Clay', 'Blueprint', 'Isometric', 'X-ray', 'Low poly', 'Wireframe', 'Thermal', 'Cut-away', 'Clay rough', 'Clay rough colour'];
 export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral grey', 'None'];
 
 /** A render that waits in the queue. */
@@ -293,6 +293,15 @@ export class RenderService {
   /** The style of the render (FX): see fxIds. */
   readonly fx = signal('none');
 
+  /** The cut-away section: the axis, how far along the parts (percent) and which side is cut away (0 or 1), as "z:50:0". */
+  readonly cut = signal('z:50:0');
+  cutParts() { const [axis, position, flip] = this.cut().split(':'); return { axis, position: +position, flip: flip === '1' }; }
+  setCut(change: Partial<{ axis: string; position: number; flip: boolean }>) {
+    const now = { ...this.cutParts(), ...change };
+    this.cut.set(`${now.axis}:${Math.min(Math.max(Math.round(now.position), 0), 100)}:${now.flip ? 1 : 0}`);
+    this.saveSettings();
+  }
+
   setFx(id: string) {
     this.fx.set(fxIds.includes(id) ? id : 'none');
     this.saveSettings();
@@ -370,8 +379,8 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'all'); this.lookAt.set(own.lookAt ?? (own.trackId ? 'part' : 'view')); this.reflections.set(own.reflections ?? 0); this.fx.set(own.fx && fxIds.includes(own.fx) ? own.fx : 'none'); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('all'); this.lookAt.set('view'); this.reflections.set(0); this.fx.set('none'); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'all'); this.lookAt.set(own.lookAt ?? (own.trackId ? 'part' : 'view')); this.reflections.set(own.reflections ?? 0); this.fx.set(own.fx && fxIds.includes(own.fx) ? own.fx : 'none'); this.cut.set(own.cut && /^[xyz]:\d{1,3}:[01]$/.test(own.cut) ? own.cut : 'z:50:0'); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('all'); this.lookAt.set('view'); this.reflections.set(0); this.fx.set('none'); this.cut.set('z:50:0'); } // a document without render settings starts with the normal lamp (100%)
     });
     this.store.onTrackChosen = id => { // the 3D view's pick of the part a turntable tracks is over
       if (id) { this.setTrack(id); this.store.announce(`The turntable tracks "${this.tracked()?.name ?? ''}"`, 4000); }
@@ -548,7 +557,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), lookAt: this.lookAt(), reflections: this.reflections(), fx: this.fx(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), lookAt: this.lookAt(), reflections: this.reflections(), fx: this.fx(), cut: this.cut(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -560,6 +569,7 @@ export class RenderService {
     url.searchParams.set('aspect', this.aspect());
     url.searchParams.set('reflections', String(this.reflections()));
     url.searchParams.set('fx', this.fx());
+    url.searchParams.set('cut', this.cut());
     url.searchParams.set('transparent', String(this.transparent()));
     if (this.background() !== null) url.searchParams.set('bg', String(this.background()));
     if (this.ground() !== null) url.searchParams.set('floor', String(this.ground()));
@@ -651,7 +661,7 @@ export class RenderService {
       put('view', settings['view']); put('light', settings['light']);
       put('dof', settings['depthOfField']); put('strength', settings['dofStrength']); put('focus', settings['focusId']);
       put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
-      put('bg', settings['background']); put('floor', settings['ground']); put('aspect', settings['aspect']); put('transparent', settings['transparent']); put('reflections', settings['reflections']); put('fx', settings['fx']);
+      put('bg', settings['background']); put('floor', settings['ground']); put('aspect', settings['aspect']); put('transparent', settings['transparent']); put('reflections', settings['reflections']); put('fx', settings['fx']); put('cut', settings['cut']);
       if (settings['savedView']) url.searchParams.set('savedView', JSON.stringify(settings['savedView']));
       url.searchParams.set('width', String(width));
       url.searchParams.set('samples', String(this.hdSamples()));

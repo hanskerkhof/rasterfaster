@@ -274,9 +274,10 @@ ground_text, _, rest_text = rest_text.partition(",")
 beam_text, _, rest_text = rest_text.partition(",")
 aspect_text, _, rest_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...)
 transparent_text, _, rest_text = rest_text.partition(",")  # "1" for a transparent background
-reflections_text, _, fx_text = rest_text.partition(",")  # what metal, mirror and glass reflect (0 to 4), and the style of the picture
+reflections_text, _, rest_text = rest_text.partition(",")  # what metal, mirror and glass reflect (0 to 4)
+fx_text, _, cut_text = rest_text.partition(",")  # the style of the picture, and where the cut-away cuts ("z:50:0")
 reflections = min(max(int(reflections_text or 0), 0), 4)
-fx = fx_text if fx_text in ("cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly") else "none"
+fx = fx_text if fx_text in ("cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour") else "none"
 aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
 aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
 transparent_background = transparent_text == "1"
@@ -666,6 +667,11 @@ def apply_fx():
         "isometric": (None, (1.0, 1.0, 1.0), (1.4, (0.05, 0.05, 0.07), False), 9),
         "xray": (None, (0.01, 0.03, 0.07), None, 0),
         "lowpoly": (None, None, None, 0),
+        "wireframe": (None, (0.95, 0.95, 0.95), None, 0),
+        "thermal": (None, None, None, 0),
+        "cutaway": (None, None, None, 0),
+        "clayrough": (None, None, None, 0),
+        "clayroughcolour": (None, None, None, 0),
     }[fx]
     colour, paper, lines, steps = style
     if fx == "xray":  # see-through parts whose edges glow: the more a surface turns away from the camera, the more it shines
@@ -718,6 +724,145 @@ def apply_fx():
         shader.inputs["Base Color"].default_value = (*(c ** 2.2 for c in colour), 1)
         shader.inputs["Roughness"].default_value = 0.9
         view_layer.material_override = material
+    if fx in ("clayrough", "clayroughcolour"):  # clay modelled by hand: lumpy, with thumb prints and grain (mottled grey, or in the colours of the parts)
+        def roughen(tree, shader, mottled):
+            shader.inputs["Roughness"].default_value = 0.95
+            coords = tree.nodes.new("ShaderNodeTexCoord")
+            lumps, prints, grain = (tree.nodes.new("ShaderNodeTexNoise") for _ in range(3))
+            for node, scale, detail, roughness in ((lumps, 14.0, 6.0, 0.62), (prints, 55.0, 8.0, 0.7), (grain, 420.0, 3.0, 0.55)):
+                node.inputs["Scale"].default_value = scale
+                node.inputs["Detail"].default_value = detail
+                node.inputs["Roughness"].default_value = roughness
+                tree.links.new(coords.outputs["Object"], node.inputs["Vector"])
+            height = tree.nodes.new("ShaderNodeMath")  # the lumps count most, the prints less, the grain least
+            height.operation = "MULTIPLY_ADD"
+            height.inputs[1].default_value = 0.6
+            tree.links.new(lumps.outputs["Fac"], height.inputs[0])
+            both = tree.nodes.new("ShaderNodeMath")
+            both.operation = "MULTIPLY_ADD"
+            both.inputs[1].default_value = 0.3
+            tree.links.new(prints.outputs["Fac"], both.inputs[0])
+            tree.links.new(height.outputs[0], both.inputs[2])
+            rough = tree.nodes.new("ShaderNodeMath")
+            rough.operation = "MULTIPLY_ADD"
+            rough.inputs[1].default_value = 0.1
+            tree.links.new(grain.outputs["Fac"], rough.inputs[0])
+            tree.links.new(both.outputs[0], rough.inputs[2])
+            bump = tree.nodes.new("ShaderNodeBump")
+            bump.inputs["Strength"].default_value = 1.0
+            bump.inputs["Distance"].default_value = 0.012
+            tree.links.new(rough.outputs[0], bump.inputs["Height"])
+            tree.links.new(bump.outputs["Normal"], shader.inputs["Normal"])
+            if mottled:  # the colour is a little uneven, like clay that was not kneaded through
+                ramp = tree.nodes.new("ShaderNodeValToRGB")
+                ramp.color_ramp.elements[0].color = (0.19, 0.16, 0.135, 1)
+                ramp.color_ramp.elements[1].color = (0.36, 0.31, 0.27, 1)
+                tree.links.new(lumps.outputs["Fac"], ramp.inputs["Factor"])
+                tree.links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
+        if fx == "clayrough":
+            material = bpy.data.materials.new("FX rough clay")
+            material.use_nodes = True
+            roughen(material.node_tree, next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), True)
+            view_layer.material_override = material
+        else:  # every material keeps its colour and gets the lumps
+            for material in list(bpy.data.materials):
+                if not material.use_nodes:
+                    continue
+                shader = next((n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+                if shader is not None:
+                    shader.inputs["Metallic"].default_value = 0.0
+                    shader.inputs["Coat Weight"].default_value = 0.0
+                    roughen(material.node_tree, shader, False)
+    if fx == "wireframe":  # light parts with the triangles of their meshes drawn on them
+        material = bpy.data.materials.new("FX wireframe")
+        material.use_nodes = True
+        tree = material.node_tree
+        output = next(n for n in tree.nodes if n.type == "OUTPUT_MATERIAL")
+        shaded = next(n for n in tree.nodes if n.type == "BSDF_PRINCIPLED")
+        shaded.inputs["Base Color"].default_value = (0.62, 0.62, 0.64, 1)
+        shaded.inputs["Roughness"].default_value = 0.8
+        ink_node, wire, mix = tree.nodes.new("ShaderNodeEmission"), tree.nodes.new("ShaderNodeWireframe"), tree.nodes.new("ShaderNodeMixShader")
+        ink_node.inputs["Color"].default_value = (0.02, 0.03, 0.05, 1)
+        ink_node.inputs["Strength"].default_value = 1.0
+        wire.use_pixel_size = True
+        wire.inputs["Size"].default_value = 0.7
+        tree.links.new(wire.outputs[0], mix.inputs[0])
+        tree.links.new(shaded.outputs[0], mix.inputs[1])
+        tree.links.new(ink_node.outputs[0], mix.inputs[2])
+        tree.links.new(mix.outputs[0], output.inputs["Surface"])
+        view_layer.material_override = material
+    if fx == "cutaway":  # a plane cuts through the assembly: one side is cut away and the cut shows in orange
+        parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Studio floor", "Camera path") and not o.hide_render and not o.get("noRender")]
+        corners = [o.matrix_world @ Vector(c) for o in parts for c in o.bound_box]
+        if corners:
+            axis_name, position_text, flip_text = (cut_text or "z:50:0").split(":")
+            axis = "xyz".index(axis_name)
+            low = Vector(map(min, *[tuple(c) for c in corners]))
+            high = Vector(map(max, *[tuple(c) for c in corners]))
+            at = low[axis] + (high[axis] - low[axis]) * min(max(int(position_text), 0), 100) / 100
+            sign = -1 if flip_text == "1" else 1  # which side goes: the high side (1) or the low side (-1)
+            reach = max((high - low).length, 0.01) * 2
+            cutter = bpy.data.objects.new("FX cutter", bpy.data.meshes.new("FX cutter"))
+            import bmesh
+            shape = bmesh.new()
+            bmesh.ops.create_cube(shape, size=2.0)  # a closed box with outward faces
+            shape.to_mesh(cutter.data)
+            shape.free()
+            scene.collection.objects.link(cutter)
+            cutter.scale = Vector((reach, reach, reach))
+            centre = (low + high) / 2
+            centre[axis] = at + sign * reach
+            cutter.location = centre
+            cap = bpy.data.materials.new("FX cut")
+            cap.use_nodes = True
+            shader = next(n for n in cap.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+            shader.inputs["Base Color"].default_value = (0.9, 0.32, 0.05, 1)
+            shader.inputs["Roughness"].default_value = 0.7
+            cutter.data.materials.append(cap)
+            cutter.hide_render = True
+            cutter.display_type = "BOUNDS"
+            for obj in parts:
+                cut = obj.modifiers.new("FX cut", "BOOLEAN")
+                cut.operation = "DIFFERENCE"
+                cut.object = cutter
+                try:
+                    cut.solver = "MANIFOLD"  # fast and exact on closed meshes
+                except (TypeError, AttributeError):
+                    cut.solver = "EXACT"
+                try:
+                    cut.material_mode = "TRANSFER"  # the cut faces take the cutter's colour
+                except (TypeError, AttributeError):
+                    pass
+    if fx == "thermal":  # false colour by distance from the camera: warm near, cold far
+        camera = scene.camera
+        if camera:
+            view_layer.use_pass_z = True
+            forward = -(camera.matrix_world.to_3x3() @ Vector((0, 0, 1)))
+            parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path",) and not o.hide_render]
+            depths = [(o.matrix_world @ Vector(c) - camera.matrix_world.translation).dot(forward) for o in parts if o.name != "Studio floor" for c in o.bound_box]
+            near, far = (min(depths), max(depths)) if depths else (0.1, 10.0)
+            far = max(far, near + 0.01)
+            tree = bpy.data.node_groups.new("FX compositing", "CompositorNodeTree")
+            tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+            scene.compositing_node_group = tree
+            layers = tree.nodes.new("CompositorNodeRLayers")
+            ranged = tree.nodes.new("ShaderNodeMapRange")
+            ranged.inputs["From Min"].default_value = near
+            ranged.inputs["From Max"].default_value = far
+            ranged.inputs["To Min"].default_value = 1.0  # near is hot
+            ranged.inputs["To Max"].default_value = 0.0
+            ranged.clamp = True
+            ramp = tree.nodes.new("ShaderNodeValToRGB")
+            colours = [(0.0, (0.0, 0.0, 0.08, 1)), (0.2, (0.1, 0.0, 0.45, 1)), (0.4, (0.6, 0.0, 0.55, 1)), (0.6, (0.95, 0.15, 0.1, 1)), (0.8, (1.0, 0.7, 0.0, 1)), (1.0, (1.0, 1.0, 0.8, 1))]
+            ramp.color_ramp.elements[0].position, ramp.color_ramp.elements[0].color = colours[0]
+            ramp.color_ramp.elements[1].position, ramp.color_ramp.elements[1].color = colours[-1]
+            for position, colour_ in colours[1:-1]:
+                element = ramp.color_ramp.elements.new(position)
+                element.color = colour_
+            out = tree.nodes.new("NodeGroupOutput")
+            tree.links.new(layers.outputs["Depth"], ranged.inputs["Value"])
+            tree.links.new(ranged.outputs["Result"], ramp.inputs["Factor"])
+            tree.links.new(ramp.outputs["Color"], out.inputs[0])
     if paper is not None:  # the camera sees the paper, everything else the studio's lighting
         floor = bpy.data.objects.get("Studio floor")
         if floor:
