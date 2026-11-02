@@ -1,4 +1,4 @@
-import type { DocItem, Quat, Vec3 } from './document.store';
+import type { DocItem, ItemRender, Quat, Vec3 } from './document.store';
 
 /** A copied part: its content, no id and no absolute position (that is `offset` from the copied selection's lowest corner). */
 export interface ClipboardItem {
@@ -12,6 +12,7 @@ export interface ClipboardItem {
   noExport: boolean;
   noRender: boolean;
   origin: Vec3 | null;
+  render: ItemRender | null;
   offset: Vec3;
 }
 
@@ -29,7 +30,7 @@ export function copyItems(items: readonly DocItem[]): ClipboardContent | null {
     origin,
     items: items.map(i => ({
       path: i.path, name: i.name, color: i.color, rotation: [...i.rotation] as Quat, scale: i.scale ? [...i.scale] as Vec3 : null,
-      muted: !!i.muted, centered: !!i.centered, noExport: !!i.noExport, noRender: !!i.noRender, origin: i.origin ? [...i.origin] as Vec3 : null,
+      muted: !!i.muted, centered: !!i.centered, noExport: !!i.noExport, noRender: !!i.noRender, origin: i.origin ? [...i.origin] as Vec3 : null, render: i.render ? { ...i.render } : null,
       offset: [i.position[0] - origin[0], i.position[1] - origin[1], i.position[2] - origin[2]],
     })),
   };
@@ -58,6 +59,7 @@ export function pasteItems(
     ...(item.noRender ? { noRender: true } : {}),
     ...(item.scale ? { scale: [...item.scale] as Vec3 } : {}),
     ...(item.origin ? { origin: [...item.origin] as Vec3 } : {}),
+    ...(item.render ? { render: { ...item.render } } : {}),
     position: place([base[0] + item.offset[0], base[1] + item.offset[1], base[2] + item.offset[2]], item),
   }));
 }

@@ -1,5 +1,5 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
-import { DocumentStore } from './document.store';
+import { DocumentStore, Finish } from './document.store';
 import { ColorPalette } from './color-palette';
 import { closeOnEscape } from './escape-close';
 import { baseThicknessMm } from './z-levels';
@@ -43,6 +43,18 @@ import { baseThicknessMm } from './z-levels';
         <button type="button" role="menuitem" class="sub" (mouseenter)="openColors($event)" (click)="openColors($event)">
           <span class="icon">◐</span>Color<span class="hint">▸</span>
         </button>
+        @if (store.appMode() === 'render') {
+          <div class="finishrow" role="group" aria-label="Finish">
+            <span class="icon">✦</span><span class="flabel">Finish</span>
+            @for (f of finishOptions; track f.id) {
+              <button type="button" role="menuitemradio" [attr.aria-checked]="finishIs(f.id)" [class.on]="finishIs(f.id)" [title]="f.title" (click)="setFinish(f.id)">{{ f.label }}</button>
+            }
+          </div>
+          <button type="button" role="menuitem" (click)="toggleHiddenInRender()">
+            <span class="icon">{{ allHiddenInRender() ? '✓' : '◍' }}</span>Hide in Render mode
+            <span class="hint">{{ allHiddenInRender() ? 'on: not drawn in Render mode or in renders' : 'leave it out of the render and the Blender file' }}</span>
+          </button>
+        }
         <button type="button" role="menuitem" (click)="toggleMuted()">
           <span class="icon">◌</span>{{ allMuted() ? 'Show normally' : 'Dim (mute)' }}
           <span class="hint">{{ allMuted() ? '' : 'barely visible, ignores clicks' }}</span><span class="hint key">V</span>
@@ -100,12 +112,21 @@ import { baseThicknessMm } from './z-levels';
       </div>
       @if (colorsAt(); as at) {
         <div class="flyout" role="menu" aria-label="Color" (mouseenter)="keepColors()" [style.left.px]="at.x" [style.top.px]="at.y">
+          @if (store.appMode() === 'render') { <div class="flyhead">Render colour</div> }
           <app-color-palette [isOn]="isColorFn" (picked)="setColor($event)" />
+          @if (store.appMode() === 'render') {
+            <button type="button" role="menuitem" class="flybtn" [disabled]="!anyRenderColor()" (click)="resetRenderColor()">Reset to the design colour</button>
+            <button type="button" role="menuitem" class="flybtn" (click)="copyDesignColor()">Copy the design colour</button>
+          }
         </div>
       }
     }
   `,
   styles: `
+    .finishrow { display: flex; align-items: center; gap: 4px; padding: 3px 8px; } .finishrow .icon { width: 16px; text-align: center; } .flabel { margin-right: auto; }
+    .finishrow button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; font-size: 12px; cursor: pointer; } .finishrow button:hover { background: #3d4452; } .finishrow button.on { background: #2f6fed; color: #fff; }
+    .flyhead { padding: 2px 4px 6px; color: #8a93a2; font-size: 11px; }
+    .flybtn { display: block; width: 100%; margin-top: 4px; padding: 4px 8px; text-align: left; background: transparent; color: inherit; border: 0; border-radius: 4px; font: inherit; font-size: 12px; cursor: pointer; } .flybtn:hover:not(:disabled) { background: #2f6fed; color: #fff; } .flybtn:disabled { opacity: .45; cursor: default; }
     .backdrop { position: fixed; inset: 0; z-index: 30; }
     .menu { position: fixed; z-index: 31; max-height: calc(100vh - 16px); overflow-y: auto; width: max-content; min-width: 380px; max-width: calc(100vw - 16px); padding: 4px; background: #2b2f38; color: #dde1e8; border: 1px solid rgba(255,255,255,.18);
             border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); font-size: 13px; }
@@ -136,7 +157,7 @@ export class ObjectMenu {
   protected readonly colorsAt = signal<{ x: number; y: number } | null>(null);
 
   protected isColor(c: number) {
-    return this.items().length > 0 && this.items().every(i => i.color === c);
+    return this.items().length > 0 && this.items().every(i => this.store.displayColor(i) === c);
   }
 
   /** Opens the flyout to the right of the row (to the left when there is no room); it is 6 swatches wide. */
@@ -158,6 +179,39 @@ export class ObjectMenu {
   protected keepColors() {
     clearTimeout(this.closeColorsTimer);
     this.closeColorsTimer = undefined;
+  }
+
+  protected readonly finishOptions: { id: Finish; label: string; title: string }[] = [
+    { id: 'satin', label: 'Satin', title: 'Satin PLA: the plain plastic look' },
+    { id: 'metal', label: 'Metal', title: 'Brushed metal in the part\'s colour' },
+    { id: 'glass', label: 'Transparent', title: 'See-through, like glass' },
+    { id: 'mirror', label: 'Mirror', title: 'A perfect mirror (fun for a teapot)' },
+  ];
+  protected finishIs(finish: Finish) {
+    return this.items().length > 0 && this.items().every(i => (i.render?.finish ?? 'satin') === finish);
+  }
+  protected setFinish(finish: Finish) {
+    this.store.setFinish(this.items().map(i => i.id), finish);
+    this.close();
+  }
+  protected allHiddenInRender() {
+    return this.items().length > 0 && this.items().every(i => i.render?.hidden);
+  }
+  protected toggleHiddenInRender() {
+    this.store.setHiddenInRender(this.items().map(i => i.id), !this.allHiddenInRender());
+    this.close();
+  }
+
+  protected anyRenderColor() {
+    return this.items().some(i => i.render?.color != null);
+  }
+  protected resetRenderColor() {
+    this.store.resetRenderColor(this.items().map(i => i.id));
+    this.close();
+  }
+  protected copyDesignColor() {
+    this.store.copyDesignToRender(this.items().map(i => i.id));
+    this.close();
   }
 
   protected setColor(color: number) {

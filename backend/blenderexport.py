@@ -101,6 +101,25 @@ def quaternion(matrix: np.ndarray) -> list[float]:
 
 
 dimmedAlpha = 0.18  # a dimmed (muted) part: how much of it shows
+finishes = ("metal", "glass", "mirror")  # Render mode's finishes besides satin PLA
+
+
+def colour_material(colour: int, dimmed: bool, finish: str | None) -> dict:
+    """The material of a part in its colour: satin PLA, or one of Render mode's finishes (metal, glass, mirror)."""
+    base = [srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)]
+    alpha = dimmedAlpha if dimmed else 1.0
+    name = f"colour_{colour:06x}" + (f"_{finish}" if finish else "") + ("_dimmed" if dimmed else "")
+    extra = {"alphaMode": "BLEND"} if dimmed else {}
+    if finish == "metal":  # brushed metal in the colour of the part
+        return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*base, alpha], "metallicFactor": 1.0, "roughnessFactor": 0.28}, **extra}
+    if finish == "mirror":  # a polished mirror: almost white metal with only a trace of the colour
+        tint = [0.85 + 0.15 * c for c in base]
+        return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*tint, alpha], "metallicFactor": 1.0, "roughnessFactor": 0.0}, **extra}
+    if finish == "glass":  # see-through plastic or glass in the colour of the part
+        return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*base, alpha], "metallicFactor": 0.0, "roughnessFactor": 0.04},
+                "extensions": {"KHR_materials_transmission": {"transmissionFactor": 1.0}}, **extra}
+    return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*base, alpha], "metallicFactor": 0.0, "roughnessFactor": 0.42},  # the same satin finish as Black PLA, in the document's colour
+            "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}}, **extra}
 
 
 def black_pla(dimmed: bool = False) -> dict:
@@ -168,26 +187,27 @@ def build_glb(document: dict, load_stl: Callable[[str], bytes], camera: bool = T
     for item, placement in zip(items, placements):
         colour = (int(item["color"]) & 0xFFFFFF) if colours else -1  # -1: Black PLA
         dimmed = bool(item.get("muted"))
-        if (colour, dimmed) not in materialIndex:
-            materialIndex[(colour, dimmed)] = len(materials)
+        finish = (item.get("render") or {}).get("finish") if colours else None  # Render mode's finish (none: satin PLA)
+        if finish not in finishes:
+            finish = None
+        if (colour, dimmed, finish) not in materialIndex:
+            materialIndex[(colour, dimmed, finish)] = len(materials)
             if colour < 0:
                 materials.append(black_pla(dimmed))
             else:
-                materials.append({"name": f"colour_{colour:06x}" + ("_dimmed" if dimmed else ""), "pbrMetallicRoughness": {
-                    "baseColorFactor": [*(srgb_to_linear(((colour >> shift) & 255) / 255) for shift in (16, 8, 0)), dimmedAlpha if dimmed else 1.0], "metallicFactor": 0.0, "roughnessFactor": 0.42},  # the same satin finish as Black PLA, in the document's colour
-                    "extensions": {"KHR_materials_clearcoat": {"clearcoatFactor": 0.12, "clearcoatRoughnessFactor": 0.35}},
-                    **({"alphaMode": "BLEND"} if dimmed else {})})
-        key = (item["path"], colour, dimmed)  # one glTF mesh per library file, colour and dimming; parts used several times share it
+                materials.append(colour_material(colour, dimmed, finish))
+        key = (item["path"], colour, dimmed, finish)  # one glTF mesh per library file, colour, dimming and finish; parts used several times share it
         if key not in meshIndex:
             meshIndex[key] = len(gltfMeshes)
             position, indices = accessors[item["path"]]
             gltfMeshes.append({"name": item["path"].rsplit("/", 1)[-1], "primitives": [{
-                "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[(colour, dimmed)]}]})  # no normals: faces shade flat
+                "attributes": {"POSITION": position}, "indices": indices, "material": materialIndex[(colour, dimmed, finish)]}]})  # no normals: faces shade flat
         nodes.append({"name": item["name"], "mesh": meshIndex[key], "matrix": node_matrix(placement), "extras": {"itemId": item["id"], **({"noRender": True} if item.get("noRender") else {})}})  # the id lets a light find its part; a part marked "Do not render" stays in the scene (to focus or aim on) but is not drawn
         partNodes.append(len(nodes) - 1)
 
     sceneNodes = list(partNodes)
-    gltf: dict = {"extensionsUsed": ["KHR_materials_clearcoat"], "asset": {"version": "2.0", "generator": "RASTERFASTER composition tool"}, "scene": 0,
+    used = ["KHR_materials_clearcoat"] + (["KHR_materials_transmission"] if any("KHR_materials_transmission" in m.get("extensions", {}) for m in materials) else [])
+    gltf: dict = {"extensionsUsed": used, "asset": {"version": "2.0", "generator": "RASTERFASTER composition tool"}, "scene": 0,
                   "meshes": gltfMeshes, "materials": materials, "nodes": nodes}
 
     if camera:

@@ -33,6 +33,7 @@ interface ItemRuntime {
   muted: boolean;
   mode: ViewMode;
   color: number;
+  finish: string | null;
   silhouette: boolean;
 }
 
@@ -59,6 +60,8 @@ export interface DocumentSceneContext {
   host: HTMLElement;
   store: DocumentStore;
   background: THREE.Color;
+  /** The reflections of metal, glass and mirror parts (made once by the viewer). */
+  environment?: () => THREE.Texture | null;
   loadGeometry: (path: string) => Promise<THREE.BufferGeometry>;
   /** Degrees per keyboard rotation press (the rotate panel's step). */
   rotationStep: () => number;
@@ -499,29 +502,36 @@ export class DocumentScene {
     if (!entry) { if (!this.failed.has(key)) void this.prepare(item, key); return; }
     let runtime = this.runtimes.get(item.id);
     if (!runtime) {
-      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, silhouette: false };
+      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, finish: null, silhouette: false };
       runtime.group.userData['itemId'] = item.id;
       this.group.add(runtime.group);
       this.runtimes.set(item.id, runtime);
     }
     const muted = !!item.muted;
-    if (runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== item.color || runtime.silhouette !== silhouetteEdges()) {
+    if (runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== this.ctx.store.displayColor(item) || runtime.finish !== this.finishOf(item) || runtime.silhouette !== silhouetteEdges()) {
       clearParts(runtime.group);
-      const base = new THREE.Color(selected ? selectedColor : item.color);
+      const base = new THREE.Color(selected ? selectedColor : this.ctx.store.displayColor(item));
       const style = {
         background: this.ctx.background, solid: base.getHex(), line: base.getHex(), wire: base.getHex(),
         dashed: base.clone().multiplyScalar(0.45).getHex(), radius: entry.size.length() / 2,
         edges: () => (entry.edges ??= new THREE.EdgesGeometry(entry.geometry, creaseDegrees)),
         silhouette: () => (entry.silhouette ??= buildSilhouetteGeometry(entry.geometry)),
         ghost: muted,
+        finish: this.finishOf(item), environment: this.ctx.environment?.() ?? null,
       };
       for (const part of buildParts(entry.geometry, this.mode, style)) {
         part.userData['itemId'] = item.id;
         runtime.group.add(part);
       }
-      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: item.color, silhouette: silhouetteEdges() });
+      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: this.ctx.store.displayColor(item), finish: this.finishOf(item), silhouette: silhouetteEdges() });
     }
+    runtime.group.visible = !this.ctx.store.isHiddenNow(item); // hidden in Render mode: not drawn, and not clickable (see pickableMeshes)
     runtime.group.position.set(...item.position);
+  }
+
+  /** The finish a part has in the current mode: only Render mode shows it. */
+  private finishOf(item: DocItem) {
+    return this.ctx.store.appMode() === 'render' ? (item.render?.finish ?? null) : null;
   }
 
   private async prepare(item: DocItem, key: string) {
@@ -1732,9 +1742,11 @@ export class DocumentScene {
 
   /** Meshes a click can hit: everything except muted items (or only the muted ones, for the right-click menu). */
   pickableMeshes(mutedOnly = false): THREE.Object3D[] {
-    const muted = new Set(this.ctx.store.doc().items.filter(i => i.muted).map(i => i.id));
+    const { store } = this.ctx;
+    const muted = new Set(store.doc().items.filter(i => i.muted).map(i => i.id));
+    const hidden = new Set(store.doc().items.filter(i => store.isHiddenNow(i)).map(i => i.id)); // out of Render mode: nothing to click
     const meshes: THREE.Object3D[] = [];
-    this.group.traverse(o => { if ((o as THREE.Mesh).isMesh && muted.has(o.userData['itemId']) === mutedOnly) meshes.push(o); });
+    this.group.traverse(o => { if ((o as THREE.Mesh).isMesh && !hidden.has(o.userData['itemId']) && muted.has(o.userData['itemId']) === mutedOnly) meshes.push(o); });
     return meshes;
   }
 

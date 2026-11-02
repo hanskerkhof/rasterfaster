@@ -18,6 +18,21 @@ export interface PartStyle {
   silhouette?: () => THREE.BufferGeometry;
   /** Draw as a barely visible ghost that doesn't hide what is behind it. */
   ghost?: boolean;
+  /** Render mode's finish of the part (only the solid and shaded views show it; none or satin is the plain PLA look). */
+  finish?: 'satin' | 'metal' | 'glass' | 'mirror' | null;
+  /** The reflections metal, glass and mirror need. */
+  environment?: THREE.Texture | null;
+}
+
+/** The look of a finish: the material of the solid and shaded views. Satin (none) is the plain PLA look the views always had. */
+function finishMaterial(style: PartStyle, fallback: () => THREE.Material): THREE.Material {
+  const base = { color: style.solid, envMap: style.environment ?? null };
+  switch (style.finish) {
+    case 'metal': return new THREE.MeshPhysicalMaterial({ ...base, metalness: 1, roughness: 0.3 });
+    case 'mirror': return new THREE.MeshPhysicalMaterial({ ...base, color: new THREE.Color(style.solid).lerp(new THREE.Color(0xffffff), 0.75), metalness: 1, roughness: 0.02, envMapIntensity: 1.3 });
+    case 'glass': return new THREE.MeshPhysicalMaterial({ ...base, metalness: 0, roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false, envMapIntensity: 1, side: THREE.DoubleSide });
+    default: return fallback();
+  }
 }
 
 /** The outline of the solid-with-outline mode: dark, to stand out on the light grey parts. */
@@ -42,10 +57,10 @@ function creasedCopy(geometry: THREE.BufferGeometry): THREE.BufferGeometry {
 export function buildParts(geometry: THREE.BufferGeometry, mode: ViewMode, style: PartStyle): THREE.Object3D[] {
   if (style.ghost) return buildGhostParts(geometry, mode, style);
   if (mode === 'solid') {
-    return [new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true }))];
+    return [new THREE.Mesh(geometry, finishMaterial(style, () => new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.6, metalness: 0.1, flatShading: true })))];
   }
   if (mode === 'shaded') { // a glossy material, smooth normals, and it casts and receives the shadows of the light source (see the viewer)
-    const mesh = new THREE.Mesh(creasedCopy(geometry), new THREE.MeshPhysicalMaterial({ color: style.solid, roughness: 0.38, metalness: 0.12, clearcoat: 0.3, clearcoatRoughness: 0.35 }));
+    const mesh = new THREE.Mesh(creasedCopy(geometry), finishMaterial(style, () => new THREE.MeshPhysicalMaterial({ color: style.solid, roughness: 0.38, metalness: 0.12, clearcoat: 0.3, clearcoatRoughness: 0.35 })));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return [mesh];

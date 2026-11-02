@@ -5,6 +5,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { RenderService } from './render.service';
 import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
@@ -17,6 +19,8 @@ import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels'
 const gridCellMm = 20; // RASTERFASTER base grid pitch
 const gridColor = 0x4a4e58; // dark gray, visible on the #1b1d22 background
 const grid3dStorageKey = 'rasterfaster.grid3d';
+/** The studio of the Blender scene: its dark background and dark matte floor. */
+const studioColour = { background: 0x1b1d22, ground: 0x1b1d23 };
 const groundGridStorageKey = 'rasterfaster.groundGrid';
 const groundModeStorageKey = 'rasterfaster.groundMode';
 const groundColorStorageKey = 'rasterfaster.groundColor';
@@ -364,6 +368,7 @@ export class StlViewer implements OnDestroy {
   /** false: preview one STL; true: show and edit the document's items. */
   readonly documentMode = input(false);
   protected readonly store = inject(DocumentStore);
+  private readonly renderSettings = inject(RenderService);
   private readonly viewFocus = inject(ViewFocus);
   private readonly library = inject(LibraryService);
   readonly info = signal('');
@@ -501,7 +506,12 @@ export class StlViewer implements OnDestroy {
   /** Show the grid on the ground (and the 3D lattice with it); the view cube menu switches it. */
   protected readonly groundMode = signal<GroundMode>(readGroundMode());
   protected readonly groundColor = signal(readGroundColor());
-  protected readonly groundGrid = computed(() => this.groundMode() === 'grid');
+  /** In Render mode the view shows the ground of the render: the Render dialog's ground colour when one is set, else the studio's dark floor. */
+  private readonly renderMode = computed(() => this.store.appMode() === 'render');
+  private readonly shownGroundMode = computed<GroundMode>(() => (this.renderMode() ? 'solid' : this.groundMode()));
+  private readonly shownGroundColor = computed(() => (this.renderMode() ? (this.renderSettings.ground() ?? studioColour.ground) : this.groundColor()));
+  private readonly shownBackground = computed(() => (this.renderMode() ? (this.renderSettings.background() ?? studioColour.background) : studioColour.background));
+  protected readonly groundGrid = computed(() => this.shownGroundMode() === 'grid');
   protected readonly groundMenuOpen = signal(false);
   protected readonly groundSolidOpen = signal(false);
   private groundPlane: THREE.Mesh | null = null;
@@ -570,9 +580,10 @@ export class StlViewer implements OnDestroy {
       this.grid3d();
       this.zGridMode(); // the 3D grid's levels follow the mode
       this.groundGrid(); // switching the grid on or off only needs the visibility (rebuildGrid sets it)
-      this.groundMode(); this.groundColor(); // and the solid ground is built with the grid
+      this.shownGroundMode(); this.shownGroundColor(); // and the solid ground is built with the grid
       if (this.ready()) untracked(() => { this.rebuildGrid(); this.updateShadowRig(); });
     });
+    effect(() => { const colour = this.shownBackground(); (this.scene.background as THREE.Color | null)?.set(colour); });
     // A file came back (or went away): parts that could not be loaded are tried again.
     effect(() => { this.store.missingPaths(); untracked(() => { if (this.ready()) this.documentScene.retryFailed(); }); });
     // Another document was opened: fit the camera to it once its geometry has loaded.
@@ -607,7 +618,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     Object.assign(this.renderer.domElement.style, { position: 'absolute', inset: '0', width: '100%', height: '100%' });
     el.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(0x1b1d22);
+    this.scene.background = new THREE.Color(this.shownBackground());
     this.scene.add(this.model);
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x444455, 1.1));
     const dir = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -643,6 +654,7 @@ export class StlViewer implements OnDestroy {
       scene: this.scene, get camera() { return viewer.camera; }, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
       background: this.scene.background as THREE.Color,
       loadGeometry: path => this.loadGeometry(path),
+      environment: () => this.reflections(),
       zGridMode: () => this.zGridMode(),
       viewCenter: () => ({ x: this.controls.target.x, y: this.controls.target.y }),
       rotationStep: () => this.rotationStep(),
@@ -1215,7 +1227,7 @@ export class StlViewer implements OnDestroy {
     return {
       projection: this.projection,
       position: this.camera.position.toArray().map(round) as Vec3, target: this.controls.target.toArray().map(round) as Vec3, zoom: round(this.camera.zoom), radius: round(this.radius),
-      mode: this.mode(), light: this.store.doc().light ?? null,
+      mode: this.mode(), appMode: this.store.appMode(), light: this.store.doc().light ?? null,
       ground: this.groundMode(), groundColor: this.groundColor(), grid3d: this.grid3d(), zGrid: this.zGridMode(),
     };
   }
@@ -1227,6 +1239,7 @@ export class StlViewer implements OnDestroy {
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.touchView();
     if (view.mode && view.mode !== this.mode()) this.modeRequest.emit(view.mode as ViewMode);
+    if (view.appMode === 'design' || view.appMode === 'render') this.store.setAppMode(view.appMode);
     if (view.light !== undefined && JSON.stringify(view.light ?? null) !== JSON.stringify(this.store.doc().light ?? null)) this.store.setLight(view.light ?? null);
     if (view.ground) this.groundMode.set(view.ground);
     if (typeof view.groundColor === 'number') this.groundColor.set(view.groundColor);
@@ -1623,14 +1636,26 @@ export class StlViewer implements OnDestroy {
       (this.groundPlane.material as THREE.Material).dispose();
       this.groundPlane = null;
     }
-    if (this.groundMode() !== 'solid') return;
+    if (this.shownGroundMode() !== 'solid') return;
     const reach = 10 * cell;
     const width = maxX - minX + 2 * reach, height = maxY - minY + 2 * reach;
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ color: this.groundColor(), roughness: 0.95, metalness: 0 }));
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshStandardMaterial({ color: this.shownGroundColor(), roughness: 0.95, metalness: 0 }));
     plane.position.set((minX + maxX) / 2, (minY + maxY) / 2, -0.1);
     plane.receiveShadow = true;
     this.groundPlane = plane;
     this.scene.add(plane);
+  }
+
+  private environmentTexture: THREE.Texture | null = null;
+
+  /** The reflections metal, glass and mirror parts show: a plain studio room, made once (it is only needed when a part has such a finish). */
+  private reflections(): THREE.Texture | null {
+    if (!this.environmentTexture && this.renderer) {
+      const generator = new THREE.PMREMGenerator(this.renderer);
+      this.environmentTexture = generator.fromScene(new RoomEnvironment(), 0.04).texture;
+      generator.dispose();
+    }
+    return this.environmentTexture;
   }
 
   private clearModel() {
@@ -1670,7 +1695,7 @@ export class StlViewer implements OnDestroy {
   private updateShadowRig() {
     const on = this.mode() === 'shaded';
     this.keyLight.castShadow = on;
-    this.shadowFloor.visible = on && this.groundMode() !== 'solid'; // the Solid ground catches the shadows itself
+    this.shadowFloor.visible = on && this.shownGroundMode() !== 'solid'; // the Solid ground catches the shadows itself
     this.lightGizmo.visible = on;
     if (!on) return;
     let box: THREE.Box3 | null = null;
@@ -1903,6 +1928,7 @@ export class StlViewer implements OnDestroy {
     this.store.showInAssembly = null;
     this.store.viewSvg = null;
     this.store.captureView = null;
+    this.environmentTexture?.dispose();
     this.store.recallView = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);

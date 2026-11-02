@@ -263,6 +263,120 @@ describe('Groups', () => {
   });
 });
 
+describe('Design and Render mode', () => {
+  let store: DocumentStore;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+  });
+
+  it('starts in Design, toggles, and remembers the mode per browser', () => {
+    expect(store.appMode()).toBe('design');
+    store.toggleAppMode();
+    expect(store.appMode()).toBe('render');
+    expect(localStorage.getItem('rasterfaster.appMode')).toBe('render');
+    store.setAppMode('design');
+    expect(store.appMode()).toBe('design');
+  });
+
+  it('shows the render colour only in Render mode, and only when the part has one', () => {
+    const plain = store.addItem({ ...part(), color: 0x112233 });
+    const own = store.addItem({ ...part(), color: 0x112233, render: { color: 0xabcdef } });
+    expect([store.displayColor(plain), store.displayColor(own)]).toEqual([0x112233, 0x112233]);
+    store.setAppMode('render');
+    expect([store.displayColor(plain), store.displayColor(own)]).toEqual([0x112233, 0xabcdef]); // no render colour: the design colour
+  });
+
+  it('the render settings of a part go through undo and the clipboard', () => {
+    const { id } = store.addItem(part());
+    store.updateItems('Render finish', new Map([[id, { render: { finish: 'metal', color: 0x336699 } }]]));
+    expect(store.doc().items[0].render).toEqual({ finish: 'metal', color: 0x336699 });
+    store.undo();
+    expect(store.doc().items[0].render).toBeUndefined();
+    store.redo();
+    store.select(id);
+    store.copySelection();
+    store.pasteClipboard();
+    expect(store.doc().items[1].render).toEqual({ finish: 'metal', color: 0x336699 });
+  });
+});
+
+describe('Colours by mode', () => {
+  let store: DocumentStore;
+  let a: string, b: string;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+    a = store.addItem({ ...part(), color: 0x111111 }).id;
+    b = store.addItem({ ...part([20, 0, 0]), color: 0x222222 }).id;
+  });
+
+  const item = (id: string) => store.doc().items.find(i => i.id === id)!;
+
+  it('colours the design colour in Design mode and the render colour in Render mode', () => {
+    store.setColor([a], 0xaa0000);
+    expect([item(a).color, item(a).render]).toEqual([0xaa0000, undefined]);
+    store.setAppMode('render');
+    store.setColor([a, b], 0x00aa00);
+    expect([item(a).color, item(a).render?.color, item(b).color, item(b).render?.color]).toEqual([0xaa0000, 0x00aa00, 0x222222, 0x00aa00]); // the design colours are untouched
+    expect(store.displayColor(item(a))).toBe(0x00aa00);
+    store.setAppMode('design');
+    expect(store.displayColor(item(a))).toBe(0xaa0000);
+  });
+
+  it('resets a render colour, copies the design colour, and drops the empty render field', () => {
+    store.setAppMode('render');
+    store.setColor([a], 0x00aa00);
+    store.resetRenderColor([a]);
+    expect(item(a).render).toBeNull(); // nothing of Render mode is left on the part
+    store.copyDesignToRender([b]);
+    expect(item(b).render?.color).toBe(0x222222);
+    store.setItemRender([b], { finish: 'metal' });
+    store.resetRenderColor([b]);
+    expect(item(b).render).toEqual({ color: null, finish: 'metal' }); // the finish stays
+  });
+});
+
+describe('Finishes and hiding in Render mode', () => {
+  let store: DocumentStore;
+  let a: string, b: string;
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+    a = store.addItem(part()).id;
+    b = store.addItem(part([20, 0, 0])).id;
+  });
+
+  const item = (id: string) => store.doc().items.find(i => i.id === id)!;
+
+  it('sets a finish, and satin takes it away again', () => {
+    store.setFinish([a], 'mirror');
+    expect(item(a).render).toEqual({ finish: 'mirror' });
+    store.setFinish([a], 'satin');
+    expect(item(a).render).toBeNull();
+  });
+
+  it('hides parts in Render mode only, and Select all leaves them out there', () => {
+    store.setHiddenInRender([a], true);
+    expect(store.isHiddenNow(item(a))).toBe(false); // Design mode: still there
+    store.selectAll();
+    expect(store.selectedIds().length).toBe(2);
+    store.setAppMode('render');
+    expect(store.isHiddenNow(item(a))).toBe(true);
+    expect(store.isHiddenNow(item(b))).toBe(false);
+    store.selectAll();
+    expect(store.selectedIds()).toEqual([b]);
+    store.setHiddenInRender([a], false);
+    expect(item(a).render).toBeNull();
+  });
+});
+
 describe('Saved views', () => {
   let store: DocumentStore;
   const camera = (x: number) => ({ projection: 'ortho' as const, position: [x, 0, 0] as Vec3, target: [0, 0, 0] as Vec3, zoom: 1, radius: 100, mode: 'solid' });

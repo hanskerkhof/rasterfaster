@@ -342,3 +342,13 @@ def test_image_library_thumbnail_rename_and_deleting(client):
     assert client.delete(f"{base}/{new['id']}").status_code == 204
     assert client.delete(f"{base}/{new['id']}").status_code == 404
     assert client.get(f"/api/documents/nope/images").status_code == 404
+
+
+def test_part_render_settings_are_kept_and_checked(client):
+    item = {"id": "a", "path": "a10.stl", "name": "A", "color": 1, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "R", "items": [{**item, "render": {"color": 0x336699, "finish": "mirror", "hidden": True}}]})
+    assert created.status_code == 201
+    assert client.get(f"/api/documents/{created.json()['id']}").json()["items"][0]["render"] == {"color": 0x336699, "finish": "mirror", "hidden": True}
+    assert client.post("/api/documents", json={"name": "R", "items": [item]}).json()["items"][0]["render"] is None
+    assert client.post("/api/documents", json={"name": "R", "items": [{**item, "render": {"finish": "chrome"}}]}).status_code == 422
+    assert client.post("/api/documents", json={"name": "R", "items": [{**item, "render": {"color": -1}}]}).status_code == 422

@@ -152,13 +152,15 @@ function readGeometry(): PanelGeometry | null {
         </div>
        }
        @if (!item.groupId || !folded(item.groupId)) {
-        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · the group row selects the whole group">
+        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted || store.isHiddenNow(item)" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · the group row selects the whole group">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
           @if (store.missingPaths().has(item.path) || item.path.startsWith('embedded:')) { <button type="button" class="relink" title="Relink: pick another library file for this part" (click)="relink($event, item.id)">⇄</button> }
           @if (item.path.startsWith('embedded:')) { <span class="badge warn" title="This geometry comes from an imported 3MF: there is no file for it in the library. Right-click ▸ Export STL (original) saves it as an STL.">⚠</span> }
           @if (item.centered) { <span class="badge" title="Kept centered on the grid">⌖</span> }
+          @if (store.appMode() === 'render' && item.render?.finish) { <span class="badge" [title]="'Finish in Render mode: ' + item.render!.finish">✦ {{ item.render!.finish }}</span> }
+          @if (item.render?.hidden) { <span class="badge" title="Hidden in Render mode: not drawn in Render mode, in renders or in the Blender file">◍</span> }
           @if (item.noRender) { <span class="badge" title="Do not render: in the Blender scene (to focus or aim the lamp at) but not drawn">◌</span> }
           @if (item.noExport) { <span class="badge" title="Do not export: left out of the 3MF and SVG, listed in its own BOM section">⊘</span> }
           <button type="button" class="x" title="Remove from document" (click)="remove($event, item)">✕</button>
@@ -651,7 +653,7 @@ export class DocumentPanel {
   }
 
   protected hex(item: DocItem) {
-    return '#' + item.color.toString(16).padStart(6, '0');
+    return '#' + this.store.displayColor(item).toString(16).padStart(6, '0');
   }
 
   protected onItemContextMenu(event: MouseEvent, id: string) {

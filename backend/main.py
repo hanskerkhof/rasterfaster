@@ -338,6 +338,13 @@ def get_file(path: str) -> FileResponse:
     return FileResponse(file, media_type="model/stl", headers={"Cache-Control": "no-cache"})
 
 
+class DocumentItemRender(BaseModel):
+    """What Render mode changes for one part (all optional: a part without them is drawn as in Design mode)."""
+    color: int | None = Field(default=None, ge=0, le=0xFFFFFF)  # the render colour; none: the part's design colour
+    finish: Literal["satin", "metal", "glass", "mirror"] | None = None  # none: satin (PLA, as renders always were)
+    hidden: bool = False  # left out of Render mode: not in the view, the render or the Blender file
+
+
 class DocumentItem(BaseModel):
     id: str = Field(max_length=64)
     path: str = Field(max_length=1024)
@@ -352,6 +359,7 @@ class DocumentItem(BaseModel):
     scale: tuple[float, float, float] | None = None  # scale along the part's own X, Y and Z axes, applied before the rotation (None: 1, 1, 1)
     origin: tuple[float, float, float] | None = None  # origin point set by the user, in the part's own STL coordinates (None: the STL's own 0, 0, 0)
     groupId: str | None = Field(default=None, max_length=64)  # the group of the document this part belongs to (moved, turned and scaled together)
+    render: DocumentItemRender | None = None  # Render mode's own colour, finish and visibility of this part
 
 
 class DocumentGroup(BaseModel):
@@ -380,6 +388,7 @@ class DocumentSavedView(DocumentView):
     id: str = Field(max_length=64)
     name: str = Field(min_length=1, max_length=80)
     mode: str | None = Field(default=None, max_length=32)  # display mode: solid, wireframe ...
+    appMode: Literal["design", "render"] | None = None  # Design or Render mode
     light: DocumentLight | None = None
     ground: Literal["none", "grid", "solid"] | None = None
     groundColor: int | None = Field(default=None, ge=0, le=0xFFFFFF)
@@ -704,6 +713,15 @@ def exportable(document: DocumentOut) -> DocumentOut:
     return document.model_copy(update={"items": kept})
 
 
+def render_view(document: DocumentOut) -> DocumentOut:
+    """The document as a render and the Blender file see it: parts hidden in Render mode left out, render colours in place of design colours
+    (the finishes ride along in each part's `render`). The 3MF, SVG and BOM never use this: they keep the design colours."""
+    items = [item for item in document.items if not (item.render and item.render.hidden)]
+    if document.items and not items:
+        raise HTTPException(status_code=422, detail="every part is hidden in Render mode")
+    return document.model_copy(update={"items": [item.model_copy(update={"color": item.render.color}) if item.render and item.render.color is not None else item for item in items]})
+
+
 def load_document_stls(document: DocumentOut) -> dict[str, bytes]:
     stlBytes: dict[str, bytes] = {}
     missing = []
@@ -774,7 +792,7 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
     blender = blenderexport.find_blender()
     if not blender:
         raise HTTPException(status_code=503, detail="Blender was not found on this machine (set the BLENDER environment variable to its path)")
-    document = exportable(read_document(documentId))
+    document = render_view(exportable(read_document(documentId)))  # a render shows Render mode: render colours, finishes, hidden parts left out
     stlBytes = load_document_stls(document)
     try:
         glb = blenderexport.build_glb(document.model_dump(), stlBytes.__getitem__, True, colours, parsed_view(view))

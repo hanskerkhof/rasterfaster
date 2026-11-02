@@ -119,6 +119,8 @@ export class App {
   ];
 
   constructor() {
+    document.addEventListener('keydown', this.onTabKey, true);
+    inject(DestroyRef).onDestroy(() => document.removeEventListener('keydown', this.onTabKey, true));
     void this.store.init();
     effect(() => { if (this.store.relinkRequest()) untracked(() => this.startRelinkMode()); });
     effect(() => { this.store.docId(); untracked(() => this.store.relinkRequest.set(null)); }); // another document: no relink mode
@@ -445,6 +447,18 @@ export class App {
     try { localStorage.setItem(panelHiddenStorageKey, String(hidden)); } catch { /* the choice just is not remembered */ }
     if (hidden) (document.activeElement as HTMLElement | null)?.blur(); // focus must not stay inside the hidden panel
   }
+
+  /**
+   * Tab never moves the focus around in this app (nothing is reachable by tabbing, as if every tabindex were -1): it switches between the
+   * Design and the Render mode instead. Inside a text field it does nothing. Registered in the capture phase so no dialog can use it first.
+   */
+  private readonly onTabKey = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab') return;
+    event.preventDefault();
+    if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || event.repeat) return;
+    if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) return;
+    this.store.toggleAppMode();
+  };
 
   @HostListener('document:keydown', ['$event'])
   protected onGlobalKey(event: KeyboardEvent) {

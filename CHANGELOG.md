@@ -2,6 +2,13 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Design and Render mode (0.11.0)
+
+### Added
+- **FE** + **BE** (`document.store.ts`, `app.ts`, `stl-viewer.ts`, `object-menu.ts`, `model-render.ts`, `blenderexport.py`, `main.py`): **Design | Render** mode, switched with the toolbar buttons or **Tab** (which no longer moves the focus anywhere in the app). Each part has an optional `render` field with its own colour, finish and visibility in Render mode. In Render mode the Color menu sets the render colour (with *Reset to the design colour* and *Copy the design colour*), a *Finish* row sets Satin, Metal, Transparent or Mirror, and *Hide in Render mode* leaves a part out; the 3D view and the part list show render colours, the studio background and ground, finishes (with reflections in the solid and shaded views) and hide hidden parts (not clickable, skipped by Select all).
+- **BE**: quick renders, full-size renders and the `.blend` use the render colours, finishes (metal, mirror, transmission) and hidden parts; the 3MF, SVG and BOM keep the design colours. Saved views remember the mode.
+- **README**: a section on groups, saved views, the image library and Design / Render mode.
+
 ## 2026-11-02 - Image library: settings, cycling, menu, resize, render again (0.10.70)
 
 ### Added

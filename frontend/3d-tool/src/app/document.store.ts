@@ -69,6 +69,21 @@ export interface DocItem {
   origin?: Vec3 | null;
   /** The group this part belongs to (an id in the document's `groups`); none means it is on its own. */
   groupId?: string | null;
+  /** What Render mode changes for this part; none means it looks as in Design mode. */
+  render?: ItemRender | null;
+}
+
+export type Finish = 'satin' | 'metal' | 'glass' | 'mirror';
+export const finishes: readonly Finish[] = ['satin', 'metal', 'glass', 'mirror'];
+
+/** A part's own colour, finish and visibility in Render mode (every field optional). */
+export interface ItemRender {
+  /** The render colour; none: the part's design colour. */
+  color?: number | null;
+  /** The finish; none: satin PLA, as renders always were. */
+  finish?: Finish | null;
+  /** Left out of Render mode (the view, the render and the Blender file). */
+  hidden?: boolean;
 }
 
 /** A named set of parts that is selected, moved, turned and scaled as one. */
@@ -110,6 +125,8 @@ export interface DocSavedView extends DocView {
   name: string;
   /** The display mode (solid, wireframe …), the light, and the ground and grid options at the time. */
   mode?: string | null;
+  /** Design or Render mode at the time. */
+  appMode?: AppMode | null;
   light?: DocLight | null;
   ground?: 'none' | 'grid' | 'solid' | null;
   groundColor?: number | null;
@@ -180,6 +197,11 @@ function sanitize(doc: RfDocument): boolean {
     item.position = clamped;
     if (!item.rotation.every(Number.isFinite)) { item.rotation = [0, 0, 0, 1]; changed = true; }
     if (item.scale && !item.scale.every(v => Number.isFinite(v) && v >= 0.01 && v <= 100)) { item.scale = null; changed = true; }
+    if (item.render) {
+      const { color, finish } = item.render;
+      if (color != null && !(Number.isInteger(color) && color >= 0 && color <= 0xffffff)) { item.render = { ...item.render, color: null }; changed = true; }
+      if (finish != null && !finishes.includes(finish)) { item.render = { ...item.render, finish: null }; changed = true; }
+    }
   }
   if (tidyGroups(doc)) changed = true;
   return changed;
@@ -197,6 +219,12 @@ function tidyGroups(doc: RfDocument): boolean {
   const kept = (doc.groups ?? []).filter(g => (counts.get(g.id) ?? 0) >= 2);
   if (kept.length !== (doc.groups ?? []).length) { doc.groups = kept; changed = true; }
   return changed;
+}
+
+export type AppMode = 'design' | 'render';
+const appModeStorageKey = 'rasterfaster.appMode';
+function readAppMode(): AppMode {
+  try { return localStorage.getItem(appModeStorageKey) === 'render' ? 'render' : 'design'; } catch { return 'design'; }
 }
 
 const imagesOpenStorageKey = 'rasterfaster.imagesOpen';
@@ -656,7 +684,7 @@ export class DocumentStore {
   }
 
   /** Changes properties of several items in one step. */
-  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'noRender' | 'origin' | 'scale'>>>): boolean {
+  updateItems(label: string, changes: Map<string, Partial<Pick<DocItem, 'position' | 'rotation' | 'color' | 'muted' | 'centered' | 'noExport' | 'noRender' | 'origin' | 'scale' | 'render'>>>): boolean {
     if (!changes.size) return false;
     return this.mutate(label, d => ({ ...d, items: d.items.map(i => (changes.has(i.id) ? { ...i, ...changes.get(i.id) } : i)) }));
   }
@@ -781,6 +809,23 @@ export class DocumentStore {
   }
 
   /** Groups that are folded in the part list (not saved: folding is not an edit). */
+  /** Design: every part in its own colour, to tell them apart while editing. Render: how the picture will look (render colours, finishes, the studio). Remembered per browser. */
+  readonly appMode = signal<AppMode>(readAppMode());
+
+  setAppMode(mode: AppMode) {
+    this.appMode.set(mode);
+    try { localStorage.setItem(appModeStorageKey, mode); } catch { /* storage unavailable */ }
+  }
+
+  toggleAppMode() {
+    this.setAppMode(this.appMode() === 'design' ? 'render' : 'design');
+  }
+
+  /** The colour a part has in the current mode: its render colour in Render mode when it has one, else its design colour. */
+  displayColor(item: DocItem): number {
+    return this.appMode() === 'render' && item.render?.color != null ? item.render.color : item.color;
+  }
+
   /** The image library panel is shown (the I key or the Images button); remembered per browser. */
   readonly imagesOpen = signal(readImagesOpen());
 
@@ -838,7 +883,7 @@ export class DocumentStore {
 
   /** Selects everything that reacts to clicks (muted items stay out of it). */
   selectAll() {
-    this.selectedIds.set(this.doc().items.filter(i => !i.muted).map(i => i.id));
+    this.selectedIds.set(this.doc().items.filter(i => !i.muted && !this.isHiddenNow(i)).map(i => i.id));
   }
 
   /** Dims or restores items (one undo step). */
@@ -874,8 +919,51 @@ export class DocumentStore {
     return targets.size;
   }
 
+  /** Colours parts: the design colour in Design mode, the part's own render colour in Render mode. */
   setColor(ids: readonly string[], color: number) {
+    if (this.appMode() === 'render') { this.setItemRender(ids, { color }, 'Render colour'); return; }
     this.updateItems('Colour parts', new Map(ids.map(id => [id, { color }])));
+  }
+
+  /** Changes what Render mode does to these parts (one undo step); a part with nothing left of it loses its `render` field. */
+  setItemRender(ids: readonly string[], patch: Partial<ItemRender>, label = 'Render settings') {
+    const wanted = new Set(ids);
+    const changes = new Map<string, Partial<DocItem>>();
+    for (const item of this.doc().items) {
+      if (!wanted.has(item.id)) continue;
+      const merged: ItemRender = { ...item.render, ...patch };
+      const empty = merged.color == null && merged.finish == null && !merged.hidden;
+      changes.set(item.id, { render: empty ? null : merged });
+    }
+    this.updateItems(label, changes as Map<string, Partial<Pick<DocItem, 'render'>>>);
+  }
+
+  /** The finish of these parts in Render mode (satin PLA clears it, as that is what renders always were). */
+  setFinish(ids: readonly string[], finish: Finish) {
+    this.setItemRender(ids, { finish: finish === 'satin' ? null : finish }, 'Finish');
+  }
+
+  /** Leaves parts out of Render mode: not drawn in the view, the render or the Blender file. */
+  setHiddenInRender(ids: readonly string[], hidden: boolean) {
+    this.setItemRender(ids, { hidden }, hidden ? 'Hide in Render mode' : 'Show in Render mode');
+  }
+
+  /** Whether the part is out of sight right now (hidden in Render mode, and the mode is Render). */
+  isHiddenNow(item: DocItem) {
+    return this.appMode() === 'render' && !!item.render?.hidden;
+  }
+
+  /** Back to the design colour in Render mode. */
+  resetRenderColor(ids: readonly string[]) {
+    this.setItemRender(ids, { color: null }, 'Reset render colour');
+  }
+
+  /** The render colour becomes a copy of the design colour as it is now (it no longer follows it). */
+  copyDesignToRender(ids: readonly string[]) {
+    const wanted = new Set(ids);
+    const changes = new Map<string, Partial<Pick<DocItem, 'render'>>>();
+    for (const item of this.doc().items) if (wanted.has(item.id)) changes.set(item.id, { render: { ...item.render, color: item.color } });
+    this.updateItems('Copy design colour', changes);
   }
 
   setMuted(ids: readonly string[], muted: boolean) {

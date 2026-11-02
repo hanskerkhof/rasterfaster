@@ -345,3 +345,30 @@ def test_part_marked_do_not_render_stays_in_the_scene_with_a_marker():
     gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False))
     marked = {node["extras"]["itemId"]: node["extras"].get("noRender", False) for node in gltf["nodes"] if "extras" in node}
     assert marked == {items[0]["id"]: False, items[1]["id"]: True, items[2]["id"]: False}
+
+
+def test_finishes_become_materials_and_their_extensions():
+    items, stls = items_and_stls()
+    items = [dict(item) for item in items]
+    items[0]["render"] = {"finish": "metal"}
+    items[1]["render"] = {"finish": "glass"}
+    items[2]["render"] = {"finish": "mirror"}
+    gltf, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False, colours=True))
+    pbr = {m["name"].split("_")[-1]: m for m in gltf["materials"]}
+    assert pbr["metal"]["pbrMetallicRoughness"]["metallicFactor"] == 1.0 and pbr["mirror"]["pbrMetallicRoughness"]["roughnessFactor"] == 0.0
+    assert pbr["glass"]["extensions"]["KHR_materials_transmission"]["transmissionFactor"] == 1.0
+    assert "KHR_materials_transmission" in gltf["extensionsUsed"]
+    plain, _ = parse_glb(blenderexport.build_glb({"name": "Doc", "items": items}, stls.__getitem__, camera=False, colours=False))  # Black PLA: no finishes
+    assert [m["name"] for m in plain["materials"]] == ["Black PLA"]
+
+
+def test_render_view_uses_render_colours_and_leaves_hidden_parts_out():
+    def item(identifier, **extra):
+        return main.DocumentItem(id=identifier, path="a.stl", name=identifier, color=0x111111, position=(0, 0, 0), rotation=(0, 0, 0, 1), **extra)
+    document = main.DocumentOut(id="d", modified=0, name="N", items=[item("plain"), item("coloured", render=main.DocumentItemRender(color=0xabcdef, finish="metal")), item("gone", render=main.DocumentItemRender(hidden=True))])
+    seen = main.render_view(document)
+    assert [(i.id, i.color) for i in seen.items] == [("plain", 0x111111), ("coloured", 0xabcdef)]
+    assert seen.items[1].render.finish == "metal"  # the finish rides along
+    assert [i.color for i in document.items] == [0x111111] * 3  # the document itself is untouched
+    with pytest.raises(main.HTTPException):
+        main.render_view(document.model_copy(update={"items": [document.items[2]]}))
