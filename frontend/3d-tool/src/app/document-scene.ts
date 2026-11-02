@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
 import { ViewMode, buildParts, clearParts } from './model-render';
@@ -19,6 +20,8 @@ const maxDragDeltaMm = 2000;
 
 /** A geometry rotated for one orientation and moved so its bounding-box minimum sits at the local origin. */
 interface OrientedEntry {
+  /** Cached: the two big faces of a flat part (as outlines in the plane), or null when it is not flat along a world axis. */
+  flat?: { normal: THREE.Vector3; u: THREE.Vector3; v: THREE.Vector3; low: number; high: number; hi: [number, number][]; lo: [number, number][] } | null;
   geometry: THREE.BufferGeometry;
   size: THREE.Vector3;
   edges?: THREE.EdgesGeometry;
@@ -61,6 +64,8 @@ export interface DocumentSceneContext {
   host: HTMLElement;
   store: DocumentStore;
   background: THREE.Color;
+  /** The renderer, for the live reflections of mirror parts. */
+  renderer?: THREE.WebGLRenderer;
   /** The reflections of metal, glass and mirror parts (made once by the viewer). */
   environment?: () => THREE.Texture | null;
   loadGeometry: (path: string) => Promise<THREE.BufferGeometry>;
@@ -489,6 +494,7 @@ export class DocumentScene {
       this.runtimes.delete(id);
     }
     for (const item of items) this.syncItem(item, selectedIds.has(item.id));
+    this.probesDirty = true; // something may have moved: the mirrors look again
     this.updateSelectionBox();
     this.updateSnapHandles();
     this.updateRotateTool();
@@ -521,12 +527,14 @@ export class DocumentScene {
         edges: () => (entry.edges ??= new THREE.EdgesGeometry(entry.geometry, creaseDegrees)),
         silhouette: () => (entry.silhouette ??= buildSilhouetteGeometry(entry.geometry)),
         ghost: muted,
-        finish: this.finishOf(item), environment,
+        finish: this.finishOf(item), environment: this.finishOf(item) === 'mirror' && !this.flatFaces(entry) ? this.probeTexture(item.id, entry) ?? environment : environment,
       };
       for (const part of buildParts(entry.geometry, this.mode, style)) {
         part.userData['itemId'] = item.id;
         runtime.group.add(part);
       }
+      if (this.finishOf(item) === 'mirror') this.addMirrorReflection(runtime.group, entry, item.id);
+      else this.dropProbe(item.id);
       Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: this.ctx.store.displayColor(item), finish: this.finishOf(item), silhouette: silhouetteEdges(), environment });
     }
     runtime.group.visible = !this.ctx.store.isHiddenNow(item); // hidden in Render mode: not drawn, and not clickable (see pickableMeshes)
@@ -659,7 +667,112 @@ export class DocumentScene {
   }
 
   /** Called every frame: keeps the snap handles the same size on screen whatever the zoom. */
+  /** The two big faces of a flat part (a plate, however it lies): the direction they face and the outline of each; null for anything else. */
+  private flatFaces(entry: OrientedEntry) {
+    if (entry.flat !== undefined) return entry.flat;
+    entry.flat = null;
+    const position = entry.geometry.getAttribute('position');
+    const index = entry.geometry.getIndex();
+    const count = index ? index.count : position.count;
+    const point = (i: number) => { const k = index ? index.getX(i) : i; return new THREE.Vector3(position.getX(k), position.getY(k), position.getZ(k)); };
+    const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), cross = new THREE.Vector3();
+    const triangles: { normal: THREE.Vector3; area: number }[] = [];
+    let total = 0, biggest: { normal: THREE.Vector3; area: number } | null = null;
+    for (let i = 0; i + 2 < count; i += 3) {
+      a.copy(point(i)); b.copy(point(i + 1)); c.copy(point(i + 2));
+      cross.crossVectors(b.clone().sub(a), c.clone().sub(a));
+      const area = cross.length() / 2;
+      if (area < 1e-9) continue;
+      const entryT = { normal: cross.clone().normalize(), area };
+      triangles.push(entryT);
+      total += area;
+      if (!biggest || area > biggest.area) biggest = entryT;
+    }
+    if (!biggest) return entry.flat;
+    const normal = biggest.normal.clone();
+    const facing = triangles.filter(t => Math.abs(t.normal.dot(normal)) > 0.999).reduce((sum, t) => sum + t.area, 0);
+    if (facing < 0.85 * total) return entry.flat; // not a plate: most of its surface does not face the same way
+    const u = Math.abs(normal.z) < 0.9 ? new THREE.Vector3(0, 0, 1).cross(normal).normalize() : new THREE.Vector3(1, 0, 0).cross(normal).normalize();
+    const v = normal.clone().cross(u);
+    let lowest = Infinity, highest = -Infinity;
+    const all: { d: number; p: [number, number] }[] = [];
+    for (let i = 0; i < position.count; i++) {
+      const q = new THREE.Vector3(position.getX(i), position.getY(i), position.getZ(i));
+      const d = q.dot(normal);
+      lowest = Math.min(lowest, d); highest = Math.max(highest, d);
+      all.push({ d, p: [q.dot(u), q.dot(v)] });
+    }
+    if (highest - lowest > 0.06 * Math.max(entry.size.x, entry.size.y, entry.size.z)) return entry.flat; // thick: not a plate
+    const eps = 0.02;
+    const hi = all.filter(x => x.d > highest - eps).map(x => x.p), lo = all.filter(x => x.d < lowest + eps).map(x => x.p);
+    if (hi.length < 3 || lo.length < 3) return entry.flat;
+    entry.flat = { normal, u, v, low: lowest, high: highest, hi: convexHull(hi), lo: convexHull(lo) };
+    return entry.flat;
+  }
+
+  /** A flat mirror reflects the scene properly: a planar reflection on each big face (the mirror material stays underneath for the edges). */
+  private addMirrorReflection(group: THREE.Group, entry: OrientedEntry, id: string) {
+    const flat = this.flatFaces(entry);
+    if (!flat) return;
+    for (const side of [1, -1]) {
+      const outline = side > 0 ? flat.hi : flat.lo;
+      const points = outline.map(([x, y]) => (side > 0 ? new THREE.Vector2(x, y) : new THREE.Vector2(y, x))); // seen from outside the axes turn the other way on the far face
+      const mirror = new Reflector(new THREE.ShapeGeometry(new THREE.Shape(points)), { color: 0xd8d8d8, textureWidth: 512, textureHeight: 512, clipBias: 0.003 });
+      const normal = flat.normal.clone().multiplyScalar(side);
+      mirror.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side > 0 ? flat.u : flat.v, side > 0 ? flat.v : flat.u, normal));
+      mirror.position.copy(flat.normal).multiplyScalar(side > 0 ? flat.high + 0.05 : flat.low - 0.05);
+      mirror.userData['itemId'] = id;
+      group.add(mirror);
+    }
+  }
+
+  private readonly probes = new Map<string, { camera: THREE.CubeCamera; target: THREE.WebGLCubeRenderTarget; entry: OrientedEntry }>();
+  private probesDirty = true;
+  private probesAt = 0;
+
+  /** A live low-resolution reflection of the surroundings for a mirror that is not flat (updated now and then, see tick). */
+  private probeTexture(id: string, entry: OrientedEntry): THREE.Texture | null {
+    if (!this.ctx.renderer) return null;
+    let probe = this.probes.get(id);
+    if (!probe) {
+      const target = new THREE.WebGLCubeRenderTarget(256, { generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+      probe = { camera: new THREE.CubeCamera(1, 20000, target), target, entry };
+      this.probes.set(id, probe);
+    }
+    probe.entry = entry;
+    this.probesDirty = true;
+    return probe.target.texture;
+  }
+
+  private dropProbe(id: string) {
+    const probe = this.probes.get(id);
+    if (!probe) return;
+    probe.target.dispose();
+    this.probes.delete(id);
+  }
+
+  /** The parts moved or changed: the probes look again (at most a few times a second; the mirror itself is out of its own view). */
+  private updateProbes() {
+    const renderer = this.ctx.renderer;
+    if (!renderer || !this.probes.size || !this.probesDirty || performance.now() - this.probesAt < 300) return;
+    this.probesDirty = false;
+    this.probesAt = performance.now();
+    const autoClear = renderer.autoClear;
+    renderer.autoClear = true;
+    for (const [id, probe] of this.probes) {
+      const runtime = this.runtimes.get(id);
+      if (!runtime) { this.dropProbe(id); continue; }
+      const shown = runtime.group.visible;
+      runtime.group.visible = false;
+      probe.camera.position.copy(runtime.group.position).add(probe.entry.size.clone().multiplyScalar(0.5));
+      probe.camera.update(renderer, this.ctx.scene);
+      runtime.group.visible = shown;
+    }
+    renderer.autoClear = autoClear;
+  }
+
   tick() {
+    this.updateProbes();
     const camera = this.ctx.camera;
     const height = this.ctx.canvas.clientHeight;
     if (this.scaleCorners.visible) { // the corner handles keep their size on screen
@@ -2013,4 +2126,20 @@ export class DocumentScene {
     this.ctx.scene.remove(this.movePivot, this.moveTool.getHelper());
     this.ctx.scene.remove(this.rotatePivot, this.rotateTool.getHelper());
   }
+}
+
+/** The outline (convex hull) of 2D points, counter-clockwise. */
+function convexHull(points: [number, number][]): [number, number][] {
+  const sorted = [...points].sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const half = (list: [number, number][]) => {
+    const out: [number, number][] = [];
+    for (const p of list) {
+      while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], p) <= 0) out.pop();
+      out.push(p);
+    }
+    out.pop();
+    return out;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
 }

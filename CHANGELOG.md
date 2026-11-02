@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - FX styles and mirror reflections in the 3D view (0.11.15)
+
+### Added
+- **FE** + **BE** (`app.html`, `render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): **FX**, a style for renders: None, **Cartoon** (flat colour bands, dark outlines), **Outline** (white parts, black lines), **Sketch** (hand-drawn lines on cream paper), **Clay** (one matte grey), **Blueprint** (white lines on blue), **Isometric** (no perspective, flat colours, thin outlines), **X-ray** (see-through parts with glowing edges) and **Low poly** (reduced meshes, flat facets). A dropdown in the toolbar (Render mode, before the Render button) and in the Render dialog's Lighting row; saved with the document (`render.fx`), sent as `fx=` to `render.png`, `render.mp4`, `export.blend` and `render-jobs`, shown in the Gallery notes. Lines come from Freestyle, bands from the compositor. It styles renders, not the 3D view.
+- **FE** (`document-scene.ts`): **mirror reflections in the 3D view** (Render mode, Mirror finish): flat mirrors (plates, however they lie) get a real planar reflection on both faces; other mirror shapes get a live low-resolution reflection of their surroundings.
+
 ## 2026-11-02 - Look around removed (0.11.14)
 
 ### Removed

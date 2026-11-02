@@ -162,6 +162,8 @@ export interface DocRenderSettings {
   trackPivot?: 'part' | 'all' | 'view';
   /** What metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey. */
   reflections?: number;
+  /** A style for renders: none, cartoon, outline, sketch, clay or blueprint. */
+  fx?: string;
   /** What it looks at: the tracked part, the middle of all the objects, or nothing in particular (the angle it has); none: the part when one is tracked, else the view. */
   lookAt?: 'part' | 'all' | 'view' | null;
 }

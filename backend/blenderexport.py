@@ -273,8 +273,10 @@ background_text, _, rest_text = rest_text.partition(",")
 ground_text, _, rest_text = rest_text.partition(",")
 beam_text, _, rest_text = rest_text.partition(",")
 aspect_text, _, rest_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...)
-transparent_text, _, reflections_text = rest_text.partition(",")  # "1" for a transparent background, and what metal, mirror and glass reflect (0 to 4)
+transparent_text, _, rest_text = rest_text.partition(",")  # "1" for a transparent background
+reflections_text, _, fx_text = rest_text.partition(",")  # what metal, mirror and glass reflect (0 to 4), and the style of the picture
 reflections = min(max(int(reflections_text or 0), 0), 4)
+fx = fx_text if fx_text in ("cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly") else "none"
 aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
 aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
 transparent_background = transparent_text == "1"
@@ -647,6 +649,143 @@ if studio == "1":
             stops = math.log2(0.85 ** 2.2 / max(bright, 1e-3) ** 2.2)  # the display values are about gamma 2.2 of the light
             scene.view_settings.exposure += max(stops, -3.0)
         scene.render.resolution_x, scene.render.resolution_y, scene.cycles.samples, scene.cycles.use_denoising, scene.render.filepath, scene.render.image_settings.file_format = saved
+
+def apply_fx():
+    # A style for the picture (cartoon, outline, sketch, clay, blueprint): one material for every part and/or lines drawn by Freestyle, and a plain paper
+    # for the camera (the lighting stays). The studio floor goes where the paper is the background.
+    if fx == "none":
+        return
+    view_layer = bpy.context.view_layer
+    # (colour of every part or None, paper or None, lines: (thickness in px, colour, hand drawn) or None, posterize steps)
+    style = {
+        "cartoon": (None, None, (2.2, (0.02, 0.02, 0.03), False), 7),
+        "outline": ((1.0, 1.0, 1.0), (1.0, 1.0, 1.0), (1.8, (0.02, 0.02, 0.03), False), 0),
+        "sketch": ((0.93, 0.92, 0.9), (0.97, 0.96, 0.92), (2.2, (0.12, 0.12, 0.14), True), 0),
+        "clay": ((0.6, 0.58, 0.56), None, None, 0),
+        "blueprint": ((0.1, 0.3, 0.62), (0.07, 0.22, 0.5), (1.7, (0.88, 0.94, 1.0), False), 0),
+        "isometric": (None, (1.0, 1.0, 1.0), (1.4, (0.05, 0.05, 0.07), False), 9),
+        "xray": (None, (0.01, 0.03, 0.07), None, 0),
+        "lowpoly": (None, None, None, 0),
+    }[fx]
+    colour, paper, lines, steps = style
+    if fx == "xray":  # see-through parts whose edges glow: the more a surface turns away from the camera, the more it shines
+        material = bpy.data.materials.new("FX xray")
+        material.use_nodes = True
+        tree = material.node_tree
+        for node in list(tree.nodes):
+            if node.type != "OUTPUT_MATERIAL":
+                tree.nodes.remove(node)
+        output = next(n for n in tree.nodes if n.type == "OUTPUT_MATERIAL")
+        edge, glow, clear, mix, share = (tree.nodes.new(k) for k in ("ShaderNodeFresnel", "ShaderNodeEmission", "ShaderNodeBsdfTransparent", "ShaderNodeMixShader", "ShaderNodeMath"))
+        edge.inputs["IOR"].default_value = 1.15
+        share.operation = "MULTIPLY_ADD"  # 0.12 + 0.88 x the edge
+        share.inputs[1].default_value = 0.88
+        share.inputs[2].default_value = 0.12
+        glow.inputs["Color"].default_value = (0.25, 0.75, 1.0, 1)
+        glow.inputs["Strength"].default_value = 3.0
+        tree.links.new(edge.outputs[0], share.inputs[0])
+        tree.links.new(share.outputs[0], mix.inputs[0])
+        tree.links.new(clear.outputs[0], mix.inputs[1])
+        tree.links.new(glow.outputs[0], mix.inputs[2])
+        tree.links.new(mix.outputs[0], output.inputs["Surface"])
+        view_layer.material_override = material
+        scene.cycles.transparent_max_bounces = 32
+    if fx == "lowpoly":  # few, flat facets: the meshes are reduced and every face shades on its own
+        for obj in bpy.data.objects:
+            if obj.type != "MESH" or obj.name in ("Studio floor", "Camera path"):
+                continue
+            if len(obj.data.polygons) > 60:
+                reduce = obj.modifiers.new("FX low poly", "DECIMATE")
+                reduce.ratio = 0.1
+            for polygon in obj.data.polygons:
+                polygon.use_smooth = False
+    if fx == "isometric" and scene.camera and scene.camera.data.type == "PERSP":  # a technical drawing: no perspective, parallel lines
+        camera_data = scene.camera.data
+        parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Studio floor", "Camera path") and not o.hide_render]
+        corners = [o.matrix_world @ Vector(c) for o in parts for c in o.bound_box]
+        if corners:
+            middle = (Vector(map(min, *[tuple(c) for c in corners])) + Vector(map(max, *[tuple(c) for c in corners]))) / 2
+            forward = -(scene.camera.matrix_world.to_3x3() @ Vector((0, 0, 1)))
+            depth = max((middle - scene.camera.matrix_world.translation).dot(forward), 0.01)
+            visible_height = 2 * depth * math.tan(camera_data.angle_y / 2)
+            camera_data.type = "ORTHO"
+            camera_data.sensor_fit = "VERTICAL"
+            camera_data.ortho_scale = visible_height
+    if colour is not None:  # every part in one matte colour
+        material = bpy.data.materials.new("FX " + fx)
+        material.use_nodes = True
+        shader = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED")
+        shader.inputs["Base Color"].default_value = (*(c ** 2.2 for c in colour), 1)
+        shader.inputs["Roughness"].default_value = 0.9
+        view_layer.material_override = material
+    if paper is not None:  # the camera sees the paper, everything else the studio's lighting
+        floor = bpy.data.objects.get("Studio floor")
+        if floor:
+            floor.hide_render = True
+        world = scene.world
+        if world and world.use_nodes:
+            tree = world.node_tree
+            output = next((n for n in tree.nodes if n.type == "OUTPUT_WORLD"), None)
+            if output and output.inputs["Surface"].links:
+                lighting = output.inputs["Surface"].links[0].from_node
+                plain = tree.nodes.new("ShaderNodeBackground")
+                plain.inputs["Color"].default_value = (*(c ** 2.2 for c in paper), 1)
+                path, mix = tree.nodes.new("ShaderNodeLightPath"), tree.nodes.new("ShaderNodeMixShader")
+                tree.links.new(path.outputs["Is Camera Ray"], mix.inputs[0])
+                tree.links.new(lighting.outputs[0], mix.inputs[1])
+                tree.links.new(plain.outputs[0], mix.inputs[2])
+                tree.links.new(mix.outputs[0], output.inputs["Surface"])
+        scene.render.film_transparent = False
+    if lines is not None:  # lines along the silhouettes, the borders and the sharp edges
+        thickness, ink, drawn = lines
+        scene.render.use_freestyle = True
+        view_layer.use_freestyle = True
+        scene.render.line_thickness_mode = "ABSOLUTE"
+        scene.render.line_thickness = thickness
+        settings = view_layer.freestyle_settings
+        settings.crease_angle = math.radians(115)
+        for old in list(settings.linesets):
+            settings.linesets.remove(old)
+        lineset = settings.linesets.new("FX lines")
+        for name in ("select_silhouette", "select_border", "select_crease", "select_material_boundary", "select_external_contour"):
+            setattr(lineset, name, True)
+        lineset.select_by_visibility = True
+        drawn_parts = bpy.data.collections.new("FX parts")  # the lines belong to the parts, not to the studio floor (its rim would be a line across the picture)
+        bpy.context.scene.collection.children.link(drawn_parts)
+        for o in bpy.data.objects:
+            if o.type == "MESH" and o.name not in ("Studio floor", "Camera path"):
+                drawn_parts.objects.link(o)
+        lineset.select_by_collection = True
+        lineset.collection = drawn_parts
+        style_ = bpy.data.linestyles.new("FX line style")
+        style_.color = ink
+        style_.thickness = thickness
+        if drawn:  # a wobbly, hand-drawn line
+            try:
+                style_.thickness_position = "CENTER"
+                wobble = style_.geometry_modifiers.new("Wobble", "PERLIN_NOISE_1D")
+                wobble.frequency = 12.0
+                wobble.amplitude = 2.5
+                wobble.seed = 3
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+        lineset.linestyle = style_
+    if steps:  # flat bands of colour: the compositor posterizes the picture and makes it a little livelier
+        tree = bpy.data.node_groups.new("FX compositing", "CompositorNodeTree")
+        tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        scene.compositing_node_group = tree
+        layers = tree.nodes.new("CompositorNodeRLayers")
+        lively = tree.nodes.new("CompositorNodeHueSat")
+        lively.inputs["Saturation"].default_value = 1.25
+        lively.inputs["Value"].default_value = 1.7  # the bands are cut from the linear picture: lift it so the colours are not all in the darkest band
+        bands = tree.nodes.new("CompositorNodePosterize")
+        bands.inputs["Steps"].default_value = steps
+        out = tree.nodes.new("NodeGroupOutput")
+        tree.links.new(layers.outputs["Image"], lively.inputs["Image"])
+        tree.links.new(lively.outputs["Image"], bands.inputs["Image"])
+        tree.links.new(bands.outputs["Image"], out.inputs[0])
+
+apply_fx()
 
 for o in bpy.data.objects:  # parts marked "Do not render": there, but neither drawn nor casting shadows or showing in reflections
     if o.get("noRender"):

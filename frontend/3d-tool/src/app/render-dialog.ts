@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, focusCentre, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
+import { Aspect, RenderService, focusCentre, fxIds, fxNames, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -43,6 +43,9 @@ import { ColorPalette } from './color-palette';
         </select>
         <select class="focus strength" [value]="render.reflections()" title="What metal, mirror and glass reflect (and what shows through glass): the dark studio, a softbox with bright panels, a daylight sky or a neutral grey room. The background and the lighting of the matte parts stay as they are" (change)="chooseReflections(+$any($event.target).value)">
           @for (preset of reflectionPresets; track preset.value) { <option [value]="preset.value" [selected]="preset.value === render.reflections()">Reflects: {{ preset.label }}</option> }
+        </select>
+        <select class="focus strength" [value]="render.fx()" title="FX: a style for the picture (cartoon, outline, sketch, clay, blueprint). The same setting as in the toolbar" (change)="chooseFx($any($event.target).value)">
+          @for (f of fxChoices; track f.id) { <option [value]="f.id" [selected]="f.id === render.fx()">FX: {{ f.label }}</option> }
         </select>
         <select class="focus strength" [value]="render.beam()" title="The type of the lamp: from a spotlight (razor-sharp shadows) to a flood (very soft shadows)" (change)="chooseBeam(+$any($event.target).value)">
           @for (type of beams; track type.value) { <option [value]="type.value" [selected]="type.value === render.beam()">Lamp: {{ type.label }}</option> }
@@ -281,6 +284,11 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected resetLamp() {
     this.render.setLamp(40);
     this.lampChanged();
+  }
+  protected readonly fxChoices = fxIds.map((id, i) => ({ id, label: fxNames[i] }));
+  protected chooseFx(id: string) {
+    this.render.setFx(id);
+    if (this.url() && !this.busy()) void this.quick();
   }
   protected readonly reflectionPresets = reflectionNames.map((label, value) => ({ value, label }));
   protected chooseReflections(preset: number) {

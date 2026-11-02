@@ -43,6 +43,7 @@ export interface RenderSettingsNote {
   lamp?: number;
   beam?: number;
   reflections?: number;
+  fx?: string;
   background?: number | null;
   ground?: number | null;
   projection?: 'persp' | 'ortho' | null;

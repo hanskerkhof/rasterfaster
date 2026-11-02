@@ -13,7 +13,7 @@ import { StlViewer, ViewMode } from './stl-viewer';
 import { TreePanel } from './tree-panel';
 import { TrashDialog } from './trash-dialog';
 import { RenderDialog } from './render-dialog';
-import { RenderService, aspects } from './render.service';
+import { RenderService, aspects, fxIds, fxNames } from './render.service';
 import { ApiStatus } from './api-status';
 import { APP_VERSION } from './build-info';
 
@@ -61,6 +61,7 @@ export class App {
   protected readonly store = inject(DocumentStore);
   protected readonly render = inject(RenderService);
   protected readonly aspects = aspects;
+  protected readonly fxChoices = fxIds.map((id, i) => ({ id, label: fxNames[i] }));
 
   protected time(seconds: number) {
     const whole = Math.round(seconds);

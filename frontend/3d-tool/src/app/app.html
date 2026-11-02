@@ -86,6 +86,11 @@
       }
     </div>
     <button class="step-mode" type="button" releaseFocus [title]="'Moving with Option held steps ' + store.fineStepMm() + ' mm (⌥M or click: ' + (store.fineStepMm() === 1 ? '0.1' : '1') + ' mm)'" (click)="store.toggleFineStep()">Move {{ store.fineStepMm() }} mm <kbd>⌥M</kbd></button>
+    @if (store.appMode() === 'render') {
+      <select class="shape fx-select" releaseFocus title="FX: a style for the render (cartoon, outline, sketch, clay, blueprint). It shows in renders, not in this view" aria-label="FX style of the render" [value]="render.fx()" (change)="render.setFx($any($event.target).value)">
+          @for (f of fxChoices; track f.id) { <option [value]="f.id" [selected]="f.id === render.fx()">FX: {{ f.label }}</option> }
+        </select>
+    }
     <button class="open-render" type="button" releaseFocus title="Open the render dialog (F12; on a Mac fn + F12)" (click)="render.requestOpen()">Render <kbd>fn F12</kbd></button>
     @if (store.appMode() === 'render') {
       <div class="picture-tools">

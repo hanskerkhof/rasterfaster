@@ -788,6 +788,7 @@ export class StlViewer implements OnDestroy {
       scene: this.scene, get camera() { return viewer.camera; }, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,
       background: this.scene.background as THREE.Color,
       loadGeometry: path => this.loadGeometry(path),
+      renderer: this.renderer,
       environment: () => this.reflections(),
       zGridMode: () => this.zGridMode(),
       viewCenter: () => ({ x: this.controls.target.x, y: this.controls.target.y }),

@@ -137,6 +137,7 @@ function nextGhostOrder() {
 /** Disposes the materials of everything in `group` and empties it; geometries are shared and stay alive. */
 export function clearParts(group: THREE.Object3D) {
   group.traverse(o => {
+    if ((o as { isReflector?: boolean }).isReflector) (o as unknown as { dispose(): void }).dispose(); // a mirror's reflection has its own render target
     const material = (o as THREE.Mesh).material;
     if (material) (Array.isArray(material) ? material : [material]).forEach(m => m.dispose());
   });

@@ -144,6 +144,8 @@ Development is unchanged: `cd backend && .venv1/bin/python main.py` and `cd fron
 
 **Turntable direction and view cube arrows.** The turntable goes round CCW or CW (play button's menu, Render dialog). The arrows round the view cube step to the next face or turn the view 45° about the vertical axis. The light lights up on hover, its menu can point it at the objects' centre and says what it points at. Design and Render mode keep their own camera mode.
 
+**FX styles.** The FX dropdown (toolbar in Render mode, and the Render dialog) gives renders a style: Cartoon, Outline, Sketch, Clay, Blueprint, Isometric, X-ray or Low poly (None is the normal render). Mirror parts reflect the scene in the 3D view too: flat ones exactly, other shapes approximately. API: `fx=none|cartoon|outline|sketch|clay|blueprint|isometric|xray|lowpoly`.
+
 **Picture frame.** In Render mode the toolbar has the shape of the picture (the same setting as the Render dialog), **Frame** (a dashed frame over the view: exactly what the render contains; a thin cross marks the middle of the objects, click it to centre the view) and **Box** (an outline round all the objects); the **Render** button (F12, fn + F12 on a Mac) opens the dialog. Reflects also has *None*, the depth of field can focus on the centre of the objects, the Views panel shows slots 1 – 9 and Rotate, Move and Scale are one *Transform* panel.
 
 **Reflections.** The *Reflects* menu in the Lighting row sets what metal, mirror and glass reflect: Studio dark (the default), Softbox, Daylight or Neutral grey, in renders and in the 3D view; the background stays as it is. Shapes other than 16:9 zoom so the parts fill the picture. API: `reflections=0..3`.

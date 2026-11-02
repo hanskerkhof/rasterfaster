@@ -133,3 +133,5 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .open-render:hover { background: #3a3f4e; }
 .open-render + .picture-tools { margin-left: auto; }
 .open-render kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .65; }
+.fx-select { margin-left: auto; }
+.fx-select + .open-render { margin-left: 8px; }
