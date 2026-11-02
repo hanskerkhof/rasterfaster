@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Image library (0.10.69)
+
+### Added
+- **FE** + **BE** (`images-panel.ts`, `images.service.ts`, `images.py`, `main.py`): an **image library** per document, in a floating, movable, collapsible **Images** panel (**I** key or the Images button). Finished full-size renders are kept by themselves; **Save to library** in the Render dialog keeps a quick render. Every picture carries the document version it was made from (`v13`, `v13*` when the working copy was ahead), shown as a badge. Click a picture to view it large, download, rename (double-click the name) or delete it; **Clean up** deletes the pictures of versions older than the current one, or the quick renders, in one go. API: `GET/POST /api/documents/{id}/images`, `GET …/images/{imageId}.png`, `PUT/GET …/{imageId}/thumb.jpg` (the browser makes the thumbnails), `PATCH`, `DELETE …/images/{imageId}` and `DELETE …/images?beforeVersion=&kind=`. The pictures live in `<document id>.images/` next to the document and go with it when it is deleted.
+- **FE**: the Views and Images panels have a collapsible "Keys and mouse" help text; the "render is ready" message has a close button; **⟳ Replace this view** answers with a short message.
+
 ## 2026-11-02 - Saved views (0.10.68)
 
 ### Added

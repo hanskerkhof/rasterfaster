@@ -27,6 +27,7 @@ from typing import Annotated, Literal
 import uvicorn
 import appconfig
 import blenderexport
+import images
 import versions
 import export3mf
 import import3mf
@@ -805,9 +806,11 @@ renderPhases = ["prepare", "load", "render", "finish"]  # making the scene, open
 class RenderJob:
     """A full-size render running in the background: Blender runs in a thread, its progress is read from its output."""
 
-    def __init__(self, name: str, width: int, samples: int):
+    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True):
         self.id = uuid.uuid4().hex[:12]
         self.name, self.width, self.samples = name, width, samples
+        self.documentId, self.version, self.edited = documentId, version, edited  # what it is made from: kept with the picture in the image library
+        self.imageId: str | None = None  # the picture's id in the library once it is done
         self.state = "running"  # running | done | error | cancelled
         self.progress = 0.0
         self.started = time.time()
@@ -859,7 +862,8 @@ class RenderJob:
 
     def view(self) -> dict:
         return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
-                "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error}
+                "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error,
+                "documentId": self.documentId, "imageId": self.imageId, "version": self.version}
 
 
 renderJobs: dict[str, RenderJob] = {}
@@ -930,6 +934,12 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
     try:
         job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=1800, dof=dof, crop=crop, phase=phase)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
+        if job.state == "done" and job.documentId:
+            try:  # a finished full-size render goes into the document's image library
+                job.imageId = images.add(images.images_dir(documentsRoot, job.documentId), job.png, name=job.name, kind="hd", samples=job.samples,
+                                         elapsed=time.time() - job.started, version=job.version, edited=job.edited)["id"]
+            except (OSError, ValueError):
+                pass  # the library is a bonus: the render itself is still delivered
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
         if job.state == "running":
             job.state, job.error = "error", str(error)
@@ -947,7 +957,7 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
     if any(j.state == "running" for j in renderJobs.values()):
         raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
     renderJobs.clear()  # an older picture nobody collected is dropped
-    job = RenderJob(document.name, width, samples)
+    job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion)
     renderJobs[job.id] = job
     threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField, cropped), daemon=True).start()
     notifier.notify({"type": "render", **job.view()})
@@ -996,6 +1006,112 @@ def cancel_render_job(jobId: str) -> dict:
     return job.view()
 
 
+class ImageNote(BaseModel):
+    id: str
+    name: str
+    kind: Literal["hd", "quick"]
+    created: float
+    width: int
+    height: int
+    samples: int
+    elapsed: float
+    version: int  # the document version it was made from (v0: before the first version was saved)
+    edited: bool  # the working copy was ahead of that version when it was rendered
+    thumb: bool = False
+    bytes: int = 0
+
+
+class ImageRename(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+
+def image_library(documentId: str) -> Path:
+    read_document(documentId)  # 404 for an unknown document
+    return images.images_dir(documentsRoot, documentId)
+
+
+@app.get("/api/documents/{documentId}/images", response_model=list[ImageNote])
+def list_images(documentId: str) -> list[dict]:
+    """The document's image library, newest first."""
+    return images.listing(image_library(documentId))
+
+
+@app.post("/api/documents/{documentId}/images", response_model=ImageNote, status_code=201)
+async def add_image(documentId: str, request: Request, kind: Literal["hd", "quick"] = "quick", name: str | None = Query(default=None, max_length=120),
+                    samples: int = Query(default=24, ge=1, le=4096), elapsed: float = Query(default=0, ge=0)) -> dict:
+    """Keeps a picture (the body is the PNG), e.g. a quick render, in the document's image library; it carries the document's version."""
+    directory = image_library(documentId)
+    document = read_document(documentId)
+    data = await request.body()
+    if len(data) > 200_000_000:
+        raise HTTPException(status_code=413, detail="the picture is too large")
+    try:
+        note = images.add(directory, data, name=name or document.name, kind=kind, samples=samples, elapsed=elapsed, version=document.version, edited=document.changedSinceVersion)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return images.read_note(directory, note["id"]) or note
+
+
+def image_note(documentId: str, imageId: str) -> tuple[Path, dict]:
+    directory = image_library(documentId)
+    note = images.read_note(directory, imageId)
+    if not note:
+        raise HTTPException(status_code=404, detail="image not found")
+    return directory, note
+
+
+@app.get("/api/documents/{documentId}/images/{imageId}.png")
+def get_image(documentId: str, imageId: str, download: bool = False) -> Response:
+    directory, note = image_note(documentId, imageId)
+    filename = re.sub(r"[^\w.-]+", "_", note["name"]) + f"-{note['width']}px-v{note['version']}.png"
+    return Response((directory / f"{imageId}.png").read_bytes(), media_type="image/png",
+                    headers={"Content-Disposition": f'{"attachment" if download else "inline"}; filename="{filename}"', "Cache-Control": "no-cache"})
+
+
+@app.get("/api/documents/{documentId}/images/{imageId}/thumb.jpg")
+def get_image_thumb(documentId: str, imageId: str) -> Response:
+    directory, _ = image_note(documentId, imageId)
+    file = directory / f"{imageId}.thumb.jpg"
+    if not file.is_file():
+        raise HTTPException(status_code=404, detail="no thumbnail yet")
+    return Response(file.read_bytes(), media_type="image/jpeg", headers={"Cache-Control": "no-cache"})
+
+
+@app.put("/api/documents/{documentId}/images/{imageId}/thumb.jpg", status_code=204)
+async def put_image_thumb(documentId: str, imageId: str, request: Request) -> Response:
+    """The browser makes the small picture of the gallery (the API has no image library to shrink PNGs with)."""
+    directory, _ = image_note(documentId, imageId)
+    data = await request.body()
+    if not 100 < len(data) <= 2_000_000 or data[:3] != b"\xff\xd8\xff":
+        raise HTTPException(status_code=422, detail="not a JPEG thumbnail")
+    (directory / f"{imageId}.thumb.jpg").write_bytes(data)
+    return Response(status_code=204)
+
+
+@app.patch("/api/documents/{documentId}/images/{imageId}", response_model=ImageNote)
+def rename_image(documentId: str, imageId: str, body: ImageRename) -> dict:
+    directory, note = image_note(documentId, imageId)
+    note = {key: value for key, value in note.items() if key not in ("thumb", "bytes")}
+    note["name"] = body.name.strip()
+    images.write_note(directory, note)
+    return images.read_note(directory, imageId) or note
+
+
+@app.delete("/api/documents/{documentId}/images/{imageId}", status_code=204)
+def delete_image(documentId: str, imageId: str) -> Response:
+    directory, _ = image_note(documentId, imageId)
+    images.delete(directory, imageId)
+    return Response(status_code=204)
+
+
+@app.delete("/api/documents/{documentId}/images")
+def delete_images(documentId: str, beforeVersion: int | None = Query(default=None, ge=0), kind: Literal["hd", "quick"] | None = None) -> dict:
+    """Batch delete: the pictures made from a version older than `beforeVersion` and / or of one kind. Needs at least one of them."""
+    if beforeVersion is None and kind is None:
+        raise HTTPException(status_code=422, detail="say which pictures: beforeVersion and / or kind")
+    return {"deleted": images.delete_matching(image_library(documentId), before_version=beforeVersion, kind=kind)}
+
+
 @app.get("/api/documents/{documentId}/export.svg")
 def export_document_svg(documentId: str) -> Response:
     """Top / front / right drawing of the assembly (feature lines, 20 mm grid, numbered legend)."""
@@ -1017,6 +1133,7 @@ def delete_document(documentId: str) -> None:
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="document not found")
     shutil.rmtree(versions.versions_dir(documentsRoot, documentId), ignore_errors=True)
+    images.remove_all(images.images_dir(documentsRoot, documentId))
 
 
 class RuntimeRestartRequest(BaseModel):

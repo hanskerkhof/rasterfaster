@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
+import { ImagesService } from './images.service';
 import { RenderService, hdWidths } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
@@ -74,6 +75,9 @@ import { ColorPalette } from './color-palette';
           <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, 96 samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
             @if (render.running()) { <span class="spinner small"></span> }Render HD
           </button>
+        }
+        @if (url() && picture() && render.lastQuick && !busy()) {
+          <button type="button" [disabled]="savedToLibrary()" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Saved to library' : 'Save to library' }}</button>
         }
         @if (picture()) {
           <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
@@ -202,6 +206,15 @@ export class RenderDialog implements OnInit, OnDestroy {
   }
   /** The quick render is on show (it turns the button's spinner into a tick). */
   protected readonly quickReady = signal(false);
+  private readonly images = inject(ImagesService);
+  /** The quick render on show is in the image library. */
+  protected readonly savedToLibrary = signal(false);
+
+  protected async saveToLibrary() {
+    const last = this.render.lastQuick;
+    if (!last) return;
+    this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24)));
+  }
   protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render-${this.url() ? 'quick' : 'hd'}.png`;
 
   constructor() {
@@ -256,6 +269,7 @@ export class RenderDialog implements OnInit, OnDestroy {
       return;
     }
     this.quickReady.set(false);
+    this.savedToLibrary.set(false);
     this.busyText.set('Rendering a preview with Blender (800 px, a few seconds)…');
     this.busy.set(true);
     this.error.set('');

@@ -5,6 +5,7 @@ import { filter, firstValueFrom } from 'rxjs';
 import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult } from './library.service';
 import { DocumentPanel } from './document-panel';
 import { ViewsPanel } from './views-panel';
+import { ImagesPanel } from './images-panel';
 import { ObjectMenu } from './object-menu';
 import { ReleaseFocus } from './release-focus';
 import { DocItem, DocumentStore } from './document.store';
@@ -50,7 +51,7 @@ function readFilterMode(): 'any' | 'all' {
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ObjectMenu, ReleaseFocus],
+  imports: [TreePanel, TrashDialog, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },

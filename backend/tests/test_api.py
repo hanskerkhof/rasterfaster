@@ -288,3 +288,43 @@ def test_document_view_roundtrip_and_validation(client):
     assert moved["view"]["zoom"] == 4 and moved["changedSinceVersion"] is False  # moving the camera is not a change since the version
     assert client.post("/api/documents", json={"name": "bad", "view": {**view, "zoom": 0}}).status_code == 422
     assert client.post("/api/documents", json={"name": "bad", "view": {**view, "projection": "fisheye"}}).status_code == 422
+
+
+# a tiny valid PNG header (1 x 1): the library only reads the size from it
+PNG = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x40\x00\x00\x00\x24\x08\x06\x00\x00\x00" + b"\x00" * 40
+JPEG = b"\xff\xd8\xff" + b"\x00" * 200
+
+
+def test_image_library_keeps_pictures_with_the_document_version(client):
+    document = client.post("/api/documents", json={"name": "Imgs", "items": []}).json()["id"]
+    base = f"/api/documents/{document}/images"
+    assert client.get(base).json() == []
+    first = client.post(base, content=PNG, params={"kind": "quick", "name": "A"})
+    assert first.status_code == 201 and first.json()["version"] == 0 and first.json()["edited"] is True and (first.json()["width"], first.json()["height"]) == (64, 36)
+    client.post(f"/api/documents/{document}/versions")
+    second = client.post(base, content=PNG, params={"kind": "hd", "name": "B"}).json()
+    assert second["version"] == 1 and second["edited"] is False
+    assert [note["name"] for note in client.get(base).json()] == ["B", "A"]  # newest first
+    assert client.get(f"{base}/{second['id']}.png").content == PNG
+    assert "attachment" in client.get(f"{base}/{second['id']}.png", params={"download": True}).headers["content-disposition"]
+    assert client.post(base, content=b"not a png").status_code == 422
+
+
+def test_image_library_thumbnail_rename_and_deleting(client):
+    document = client.post("/api/documents", json={"name": "Imgs", "items": []}).json()["id"]
+    base = f"/api/documents/{document}/images"
+    old = client.post(base, content=PNG, params={"kind": "quick"}).json()
+    client.post(f"/api/documents/{document}/versions")
+    new = client.post(base, content=PNG, params={"kind": "hd"}).json()
+    assert client.get(f"{base}/{old['id']}/thumb.jpg").status_code == 404
+    assert client.put(f"{base}/{old['id']}/thumb.jpg", content=JPEG).status_code == 204
+    assert client.put(f"{base}/{old['id']}/thumb.jpg", content=b"nope").status_code == 422
+    assert client.get(f"{base}/{old['id']}/thumb.jpg").content == JPEG
+    assert next(n for n in client.get(base).json() if n["id"] == old["id"])["thumb"] is True
+    assert client.patch(f"{base}/{new['id']}", json={"name": "Front"}).json()["name"] == "Front"
+    assert client.delete(base).status_code == 422  # needs a filter
+    assert client.delete(base, params={"beforeVersion": 1}).json() == {"deleted": 1}  # the one made before v1
+    assert [n["id"] for n in client.get(base).json()] == [new["id"]]
+    assert client.delete(f"{base}/{new['id']}").status_code == 204
+    assert client.delete(f"{base}/{new['id']}").status_code == 404
+    assert client.get(f"/api/documents/nope/images").status_code == 404

@@ -1924,6 +1924,7 @@ export class DocumentScene {
       const selected = store.selectedItems();
       if (selected.length && store.doc().items.length > selected.length) store.beginMovePick(selected.map(i => i.id));
     }
+    else if (!command && !e.altKey && !e.shiftKey && e.code === 'KeyI' && !e.repeat) store.toggleImages(); // I: show or hide the image library panel
     else if (!command && !e.altKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) store.goToSavedView(+e.code.slice(5)); // 1 … 9: the saved views
     else if (command && !e.altKey && e.code === 'KeyG') { if (e.shiftKey) store.ungroupSelected(); else store.groupSelected(); } // ⌘G groups the selection, ⌘⇧G ungroups it
     else if (!command && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'r' && !e.repeat) this.toggleRotateTool(); // R: the rotate tool

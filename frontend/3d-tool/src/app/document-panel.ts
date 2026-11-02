@@ -102,6 +102,7 @@ function readGeometry(): PanelGeometry | null {
     </div>
     <div class="export">
       <span>Document file</span>
+      <button type="button" [class.on]="store.imagesOpen()" title="The document's image library: finished renders and the quick renders you kept (I)" (click)="store.toggleImages()">Images</button>
       <button type="button" [disabled]="!store.docId() || exporting()" title="Save this document, with all its versions, as a file you can keep (⤓)" (click)="exportDocumentFile()">Save file</button>
       <button type="button" title="Restore a document from a saved file (with its versions)" (click)="fileInput.click()">Open file…</button>
       <input #fileInput type="file" accept=".json,application/json" hidden (change)="importFile($any($event.target))" />

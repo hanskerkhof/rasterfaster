@@ -199,6 +199,11 @@ function tidyGroups(doc: RfDocument): boolean {
   return changed;
 }
 
+const imagesOpenStorageKey = 'rasterfaster.imagesOpen';
+function readImagesOpen(): boolean {
+  try { return localStorage.getItem(imagesOpenStorageKey) === 'true'; } catch { return false; }
+}
+
 function readClipboard(): ClipboardContent | null {
   try {
     const parsed = JSON.parse(localStorage.getItem(clipboardStorageKey) ?? 'null');
@@ -771,6 +776,15 @@ export class DocumentStore {
   }
 
   /** Groups that are folded in the part list (not saved: folding is not an edit). */
+  /** The image library panel is shown (the I key or the Images button); remembered per browser. */
+  readonly imagesOpen = signal(readImagesOpen());
+
+  toggleImages() {
+    const open = !this.imagesOpen();
+    this.imagesOpen.set(open);
+    try { localStorage.setItem(imagesOpenStorageKey, String(open)); } catch { /* storage unavailable */ }
+  }
+
   readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
 
   toggleGroupFolded(id: string) {
@@ -928,7 +942,9 @@ export class DocumentStore {
   updateSavedView(id: string) {
     const captured = this.captureView?.();
     if (!captured) return;
+    const name = this.doc().views?.find(v => v.id === id)?.name;
     this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
+    this.announce(`View "${name ?? ''}" replaced by the current view`, 2500); // also when nothing differed: the click is answered
   }
 
   renameSavedView(id: string, name: string) {

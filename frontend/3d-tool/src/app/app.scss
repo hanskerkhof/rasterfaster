@@ -112,4 +112,6 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-ready .thumb { width: 96px; max-height: 64px; object-fit: contain; border-radius: 3px; background: #000; flex: none; }
 .notice.render-ready .text { display: flex; flex-direction: column; gap: 2px; } .notice.render-ready small { opacity: .75; font-size: 11px; }
 .notice.render-ready:hover { background: #2f6fed; color: #fff; }
+.notice.render-ready .close, .notice.undo.render-ready button.close { flex: none; align-self: flex-start; margin: -2px -6px 0 0; padding: 0 5px; background: transparent; border: 0; color: inherit; opacity: .6; font-size: 13px; line-height: 1.2; cursor: pointer; }
+.notice.render-ready .close:hover { opacity: 1; background: rgba(0,0,0,.25); }
 .notice.undo button { margin-left: 8px; padding: 1px 8px; background: #2f6fed; color: #fff; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }

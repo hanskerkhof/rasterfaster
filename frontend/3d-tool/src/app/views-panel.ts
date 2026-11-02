@@ -39,6 +39,9 @@ function read(): { spot: Spot | null; collapsed: boolean } {
           </div>
         } @empty { <div class="empty">No views yet. Set up the camera and display you like, then save it.</div> }
       </div>
+      <details class="keys"><summary>Keys and mouse</summary>
+        <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file</div>
+      </details>
     }
   `,
   styles: `
@@ -58,6 +61,8 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; } .x:hover { opacity: 1; background: transparent; color: #fff; }
     .rename { flex: 1; min-width: 0; box-sizing: border-box; font: inherit; color: inherit; background: #1b1d23; border: 1px solid #2f6fed; border-radius: 3px; padding: 1px 4px; outline: none; }
     .replace { font-size: 17px; line-height: 1; padding: 0 4px; }
+    .keys { flex: none; padding: 0 6px 6px; } .keys summary { cursor: pointer; opacity: .6; font-size: 11px; user-select: none; } .keys summary:hover { opacity: 1; } .keys[open] .hint { margin-top: 4px; }
+    .keys .hint { font-size: 11px; line-height: 1.45; opacity: .75; }
     .empty { padding: 4px 6px; color: #8a93a2; }
   `,
 })

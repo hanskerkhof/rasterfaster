@@ -91,6 +91,10 @@ export interface RenderState {
   phases?: { name: string; start: number | null; end: number | null; estimate: number }[];
   phase?: string | null;
   error: string;
+  /** The document it was made from, the version of that document, and the picture's id in the document's image library once it is done. */
+  documentId?: string;
+  version?: number;
+  imageId?: string | null;
 }
 
 /**
