@@ -383,11 +383,15 @@ export class RenderService {
     if (!this.dialog()) this.openRequests.update(n => n + 1);
   }
 
+  /** The view the open Render dialog shows a picture of (what a saved view would hold). */
+  quickView: Record<string, unknown> | null = null;
+
   /** The last quick picture with what it was made from: while that is unchanged (view, light, parts, render settings) the dialog shows it again instead of rendering. */
   lastQuick: { key: string; blob: Blob; detail: string; settings: string } | null = null;
 
   /** The Render button: a quick picture (shown at once by the dialog). */
   openQuick(url: string) {
+    this.quickView = this.store.captureView?.() ?? null; // the camera, display, light and ground the picture is made from: kept with it, to come back to
     this.dialog.set({ url, jobId: '' });
   }
 
@@ -399,6 +403,7 @@ export class RenderService {
       this.dofParams(url);
       url.searchParams.set('width', String(this.hdWidth()));
       url.searchParams.set('samples', String(this.hdSamples()));
+      if (this.quickView) url.searchParams.set('savedView', JSON.stringify(this.quickView));
       await this.launch(url);
     } catch (error) {
       this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });
@@ -432,6 +437,7 @@ export class RenderService {
       put('dof', settings['depthOfField']); put('strength', settings['dofStrength']); put('focus', settings['focusId']);
       put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
       put('bg', settings['background']); put('floor', settings['ground']);
+      if (settings['savedView']) url.searchParams.set('savedView', JSON.stringify(settings['savedView']));
       url.searchParams.set('width', String(width));
       url.searchParams.set('samples', String(this.hdSamples()));
       await this.launch(url);

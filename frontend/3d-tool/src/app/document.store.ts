@@ -1059,6 +1059,19 @@ export class DocumentStore {
     this.mutate('Delete view', d => ({ ...d, views: (d.views ?? []).filter(v => v.id !== id) }));
   }
 
+  /** Goes to a view that is not in the list (the one a picture of the image library was made from): the camera, display, light and ground come back. */
+  goToView(view: Omit<DocSavedView, 'id' | 'name'>) {
+    this.setView(cameraOf(view));
+    this.recallView?.({ ...view, id: '', name: '' });
+  }
+
+  /** Adds a view (for example the one of a picture) to the saved views under a name; one undo step. */
+  addSavedView(view: Omit<DocSavedView, 'id' | 'name'>, name: string) {
+    const saved: DocSavedView = { ...view, id: crypto.randomUUID(), name: name.trim().slice(0, 80) || 'View' };
+    this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), saved] }));
+    return saved;
+  }
+
   /** Goes to a saved view (the nth, 1 based, when `which` is a number). */
   goToSavedView(which: string | number) {
     const views = this.doc().views ?? [];

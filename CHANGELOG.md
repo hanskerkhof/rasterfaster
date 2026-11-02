@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - A picture keeps its view, a steadier Render dialog (0.11.5)
+
+### Added
+- **FE** + **BE** (`render.service.ts`, `images-panel.ts`, `main.py`): a picture of the image library keeps the **view** it was made from (camera, display mode, Design / Render mode, light, ground and grid options, as a saved view would) in its settings (`savedView`; `savedView` query parameter on `POST …/render-jobs`). **Go to view** in the image viewer (and *Go to its view* in the right-click menu) brings it back to carry on working, **Save as view** (*Save its view in the Views panel*) adds it to the Views panel.
+
+### Changed
+- **FE** (`render-dialog.ts`): the Render dialog is wider (up to 1180 px), its button labels stay on one line and *Save quick render to library* and *Download* are always there (greyed out until the picture exists), so nothing jumps when the render arrives.
+
 ## 2026-11-02 - Floating panels stay in view (0.11.4)
 
 ### Fixed

@@ -776,7 +776,18 @@ def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focu
     }
 
 
-def render_note(document: DocumentOut, view: str | None, settings: dict, light: str | None = None) -> dict:
+def parse_saved_view(text: str | None) -> dict | None:
+    """The view a picture was made from as the frontend captured it (camera, display, light, ground), checked like a saved view; None when it is not one."""
+    if not text:
+        return None
+    try:
+        saved = DocumentSavedView.model_validate({"id": "image", "name": "Image", **json.loads(text)})
+    except (ValueError, TypeError):
+        return None
+    return saved.model_dump(exclude={"id", "name"}, exclude_none=True)
+
+
+def render_note(document: DocumentOut, view: str | None, settings: dict, light: str | None = None, saved_view: dict | None = None) -> dict:
     """What is kept with a picture in the image library: the render settings in words a person can read back, with the focus part's name."""
     focus = next((item.name for item in document.items if item.id == settings["focusId"]), None) if settings["depthOfField"] else None
     try:
@@ -784,7 +795,7 @@ def render_note(document: DocumentOut, view: str | None, settings: dict, light: 
     except (ValueError, KeyError, TypeError):
         projection = None
     # the camera and light of the call ride along, so the picture can be rendered again at another size
-    return {**settings, "focus": focus, "projection": projection, "view": view, "light": light}
+    return {**settings, "focus": focus, "projection": projection, "view": view, "light": light, **({"savedView": saved_view} if saved_view else {})}
 
 
 def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None):
@@ -1036,7 +1047,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
-                     width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
+                     width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000)) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
@@ -1045,7 +1056,7 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
             raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light))
+                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light, parse_saved_view(savedView)))
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})

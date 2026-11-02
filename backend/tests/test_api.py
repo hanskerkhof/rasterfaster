@@ -352,3 +352,14 @@ def test_part_render_settings_are_kept_and_checked(client):
     assert client.post("/api/documents", json={"name": "R", "items": [item]}).json()["items"][0]["render"] is None
     assert client.post("/api/documents", json={"name": "R", "items": [{**item, "render": {"finish": "chrome"}}]}).status_code == 422
     assert client.post("/api/documents", json={"name": "R", "items": [{**item, "render": {"color": -1}}]}).status_code == 422
+
+
+def test_saved_view_of_a_picture_is_checked_and_kept_in_its_note():
+    good = '{"projection": "persp", "position": [1, 2, 3], "target": [0, 0, 0], "zoom": 2, "radius": 100, "mode": "shaded", "appMode": "render", "unknown": 1}'
+    kept = main.parse_saved_view(good)
+    assert kept["position"] == (1, 2, 3) and kept["appMode"] == "render" and "id" not in kept and "unknown" not in kept
+    assert main.parse_saved_view(None) is None and main.parse_saved_view("{oops") is None
+    assert main.parse_saved_view('{"projection": "sideways"}') is None
+    document = main.DocumentOut(id="d", modified=0, name="N", items=[])
+    note = main.render_note(document, None, main.resolve_render_settings(document), None, kept)
+    assert note["savedView"] == kept and "savedView" not in main.render_note(document, None, main.resolve_render_settings(document))

@@ -69,7 +69,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
         } @empty { <div class="empty">No pictures yet. Full-size renders are kept here by themselves; in the Render dialog, <b>Save quick render to library</b> keeps a quick render.</div> }
       </div>
       <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">Full-size renders arrive here by themselves when they are done · Render dialog ▸ <b>Save quick render to library</b> keeps a quick render · right-click a picture for a menu (view, download, rename, render HD again, delete) · click a picture: view it large, download, rename (double-click the name) or delete it (a second click confirms) · Esc closes the large view · ← and → (or the arrows on the picture) go through the pictures · every picture carries the document version it was made from: <b>v13</b>, <b>v13*</b> when the working copy was ahead of it · green: the current version · Clean up: delete the pictures of older versions, or the quick renders, in one go (a second click confirms) · I: show or hide this panel · drag the title bar: move it, drag an edge or corner: resize it, double-click the title bar: put it back · ▾: fold it · the pictures live next to the document and go with it when it is deleted</div>
+        <div class="hint">Full-size renders arrive here by themselves when they are done · Render dialog ▸ <b>Save quick render to library</b> keeps a quick render · right-click a picture for a menu (view, download, rename, render HD again, delete) · click a picture: view it large, Go to view brings the camera, display, light and ground it was made from back (to carry on working), Save as view puts that view in the Views panel, download, rename (double-click the name) or delete it (a second click confirms) · Esc closes the large view · ← and → (or the arrows on the picture) go through the pictures · every picture carries the document version it was made from: <b>v13</b>, <b>v13*</b> when the working copy was ahead of it · green: the current version · Clean up: delete the pictures of older versions, or the quick renders, in one go (a second click confirms) · I: show or hide this panel · drag the title bar: move it, drag an edge or corner: resize it, double-click the title bar: put it back · ▾: fold it · the pictures live next to the document and go with it when it is deleted</div>
       </details>
     }
     @if (menu(); as m) {
@@ -79,6 +79,10 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
         <button type="button" role="menuitem" (click)="menuView(m.note)"><span class="icon">⤢</span>View large</button>
         <a role="menuitem" class="item" [href]="service.downloadSrc(m.note)" download (click)="closeMenu()"><span class="icon">⤓</span>Download PNG</a>
         <button type="button" role="menuitem" (click)="menuRename(m.note)"><span class="icon">✎</span>Rename…</button>
+        @if (m.note.settings?.savedView) {
+          <button type="button" role="menuitem" (click)="menuGoToView(m.note)"><span class="icon">◎</span>Go to its view</button>
+          <button type="button" role="menuitem" (click)="menuSaveAsView(m.note)"><span class="icon">+</span>Save its view in the Views panel</button>
+        }
         @if (m.note.settings?.view) {
           <div class="msep"></div>
           <div class="mhead" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings (it joins the queue when a render is running)'">Render HD again{{ render.queueFull() ? ' (queue full)' : (render.running() ? ' (joins the queue)' : '') }}</div>
@@ -96,6 +100,10 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
             <input #nameInput class="rename" [value]="note.name" maxlength="120" (keydown)="onNameKey($event, nameInput)" (blur)="commitName(note, nameInput.value)" />
           } @else { <b class="vname" title="Double-click to rename" (dblclick)="startRename()">{{ note.name }}</b> }
           <span class="meta">@if (service.images().length > 1) { <b class="pos">{{ position(note) }} / {{ service.images().length }}</b> · }{{ note.width }} × {{ note.height }} px · {{ note.samples }} samples · {{ minutes(note.elapsed) }} · {{ versionLabel(note) }}{{ note.edited && note.version ? ' (edited)' : '' }} · {{ megabytes(note.bytes) }}</span>
+          @if (note.settings?.savedView) {
+            <button type="button" title="Go back to the view this picture was made from (camera, display, light, ground) and close this window: to carry on working on it" (click)="goToView(note)">Go to view</button>
+            <button type="button" title="Save that view in the Views panel" (click)="saveAsView(note)">Save as view</button>
+          }
           @if (note.settings?.view) {
             <span class="hdmenu">
               <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings'" (click)="hdOpen.set(!hdOpen())">Render HD ▾</button>
@@ -231,6 +239,20 @@ export class ImagesPanel {
     const width = 260, height = 380; // the menu stays inside the window
     this.menu.set({ x: Math.max(8, Math.min(event.clientX, innerWidth - width - 8)), y: Math.max(8, Math.min(event.clientY, innerHeight - height - 8)), note });
   }
+  protected goToView(note: ImageNote) {
+    const view = note.settings?.savedView;
+    if (!view) return;
+    this.viewing.set(null);
+    this.store.goToView(view as never);
+  }
+  protected saveAsView(note: ImageNote) {
+    const view = note.settings?.savedView;
+    if (!view) return;
+    const saved = this.store.addSavedView(view as never, note.name === this.store.doc().name ? `Picture of ${new Date(note.created * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : note.name);
+    this.store.announce(`Saved as the view "${saved.name}" in the Views panel`, 3500);
+  }
+  protected menuGoToView(note: ImageNote) { this.closeMenu(); this.goToView(note); }
+  protected menuSaveAsView(note: ImageNote) { this.closeMenu(); this.saveAsView(note); }
   protected closeMenu() { this.menu.set(null); this.menuConfirm.set(false); }
   protected menuView(note: ImageNote) { this.closeMenu(); this.show(note); }
   protected menuRename(note: ImageNote) { this.closeMenu(); this.show(note); this.startRename(); }

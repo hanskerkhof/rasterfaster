@@ -79,11 +79,11 @@ import { ColorPalette } from './color-palette';
             @if (render.running()) { <span class="spinner small"></span> }Render HD@if (render.waiting() > 0) { <small> (+{{ render.waiting() }})</small> }
           </button>
         }
-        @if (url() && picture() && render.lastQuick && !busy()) {
-          <button type="button" [disabled]="savedToLibrary()" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Quick render saved to library' : 'Save quick render to library' }}</button>
+        @if (url()) { <!-- always there, so the row does not change when the picture arrives -->
+          <button type="button" [disabled]="savedToLibrary() || busy() || !picture() || !render.lastQuick" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Quick render saved to library' : 'Save quick render to library' }}</button>
         }
-        @if (picture()) {
-          <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
+        @if (picture() || url()) {
+          <a class="button download" [class.off]="!picture()" [attr.href]="picture() || null" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14"/></svg>
             {{ url() ? 'Download quick render PNG' : 'Download HD render PNG' }}
           </a>
@@ -98,10 +98,11 @@ import { ColorPalette } from './color-palette';
   `,
   styles: `
     .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 10; }
-    .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(960px, 94vw); max-height: 92vh; overflow: auto;
+    .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(1180px, 96vw); max-height: 92vh; overflow: auto;
               padding: 14px; background: #23262d; color: #dde1e8; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; font-size: 13px; box-shadow: 0 12px 40px rgba(0,0,0,.5); }
     header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; padding-right: 34px; }
-    .actions { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
+    .actions .download.off { opacity: .4; pointer-events: none; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; } .actions button, .actions select, .actions .button { white-space: nowrap; } .actions .download { margin-left: auto; } /* room for the close button, which stays in the corner */
     h2 { margin: 0 auto 0 0; font-size: 16px; } h2 small { font-weight: 400; opacity: .6; margin-left: 8px; }
     .lighting { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 8px; } .bar-title { font-weight: 600; opacity: .7; }
     .lamp-value { min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; opacity: .85; }
@@ -217,7 +218,9 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected async saveToLibrary() {
     const last = this.render.lastQuick;
     if (!last) return;
-    this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24, last.settings)));
+    let settings = last.settings;
+    try { settings = JSON.stringify({ ...JSON.parse(last.settings || '{}'), ...(this.render.quickView ? { savedView: this.render.quickView } : {}) }); } catch { /* keep what the API said */ }
+    this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24, settings)));
   }
   protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render-${this.url() ? 'quick' : 'hd'}.png`;
 

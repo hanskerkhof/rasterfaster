@@ -29,6 +29,8 @@ export interface RenderSettingsNote {
   /** The camera and light of the render (the address parameters), to render the picture again at another size. */
   view?: string | null;
   light?: string | null;
+  /** The view of the 3D view the picture was made from, as the Views panel would save it. */
+  savedView?: Record<string, unknown> | null;
   crop?: boolean;
   ambient?: number;
   lamp?: number;
