@@ -42,6 +42,7 @@ export interface RenderSettingsNote {
   ambient?: number;
   lamp?: number;
   beam?: number;
+  reflections?: number;
   background?: number | null;
   ground?: number | null;
   projection?: 'persp' | 'ortho' | null;

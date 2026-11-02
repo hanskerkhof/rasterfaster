@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Reflections, fitted shapes, Quick draft video (0.11.10)
+
+### Added
+- **FE** + **BE** (`render-dialog.ts`, `render.service.ts`, `stl-viewer.ts`, `document-scene.ts`, `blenderexport.py`, `main.py`): **Reflects** menu in the Render dialog's Lighting row: what metal, mirror and glass reflect: *Studio dark* (as before, the default), *Softbox* (bright panels), *Daylight* (a sky) or *Neutral grey*. The background and the lighting of matte parts stay as they are. The 3D view shows the same preset on shiny parts. Saved with the document (`render.reflections`), shown in the Gallery notes; API: `reflections=0..3` on `render.png`, `render.mp4`, `export.blend` and `render-jobs`.
+- **FE**: **Quick draft video** next to Quick video: 320 px, 2 samples, 12 frames per second, for testing the motion in seconds instead of a minute.
+
+### Changed
+- **BE** (`blenderexport.py`): another shape than 16:9 (1:1, 4:5, 9:16) now zooms and centres the camera so the parts fill the picture (the viewing direction stays); Crop and turntables are framed as before.
+- **FE** (`stl-viewer.ts`): the live preview's *Goes round: the view* circles the centre of the view as you set it, also while a part is tracked.
+
 ## 2026-11-02 - Goes round and Looks at (0.11.9)
 
 ### Changed

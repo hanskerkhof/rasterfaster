@@ -132,6 +132,8 @@ export interface RenderStep { name: string; label: string; duration: number; fil
 export const ambientNames = ['None', 'Soft glow', 'Overcast', 'Softbox', 'Daylight', 'Bright studio'];
 export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
 export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
+/** What metal, mirror and glass reflect (the dark studio is what renders always had). */
+export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral grey'];
 
 /** A render that waits in the queue. */
 export interface QueuedRender {
@@ -273,6 +275,13 @@ export class RenderService {
   readonly trackPivot = signal<'part' | 'all' | 'view'>('all');
   /** What Camera circles keeps looking at: the tracked part, the middle of all the objects, or nothing in particular (it keeps its angle). */
   readonly lookAt = signal<'part' | 'all' | 'view'>('view');
+  /** What metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey (in the 3D view and in renders). */
+  readonly reflections = signal(0);
+
+  setReflections(preset: number) {
+    this.reflections.set(preset);
+    this.saveSettings();
+  }
 
   setLookAt(choice: 'part' | 'all' | 'view') {
     this.lookAt.set(choice);
@@ -341,8 +350,8 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'all'); this.lookAt.set(own.lookAt ?? (own.trackId ? 'part' : 'view')); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('all'); this.lookAt.set('view'); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'all'); this.lookAt.set(own.lookAt ?? (own.trackId ? 'part' : 'view')); this.reflections.set(own.reflections ?? 0); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('all'); this.lookAt.set('view'); this.reflections.set(0); } // a document without render settings starts with the normal lamp (100%)
     });
     this.store.onTrackChosen = id => { // the 3D view's pick of the part a turntable tracks is over
       if (id) { this.setTrack(id); this.store.announce(`The turntable tracks "${this.tracked()?.name ?? ''}"`, 4000); }
@@ -503,7 +512,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), lookAt: this.lookAt(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), lookAt: this.lookAt(), reflections: this.reflections(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -513,6 +522,7 @@ export class RenderService {
     url.searchParams.set('lamp', String(this.lamp()));
     url.searchParams.set('beam', String(this.beam()));
     url.searchParams.set('aspect', this.aspect());
+    url.searchParams.set('reflections', String(this.reflections()));
     url.searchParams.set('transparent', String(this.transparent()));
     if (this.background() !== null) url.searchParams.set('bg', String(this.background()));
     if (this.ground() !== null) url.searchParams.set('floor', String(this.ground()));
@@ -603,7 +613,7 @@ export class RenderService {
       put('view', settings['view']); put('light', settings['light']);
       put('dof', settings['depthOfField']); put('strength', settings['dofStrength']); put('focus', settings['focusId']);
       put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
-      put('bg', settings['background']); put('floor', settings['ground']); put('aspect', settings['aspect']); put('transparent', settings['transparent']);
+      put('bg', settings['background']); put('floor', settings['ground']); put('aspect', settings['aspect']); put('transparent', settings['transparent']); put('reflections', settings['reflections']);
       if (settings['savedView']) url.searchParams.set('savedView', JSON.stringify(settings['savedView']));
       url.searchParams.set('width', String(width));
       url.searchParams.set('samples', String(this.hdSamples()));

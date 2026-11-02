@@ -160,6 +160,8 @@ export interface DocRenderSettings {
   trackId?: string | null;
   /** What Camera circles goes round: the middle of all the objects (the default), the middle of the view, or the tracked part (a tracked part is looked at in every case). */
   trackPivot?: 'part' | 'all' | 'view';
+  /** What metal, mirror and glass reflect: 0 the dark studio, 1 softbox, 2 daylight, 3 neutral grey. */
+  reflections?: number;
   /** What it looks at: the tracked part, the middle of all the objects, or nothing in particular (the angle it has); none: the part when one is tracked, else the view. */
   lookAt?: 'part' | 'all' | 'view' | null;
 }

@@ -272,7 +272,9 @@ lamp_text, _, rest_text = rest_text.partition(",")
 background_text, _, rest_text = rest_text.partition(",")
 ground_text, _, rest_text = rest_text.partition(",")
 beam_text, _, rest_text = rest_text.partition(",")
-aspect_text, _, transparent_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...) and "1" for a transparent background
+aspect_text, _, rest_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...)
+transparent_text, _, reflections_text = rest_text.partition(",")  # "1" for a transparent background, and what metal, mirror and glass reflect (0 to 3)
+reflections = min(max(int(reflections_text or 0), 0), 3)
 aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
 aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
 transparent_background = transparent_text == "1"
@@ -394,6 +396,39 @@ for obj in bpy.data.objects:
     if obj.name == "Camera path":
         obj.hide_render = True  # a guide line, not part of the picture
 
+if abs(aspect_ratio - 16 / 9) > 1e-6 and crop_flag != "1" and not turntable_spec and scene.camera:  # another shape: zoom (and shift) so the parts fill the picture, the direction of the view stays
+    from bpy_extras.object_utils import world_to_camera_view
+    camera = scene.camera
+    shown = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and not o.hide_render and not o.get("noRender")]
+
+    def extent():
+        xs, ys = [], []
+        for o in shown:
+            for corner in o.bound_box:
+                view = world_to_camera_view(scene, camera, o.matrix_world @ Vector(corner))
+                if view.z > 0:
+                    xs.append(view.x)
+                    ys.append(view.y)
+        return xs, ys
+
+    xs, ys = extent()
+    if xs:
+        height_share = scene.render.resolution_y / scene.render.resolution_x  # a share of the height, in units of the width (the lens is fitted to the width)
+        span = max(max(xs) - min(xs), (max(ys) - min(ys)) * height_share)
+        factor = min(max(0.92 / max(span, 1e-3), 0.3), 4.0)
+        if camera.data.type == "PERSP":
+            camera.data.lens *= factor
+        else:
+            camera.data.ortho_scale /= factor
+        for _ in range(6):  # the parts in the middle of the picture
+            xs, ys = extent()
+            if not xs:
+                break
+            dx, dy = (min(xs) + max(xs)) / 2 - 0.5, (min(ys) + max(ys)) / 2 - 0.5
+            if abs(dx) < 0.002 and abs(dy) < 0.002:
+                break
+            camera.data.shift_x += dx
+            camera.data.shift_y += dy * height_share
 if dof_spec.startswith("1") and scene.camera and scene.camera.data.type == "PERSP":  # depth of field (an orthographic camera has none)
     from bpy_extras.object_utils import world_to_camera_view
 
@@ -464,6 +499,11 @@ if studio == "1":
     surface = tree.nodes["Principled BSDF"]
     surface.inputs["Base Color"].default_value = (0.05, 0.055, 0.065, 1)
     surface.inputs["Roughness"].default_value = 0.55
+    if reflections:  # a reflection preset is for the shiny parts: the matte floor keeps only a little of it
+        for name in ("Specular IOR Level", "Specular"):
+            if name in surface.inputs:
+                surface.inputs[name].default_value = 0.12
+                break
     if ground_colour:
         surface.inputs["Base Color"].default_value = ground_colour
     # Solid seen from above, invisible seen from below: a camera under the floor looks straight through it (it still catches the shadows from above).
@@ -557,6 +597,50 @@ if studio == "1":
         top_object.location = (centre.x, centre.y, high.z + above)  # an area light shines down along its own -Z
         scene.collection.objects.link(top_object)
         bg.inputs["Strength"].default_value += world_extra
+    if reflections == 1:  # Softbox: a big soft panel above and a bright strip on each side: product-photo reflections. Invisible to the camera, but in every mirror and highlight.
+        def panel(name, location, size, size_y, power):
+            data = bpy.data.lights.new(name, "AREA")
+            data.shape, data.size, data.size_y, data.color = "RECTANGLE", size, size_y, (1.0, 1.0, 1.0)
+            data.energy = power * (r * 3) ** 2 * 10
+            panel_object = bpy.data.objects.new(name, data)
+            panel_object.location = location
+            panel_object.visible_camera = False  # not seen by the camera ...
+            panel_object.visible_diffuse = False  # ... and not lighting the matte parts and the floor: it is only what shiny and see-through things reflect
+            scene.collection.objects.link(panel_object)
+            panel_aim = bpy.data.objects.new(name + " target", None)
+            panel_aim.location = centre
+            scene.collection.objects.link(panel_aim)
+            panel_track = panel_object.constraints.new("TRACK_TO")
+            panel_track.target, panel_track.track_axis, panel_track.up_axis = panel_aim, "TRACK_NEGATIVE_Z", "UP_Y"
+        panel("Softbox top", Vector((centre.x, centre.y, high.z + r * 3)), r * 6, r * 4, 5)
+        panel("Softbox left", centre + Vector((-r * 3.5, -r * 0.5, r * 0.8)), r * 1.6, r * 5, 3)
+        panel("Softbox right", centre + Vector((r * 3.5, -r * 0.5, r * 0.8)), r * 1.6, r * 5, 3)
+    elif reflections in (2, 3):  # Daylight (a sky) or a neutral grey room: only what shiny and see-through parts reflect and refract; the camera and the lighting of everything else stay as they are
+        env = nt.nodes.new("ShaderNodeBackground")
+        if reflections == 2:
+            sky = nt.nodes.new("ShaderNodeTexSky")
+            try:
+                sky.sky_type = "NISHITA"
+                sky.sun_disc = False  # a soft skylight: the lamps make the shadows
+                sky.sun_elevation = math.radians(40)
+            except (TypeError, AttributeError):
+                pass
+            nt.links.new(sky.outputs[0], env.inputs["Color"])
+            env.inputs["Strength"].default_value = 0.45
+        else:
+            env.inputs["Color"].default_value = (0.5, 0.5, 0.5, 1)
+            env.inputs["Strength"].default_value = 1.0
+        studio_source = out.inputs[0].links[0].from_node
+        shiny_path, shiny, environment_mix = nt.nodes.new("ShaderNodeLightPath"), nt.nodes.new("ShaderNodeMath"), nt.nodes.new("ShaderNodeMixShader")
+        shiny.operation = "MAXIMUM"  # a reflection ray or a ray through glass sees the environment, every other ray the studio
+        for link in list(out.inputs[0].links):
+            nt.links.remove(link)
+        nt.links.new(shiny_path.outputs["Is Glossy Ray"], shiny.inputs[0])
+        nt.links.new(shiny_path.outputs["Is Transmission Ray"], shiny.inputs[1])
+        nt.links.new(shiny.outputs[0], environment_mix.inputs["Fac"])
+        nt.links.new(studio_source.outputs[0], environment_mix.inputs[1])
+        nt.links.new(env.outputs[0], environment_mix.inputs[2])
+        nt.links.new(environment_mix.outputs[0], out.inputs[0])
     scene.render.engine = "CYCLES"
     scene.render.film_transparent = transparent_background  # no background in the picture (the lighting stays)
     if transparent_background:

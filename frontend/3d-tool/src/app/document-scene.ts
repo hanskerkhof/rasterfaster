@@ -35,6 +35,7 @@ interface ItemRuntime {
   color: number;
   finish: string | null;
   silhouette: boolean;
+  environment: THREE.Texture | null;
 }
 
 interface DragState {
@@ -504,13 +505,14 @@ export class DocumentScene {
     if (!entry) { if (!this.failed.has(key)) void this.prepare(item, key); return; }
     let runtime = this.runtimes.get(item.id);
     if (!runtime) {
-      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, finish: null, silhouette: false };
+      runtime = { group: new THREE.Group(), entryKey: '', selected: false, muted: false, mode: this.mode, color: 0, finish: null, silhouette: false, environment: null };
       runtime.group.userData['itemId'] = item.id;
       this.group.add(runtime.group);
       this.runtimes.set(item.id, runtime);
     }
     const muted = !!item.muted;
-    if (runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== this.ctx.store.displayColor(item) || runtime.finish !== this.finishOf(item) || runtime.silhouette !== silhouetteEdges()) {
+    const environment = this.ctx.environment?.() ?? null; // another reflections preset: the shiny parts are drawn again
+    if (runtime.environment !== environment || runtime.entryKey !== key || runtime.selected !== selected || runtime.muted !== muted || runtime.mode !== this.mode || runtime.color !== this.ctx.store.displayColor(item) || runtime.finish !== this.finishOf(item) || runtime.silhouette !== silhouetteEdges()) {
       clearParts(runtime.group);
       const base = new THREE.Color(selected ? selectedColor : this.ctx.store.displayColor(item));
       const style = {
@@ -519,13 +521,13 @@ export class DocumentScene {
         edges: () => (entry.edges ??= new THREE.EdgesGeometry(entry.geometry, creaseDegrees)),
         silhouette: () => (entry.silhouette ??= buildSilhouetteGeometry(entry.geometry)),
         ghost: muted,
-        finish: this.finishOf(item), environment: this.ctx.environment?.() ?? null,
+        finish: this.finishOf(item), environment,
       };
       for (const part of buildParts(entry.geometry, this.mode, style)) {
         part.userData['itemId'] = item.id;
         runtime.group.add(part);
       }
-      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: this.ctx.store.displayColor(item), finish: this.finishOf(item), silhouette: silhouetteEdges() });
+      Object.assign(runtime, { entryKey: key, selected, muted, mode: this.mode, color: this.ctx.store.displayColor(item), finish: this.finishOf(item), silhouette: silhouetteEdges(), environment });
     }
     runtime.group.visible = !this.ctx.store.isHiddenNow(item); // hidden in Render mode: not drawn, and not clickable (see pickableMeshes)
     runtime.group.position.set(...item.position);

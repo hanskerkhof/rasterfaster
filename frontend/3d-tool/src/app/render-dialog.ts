@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, ambientNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
+import { Aspect, RenderService, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -40,6 +40,9 @@ import { ColorPalette } from './color-palette';
         <select class="focus strength" [value]="render.ambient()" title="Ambient light: a big soft light above the scene that lightens the shadows." (change)="chooseAmbient(+$any($event.target).value)">
           @for (level of ambients; track level.value) { <option [value]="level.value" [selected]="level.value === render.ambient()">Ambient: {{ level.label }}</option> }
         </select>
+        <select class="focus strength" [value]="render.reflections()" title="What metal, mirror and glass reflect (and what shows through glass): the dark studio, a softbox with bright panels, a daylight sky or a neutral grey room. The background and the lighting of the matte parts stay as they are" (change)="chooseReflections(+$any($event.target).value)">
+          @for (preset of reflectionPresets; track preset.value) { <option [value]="preset.value" [selected]="preset.value === render.reflections()">Reflects: {{ preset.label }}</option> }
+        </select>
         <select class="focus strength" [value]="render.beam()" title="The type of the lamp: from a spotlight (razor-sharp shadows) to a flood (very soft shadows)" (change)="chooseBeam(+$any($event.target).value)">
           @for (type of beams; track type.value) { <option [value]="type.value" [selected]="type.value === render.beam()">Lamp: {{ type.label }}</option> }
         </select>
@@ -73,6 +76,7 @@ import { ColorPalette } from './color-palette';
         }
         @if (url()) {
           <button type="button" [disabled]="busy()" [title]="'A small turntable video to see the motion: ' + quickVideoText() + '. It is not queued; use Render turntable for the real one'" (click)="quickVideo()">Quick video</button>
+          <button type="button" [disabled]="busy()" [title]="'An even rougher turntable video, to test the motion fast: ' + quickVideoText(true)" (click)="quickVideo(true)">Quick draft video</button>
           <select class="focus shape" [value]="render.aspect()" title="The shape of the picture: the size menu gives its width, the height follows the shape" (change)="chooseAspect($any($event.target).value)">
             @for (a of shapes; track a.id) { <option [value]="a.id" [selected]="a.id === render.aspect()">{{ a.label }}</option> }
           </select>
@@ -273,6 +277,11 @@ export class RenderDialog implements OnInit, OnDestroy {
     this.render.setLamp(40);
     this.lampChanged();
   }
+  protected readonly reflectionPresets = reflectionNames.map((label, value) => ({ value, label }));
+  protected chooseReflections(preset: number) {
+    this.render.setReflections(preset);
+    if (this.url() && !this.busy()) void this.quick();
+  }
   protected chooseAmbient(level: number) {
     this.render.setAmbient(level);
     if (this.url() && !this.busy()) void this.quick();
@@ -356,22 +365,23 @@ export class RenderDialog implements OnInit, OnDestroy {
   private videoQuick: { blob: Blob; settings: string } | null = null;
 
   /** What the quick video is: a few seconds of the chosen motion, small and with few samples. */
-  protected quickVideoText() {
+  protected quickVideoText(draft = false) {
     const seconds = Math.min(this.render.turntable().seconds, 5);
-    return `${seconds} s at 24 frames per second, 640 px wide, ${this.render.turntable().motion === 'spin' ? 'objects turn' : 'camera circles'}`;
+    return `${seconds} s at ${draft ? 12 : 24} frames per second, ${draft ? 320 : 640} px wide, ${this.render.turntable().motion === 'spin' ? 'objects turn' : 'camera circles'}`;
   }
 
   /** A small turntable video of this view, made at once (not queued) and shown here like the quick render. */
-  protected async quickVideo() {
+  protected async quickVideo(draft = false) {
     this.quickReady.set(false);
     this.savedToLibrary.set(false);
-    this.busyText.set('Rendering a quick turntable video (small, up to a minute)…');
+    this.busyText.set(draft ? 'Rendering a draft turntable video (tiny and rough)…' : 'Rendering a quick turntable video (small, up to a minute)…');
     this.busy.set(true);
     this.error.set('');
     try {
       const quickUrl = new URL(this.url().replace('/render.png', '/render.mp4'), location.origin);
       this.render.dofParams(quickUrl);
       const choice = this.render.turntable();
+      if (draft) { quickUrl.searchParams.set('width', '320'); quickUrl.searchParams.set('samples', '2'); quickUrl.searchParams.set('fps', '12'); }
       quickUrl.searchParams.set('motion', choice.motion);
       quickUrl.searchParams.set('seconds', String(Math.min(choice.seconds, 5)));
       if (this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
@@ -382,7 +392,7 @@ export class RenderDialog implements OnInit, OnDestroy {
       const blob = await response.blob();
       this.videoQuick = { blob, settings: response.headers.get('X-Render-Settings') ?? '' };
       this.isVideo.set(true);
-      this.show(blob, `640 px · quick video · ${this.quickVideoText()}`);
+      this.show(blob, `${draft ? 320 : 640} px · ${draft ? 'draft' : 'quick'} video · ${this.quickVideoText(draft)}`);
     } catch (error) {
       this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);
     } finally {

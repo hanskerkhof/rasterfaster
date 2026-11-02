@@ -834,6 +834,7 @@ export class StlViewer implements OnDestroy {
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.controls.update();
     const { pivot, aim } = this.previewPivot(motion);
+    this.targetOnPart = !!aim;
     if (aim) this.controls.target.copy(aim); // a tracked part is looked at whatever the camera goes round
     this.previewState = { last: performance.now(), angle: 0, pivot, aim };
     this.turntablePaused.set(false);
@@ -849,20 +850,26 @@ export class StlViewer implements OnDestroy {
     const looksAt = this.renderSettings.lookAt();
     const aim = looksAt === 'part' ? centre : looksAt === 'all' ? middle : null;
     if (motion === 'spin') return { pivot: new THREE.Vector3(middle.x, middle.y, bounds.min.z), aim }; // the parts turn, the camera stays where the view is (and may look at a part)
-    const forward = this.controls.target.clone().sub(this.camera.position).normalize();
-    const lookedAt = this.camera.position.clone().addScaledVector(forward, Math.max(middle.clone().sub(this.camera.position).dot(forward), 1)); // the point the view looks at
+    if (!this.targetOnPart) this.viewTarget = this.controls.target.clone(); // the middle of the view as you set it (a tracked part takes the camera's target, not this)
+    const viewTarget = this.viewTarget ?? this.controls.target;
+    const forward = viewTarget.clone().sub(this.camera.position).normalize();
+    const lookedAt = this.camera.position.clone().addScaledVector(forward, Math.max(middle.clone().sub(this.camera.position).dot(forward), 1)); // the point the view looks at (as in the render): parts elsewhere in the picture fly by
     const goesRound = this.renderSettings.trackPivot();
     return { pivot: goesRound === 'part' && centre ? centre : goesRound === 'view' ? lookedAt : middle, aim };
   }
 
   /** The setting (or the tracked part) was changed while the camera circles: it goes on round the new centre from where it is. */
+  private viewTarget: THREE.Vector3 | null = null;
+  private targetOnPart = false;
+
   private refreshPreviewPivot() {
     const state = this.previewState, preview = this.turntablePreview();
     if (!state || !preview || !this.documentScene.bounds()) return;
     const { pivot, aim } = this.previewPivot(preview.motion);
     state.pivot = pivot;
     state.aim = aim;
-    if (aim) this.controls.target.copy(aim);
+    if (aim) { this.targetOnPart = true; this.controls.target.copy(aim); }
+    else if (this.targetOnPart && this.viewTarget) { this.targetOnPart = false; this.controls.target.copy(this.viewTarget); } // back to looking where the view looked
   }
 
   /** Click a part to make the camera of Camera circles go round it and keep it in the middle (the part under the pointer is outlined; Esc cancels). */
@@ -900,6 +907,7 @@ export class StlViewer implements OnDestroy {
     if (preview.motion === 'orbit') {
       const cos = Math.cos(step), sin = Math.sin(step), pivot = state.pivot;
       const points = state.aim ? [this.camera.position] : [this.camera.position, this.controls.target];
+      if (state.aim && this.viewTarget) points.push(this.viewTarget); // the middle of the view turns along, so "the view" stays what it was
       for (const point of points) {
         const x = point.x - pivot.x, y = point.y - pivot.y;
         point.x = pivot.x + cos * x - sin * y;
@@ -1832,16 +1840,48 @@ export class StlViewer implements OnDestroy {
     this.scene.add(plane);
   }
 
-  private environmentTexture: THREE.Texture | null = null;
+  private readonly environmentTextures = new Map<number, THREE.Texture>();
 
-  /** The reflections metal, glass and mirror parts show: a plain studio room, made once (it is only needed when a part has such a finish). */
-  private reflections(): THREE.Texture | null {
-    if (!this.environmentTexture && this.renderer) {
-      const generator = new THREE.PMREMGenerator(this.renderer);
-      this.environmentTexture = generator.fromScene(new RoomEnvironment(), 0.04).texture;
-      generator.dispose();
+  /** A small room for the preset: 0 the dark studio, 1 a softbox with bright panels, 2 daylight, 3 neutral grey. */
+  private environmentRoom(preset: number): THREE.Scene {
+    if (preset === 0) return new RoomEnvironment();
+    const room = new THREE.Scene();
+    const shell = (colour: number) => new THREE.MeshBasicMaterial({ color: colour, side: THREE.BackSide });
+    const panel = (w: number, h: number, intensity: number, x: number, y: number, z: number) => {
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(intensity, intensity, intensity), side: THREE.DoubleSide }));
+      mesh.position.set(x, y, z);
+      mesh.lookAt(0, 0, 0);
+      room.add(mesh);
+    };
+    if (preset === 1) {
+      room.add(new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), shell(0x101012)));
+      panel(24, 16, 6, 0, 0, 18); panel(8, 22, 3.5, -17, 0, 6); panel(8, 22, 3.5, 17, 0, 6);
+    } else if (preset === 2) {
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(30, 32, 16), new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        vertexShader: 'varying vec3 p; void main(){ p = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'varying vec3 p; void main(){ float t = clamp(p.z / 30.0 * 0.5 + 0.5, 0.0, 1.0); gl_FragColor = vec4(mix(vec3(0.22, 0.20, 0.18), vec3(0.45, 0.62, 0.95), smoothstep(0.35, 1.0, t)), 1.0); }',
+      }));
+      sky.rotation.x = -Math.PI / 2; // the sphere's pole is z (up in the document)
+      room.add(sky);
+      panel(10, 10, 5, 12, 10, 22);
+    } else {
+      room.add(new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), shell(0x808080)));
     }
-    return this.environmentTexture;
+    return room;
+  }
+
+  /** The reflections metal, glass and mirror parts show (made once per preset, only when a part has such a finish). */
+  private reflections(): THREE.Texture | null {
+    const preset = this.renderSettings.reflections();
+    let texture = this.environmentTextures.get(preset) ?? null;
+    if (!texture && this.renderer) {
+      const generator = new THREE.PMREMGenerator(this.renderer);
+      texture = generator.fromScene(this.environmentRoom(preset), 0.04).texture;
+      generator.dispose();
+      this.environmentTextures.set(preset, texture);
+    }
+    return texture;
   }
 
   private clearModel() {
@@ -2114,7 +2154,7 @@ export class StlViewer implements OnDestroy {
     this.store.showInAssembly = null;
     this.store.viewSvg = null;
     this.store.captureView = null;
-    this.environmentTexture?.dispose();
+    this.environmentTextures.forEach(t => t.dispose());
     this.store.recallView = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
