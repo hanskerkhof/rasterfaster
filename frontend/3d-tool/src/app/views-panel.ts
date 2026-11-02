@@ -1,4 +1,4 @@
-import { Component, ElementRef, effect, inject, signal } from '@angular/core';
+import { Component, ElementRef, computed, effect, inject, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 import { ReleaseFocus } from './release-focus';
 
@@ -29,18 +29,18 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     @if (!collapsed()) {
       <div class="list">
         @for (view of store.doc().views ?? []; track view.id; let i = $index) {
-          <div class="view" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" title="Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept">
+          <div class="view" [class.active]="view.id === activeId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" title="Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept">
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
             @if (editing() === view.id) {
               <input #nameInput class="rename" [value]="view.name" maxlength="80" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()" (keydown)="onKey($event, view.id, nameInput)" (blur)="commit(view.id, nameInput.value)" />
             } @else { <span class="label">{{ view.name }}</span> }
-            <button type="button" class="x replace" title="Replace this view by what you see now" (click)="update($event, view.id)">⟳</button>
+            <button type="button" class="x replace" title="Replace this view by what you see now (⇧ + its number)" (click)="update($event, view.id)">⟳</button>
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
           </div>
         } @empty { <div class="empty">No views yet. Set up the camera and display you like, then save it.</div> }
       </div>
       <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file</div>
+        <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ (or ⇧ and its number) replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views, ⇧1 – ⇧9 replace them by the current view (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file</div>
       </details>
     }
   `,
@@ -56,6 +56,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .fold { padding: 0 4px; background: transparent; border: 0; } .fold:hover { background: transparent; color: #fff; }
     .list { overflow-y: auto; padding: 0 4px 6px; display: flex; flex-direction: column; gap: 2px; }
     .view { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; border-radius: 4px; } .view:hover { background: rgba(255,255,255,.08); }
+    .view.active { background: rgba(47,111,237,.35); box-shadow: inset 3px 0 0 #2f6fed; } .view.active:hover { background: rgba(47,111,237,.45); } .view.active .num { color: #fff; }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; } .x:hover { opacity: 1; background: transparent; color: #fff; }
@@ -85,6 +86,14 @@ export class ViewsPanel {
   protected save() { this.store.saveCurrentView(); }
   protected update(event: Event, id: string) { event.stopPropagation(); this.store.updateSavedView(id); }
   protected remove(event: Event, id: string) { event.stopPropagation(); this.store.removeSavedView(id); }
+  /** The saved view the camera is on now (the camera of the document is kept a moment after it moves, so this follows it). */
+  protected readonly activeId = computed(() => {
+    const now = this.store.doc().view;
+    if (!now) return null;
+    const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
+    return this.store.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
+  });
+
   /** The view whose name is being edited in place. */
   protected readonly editing = signal<string | null>(null);
 

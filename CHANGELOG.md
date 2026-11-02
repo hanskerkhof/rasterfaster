@@ -2,6 +2,13 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Image library: settings, cycling, menu, resize, render again (0.10.70)
+
+### Added
+- **FE** + **BE** (`images-panel.ts`, `images.service.ts`, `main.py`): the render settings are kept with every picture (camera, depth of field and its focus part, ambient, lamp type and strength, background, ground, crop, and the camera and light of the render) and shown as chips in the viewer; API: `X-Render-Settings` header on `render.png`, `settings` on `POST …/images`, and `settings` in the image notes.
+- **FE**: **Render HD ▾** in the image viewer renders the picture again at full size with its camera, light and settings (the document as it is now); the viewer cycles through the pictures (‹ ›, ← →, with a counter); a right-click menu on a picture (view, download, rename, render HD again, delete); the Images panel resizes like the object panel (edges and corners, double-click the title bar to reset); the badge shows the resolution name (HD, QHD, 4K UHD …).
+- **FE**: **⇧1 … ⇧9** replace that saved view by the current one; the view the camera is on is highlighted in the Views panel; **⟳ Replace this view** answers with a short message; the Render dialog button reads **Save quick render to library**.
+
 ## 2026-11-02 - Image library (0.10.69)
 
 ### Added

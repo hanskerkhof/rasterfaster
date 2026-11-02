@@ -77,6 +77,11 @@ const stepLabels: Record<string, string> = { prepare: 'Preparing the scene', loa
 /** One step of a render in the progress bar: how long it takes (or is expected to) and how much of it is done (0 to 1). */
 export interface RenderStep { name: string; label: string; duration: number; fill: number; started: boolean; done: boolean }
 
+/** The names of the render menus, also used to describe a picture of the image library. */
+export const ambientNames = ['None', 'Soft glow', 'Overcast', 'Softbox', 'Daylight', 'Bright studio'];
+export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
+export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
+
 export interface RenderState {
   id: string;
   name: string;
@@ -351,7 +356,7 @@ export class RenderService {
   }
 
   /** The last quick picture with what it was made from: while that is unchanged (view, light, parts, render settings) the dialog shows it again instead of rendering. */
-  lastQuick: { key: string; blob: Blob; detail: string } | null = null;
+  lastQuick: { key: string; blob: Blob; detail: string; settings: string } | null = null;
 
   /** The Render button: a quick picture (shown at once by the dialog). */
   openQuick(url: string) {
@@ -366,13 +371,36 @@ export class RenderService {
       this.dofParams(url);
       url.searchParams.set('width', String(this.hdWidth()));
       url.searchParams.set('samples', '96');
-      const response = await fetch(url, { method: 'POST' });
-      if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
-      const started = await response.json();
-      this.track(started);
-      this.state.set(started); // the WebSocket keeps it up to date from here
-      this.store.announce('Full-size render started in the background: you get a message when it is ready', 6000);
-      void this.poll(); // and the polling does when there is no WebSocket
+      await this.launch(url);
+    } catch (error) {
+      this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });
+    }
+  }
+
+  /** Starts the job a render-jobs address describes and follows it. */
+  private async launch(url: URL) {
+    const response = await fetch(url, { method: 'POST' });
+    if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
+    const started = await response.json();
+    this.track(started);
+    this.state.set(started); // the WebSocket keeps it up to date from here
+    this.store.announce('Full-size render started in the background: you get a message when it is ready', 6000);
+    void this.poll(); // and the polling does when there is no WebSocket
+  }
+
+  /** Renders a picture of the image library again at full size, with the camera, light and settings it was made with (the document as it is now). */
+  async startFromNote(documentId: string, settings: Record<string, unknown>, width: number) {
+    this.toast.set(null);
+    try {
+      const url = new URL(`/api/documents/${documentId}/render-jobs`, location.origin);
+      const put = (key: string, value: unknown) => { if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value)); };
+      put('view', settings['view']); put('light', settings['light']);
+      put('dof', settings['depthOfField']); put('strength', settings['dofStrength']); put('focus', settings['focusId']);
+      put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
+      put('bg', settings['background']); put('floor', settings['ground']);
+      url.searchParams.set('width', String(width));
+      url.searchParams.set('samples', '96');
+      await this.launch(url);
     } catch (error) {
       this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });
     }

@@ -204,6 +204,11 @@ function readImagesOpen(): boolean {
   try { return localStorage.getItem(imagesOpenStorageKey) === 'true'; } catch { return false; }
 }
 
+/** Just the camera of a saved view (what the document's own `view` holds). */
+function cameraOf(view: DocView): DocView {
+  return { projection: view.projection, position: view.position, target: view.target, zoom: view.zoom, radius: view.radius };
+}
+
 function readClipboard(): ClipboardContent | null {
   try {
     const parsed = JSON.parse(localStorage.getItem(clipboardStorageKey) ?? 'null');
@@ -935,6 +940,7 @@ export class DocumentStore {
     const number = views.reduce((max, v) => Math.max(max, Number(/^View (\d+)$/.exec(v.name)?.[1] ?? 0)), 0) + 1;
     const view: DocSavedView = { ...captured, id: crypto.randomUUID(), name: (name?.trim() || `View ${number}`).slice(0, 80) };
     this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), view] }));
+    this.setView(cameraOf(view)); // the camera is on this view now: the panel marks it
     return view;
   }
 
@@ -944,7 +950,15 @@ export class DocumentStore {
     if (!captured) return;
     const name = this.doc().views?.find(v => v.id === id)?.name;
     this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
+    this.setView(cameraOf(captured));
     this.announce(`View "${name ?? ''}" replaced by the current view`, 2500); // also when nothing differed: the click is answered
+  }
+
+  /** Replaces the nth saved view (1 based) by the current one; says so when there is no such view. */
+  updateSavedViewNumber(n: number) {
+    const view = (this.doc().views ?? [])[n - 1];
+    if (view) this.updateSavedView(view.id);
+    else this.announce(`There is no view ${n} to replace`, 2500);
   }
 
   renameSavedView(id: string, name: string) {
@@ -961,7 +975,7 @@ export class DocumentStore {
   goToSavedView(which: string | number) {
     const views = this.doc().views ?? [];
     const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
-    if (view) this.recallView?.(view);
+    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); } // the panel marks it at once, the camera glides there
   }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;

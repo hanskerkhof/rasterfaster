@@ -308,6 +308,20 @@ def test_image_library_keeps_pictures_with_the_document_version(client):
     assert client.get(f"{base}/{second['id']}.png").content == PNG
     assert "attachment" in client.get(f"{base}/{second['id']}.png", params={"download": True}).headers["content-disposition"]
     assert client.post(base, content=b"not a png").status_code == 422
+    kept = client.post(base, content=PNG, params={"settings": '{"lamp": 40, "ambient": 2}'}).json()
+    assert kept["settings"] == {"lamp": 40, "ambient": 2}
+    assert client.post(base, content=PNG, params={"settings": "[1]"}).status_code == 422
+    assert client.post(base, content=PNG, params={"settings": "{oops"}).status_code == 422
+    assert client.get(base).json()[0]["settings"] == {"lamp": 40, "ambient": 2}
+
+
+def test_render_note_has_the_settings_in_words_and_the_focus_part_name():
+    document = main.DocumentOut(id="d", modified=0, name="N", items=[main.DocumentItem(id="p1", path="a.stl", name="Part A", color=1, position=(0, 0, 0), rotation=(0, 0, 0, 1))],
+                                render=main.DocumentRenderSettings(depthOfField=True, focusId="p1", lamp=50, ambient=3))
+    note = main.render_note(document, None, main.resolve_render_settings(document))
+    assert note["focus"] == "Part A" and note["lamp"] == 50 and note["ambient"] == 3 and note["depthOfField"] is True and note["projection"] == "persp" and note["focusId"] == "p1" and note["view"] is None
+    off = main.render_note(document, "0,-1,0;0,0,0;100;ortho", main.resolve_render_settings(document, dof=False, lamp=20))
+    assert off["focus"] is None and off["lamp"] == 20 and off["projection"] == "ortho"
 
 
 def test_image_library_thumbnail_rename_and_deleting(client):

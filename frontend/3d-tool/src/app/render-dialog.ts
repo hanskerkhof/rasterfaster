@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { RenderService, hdWidths } from './render.service';
+import { RenderService, ambientNames, beamNames, hdWidths, strengthNames } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -77,7 +77,7 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url() && picture() && render.lastQuick && !busy()) {
-          <button type="button" [disabled]="savedToLibrary()" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Saved to library' : 'Save to library' }}</button>
+          <button type="button" [disabled]="savedToLibrary()" title="Keep this quick render in the document's image library (it carries the document version)" (click)="saveToLibrary()">{{ savedToLibrary() ? '✓ Quick render saved to library' : 'Save quick render to library' }}</button>
         }
         @if (picture()) {
           <a class="button download" [href]="picture()" [download]="fileName()" [title]="url() ? 'Save the quick render (800 px) as a PNG file' : 'Save the full-size render as a PNG file'">
@@ -151,10 +151,10 @@ export class RenderDialog implements OnInit, OnDestroy {
       return { id: item.id, label: n > 1 ? `${item.name} (${n})` : item.name };
     });
   }
-  protected readonly strengths = [{ value: 1, label: 'Subtle' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Medium' }, { value: 4, label: 'Strong' }, { value: 5, label: 'Extreme' }];
-  protected readonly ambients = [{ value: 0, label: 'None' }, { value: 1, label: 'Soft glow' }, { value: 2, label: 'Overcast' }, { value: 3, label: 'Softbox' }, { value: 4, label: 'Daylight' }, { value: 5, label: 'Bright studio' }];
+  protected readonly strengths = strengthNames.map((label, i) => ({ value: i + 1, label }));
+  protected readonly ambients = ambientNames.map((label, value) => ({ value, label }));
   /** The lamp as a share of its normal strength: every 10 steps of the slider double or halve it. */
-  protected readonly beams = [{ value: 0, label: 'Spot' }, { value: 1, label: 'Direct' }, { value: 2, label: 'Soft' }, { value: 3, label: 'Diffuse' }, { value: 4, label: 'Flood' }];
+  protected readonly beams = beamNames.map((label, value) => ({ value, label }));
   protected chooseBeam(type: number) {
     this.render.setBeam(type);
     if (this.url() && !this.busy()) void this.quick();
@@ -213,7 +213,7 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected async saveToLibrary() {
     const last = this.render.lastQuick;
     if (!last) return;
-    this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24)));
+    this.savedToLibrary.set(!!(await this.images.saveQuick(last.blob, this.name(), 24, last.settings)));
   }
   protected fileName = () => `${this.name().replace(/[^\w.-]+/g, '_')}-render-${this.url() ? 'quick' : 'hd'}.png`;
 
@@ -278,7 +278,7 @@ export class RenderDialog implements OnInit, OnDestroy {
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();
       const detail = `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`;
-      this.render.lastQuick = { key, blob, detail };
+      this.render.lastQuick = { key, blob, detail, settings: response.headers.get('X-Render-Settings') ?? '' };
       this.show(blob, detail);
       this.quickReady.set(true);
     } catch (error) {

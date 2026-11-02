@@ -738,6 +738,37 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
     return Response(data, media_type="model/gltf-binary", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None,
+                            lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None) -> dict:
+    """The render settings of a call: what it brings, else what the document remembers, else the defaults."""
+    render = document.render
+    focusId = focus if focus is not None else (render.focusId if render else None)
+    if focusId is not None and not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", focusId):
+        raise HTTPException(status_code=422, detail="focus must be the id of a part")
+    return {
+        "depthOfField": dof if dof is not None else bool(render and render.depthOfField),
+        "focusId": focusId,
+        "dofStrength": strength if strength is not None else (render.dofStrength if render else 3),
+        "crop": crop if crop is not None else bool(render and render.crop),
+        "lamp": lamp if lamp is not None else (render.lamp if render else 40),
+        "background": background if background is not None else (render.background if render else None),
+        "ground": ground if ground is not None else (render.ground if render else None),
+        "beam": beam if beam is not None else (render.beam if render else 1),
+        "ambient": ambient if ambient is not None else (render.ambient if render else 0),
+    }
+
+
+def render_note(document: DocumentOut, view: str | None, settings: dict, light: str | None = None) -> dict:
+    """What is kept with a picture in the image library: the render settings in words a person can read back, with the focus part's name."""
+    focus = next((item.name for item in document.items if item.id == settings["focusId"]), None) if settings["depthOfField"] else None
+    try:
+        projection = blenderexport.parse_view(view)["projection"] if view else "persp"
+    except (ValueError, KeyError, TypeError):
+        projection = None
+    # the camera and light of the call ride along, so the picture can be rendered again at another size
+    return {**settings, "focus": focus, "projection": projection, "view": view, "light": light}
+
+
 def blender_scene(documentId: str, colours: bool, view: str | None, light: str | None, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None, lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None):
     """What both Blender endpoints build from: the glTF of the document and the key light (the call's own, else the light saved in the document)."""
     blender = blenderexport.find_blender()
@@ -752,19 +783,11 @@ def blender_scene(documentId: str, colours: bool, view: str | None, light: str |
             ",".join(str(v) for v in saved.direction) + ";" + (f"part:{saved.targetId}" if saved.targetId else ",".join(str(v) for v in saved.target) if saved.target else "")) if saved else None)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
-    on = dof if dof is not None else bool(document.render and document.render.depthOfField)
-    focusId = focus if focus is not None else (document.render.focusId if document.render else None)
-    if focusId is not None and not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", focusId):
-        raise HTTPException(status_code=422, detail="focus must be the id of a part")
-    level = strength if strength is not None else (document.render.dofStrength if document.render else 3)
-    cropped = crop if crop is not None else bool(document.render and document.render.crop)
-    lamp_level = lamp if lamp is not None else (document.render.lamp if document.render else 40)
-    saved_bg = background if background is not None else (document.render.background if document.render else None)
-    saved_floor = ground if ground is not None else (document.render.ground if document.render else None)
-    bg_text = f"{saved_bg:06x}" if saved_bg is not None else ""
-    floor_text = f"{saved_floor:06x}" if saved_floor is not None else ""
-    beam_level = beam if beam is not None else (document.render.beam if document.render else 1)
-    light_level = ambient if ambient is not None else (document.render.ambient if document.render else 0)
+    settings = resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, background, ground, beam)
+    on, focusId, level, cropped = settings["depthOfField"], settings["focusId"], settings["dofStrength"], settings["crop"]
+    lamp_level, beam_level, light_level = settings["lamp"], settings["beam"], settings["ambient"]
+    bg_text = f"{settings['background']:06x}" if settings["background"] is not None else ""
+    floor_text = f"{settings['ground']:06x}" if settings["ground"] is not None else ""
     return document, blender, glb, sun, ("0" if not on else f"1|{level}|{focusId or ''}") + f"#{light_level},{lamp_level},{bg_text},{floor_text},{beam_level}", cropped  # the ambient preset rides along after the "#"
 
 
@@ -794,7 +817,8 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + ".png"
-    return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+    note = render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light)
+    return Response(data, media_type="image/png", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
 # What the steps of a full-size render took the last time (seconds; the render step per megapixel and sample, the last step per megapixel),
@@ -806,9 +830,10 @@ renderPhases = ["prepare", "load", "render", "finish"]  # making the scene, open
 class RenderJob:
     """A full-size render running in the background: Blender runs in a thread, its progress is read from its output."""
 
-    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True):
+    def __init__(self, name: str, width: int, samples: int, documentId: str = "", version: int = 0, edited: bool = True, settings: dict | None = None):
         self.id = uuid.uuid4().hex[:12]
         self.name, self.width, self.samples = name, width, samples
+        self.settings = settings or {}  # the render settings, kept with the picture
         self.documentId, self.version, self.edited = documentId, version, edited  # what it is made from: kept with the picture in the image library
         self.imageId: str | None = None  # the picture's id in the library once it is done
         self.state = "running"  # running | done | error | cancelled
@@ -937,7 +962,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         if job.state == "done" and job.documentId:
             try:  # a finished full-size render goes into the document's image library
                 job.imageId = images.add(images.images_dir(documentsRoot, job.documentId), job.png, name=job.name, kind="hd", samples=job.samples,
-                                         elapsed=time.time() - job.started, version=job.version, edited=job.edited)["id"]
+                                         elapsed=time.time() - job.started, version=job.version, edited=job.edited, settings=job.settings)["id"]
             except (OSError, ValueError):
                 pass  # the library is a bonus: the render itself is still delivered
     except Exception as error:  # noqa: BLE001 - whatever went wrong is reported to the page
@@ -957,7 +982,8 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
     if any(j.state == "running" for j in renderJobs.values()):
         raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
     renderJobs.clear()  # an older picture nobody collected is dropped
-    job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion)
+    job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
+                    render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light))
     renderJobs[job.id] = job
     threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField, cropped), daemon=True).start()
     notifier.notify({"type": "render", **job.view()})
@@ -1019,6 +1045,7 @@ class ImageNote(BaseModel):
     edited: bool  # the working copy was ahead of that version when it was rendered
     thumb: bool = False
     bytes: int = 0
+    settings: dict = Field(default_factory=dict)  # the render settings it was made with
 
 
 class ImageRename(BaseModel):
@@ -1038,7 +1065,7 @@ def list_images(documentId: str) -> list[dict]:
 
 @app.post("/api/documents/{documentId}/images", response_model=ImageNote, status_code=201)
 async def add_image(documentId: str, request: Request, kind: Literal["hd", "quick"] = "quick", name: str | None = Query(default=None, max_length=120),
-                    samples: int = Query(default=24, ge=1, le=4096), elapsed: float = Query(default=0, ge=0)) -> dict:
+                    samples: int = Query(default=24, ge=1, le=4096), elapsed: float = Query(default=0, ge=0), settings: str | None = Query(default=None, max_length=4000)) -> dict:
     """Keeps a picture (the body is the PNG), e.g. a quick render, in the document's image library; it carries the document's version."""
     directory = image_library(documentId)
     document = read_document(documentId)
@@ -1046,7 +1073,10 @@ async def add_image(documentId: str, request: Request, kind: Literal["hd", "quic
     if len(data) > 200_000_000:
         raise HTTPException(status_code=413, detail="the picture is too large")
     try:
-        note = images.add(directory, data, name=name or document.name, kind=kind, samples=samples, elapsed=elapsed, version=document.version, edited=document.changedSinceVersion)
+        kept = json.loads(settings) if settings else {}
+        if not isinstance(kept, dict):
+            raise ValueError("settings must be an object")
+        note = images.add(directory, data, name=name or document.name, kind=kind, samples=samples, elapsed=elapsed, version=document.version, edited=document.changedSinceVersion, settings=kept)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     return images.read_note(directory, note["id"]) or note

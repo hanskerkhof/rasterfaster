@@ -17,6 +17,25 @@ export interface ImageNote {
   edited: boolean;
   thumb: boolean;
   bytes: number;
+  /** What the picture was rendered with (depth of field, lamp, ambient light, colours …). */
+  settings?: RenderSettingsNote;
+}
+
+export interface RenderSettingsNote {
+  depthOfField?: boolean;
+  dofStrength?: number;
+  focus?: string | null;
+  focusId?: string | null;
+  /** The camera and light of the render (the address parameters), to render the picture again at another size. */
+  view?: string | null;
+  light?: string | null;
+  crop?: boolean;
+  ambient?: number;
+  lamp?: number;
+  beam?: number;
+  background?: number | null;
+  ground?: number | null;
+  projection?: 'persp' | 'ortho' | null;
 }
 
 const thumbWidth = 320;
@@ -82,11 +101,11 @@ export class ImagesService {
   }
 
   /** Keeps a quick render (the picture the render dialog shows). */
-  async saveQuick(blob: Blob, name: string, samples: number) {
+  async saveQuick(blob: Blob, name: string, samples: number, settings = '') {
     const base = this.base();
     if (!base) return null;
     try {
-      const response = await fetch(`${base}?kind=quick&samples=${samples}&name=${encodeURIComponent(name)}`, { method: 'POST', body: blob });
+      const response = await fetch(`${base}?kind=quick&samples=${samples}&name=${encodeURIComponent(name)}${settings ? `&settings=${encodeURIComponent(settings)}` : ''}`, { method: 'POST', body: blob });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const note = await response.json() as ImageNote;
       this.images.update(list => [note, ...list]);
