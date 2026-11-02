@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Pick one part of a group in the list (0.10.67)
+
+### Changed
+- **FE** (`document-panel.ts`, `document.store.ts`): in the part list a click, ⌘-click or Shift-click on a group member selects that part alone; only the group's row selects the whole group. A right-click on a part that is not selected opens the menu for that part alone.
+
 ## 2026-11-02 - Groups (0.10.66)
 
 ### Added

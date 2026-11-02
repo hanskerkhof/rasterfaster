@@ -151,7 +151,7 @@ function readGeometry(): PanelGeometry | null {
         </div>
        }
        @if (!item.groupId || !folded(item.groupId)) {
-        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · in a group: click again (or Option-click) for this part alone">
+        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · the group row selects the whole group">
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
@@ -700,16 +700,15 @@ export class DocumentPanel {
   }
 
   protected onItemClick(event: MouseEvent, id: string) {
-    if (event.altKey && !event.shiftKey && !event.metaKey && !event.ctrlKey) { this.anchorId = id; this.store.selectPart(id); return; } // Option-click: this part alone, out of its group
+    // In the list a part is picked on its own, also when it is in a group: only the group's header row selects the whole group.
     if (event.shiftKey) {
       const ids = this.store.doc().items.map(item => item.id);
-      this.store.selectMany(rangeEndingAt(ids, this.anchorId ?? this.store.selectedId(), id), event.metaKey || event.ctrlKey);
+      this.store.selectMany(rangeEndingAt(ids, this.anchorId ?? this.store.selectedId(), id), event.metaKey || event.ctrlKey, false);
       return;
     }
     this.anchorId = id;
-    if (event.metaKey || event.ctrlKey) this.store.toggleSelect(id);
-    else if (this.store.selectedIds().length > 1 && this.store.selectedIds().includes(id)) this.store.selectPart(id); // a second click inside a selected group (or multi-selection) narrows it to this part
-    else this.store.select(id);
+    if (event.metaKey || event.ctrlKey) this.store.toggleSelect(id, false);
+    else this.store.selectPart(id);
   }
 
   protected remove(event: Event, item: DocItem) {

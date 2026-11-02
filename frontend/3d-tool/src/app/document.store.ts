@@ -791,13 +791,14 @@ export class DocumentStore {
   }
 
   /** Shift-click in the document list: select these items, the last of them is the one whose numbers are shown; `add` (⌘⇧) keeps what is selected. */
-  selectMany(ids: readonly string[], add = false) {
-    const all = this.withGroup(ids);
+  selectMany(ids: readonly string[], add = false, wholeGroups = true) {
+    const all = wholeGroups ? this.withGroup(ids) : [...ids];
     this.selectedIds.set(add ? [...this.selectedIds().filter(id => !all.includes(id)), ...all] : all);
   }
 
   /** ⌘-click: add the item to the selection, or take it out when it is already selected. */
-  toggleSelect(id: string) {
+  toggleSelect(id: string, wholeGroup = true) {
+    if (!wholeGroup) { this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])); return; }
     const group = this.withGroup([id]);
     this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => !group.includes(x)) : [...ids.filter(x => !group.includes(x)), ...group]));
   }
