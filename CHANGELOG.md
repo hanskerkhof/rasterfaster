@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Look around from here (0.11.13)
+
+### Added
+- **FE** (`stl-viewer.ts`): **Look around from here**, the eye button next to Fit all in the view's top right: the camera stays where it is and a drag turns the view about it; the scroll walks forward and back (sideways scroll steps sideways, ⌥-scroll zooms). It switches to perspective. Renders and videos use the exact camera position, so you can stand inside the scene (between two mirrors, for an infinite reflection).
+
 ## 2026-11-02 - Turntable direction, cube arrows, light menu, saving fix (0.11.12)
 
 ### Added
