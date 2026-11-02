@@ -19,6 +19,18 @@ function readColour(key: string): number | null {
   return null;
 }
 const hdWidthStorageKey = 'rasterfaster.renderHdWidth';
+const hdSamplesStorageKey = 'rasterfaster.renderHdSamples';
+
+/** The quality of a full-size render: the samples Cycles takes per pixel (more is cleaner, mirrors and glass especially, and slower). */
+export const hdQualities = [{ samples: 96, label: 'Standard · 96 samples' }, { samples: 256, label: 'Fine · 256 samples' }, { samples: 512, label: 'Best · 512 samples' }];
+
+function readHdSamples(): number {
+  try {
+    const stored = Number(localStorage.getItem(hdSamplesStorageKey));
+    if (hdQualities.some(q => q.samples === stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 96;
+}
 /** The widths the full-size render can be made at (16:9): the first is the default. */
 export const hdWidths = [{ width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
 
@@ -182,6 +194,7 @@ export class RenderService {
   readonly ground = signal<number | null>(readColour(groundStorageKey));
   /** The width of the full-size render (its height follows at 16:9). */
   readonly hdWidth = signal(readHdWidth());
+  readonly hdSamples = signal(readHdSamples());
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
   private socket?: WebSocket;
@@ -303,6 +316,11 @@ export class RenderService {
     return name ? ` (${name})` : '';
   }
 
+  setHdSamples(samples: number) {
+    this.hdSamples.set(samples);
+    try { localStorage.setItem(hdSamplesStorageKey, String(samples)); } catch { /* storage unavailable */ }
+  }
+
   setHdWidth(width: number) {
     this.hdWidth.set(width);
     try { localStorage.setItem(hdWidthStorageKey, String(width)); } catch { /* storage unavailable */ }
@@ -370,7 +388,7 @@ export class RenderService {
       const url = new URL(quickUrl.replace('/render.png', '/render-jobs'), location.origin);
       this.dofParams(url);
       url.searchParams.set('width', String(this.hdWidth()));
-      url.searchParams.set('samples', '96');
+      url.searchParams.set('samples', String(this.hdSamples()));
       await this.launch(url);
     } catch (error) {
       this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });
@@ -399,7 +417,7 @@ export class RenderService {
       put('crop', settings['crop']); put('ambient', settings['ambient']); put('lamp', settings['lamp']); put('beam', settings['beam']);
       put('bg', settings['background']); put('floor', settings['ground']);
       url.searchParams.set('width', String(width));
-      url.searchParams.set('samples', '96');
+      url.searchParams.set('samples', String(this.hdSamples()));
       await this.launch(url);
     } catch (error) {
       this.toast.set({ error: `Render failed: ${error instanceof Error ? error.message : error}` });

@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Smoother mirrors, render quality (0.11.2)
+
+### Added
+- **FE** (`render-dialog.ts`, `render.service.ts`): a **Quality** menu next to the size menu of the Render dialog: Standard (96 samples), Fine (256) and Best (512); remembered; also used by *Render HD* in the image viewer and its right-click menu.
+
+### Changed
+- **BE** (`blenderexport.py`): parts with the Metal, Mirror or Transparent finish are smooth-shaded by angle (35°) in renders and the `.blend`, so their reflections are no longer patches of flat triangles; Cycles follows 8 glossy and 12 transmission bounces (4 and 12 before).
+
 ## 2026-11-02 - Light through glass, light type menu, one display mode in Render mode (0.11.1)
 
 ### Added

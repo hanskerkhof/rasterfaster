@@ -101,7 +101,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
               @if (hdOpen()) {
                 <div class="hdlist" role="menu">
                   @for (size of hdSizes; track size.width) { <button type="button" role="menuitem" (click)="renderHd(note, size.width)">{{ size.label }}</button> }
-                  <small>same camera, light and settings; the document as it is now</small>
+                  <small>same camera, light and settings, {{ render.hdSamples() }} samples (the quality of the Render dialog); the document as it is now</small>
                 </div>
               }
             </span>

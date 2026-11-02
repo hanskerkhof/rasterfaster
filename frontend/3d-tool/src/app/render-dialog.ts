@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { RenderService, ambientNames, beamNames, hdWidths, strengthNames } from './render.service';
+import { RenderService, ambientNames, beamNames, hdQualities, hdWidths, strengthNames } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -72,7 +72,10 @@ import { ColorPalette } from './color-palette';
           <select class="focus size" [disabled]="render.running()" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
             @for (size of hdSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.hdWidth()">{{ size.label }}</option> }
           </select>
-          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, 96 samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
+          <select class="focus size" [disabled]="render.running()" [value]="render.hdSamples()" title="The quality of the full-size render: more samples are cleaner (mirrors, metal and glass especially) and take longer" (change)="render.setHdSamples(+$any($event.target).value)">
+            @for (q of hdQualities; track q.samples) { <option [value]="q.samples" [selected]="q.samples === render.hdSamples()">{{ q.label }}</option> }
+          </select>
+          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, ' + render.hdSamples() + ' samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
             @if (render.running()) { <span class="spinner small"></span> }Render HD
           </button>
         }
@@ -160,6 +163,7 @@ export class RenderDialog implements OnInit, OnDestroy {
     if (this.url() && !this.busy()) void this.quick();
   }
   protected readonly hdSizes = hdWidths;
+  protected readonly hdQualities = hdQualities;
   protected readonly colourTargets = [
     { key: 'background' as const, label: 'Background', title: 'The colour of the background behind the parts (the studio default is dark)' },
     { key: 'ground' as const, label: 'Ground', title: 'The colour of the round ground the parts stand on (the studio default is dark)' },

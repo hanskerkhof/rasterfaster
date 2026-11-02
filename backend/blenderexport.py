@@ -308,6 +308,30 @@ def let_light_through_glass():
         tree.links.new(mix.outputs[0], output.inputs["Surface"])
 
 let_light_through_glass()
+
+def smooth_shiny_parts():
+    # The export has no normals, so every triangle shades flat: harmless on satin plastic, but a mirror or metal shows each facet as a patch of its
+    # reflection. Parts with a finish are smoothed by angle (as the 3D view does): round surfaces reflect smoothly, sharp edges stay sharp.
+    import math
+    done = set()
+    for obj in bpy.data.objects:
+        if obj.type != "MESH" or obj.data.name in done:
+            continue
+        if not any(slot.material and any(f in slot.material.name for f in ("_metal", "_mirror", "_glass")) for slot in obj.material_slots):
+            continue
+        done.add(obj.data.name)
+        for other in bpy.context.view_layer.objects:
+            other.select_set(False)
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        try:
+            bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
+        except Exception:  # an older Blender: smooth everything, the creases of a flat part stay soft but it still reflects better than facets
+            bpy.ops.object.shade_smooth()
+    for other in bpy.context.view_layer.objects:
+        other.select_set(False)
+
+smooth_shiny_parts()
 scene.render.resolution_x, scene.render.resolution_y = 1920, 1080
 scene.unit_settings.system = "METRIC"
 for obj in bpy.data.objects:
@@ -484,6 +508,8 @@ if studio == "1":
     scene.render.engine = "CYCLES"
     scene.cycles.samples = 96
     scene.cycles.use_denoising = True
+    scene.cycles.glossy_bounces = 8  # mirrors facing each other (and a mirror in a mirror) stay bright for a few more reflections
+    scene.cycles.transmission_bounces = 12
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
     scene.view_settings.exposure = -0.3
