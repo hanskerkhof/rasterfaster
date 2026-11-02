@@ -626,7 +626,8 @@ if render_spec:  # a picture of this size and with this many samples: the settin
         fields = turntable_spec.split(",")
         frames_text, motion, fps_text = fields[:3]
         track_id = fields[3] if len(fields) > 3 else ""  # the item id of the part the camera tracks
-        track_pivot = fields[4] if len(fields) > 4 else "view"  # "part": the camera goes round that part; "view": round the middle of the view, looking at the part
+        look_at = fields[5] if len(fields) > 5 else ("part" if track_id else "view")  # what the camera keeps looking at: "part", "all" (the middle of all the objects) or "view" (where it points now)
+        track_pivot = fields[4] if len(fields) > 4 else "all"  # "part": the camera goes round that part; "all": round the middle of all the objects, "view": round the point the view looks at; a tracked part is looked at in every case
         frames, fps = int(frames_text), int(fps_text)
         scene.frame_start, scene.frame_end = 1, frames
         scene.render.fps = fps
@@ -647,17 +648,40 @@ if render_spec:  # a picture of this size and with this many samples: the settin
                 if o.type == "MESH" and o.name not in ("Camera path", "Studio floor") and o.parent is None:
                     o.parent = pivot
                     o.matrix_parent_inverse = pivot.matrix_world.inverted()
+            # the camera stays where the view is, and may look at the tracked part (which turns with the parts) or at the middle of all of them
+            tracked = [o for o in shown if track_id and o.get("itemId") == track_id]
+            aim_at = None
+            if look_at == "part" and tracked:
+                points = [o.matrix_world @ Vector(c) for o in tracked for c in o.bound_box]
+                aim_at = (Vector(map(min, *points)) + Vector(map(max, *points))) / 2 if len(points) > 1 else points[0]
+            elif look_at == "all":
+                aim_at = middle
+            if aim_at is not None:
+                aim = bpy.data.objects.new("Look target", None)
+                aim.location = aim_at
+                scene.collection.objects.link(aim)
+                aim.parent = pivot  # it turns with the parts, so the camera follows the part round
+                aim.matrix_parent_inverse = pivot.matrix_world.inverted()
+                follow = camera.constraints.new("TRACK_TO")
+                follow.target, follow.track_axis, follow.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
         else:  # the camera circles about the upright line through the point it looks at (or through the part it tracks), keeping its height and its distance
             forward = camera.matrix_world.to_quaternion() @ Vector((0, 0, -1))
             looked_at = camera.matrix_world.translation + forward * max((middle - camera.matrix_world.translation).dot(forward), 0.01)
             tracked = [o for o in shown if track_id and o.get("itemId") == track_id]
-            if tracked:  # the camera goes round this part and keeps it in the middle of the picture
+            part_centre = None
+            if tracked:
                 points = [o.matrix_world @ Vector(c) for o in tracked for c in o.bound_box]
                 part_centre = (Vector(map(min, *points)) + Vector(map(max, *points))) / 2 if len(points) > 1 else points[0]
-                if track_pivot == "part":
-                    looked_at = part_centre  # round the part itself
-                aim = bpy.data.objects.new("Track target", None)  # either way the camera keeps looking at the part
-                aim.location = part_centre
+            # what the camera goes round: the point the view looks at (the default of `looked_at`), the middle of all the objects, or the tracked part
+            if track_pivot == "part" and part_centre is not None:
+                looked_at = part_centre
+            elif track_pivot in ("all", "part"):
+                looked_at = middle
+            # what it keeps looking at: the tracked part, the middle of all the objects, or (view) nothing in particular: it keeps the angle it has
+            aim_at = part_centre if look_at == "part" else middle if look_at == "all" else None
+            if aim_at is not None:
+                aim = bpy.data.objects.new("Look target", None)
+                aim.location = aim_at
                 scene.collection.objects.link(aim)
                 follow = camera.constraints.new("TRACK_TO")
                 follow.target, follow.track_axis, follow.up_axis = aim, "TRACK_NEGATIVE_Z", "UP_Y"
@@ -699,7 +723,7 @@ def find_blender() -> str | None:
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "view") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part") -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -718,7 +742,7 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
                                f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0",
-                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track},{track_pivot}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
+                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track},{track_pivot},{look_at}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -785,7 +809,7 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "view") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part") -> bytes:
     """A PNG of the scene (`width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours. With `turntable` = (frames, "orbit" | "spin", fps)
     an MP4 of that many frames instead: the camera circles the scene once, or the parts turn once in front of the camera."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track, track_pivot)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track, track_pivot, look_at)

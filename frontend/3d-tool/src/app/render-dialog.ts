@@ -102,15 +102,21 @@ import { ColorPalette } from './color-palette';
           <select class="focus size" [value]="render.turntable().motion" title="How it moves" (change)="render.setTurntable({ motion: $any($event.target).value })">
             @for (m of motions; track m.id) { <option [value]="m.id" [selected]="m.id === render.turntable().motion" [title]="m.title">{{ m.label }}</option> }
           </select>
-          <select class="focus size" [disabled]="render.turntable().motion !== 'orbit'" [value]="render.tracked()?.id ?? ''" [title]="render.turntable().motion === 'orbit' ? 'The part the camera goes round and keeps in the middle of the picture (none: the point the view looks at)' : 'Only Camera circles follows a part'" (change)="render.setTrack($any($event.target).value || null)">
+          <select class="focus size" [value]="render.tracked()?.id ?? ''" title="The part the camera can look at (and go round with Camera circles)" (change)="render.setTrack($any($event.target).value || null)">
             <option value="" [selected]="!render.tracked()">Track: the view's centre</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === render.tracked()?.id">Track: {{ part.label }}</option> }
           </select>
-          <select class="focus size" [disabled]="render.turntable().motion !== 'orbit' || !render.tracked()" [value]="render.trackPivot()" title="What the camera goes round while it tracks a part: the middle of the view, looking at the part (like a drone), or the part itself" (change)="render.setTrackPivot($any($event.target).value)">
-            <option value="view" [selected]="render.trackPivot() === 'view'">Goes round: the view's centre</option>
-            <option value="part" [selected]="render.trackPivot() === 'part'">Goes round: the part</option>
+          <select class="focus size" [disabled]="render.turntable().motion !== 'orbit'" [value]="render.trackPivot()" [title]="render.turntable().motion === 'orbit' ? 'What the camera goes round: the middle of all the objects, the middle of the view, or the tracked part' : 'Only for Camera circles: with Objects turn the camera stays where the view is'" (change)="render.setTrackPivot($any($event.target).value)">
+            <option value="all" [selected]="render.trackPivot() === 'all'">Goes round: all objects</option>
+            <option value="view" [selected]="render.trackPivot() === 'view'">Goes round: the view</option>
+            <option value="part" [disabled]="!render.tracked()" [selected]="render.trackPivot() === 'part'">Goes round: the tracked part</option>
           </select>
-          <button type="button" [disabled]="render.turntable().motion !== 'orbit'" title="Click a part in the 3D view to track it (the dialog closes and comes back)" (click)="pickTrack()">Pick…</button>
+          <select class="focus size" [value]="render.lookAt()" title="What the camera keeps looking at (also with Objects turn, where the camera stays where the view is): the tracked part, the middle of all the objects, or nothing in particular (it keeps the angle it has, as the view looks now)" (change)="render.setLookAt($any($event.target).value)">
+            <option value="view" [selected]="render.lookAt() === 'view'">Looks at: as the view does</option>
+            <option value="all" [selected]="render.lookAt() === 'all'">Looks at: all objects</option>
+            <option value="part" [disabled]="!render.tracked()" [selected]="render.lookAt() === 'part'">Looks at: the tracked part</option>
+          </select>
+          <button type="button" title="Click a part in the 3D view to track it (the dialog closes and comes back)" (click)="pickTrack()">Pick…</button>
           <select class="focus size" [value]="render.turntable().seconds" title="How long one turn takes (30 frames per second)" (change)="render.setTurntable({ seconds: +$any($event.target).value })">
             @for (n of lengths; track n) { <option [value]="n" [selected]="n === render.turntable().seconds">{{ n }} seconds · {{ n * render.turntableSpec().fps }} frames</option> }
           </select>
@@ -368,7 +374,9 @@ export class RenderDialog implements OnInit, OnDestroy {
       const choice = this.render.turntable();
       quickUrl.searchParams.set('motion', choice.motion);
       quickUrl.searchParams.set('seconds', String(Math.min(choice.seconds, 5)));
-      if (choice.motion === 'orbit' && this.render.tracked()) { quickUrl.searchParams.set('track', this.render.tracked()!.id); quickUrl.searchParams.set('trackPivot', this.render.trackPivot()); }
+      if (this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
+      quickUrl.searchParams.set('trackPivot', this.render.trackPivot());
+      quickUrl.searchParams.set('lookAt', this.render.lookAt());
       const response = await fetch(quickUrl, { cache: 'no-store' });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();

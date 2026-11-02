@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Goes round and Looks at (0.11.9)
+
+### Changed
+- **FE** + **BE** (`render-dialog.ts`, `stl-viewer.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): the turntable's camera has two separate settings. **Goes round** (Camera circles): *all objects* (the new default: the middle of the box round all the parts), *the view* (the point the view looks at, as before) or *the tracked part*. **Looks at** (Camera circles and Objects turn): *as the view does* (the camera keeps its angle), *all objects* or *the tracked part*, which the camera keeps in the middle of the picture like a drone filming its subject; with Objects turn the camera stays where the view is and turns to look at the part as it turns with the others. Picking a part to track sets *Looks at* to it. Saved with the document (`render.trackPivot`, `render.lookAt`); API: `trackPivot=all|view|part`, `lookAt=part|all|view` and `track` on `render.mp4` and `render-jobs`. The live preview follows both settings, also while it plays.
+
 ## 2026-11-02 - Drone-style tracking (0.11.8)
 
 ### Added

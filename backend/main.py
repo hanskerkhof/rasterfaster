@@ -409,7 +409,8 @@ class DocumentRenderSettings(BaseModel):
     dofStrength: int = Field(default=3, ge=1, le=5)  # 1 subtle ... 5 extreme; 3: what is farthest is unsharp but still recognizable
     aspect: Literal["16:9", "1:1", "4:5", "9:16"] = "16:9"  # the shape of the picture (its width comes from the size, the height follows)
     trackId: str | None = Field(default=None, max_length=64)  # a part the camera follows in a turntable (Camera circles)
-    trackPivot: Literal["part", "view"] = "view"  # the camera goes round the middle of the view (and looks at the part) or round the part itself
+    trackPivot: Literal["part", "all", "view"] = "all"  # what Camera circles goes round: the middle of all the objects, the middle of the view, or the tracked part
+    lookAt: Literal["part", "all", "view"] | None = None  # what it looks at: the tracked part, the middle of all the objects, or where the view points (none: the part when one is tracked, else the view)
     transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
 
@@ -762,7 +763,7 @@ def export_document_glb(documentId: str, camera: bool = True, colours: bool = Tr
 
 def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focus: str | None = None, strength: int | None = None, crop: bool | None = None, ambient: int | None = None,
                             lamp: int | None = None, background: int | None = None, ground: int | None = None, beam: int | None = None,
-                            aspect: str | None = None, transparent: bool | None = None, track: str | None = None, track_pivot: str | None = None) -> dict:
+                            aspect: str | None = None, transparent: bool | None = None, track: str | None = None, track_pivot: str | None = None, look_at: str | None = None) -> dict:
     """The render settings of a call: what it brings, else what the document remembers, else the defaults."""
     render = document.render
     focusId = focus if focus is not None else (render.focusId if render else None)
@@ -781,7 +782,8 @@ def resolve_render_settings(document: DocumentOut, dof: bool | None = None, focu
         "aspect": aspect if aspect is not None else (render.aspect if render else "16:9"),
         "transparent": transparent if transparent is not None else bool(render and render.transparent),
         "trackId": track if track is not None else (render.trackId if render else None),
-        "trackPivot": track_pivot if track_pivot is not None else (render.trackPivot if render else "view"),
+        "trackPivot": track_pivot if track_pivot is not None else (render.trackPivot if render else "all"),
+        "lookAt": look_at if look_at is not None else ((render.lookAt if render and render.lookAt else None) or ("part" if (track if track is not None else (render.trackId if render else None)) else "view")),
     }
 
 
@@ -863,18 +865,18 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
 @app.get("/api/documents/{documentId}/render.mp4")
 def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
-                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "view"] | None = None) -> Response:
+                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None) -> Response:
     """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
     document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False)
     try:
-        tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot)["trackId"] or ""
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot)["trackPivot"])
+        tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["trackId"] or ""
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["lookAt"])
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + "-quick.mp4"
-    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps}}
+    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps}}
     return Response(data, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
@@ -910,7 +912,8 @@ class RenderJob:
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
         self.step: str | None = None
         self.track = ""  # the item id of the part a turntable follows
-        self.track_pivot = "view"
+        self.track_pivot = "all"
+        self.look_at = "view"
         self.turntable = turntable  # (frames, "orbit" | "spin", fps) for a turntable video, else None
         self.aspect = aspect
         self.dimensions = (width, round(width / aspect))  # of one picture or video frame
@@ -1072,7 +1075,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
     try:
         job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=4 * 3600 if job.turntable else 1800, dof=dof, crop=crop, phase=phase,
-                                             turntable=job.turntable, track=job.track, track_pivot=job.track_pivot)  # (job.png holds the MP4 of a turntable)
+                                             turntable=job.turntable, track=job.track, track_pivot=job.track_pivot, look_at=job.look_at)  # (job.png holds the MP4 of a turntable)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
         if job.state == "done" and job.documentId:
             try:  # a finished full-size render goes into the document's image library
@@ -1099,7 +1102,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000),
-                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "view"] | None = None) -> dict:
+                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None) -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent)
@@ -1112,11 +1115,12 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
             raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                        {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track, trackPivot), light, parse_saved_view(savedView)),
+                        {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track, trackPivot, lookAt), light, parse_saved_view(savedView)),
                            **({"turntable": {"motion": turntable, "seconds": seconds, "fps": fps}} if turntable else {})},
                         aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")), (seconds * fps, turntable, fps) if turntable else None)
-        job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot)["trackId"] or "") if turntable else ""
-        job.track_pivot = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot)["trackPivot"]
+        job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["trackId"] or "") if turntable else ""
+        job.track_pivot = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["trackPivot"]
+        job.look_at = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt)["lookAt"]
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})

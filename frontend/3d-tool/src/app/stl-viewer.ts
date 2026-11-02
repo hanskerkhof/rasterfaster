@@ -330,11 +330,16 @@ function readShowPath() {
             <div class="head">Turntable preview (the video, live; steer meanwhile; Space pauses)</div>
             <button type="button" role="menuitem" (click)="startTurntablePreview('orbit'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'orbit' ? '✓' : '' }}</span>Camera circles<span class="hint">once around, looping</span></button>
             <button type="button" role="menuitem" (click)="startTurntablePreview('spin'); flyMenuOpen.set(false)"><span class="tick">{{ turntablePreview()?.motion === 'spin' ? '✓' : '' }}</span>Objects turn<span class="hint">in front of the camera</span></button>
-            <button type="button" role="menuitem" (click)="startTrackPick(); flyMenuOpen.set(false)"><span class="tick">{{ renderSettings.tracked() ? '✓' : '' }}</span>Track an object…<span class="hint">{{ renderSettings.tracked()?.name ?? 'Camera circles: the centre of the view' }}</span></button>
-            @if (renderSettings.tracked()) {
-              <button type="button" role="menuitem" (click)="renderSettings.setTrackPivot(renderSettings.trackPivot() === 'view' ? 'part' : 'view')"><span class="tick">{{ renderSettings.trackPivot() === 'view' ? '✓' : '' }}</span>Go round the view, look at the part<span class="hint">{{ renderSettings.trackPivot() === 'view' ? 'on (like a drone)' : 'off: round the part' }}</span></button>
-              <button type="button" role="menuitem" (click)="renderSettings.setTrack(null); flyMenuOpen.set(false)"><span class="tick"></span>Stop tracking<span class="hint">go round the centre of the view</span></button>
+            <button type="button" role="menuitem" (click)="startTrackPick(); flyMenuOpen.set(false)"><span class="tick">{{ renderSettings.tracked() ? '✓' : '' }}</span>Track an object…<span class="hint">{{ renderSettings.tracked()?.name ?? 'none chosen' }}</span></button>
+            <div class="head">Camera circles goes round</div>
+            @for (choice of pivotChoices; track choice.id) {
+              <button type="button" role="menuitemradio" [attr.aria-checked]="renderSettings.trackPivot() === choice.id" [disabled]="choice.id === 'part' && !renderSettings.tracked()" (click)="renderSettings.setTrackPivot(choice.id)"><span class="tick">{{ renderSettings.trackPivot() === choice.id ? '✓' : '' }}</span>{{ choice.label }}<span class="hint">{{ choice.hint }}</span></button>
             }
+            <div class="head">Looks at (Camera circles and Objects turn)</div>
+            @for (choice of lookChoices; track choice.id) {
+              <button type="button" role="menuitemradio" [attr.aria-checked]="renderSettings.lookAt() === choice.id" [disabled]="choice.id === 'part' && !renderSettings.tracked()" (click)="renderSettings.setLookAt(choice.id)"><span class="tick">{{ renderSettings.lookAt() === choice.id ? '✓' : '' }}</span>{{ choice.label }}<span class="hint">{{ choice.hint }}</span></button>
+            }
+            @if (renderSettings.tracked()) { <button type="button" role="menuitem" (click)="renderSettings.setTrack(null); flyMenuOpen.set(false)"><span class="tick"></span>Stop tracking<span class="hint">stop looking at the part</span></button> }
             @if (turntablePreview()) {
               <button type="button" role="menuitem" (click)="pauseTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>{{ turntablePaused() ? 'Go on' : 'Pause' }}<span class="hint">Space</span></button>
               <button type="button" role="menuitem" (click)="stopTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>End the preview<span class="hint">Esc</span></button>
@@ -613,6 +618,16 @@ export class StlViewer implements OnDestroy {
   private readonly stopFlight = () => this.flying.set(false); // (the turntable preview goes on while you steer: it stops with the play button or Space)
   protected readonly flyMenuOpen = signal(false);
   protected readonly turnLengths = turntableLengths;
+  protected readonly pivotChoices: { id: 'all' | 'view' | 'part'; label: string; hint: string }[] = [
+    { id: 'all', label: 'All objects', hint: 'the middle of the parts' },
+    { id: 'view', label: 'The view', hint: 'the point you look at' },
+    { id: 'part', label: 'The tracked part', hint: 'needs a tracked part' },
+  ];
+  protected readonly lookChoices: { id: 'all' | 'view' | 'part'; label: string; hint: string }[] = [
+    { id: 'view', label: 'As the view does', hint: 'keeps its angle' },
+    { id: 'all', label: 'All objects', hint: 'the middle of the parts' },
+    { id: 'part', label: 'The tracked part', hint: 'needs a tracked part' },
+  ];
   /** The live turntable preview: how it moves; null when it is not running. */
   protected readonly turntablePreview = signal<{ motion: 'orbit' | 'spin' } | null>(null);
   /** The preview is paused (Space): the camera or the parts stay where they are, Space goes on from there. */
@@ -627,6 +642,7 @@ export class StlViewer implements OnDestroy {
   private readonly homeDirection = new THREE.Vector3(1, -1, 0.3).normalize();
 
   constructor() {
+    effect(() => { this.renderSettings.trackPivot(); this.renderSettings.lookAt(); this.renderSettings.trackId(); untracked(() => this.refreshPreviewPivot()); }); // the choice of what Camera circles goes round counts at once, also while it plays
     effect(() => { // picking the part a turntable tracks: a cross-hair, and a hint until a part is clicked
       const picking = this.store.trackPick();
       untracked(() => {
@@ -812,26 +828,41 @@ export class StlViewer implements OnDestroy {
    * parts turn about the middle of their footprint in front of the camera. One turn takes the length of the video; it loops until something is clicked.
    */
   protected startTurntablePreview(motion: 'orbit' | 'spin') {
-    if (!this.documentMode()) return;
-    const bounds = this.documentScene.bounds();
-    if (!bounds) return;
+    if (!this.documentMode() || !this.documentScene.bounds()) return;
     this.stopTurntablePreview();
     this.flying.set(false);
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.controls.update();
-    const middle = bounds.getCenter(new THREE.Vector3());
-    const forward = this.controls.target.clone().sub(this.camera.position).normalize();
-    const lookedAt = this.camera.position.clone().addScaledVector(forward, Math.max(middle.clone().sub(this.camera.position).dot(forward), 1));
-    let pivot = motion === 'spin' ? new THREE.Vector3(middle.x, middle.y, bounds.min.z) : lookedAt;
-    const tracked = motion === 'orbit' ? this.renderSettings.tracked() : null;
-    const centre = tracked ? this.documentScene.itemCenter(tracked.id) : null;
-    if (centre) {
-      if (this.renderSettings.trackPivot() === 'part') pivot = centre; // round the part itself ...
-      this.controls.target.copy(centre); // ... or round the middle of the view: either way the camera looks at the tracked part
-    }
-    this.previewState = { last: performance.now(), angle: 0, pivot, aim: centre && motion === 'orbit' ? centre.clone() : null };
+    const { pivot, aim } = this.previewPivot(motion);
+    if (aim) this.controls.target.copy(aim); // a tracked part is looked at whatever the camera goes round
+    this.previewState = { last: performance.now(), angle: 0, pivot, aim };
     this.turntablePaused.set(false);
     this.turntablePreview.set({ motion });
+  }
+
+  /** What the preview turns about, and what the camera keeps looking at (the tracked part, or none): from the Camera circles setting and the tracked part. */
+  private previewPivot(motion: 'orbit' | 'spin'): { pivot: THREE.Vector3; aim: THREE.Vector3 | null } {
+    const bounds = this.documentScene.bounds()!;
+    const middle = bounds.getCenter(new THREE.Vector3());
+    const tracked = this.renderSettings.tracked();
+    const centre = tracked ? this.documentScene.itemCenter(tracked.id) : null;
+    const looksAt = this.renderSettings.lookAt();
+    const aim = looksAt === 'part' ? centre : looksAt === 'all' ? middle : null;
+    if (motion === 'spin') return { pivot: new THREE.Vector3(middle.x, middle.y, bounds.min.z), aim }; // the parts turn, the camera stays where the view is (and may look at a part)
+    const forward = this.controls.target.clone().sub(this.camera.position).normalize();
+    const lookedAt = this.camera.position.clone().addScaledVector(forward, Math.max(middle.clone().sub(this.camera.position).dot(forward), 1)); // the point the view looks at
+    const goesRound = this.renderSettings.trackPivot();
+    return { pivot: goesRound === 'part' && centre ? centre : goesRound === 'view' ? lookedAt : middle, aim };
+  }
+
+  /** The setting (or the tracked part) was changed while the camera circles: it goes on round the new centre from where it is. */
+  private refreshPreviewPivot() {
+    const state = this.previewState, preview = this.turntablePreview();
+    if (!state || !preview || !this.documentScene.bounds()) return;
+    const { pivot, aim } = this.previewPivot(preview.motion);
+    state.pivot = pivot;
+    state.aim = aim;
+    if (aim) this.controls.target.copy(aim);
   }
 
   /** Click a part to make the camera of Camera circles go round it and keep it in the middle (the part under the pointer is outlined; Esc cancels). */
@@ -880,6 +911,10 @@ export class StlViewer implements OnDestroy {
       const cos = Math.cos(angle), sin = Math.sin(angle);
       this.documentScene.group.rotation.z = angle;
       this.documentScene.group.position.set(state.pivot.x - (cos * state.pivot.x - sin * state.pivot.y), state.pivot.y - (sin * state.pivot.x + cos * state.pivot.y), 0);
+      if (state.aim) { // the camera stays and looks at the part (or the middle of the parts) as it turns with them
+        const x = state.aim.x - state.pivot.x, y = state.aim.y - state.pivot.y;
+        this.controls.target.set(state.pivot.x + cos * x - sin * y, state.pivot.y + sin * x + cos * y, state.aim.z);
+      }
     }
   }
 

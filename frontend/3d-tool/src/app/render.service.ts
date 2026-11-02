@@ -270,15 +270,27 @@ export class RenderService {
   readonly tracked = computed(() => this.store.doc().items.find(i => i.id === this.trackId()) ?? null);
 
   /** What the camera goes round while it tracks a part: the middle of the view (looking at the part, like a drone) or the part itself. */
-  readonly trackPivot = signal<'part' | 'view'>('view');
+  readonly trackPivot = signal<'part' | 'all' | 'view'>('all');
+  /** What Camera circles keeps looking at: the tracked part, the middle of all the objects, or nothing in particular (it keeps its angle). */
+  readonly lookAt = signal<'part' | 'all' | 'view'>('view');
 
-  setTrackPivot(pivot: 'part' | 'view') {
+  setLookAt(choice: 'part' | 'all' | 'view') {
+    this.lookAt.set(choice);
+    this.saveSettings();
+  }
+
+  setTrackPivot(pivot: 'part' | 'all' | 'view') {
     this.trackPivot.set(pivot);
     this.saveSettings();
   }
 
   setTrack(id: string | null) {
     this.trackId.set(id);
+    if (id && this.lookAt() === 'view') this.lookAt.set('part'); // a part was chosen to be tracked: the camera looks at it
+    if (!id) { // no part any more: what needed one goes back to something that does not
+      if (this.lookAt() === 'part') this.lookAt.set('view');
+      if (this.trackPivot() === 'part') this.trackPivot.set('all');
+    }
     this.saveSettings();
   }
 
@@ -329,8 +341,8 @@ export class RenderService {
     effect(() => { // a document that says what it wants wins over what this browser remembers
       const own = this.store.doc().render;
       const id = this.store.docId();
-      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'view'); }
-      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('view'); } // a document without render settings starts with the normal lamp (100%)
+      if (own) { this.depthOfField.set(own.depthOfField); this.focusId.set(own.focusId ?? null); if (own.dofStrength) this.dofStrength.set(own.dofStrength); this.crop.set(!!own.crop); this.ambient.set(own.ambient ?? 0); this.lamp.set(own.lamp ?? 40); this.beam.set(own.beam ?? 1); this.background.set(own.background ?? null); this.ground.set(own.ground ?? null); this.aspect.set(own.aspect ?? '16:9'); this.transparent.set(!!own.transparent); this.trackId.set(own.trackId ?? null); this.trackPivot.set(own.trackPivot ?? 'all'); this.lookAt.set(own.lookAt ?? (own.trackId ? 'part' : 'view')); }
+      else { this.focusId.set(id ? readFocus(id) : null); this.lamp.set(40); this.beam.set(1); this.background.set(null); this.ground.set(null); this.aspect.set('16:9'); this.transparent.set(false); this.trackId.set(null); this.trackPivot.set('all'); this.lookAt.set('view'); } // a document without render settings starts with the normal lamp (100%)
     });
     this.store.onTrackChosen = id => { // the 3D view's pick of the part a turntable tracks is over
       if (id) { this.setTrack(id); this.store.announce(`The turntable tracks "${this.tracked()?.name ?? ''}"`, 4000); }
@@ -491,7 +503,7 @@ export class RenderService {
   }
 
   private saveSettings() {
-    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
+    this.store.setRenderSettings({ depthOfField: this.depthOfField(), dofStrength: this.dofStrength(), crop: this.crop(), ambient: this.ambient(), lamp: this.lamp(), beam: this.beam(), background: this.background(), ground: this.ground(), aspect: this.aspect(), transparent: this.transparent(), ...(this.trackId() ? { trackId: this.trackId() } : {}), trackPivot: this.trackPivot(), lookAt: this.lookAt(), ...(this.focusId() ? { focusId: this.focusId() } : {}) });
   }
 
   /** The address parameters for the focus: `dof` and, with a part chosen that is still in the document, `focus`. */
@@ -554,7 +566,9 @@ export class RenderService {
       url.searchParams.set('turntable', spec.motion);
       url.searchParams.set('seconds', String(spec.seconds));
       url.searchParams.set('fps', String(spec.fps));
-      if (spec.motion === 'orbit' && this.tracked()) { url.searchParams.set('track', this.tracked()!.id); url.searchParams.set('trackPivot', this.trackPivot()); }
+      if (this.tracked()) url.searchParams.set('track', this.tracked()!.id); // the camera looks at it (both motions) ...
+      url.searchParams.set('trackPivot', this.trackPivot()); // ... what it goes round (Camera circles only: with Objects turn the camera stays where the view is)
+      url.searchParams.set('lookAt', this.lookAt());
       if (this.quickView) url.searchParams.set('savedView', JSON.stringify(this.quickView));
       await this.launch(url);
     } catch (error) {
