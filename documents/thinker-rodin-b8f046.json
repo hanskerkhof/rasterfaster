@@ -19,6 +19,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -27,7 +28,7 @@
       "name": "RODIN_THINKER_02",
       "color": 12745632,
       "position": [
-        -20.0,
+        -120.0,
         0.0,
         0.0
       ],
@@ -39,6 +40,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -59,6 +61,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -79,6 +82,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -99,6 +103,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -119,38 +124,83 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "341599db-c95b-41a1-9457-53c17ece2fc2",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES CUBE 20mm.stl",
+      "name": "RF1.11 PRIMITIVES CUBE 20mm",
+      "color": 7775663,
+      "position": [
+        200.0,
+        100.0,
+        126.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": true,
+      "noExport": false
+    },
+    {
+      "id": "4bb11f78-eea5-4266-8b14-026a5386c551",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES SPHERE 20mm.stl",
+      "name": "RF1.11 PRIMITIVES SPHERE 20mm",
+      "color": 16767334,
+      "position": [
+        220.0,
+        20.0,
+        90.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": true,
       "noExport": false
     }
   ],
+  "groups": [],
   "light": {
     "direction": [
-      0.746,
-      -0.48,
-      -0.461
+      -0.024,
+      -0.712,
+      -0.702
     ],
-    "targetId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c"
+    "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
   },
   "view": {
     "projection": "persp",
     "position": [
-      820.499,
-      -338.202,
-      210.547
+      826.458,
+      -192.632,
+      -45.165
     ],
     "target": [
-      200.381,
-      48.003,
-      63.66
+      125.753,
+      62.29,
+      83.506
     ],
-    "zoom": 2.747,
-    "radius": 180.731
+    "zoom": 2.84,
+    "radius": 183.518
   },
   "render": {
     "depthOfField": true,
-    "focusId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
+    "focusId": "4bb11f78-eea5-4266-8b14-026a5386c551",
     "crop": false,
+    "beam": 2,
     "lamp": 40,
-    "ambient": 0,
-    "dofStrength": 3
+    "ambient": 2,
+    "dofStrength": 4
   }
 }

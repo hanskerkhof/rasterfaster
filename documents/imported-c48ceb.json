@@ -19,6 +19,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -39,6 +40,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -59,7 +61,9 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
     },
     {
       "id": "363b3dfb-5b85-4531-be31-d14167f78208",
@@ -79,7 +83,9 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
     },
     {
       "id": "f4e0a952-ef58-47e6-98c4-7d3330b130a1",
@@ -99,7 +105,53 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+    },
+    {
+      "id": "662716d9-499a-475f-8587-c12a0ee83f8b",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        162.345,
+        82.349,
+        16.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+    },
+    {
+      "id": "2b82f975-4ea6-4af4-9607-ad8ec2f02e0c",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        162.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
     },
     {
       "id": "9a6289c5-1a8a-4bfd-a269-4fb0daa86a3a",
@@ -119,6 +171,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -139,6 +192,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -159,6 +213,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -179,6 +234,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -199,6 +255,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -219,6 +276,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -239,6 +297,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -259,6 +318,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -279,7 +339,9 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
     },
     {
       "id": "dffda44f-44af-4f9b-8e13-862156a0cbbf",
@@ -299,7 +361,9 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
     },
     {
       "id": "b4bf1f84-3712-491c-80da-2c9cd2131abb",
@@ -319,7 +383,53 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+    },
+    {
+      "id": "89d20ccd-9e74-4a7b-9664-8ae4c7b3621c",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        182.345,
+        82.349,
+        16.0
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+    },
+    {
+      "id": "7d06a6e5-7e1a-43ad-8eee-35afb1b75b97",
+      "path": "BOLTS/BOLT_S1.stl",
+      "name": "BOLT_S1",
+      "color": 9338051,
+      "position": [
+        182.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        -5.551115123125783e-17,
+        -1.0,
+        -3.0814879110195774e-33,
+        -5.551115123125783e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
     },
     {
       "id": "0eb0b01c-8538-4a2b-939d-7ebb4c24b7ed",
@@ -339,6 +449,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -359,6 +470,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -379,6 +491,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -399,6 +512,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -419,6 +533,7 @@
       ],
       "muted": true,
       "centered": false,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -439,7 +554,9 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
     },
     {
       "id": "807ef342-5ea3-4376-bbf4-fce78a23dec2",
@@ -459,27 +576,9 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "8c9a4ff4-d8b4-4e83-ac71-b0da4dd51d6f",
-      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
-      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
-      "color": 7317724,
-      "position": [
-        100.502,
-        80.501,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
     },
     {
       "id": "44657d37-e24a-4da4-96b9-d847bc177e24",
@@ -499,47 +598,119 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
     },
     {
-      "id": "89d20ccd-9e74-4a7b-9664-8ae4c7b3621c",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
+      "id": "8c9a4ff4-d8b4-4e83-ac71-b0da4dd51d6f",
+      "path": "1.8.FEET - APPARAAT VOET/1.8.FEET - APPARAAT VOET_RF1 v273_FOOT.stl",
+      "name": "1.8.FEET - APPARAAT VOET_RF1 v273_FOOT",
+      "color": 7317724,
       "position": [
-        182.345,
-        82.349,
-        16.0
+        100.502,
+        80.501,
+        0.0
       ],
       "rotation": [
-        -5.551115123125783e-17,
-        -1.0,
-        -3.0814879110195774e-33,
-        -5.551115123125783e-17
+        0.0,
+        0.0,
+        0.0,
+        1.0
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
     },
     {
-      "id": "662716d9-499a-475f-8587-c12a0ee83f8b",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
+      "id": "4fa11bfc-a475-4e74-9fcf-ebcb547e5a9c",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
       "position": [
-        162.345,
-        82.349,
-        16.0
+        105.15,
+        -55.6,
+        2.0
       ],
       "rotation": [
-        -5.551115123125783e-17,
         -1.0,
-        -3.0814879110195774e-33,
-        -5.551115123125783e-17
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+    },
+    {
+      "id": "645a1e7d-c6da-406c-94c6-df9090c621e3",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        265.15,
+        -55.6,
+        2.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+    },
+    {
+      "id": "9003a2c0-bad5-4976-bf27-a2823418ff39",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        265.15,
+        84.4,
+        2.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+    },
+    {
+      "id": "3b09db2c-ebb6-4620-8923-14314b47d671",
+      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
+      "name": "1.8 - BOLT LONG",
+      "color": 16167531,
+      "position": [
+        105.15,
+        84.4,
+        2.297
+      ],
+      "rotation": [
+        -1.0,
+        0.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false,
+      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
     },
     {
       "id": "4eb5819b-5ce7-4515-88ab-f8f222ffec00",
@@ -559,6 +730,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -579,17 +751,18 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "51619d10-5ab4-4fd7-9e98-d0f51824a3c8",
       "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
+      "color": 13751253,
       "position": [
-        302.401,
-        -17.599,
-        0.0
+        322.401,
+        2.401,
+        6.0
       ],
       "rotation": [
         1.3877787807814457e-16,
@@ -599,6 +772,154 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "a0ea4117-ffb9-4989-b98c-29b35c8e1967",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        322.401,
+        22.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "912f101f-5f0d-45ab-a4e7-327ab9468b70",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        342.401,
+        2.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "ccba2a1f-de46-4e07-9500-f5c76d82a108",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        342.401,
+        22.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "e936618e-352b-49d6-a914-198dc7d5e3af",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        362.401,
+        2.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "c4e6208a-8768-4ec9-bdd5-56c885f39ba3",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        362.401,
+        22.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "122153b5-a35b-4158-89e8-9174788ee204",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        382.401,
+        2.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "a1dc66c9-151f-4dbc-bed0-c3a902475993",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 13751253,
+      "position": [
+        382.401,
+        22.401,
+        6.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -619,6 +940,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -639,46 +961,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "7d06a6e5-7e1a-43ad-8eee-35afb1b75b97",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
-      "position": [
-        182.345,
-        2.349,
-        15.997
-      ],
-      "rotation": [
-        -5.551115123125783e-17,
-        -1.0,
-        -3.0814879110195774e-33,
-        -5.551115123125783e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "2b82f975-4ea6-4af4-9607-ad8ec2f02e0c",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 9338051,
-      "position": [
-        162.345,
-        2.349,
-        15.997
-      ],
-      "rotation": [
-        -5.551115123125783e-17,
-        -1.0,
-        -3.0814879110195774e-33,
-        -5.551115123125783e-17
-      ],
-      "muted": false,
-      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -699,6 +982,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": true
     },
     {
@@ -719,50 +1003,11 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": true
     },
     {
-      "id": "a0ea4117-ffb9-4989-b98c-29b35c8e1967",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        302.401,
-        2.401,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
       "id": "8e0dbc3b-42a9-4dcb-82a5-9f026427c42e",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        2.401,
-        -57.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "843524d2-aa4f-4e96-90e3-a7faa71ea6ef",
       "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
@@ -779,15 +1024,16 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
-      "id": "912f101f-5f0d-45ab-a4e7-327ab9468b70",
+      "id": "843524d2-aa4f-4e96-90e3-a7faa71ea6ef",
       "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        322.401,
+        2.401,
         -17.599,
         0.0
       ],
@@ -799,50 +1045,11 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "ccba2a1f-de46-4e07-9500-f5c76d82a108",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        322.401,
-        2.401,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
       "id": "3f08e4b3-def5-4393-925f-c0726d09ecbd",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        22.401,
-        -57.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "8fe4d497-a717-4fbf-b290-a128d207a004",
       "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
@@ -859,6 +1066,112 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "8fe4d497-a717-4fbf-b290-a128d207a004",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        22.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "1ec65be4-4afe-442a-b2c1-36856dc44ed5",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        42.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "4cc50df0-5f99-4ab3-9505-a637593a3828",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        42.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "e63e7f2b-ffa4-427e-b5ab-00db9fdb1d83",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        62.401,
+        -37.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "53af65b0-375e-4f7a-8499-6f6fd9dd2928",
+      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
+      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
+      "color": 12745632,
+      "position": [
+        62.401,
+        -17.599,
+        0.0
+      ],
+      "rotation": [
+        1.3877787807814457e-16,
+        -2.220446049250313e-16,
+        -0.9238795325112867,
+        0.3826834323650898
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -879,6 +1192,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -899,86 +1213,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "e936618e-352b-49d6-a914-198dc7d5e3af",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        342.401,
-        -17.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "c4e6208a-8768-4ec9-bdd5-56c885f39ba3",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        342.401,
-        2.401,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "1ec65be4-4afe-442a-b2c1-36856dc44ed5",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        42.401,
-        -57.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "4cc50df0-5f99-4ab3-9505-a637593a3828",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        42.401,
-        -37.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -999,6 +1234,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1019,86 +1255,7 @@
       ],
       "muted": false,
       "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "122153b5-a35b-4158-89e8-9174788ee204",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        362.401,
-        -17.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "a1dc66c9-151f-4dbc-bed0-c3a902475993",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        362.401,
-        2.401,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "e63e7f2b-ffa4-427e-b5ab-00db9fdb1d83",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        62.401,
-        -57.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "53af65b0-375e-4f7a-8499-6f6fd9dd2928",
-      "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
-      "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
-      "color": 12745632,
-      "position": [
-        62.401,
-        -37.599,
-        0.0
-      ],
-      "rotation": [
-        1.3877787807814457e-16,
-        -2.220446049250313e-16,
-        -0.9238795325112867,
-        0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1119,6 +1276,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1139,6 +1297,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1159,6 +1318,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1179,6 +1339,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1199,6 +1360,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1219,6 +1381,7 @@
       ],
       "muted": false,
       "centered": false,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1239,86 +1402,7 @@
       ],
       "muted": false,
       "centered": false,
-      "noExport": false
-    },
-    {
-      "id": "4fa11bfc-a475-4e74-9fcf-ebcb547e5a9c",
-      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
-      "name": "1.8 - BOLT LONG",
-      "color": 16167531,
-      "position": [
-        305.15,
-        -75.6,
-        0.297
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "645a1e7d-c6da-406c-94c6-df9090c621e3",
-      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
-      "name": "1.8 - BOLT LONG",
-      "color": 16167531,
-      "position": [
-        285.15,
-        -75.6,
-        0.297
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "9003a2c0-bad5-4976-bf27-a2823418ff39",
-      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
-      "name": "1.8 - BOLT LONG",
-      "color": 16167531,
-      "position": [
-        305.15,
-        -95.6,
-        0.297
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noExport": false
-    },
-    {
-      "id": "3b09db2c-ebb6-4620-8923-14314b47d671",
-      "path": "1.8.FEET - APPARAAT VOET/1.8 - BOLT LONG.stl",
-      "name": "1.8 - BOLT LONG",
-      "color": 16167531,
-      "position": [
-        285.15,
-        -95.6,
-        0.297
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1339,6 +1423,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1359,6 +1444,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1379,6 +1465,7 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
     },
     {
@@ -1399,7 +1486,22 @@
       ],
       "muted": false,
       "centered": true,
+      "noRender": false,
       "noExport": false
+    }
+  ],
+  "groups": [
+    {
+      "id": "ec409158-b0f2-4e52-b321-60715544c407",
+      "name": "Group 2"
+    },
+    {
+      "id": "25700c3c-7ba4-42cd-b391-89d43ea10b4e",
+      "name": "Group 4"
+    },
+    {
+      "id": "84dbd8ba-e30f-4281-967a-581e9eb13570",
+      "name": "Group 5"
     }
   ],
   "light": {
@@ -1413,16 +1515,16 @@
   "view": {
     "projection": "ortho",
     "position": [
-      745.262,
-      -535.261,
-      487.209
+      -192.912,
+      704.684,
+      587.014
     ],
     "target": [
-      190.0,
-      20.0,
-      42.999
+      204.121,
+      59.862,
+      47.215
     ],
-    "zoom": 0.987,
+    "zoom": 3.088,
     "radius": 225.548
   }
 }
