@@ -62,7 +62,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "mirror",
+        "hidden": false
+      }
     },
     {
       "id": "17c27513-f8f1-424e-a2f4-23db084f0f52",
@@ -109,7 +113,11 @@
         0.41,
         0.41,
         0.41
-      ]
+      ],
+      "render": {
+        "finish": "mirror",
+        "hidden": false
+      }
     },
     {
       "id": "ab308e75-58f2-44cc-b3f8-6f74d58346ee",
@@ -127,10 +135,15 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "color": 16777215,
+        "finish": "glass",
+        "hidden": false
+      }
     },
     {
       "id": "e84fb871-d1c4-48a0-9cf1-e868e770549f",
@@ -159,8 +172,8 @@
       "name": "StanfordBunny_fixed",
       "color": 16050143,
       "position": [
-        -39.998,
-        -260.002,
+        -19.998,
+        -160.002,
         0.0
       ],
       "rotation": [
@@ -206,36 +219,132 @@
       ]
     }
   ],
+  "groups": [],
+  "views": [
+    {
+      "projection": "persp",
+      "position": [
+        434.52,
+        -786.827,
+        145.457
+      ],
+      "target": [
+        24.975,
+        -128.63,
+        67.227
+      ],
+      "zoom": 3.249,
+      "radius": 188.972,
+      "id": "3fe05448-3ef7-4341-a943-6c55497ef6f2",
+      "name": "View 1",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.2,
+          0.174,
+          0.964
+        ],
+        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        273.364,
+        -622.192,
+        99.777
+      ],
+      "target": [
+        21.309,
+        -43.848,
+        56.043
+      ],
+      "zoom": 1.704,
+      "radius": 153.38,
+      "id": "08be7fd8-9863-4a3e-ac3f-6ff0d395c6a0",
+      "name": "View 2",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.12,
+          -0.595,
+          0.795
+        ],
+        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        142.192,
+        -668.367,
+        245.147
+      ],
+      "target": [
+        -109.863,
+        -90.023,
+        201.413
+      ],
+      "zoom": 0.605,
+      "radius": 153.38,
+      "id": "7fb955ba-b7c6-48c8-a432-817ff03e9e13",
+      "name": "View 3",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.255,
+          -0.208,
+          0.944
+        ],
+        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  ],
   "light": {
     "direction": [
-      -0.187,
-      -0.973,
-      -0.137
+      -0.2,
+      0.174,
+      0.964
     ],
-    "targetId": "47394a52-0a2f-49dc-ad8c-aaf54d8368bf"
+    "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
   },
   "view": {
     "projection": "persp",
     "position": [
-      12.272,
-      -461.418,
-      62.843
+      434.52,
+      -786.827,
+      145.457
     ],
     "target": [
-      6.509,
-      -90.036,
-      40.827
+      24.975,
+      -128.63,
+      67.227
     ],
-    "zoom": 1.209,
+    "zoom": 3.249,
     "radius": 188.972
   },
   "render": {
     "depthOfField": false,
     "focusId": "47394a52-0a2f-49dc-ad8c-aaf54d8368bf",
     "crop": false,
-    "beam": 0,
+    "beam": 1,
     "lamp": 30,
-    "ambient": 0,
+    "ambient": 2,
     "dofStrength": 4
   }
 }

@@ -131,7 +131,7 @@
       "id": "9ab2f577-19c4-4234-a4ea-9677b404648c",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE COVER.stl",
       "name": "15.1 KIOSK REMOTE COVER",
-      "color": 16767334,
+      "color": 9684093,
       "position": [
         100.0,
         76.0,
@@ -143,16 +143,21 @@
         0.0,
         1.0
       ],
-      "muted": true,
+      "muted": false,
       "centered": false,
-      "noRender": true,
-      "noExport": false
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "finish": "pei",
+        "hidden": false
+      }
     },
     {
       "id": "4a931944-c994-4baa-aa72-d0d942c2b36b",
       "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
       "name": "15.1 KIOSK REMOTE FRONT",
-      "color": 0,
+      "color": 9684093,
       "position": [
         100.0,
         40.0,
@@ -167,7 +172,12 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "finish": "pei",
+        "hidden": false
+      }
     },
     {
       "id": "af86ba3d-8c2d-4ce5-8e92-c5ebad121c72",
@@ -401,6 +411,71 @@
       "noExport": false
     }
   ],
+  "groups": [],
+  "views": [
+    {
+      "projection": "persp",
+      "position": [
+        -275.07,
+        -236.798,
+        276.044
+      ],
+      "target": [
+        179.474,
+        68.578,
+        25.063
+      ],
+      "zoom": 4.334,
+      "radius": 146.099,
+      "id": "6cb1757c-2a20-495e-bb83-38f978f3174f",
+      "name": "View 1",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.534,
+          0.704,
+          0.468
+        ],
+        "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        -315.624,
+        -203.477,
+        234.244
+      ],
+      "target": [
+        179.205,
+        72.471,
+        29.662
+      ],
+      "zoom": 4.334,
+      "radius": 146.099,
+      "id": "89aba756-c5f7-4427-a3cd-07f5e488dce2",
+      "name": "View 2",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.534,
+          0.704,
+          0.468
+        ],
+        "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  ],
   "light": {
     "direction": [
       0.534,
@@ -412,24 +487,25 @@
   "view": {
     "projection": "persp",
     "position": [
-      -293.231,
-      -199.916,
-      288.029
+      -276.752,
+      -235.31,
+      274.809
     ],
     "target": [
-      161.313,
-      105.46,
-      37.048
+      177.792,
+      70.066,
+      23.828
     ],
-    "zoom": 5.007,
+    "zoom": 4.334,
     "radius": 146.099
   },
   "render": {
     "depthOfField": true,
-    "focusId": "420d18d4-c5e1-4411-a2e8-f70c9f7c8be8",
+    "focusId": "6470b3c2-f350-4d0d-9cd5-a0c836c54730",
     "crop": false,
+    "beam": 1,
     "lamp": 40,
     "ambient": 3,
-    "dofStrength": 4
+    "dofStrength": 3
   }
 }

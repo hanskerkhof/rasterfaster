@@ -44,6 +44,69 @@
       "noExport": false
     },
     {
+      "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
+      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
+      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
+      "color": 7775663,
+      "position": [
+        214.2,
+        51.108000000000004,
+        54.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "2a7003c4-a7cb-4d52-811c-427d83f30551",
+      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
+      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
+      "color": 16767334,
+      "position": [
+        222.345,
+        82.349,
+        18.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "8dd5f5ef-fe41-43f7-ae7e-41d55d498c2f",
+      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
+      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
+      "color": 16767334,
+      "position": [
+        242.345,
+        82.349,
+        18.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
       "id": "e62cf025-06ff-4d22-b714-c50e796819f9",
       "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder.stl",
       "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_TOP LONG w B0505S holder",
@@ -62,8 +125,7 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false,
-      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+      "noExport": false
     },
     {
       "id": "363b3dfb-5b85-4531-be31-d14167f78208",
@@ -84,8 +146,7 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false,
-      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+      "noExport": false
     },
     {
       "id": "f4e0a952-ef58-47e6-98c4-7d3330b130a1",
@@ -106,8 +167,7 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false,
-      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+      "noExport": false
     },
     {
       "id": "662716d9-499a-475f-8587-c12a0ee83f8b",
@@ -128,8 +188,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+      "noExport": false
     },
     {
       "id": "2b82f975-4ea6-4af4-9607-ad8ec2f02e0c",
@@ -150,8 +209,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "25700c3c-7ba4-42cd-b391-89d43ea10b4e"
+      "noExport": false
     },
     {
       "id": "9a6289c5-1a8a-4bfd-a269-4fb0daa86a3a",
@@ -173,6 +231,27 @@
       "centered": false,
       "noRender": false,
       "noExport": true
+    },
+    {
+      "id": "d11abe70-14c8-4c9b-a714-cd5c60834b34",
+      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V COVER.stl",
+      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V COVER",
+      "color": 7775663,
+      "position": [
+        140.0,
+        -60.0,
+        54.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
     },
     {
       "id": "c2cc52e8-05ab-4309-8cec-45b7472a5ef6",
@@ -340,30 +419,7 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false,
-      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
-    },
-    {
-      "id": "dffda44f-44af-4f9b-8e13-862156a0cbbf",
-      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
-      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
-      "color": 9684093,
-      "position": [
-        181.02,
-        0.0,
-        22.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -1.0,
-        0.0
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false,
-      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+      "noExport": false
     },
     {
       "id": "b4bf1f84-3712-491c-80da-2c9cd2131abb",
@@ -384,8 +440,7 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false,
-      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+      "noExport": false
     },
     {
       "id": "89d20ccd-9e74-4a7b-9664-8ae4c7b3621c",
@@ -406,8 +461,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+      "noExport": false
     },
     {
       "id": "7d06a6e5-7e1a-43ad-8eee-35afb1b75b97",
@@ -428,8 +482,28 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "84dbd8ba-e30f-4281-967a-581e9eb13570"
+      "noExport": false
+    },
+    {
+      "id": "dffda44f-44af-4f9b-8e13-862156a0cbbf",
+      "path": "MOUNTS/MD PLAYER (serial mp3 player)/2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG.stl",
+      "name": "2.1.MD PLAYER (serial mp3 player)_RF2 MNTS ACTIVE v837_BOTTOM LONG",
+      "color": 9684093,
+      "position": [
+        181.02,
+        0.0,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
     },
     {
       "id": "0eb0b01c-8538-4a2b-939d-7ebb4c24b7ed",
@@ -472,27 +546,6 @@
       "centered": true,
       "noRender": false,
       "noExport": true
-    },
-    {
-      "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
-      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
-      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
-      "color": 7775663,
-      "position": [
-        214.2,
-        51.108000000000004,
-        54.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -1.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
     },
     {
       "id": "354c4bc4-02da-4a9b-ad2a-5f5eb3182302",
@@ -555,8 +608,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "807ef342-5ea3-4376-bbf4-fce78a23dec2",
@@ -577,8 +629,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "44657d37-e24a-4da4-96b9-d847bc177e24",
@@ -599,8 +650,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "8c9a4ff4-d8b4-4e83-ac71-b0da4dd51d6f",
@@ -621,8 +671,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "4fa11bfc-a475-4e74-9fcf-ebcb547e5a9c",
@@ -643,8 +692,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "645a1e7d-c6da-406c-94c6-df9090c621e3",
@@ -665,8 +713,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "9003a2c0-bad5-4976-bf27-a2823418ff39",
@@ -687,8 +734,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "3b09db2c-ebb6-4620-8923-14314b47d671",
@@ -709,8 +755,7 @@
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false,
-      "groupId": "ec409158-b0f2-4e52-b321-60715544c407"
+      "noExport": false
     },
     {
       "id": "4eb5819b-5ce7-4515-88ab-f8f222ffec00",
@@ -916,48 +961,6 @@
         -2.220446049250313e-16,
         -0.9238795325112867,
         0.3826834323650898
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "2a7003c4-a7cb-4d52-811c-427d83f30551",
-      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
-      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
-      "color": 16767334,
-      "position": [
-        222.345,
-        82.349,
-        18.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "8dd5f5ef-fe41-43f7-ae7e-41d55d498c2f",
-      "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
-      "name": "ESP32 devkit_RF2 v720_BOLT_S9",
-      "color": 16767334,
-      "position": [
-        242.345,
-        82.349,
-        18.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
       ],
       "muted": false,
       "centered": true,
@@ -1325,7 +1328,7 @@
       "id": "daed045d-5fa4-4b52-8f01-ea115a85220d",
       "path": "MOUNTS/3.20.POWER SWITCH 230V/Rocker Switch_Green.stp.stl",
       "name": "Rocker Switch_Green.stp",
-      "color": 12745632,
+      "color": 6013014,
       "position": [
         92.4,
         -39.6,
@@ -1385,33 +1388,12 @@
       "noExport": false
     },
     {
-      "id": "d11abe70-14c8-4c9b-a714-cd5c60834b34",
-      "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V COVER.stl",
-      "name": "5.25 AIR POMP POWER SUPPLY PSU 12V COVER",
-      "color": 7775663,
-      "position": [
-        140.0,
-        -60.0,
-        54.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -1.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
       "id": "33a511fd-2e0f-4475-921c-44f2c7388fed",
       "path": "BOLTS/tmp/1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND.stl",
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        102.401,
+        322.401,
         -97.599,
         1.01
       ],
@@ -1432,7 +1414,7 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        262.401,
+        342.401,
         -97.599,
         1.01
       ],
@@ -1453,8 +1435,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        262.401,
-        122.401,
+        342.401,
+        -117.599,
         1.01
       ],
       "rotation": [
@@ -1474,8 +1456,8 @@
       "name": "1.4.BOLTS & NUTS_RF1 v266_BOLT_S1_BLIND",
       "color": 12745632,
       "position": [
-        102.401,
-        122.401,
+        322.401,
+        -117.599,
         1.01
       ],
       "rotation": [
@@ -1488,22 +1470,60 @@
       "centered": true,
       "noRender": false,
       "noExport": false
-    }
-  ],
-  "groups": [
-    {
-      "id": "ec409158-b0f2-4e52-b321-60715544c407",
-      "name": "Group 2"
     },
     {
-      "id": "25700c3c-7ba4-42cd-b391-89d43ea10b4e",
-      "name": "Group 4"
+      "id": "1940237b-b32d-4b31-a16c-bb1703050c86",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/speaker-spring-terminal-clip-connector-1.snapshot.3/Speaker Connector.stl",
+      "name": "Speaker Connector",
+      "color": 7775663,
+      "position": [
+        85.803,
+        -39.004,
+        42.399
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5,
+        -0.4999999999999999,
+        -0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "hidden": false
+      }
     },
     {
-      "id": "84dbd8ba-e30f-4281-967a-581e9eb13570",
-      "name": "Group 5"
+      "id": "f23a3510-ebae-4b7c-a4a9-abfc807f36dc",
+      "path": "MOUNTS/SPEAKER TERMINAL 2P/speaker-spring-terminal-clip-connector-1.snapshot.3/Speaker Connector.stl",
+      "name": "Speaker Connector",
+      "color": 7775663,
+      "position": [
+        86.002,
+        -39.999,
+        61.999
+      ],
+      "rotation": [
+        0.5000000000000003,
+        0.5000000000000001,
+        -0.49999999999999994,
+        -0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "hidden": false
+      }
     }
   ],
+  "groups": [],
+  "views": [],
   "light": {
     "direction": [
       0.666,
@@ -1513,18 +1533,27 @@
     "targetId": "d11abe70-14c8-4c9b-a714-cd5c60834b34"
   },
   "view": {
-    "projection": "ortho",
+    "projection": "persp",
     "position": [
-      -192.912,
-      704.684,
-      587.014
+      -80.209,
+      -187.817,
+      188.061
     ],
     "target": [
-      204.121,
-      59.862,
-      47.215
+      133.709,
+      16.213,
+      22.218
     ],
-    "zoom": 3.088,
-    "radius": 225.548
+    "zoom": 0.814,
+    "radius": 230.588
+  },
+  "render": {
+    "depthOfField": true,
+    "focusId": "f23a3510-ebae-4b7c-a4a9-abfc807f36dc",
+    "crop": false,
+    "beam": 1,
+    "lamp": 40,
+    "ambient": 2,
+    "dofStrength": 5
   }
 }
