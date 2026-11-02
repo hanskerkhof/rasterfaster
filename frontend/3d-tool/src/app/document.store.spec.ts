@@ -263,6 +263,42 @@ describe('Groups', () => {
   });
 });
 
+describe('Saved views', () => {
+  let store: DocumentStore;
+  const camera = (x: number) => ({ projection: 'ortho' as const, position: [x, 0, 0] as Vec3, target: [0, 0, 0] as Vec3, zoom: 1, radius: 100, mode: 'solid' });
+
+  beforeEach(() => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    store = TestBed.inject(DocumentStore);
+  });
+
+  it('saves, numbers, renames, updates, recalls and deletes views, each one undo step', () => {
+    expect(store.saveCurrentView()).toBeNull(); // no 3D view to take it from
+    let x = 1;
+    store.captureView = () => camera(x);
+    const recalled: string[] = [];
+    store.recallView = view => recalled.push(view.name);
+    const first = store.saveCurrentView()!;
+    x = 2;
+    const second = store.saveCurrentView('Front')!;
+    expect(first.name).toBe('View 1');
+    expect(store.doc().views?.map(v => v.name)).toEqual(['View 1', 'Front']);
+    store.renameSavedView(first.id, 'Top');
+    x = 3;
+    store.updateSavedView(second.id);
+    expect(store.doc().views?.[1].position).toEqual([3, 0, 0]);
+    store.goToSavedView(1);
+    store.goToSavedView(second.id);
+    store.goToSavedView(9); // there is no ninth
+    expect(recalled).toEqual(['Top', 'Front']);
+    store.removeSavedView(first.id);
+    expect(store.doc().views?.length).toBe(1);
+    store.undo();
+    expect(store.doc().views?.length).toBe(2);
+  });
+});
+
 describe('Center on grid (X, Y and Z)', () => {
   const upright: Vec3 = [15.31, 15.301, 44];    // BOLT_S8 standing up
   const lying: Vec3 = [44, 15.31, 15.301];      // the same bolt on its side

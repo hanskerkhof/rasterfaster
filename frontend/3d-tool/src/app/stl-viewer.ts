@@ -1,11 +1,11 @@
-import { Component, ElementRef, OnDestroy, computed, effect, inject, input, signal, untracked, viewChild, afterNextRender } from '@angular/core';
+import { Component, ElementRef, OnDestroy, computed, effect, inject, input, output, signal, untracked, viewChild, afterNextRender } from '@angular/core';
 import * as THREE from 'three';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
-import { DocLight, DocView, DocumentStore, Vec3, workArea } from './document.store';
+import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
@@ -359,6 +359,8 @@ function readShowPath() {
 export class StlViewer implements OnDestroy {
   readonly data = input<ArrayBuffer | null>(null);
   readonly mode = input<ViewMode>('solid');
+  /** Recalling a saved view asks the app to switch the display mode. */
+  readonly modeRequest = output<ViewMode>();
   /** false: preview one STL; true: show and edit the document's items. */
   readonly documentMode = input(false);
   protected readonly store = inject(DocumentStore);
@@ -597,6 +599,8 @@ export class StlViewer implements OnDestroy {
     this.viewFocus.target = el;
     this.store.showInAssembly = ids => this.showInAssembly(ids);
     this.store.viewSvg = () => this.viewSvg();
+    this.store.captureView = () => this.captureView();
+    this.store.recallView = view => this.recallView(view);
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(devicePixelRatio);
     this.renderer.shadowMap.enabled = true; // only the key light of the "Shaded" view casts (see updateShadowRig)
@@ -666,6 +670,7 @@ export class StlViewer implements OnDestroy {
       this.frame = requestAnimationFrame(loop);
       this.stepSnapAnimation();
       this.stepPanAnimation();
+      this.stepViewAnimation();
       this.stepPivot();
       this.stepFlight();
       this.updatePathLine();
@@ -1200,6 +1205,56 @@ export class StlViewer implements OnDestroy {
     this.flying.set(false);
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.fitBounds(bounds, true);
+  }
+
+  /** The camera and display of this moment, for a saved view (null outside the document view or before anything is shown). */
+  private captureView(): Omit<DocSavedView, 'id' | 'name'> | null {
+    if (!this.documentMode() || !this.ready()) return null;
+    this.controls.update();
+    const round = (v: number) => Math.round(v * 1000) / 1000;
+    return {
+      projection: this.projection,
+      position: this.camera.position.toArray().map(round) as Vec3, target: this.controls.target.toArray().map(round) as Vec3, zoom: round(this.camera.zoom), radius: round(this.radius),
+      mode: this.mode(), light: this.store.doc().light ?? null,
+      ground: this.groundMode(), groundColor: this.groundColor(), grid3d: this.grid3d(), zGrid: this.zGridMode(),
+    };
+  }
+
+  /** Goes to a saved view: the display comes back at once, the camera glides there. */
+  private recallView(view: DocSavedView) {
+    if (!this.documentMode()) return;
+    this.flying.set(false);
+    this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
+    this.touchView();
+    if (view.mode && view.mode !== this.mode()) this.modeRequest.emit(view.mode as ViewMode);
+    if (view.light !== undefined && JSON.stringify(view.light ?? null) !== JSON.stringify(this.store.doc().light ?? null)) this.store.setLight(view.light ?? null);
+    if (view.ground) this.groundMode.set(view.ground);
+    if (typeof view.groundColor === 'number') this.groundColor.set(view.groundColor);
+    if (typeof view.grid3d === 'boolean') this.grid3d.set(view.grid3d);
+    if (view.zGrid && zGridModes.some(m => m.id === view.zGrid)) this.zGridMode.set(view.zGrid as ZGridMode);
+    if (view.projection !== this.projection) {
+      this.setProjection(view.projection);
+      this.cameraMode.set(view.projection === 'persp' ? 'perspective' : 'orthographic');
+    }
+    this.viewAnimation = {
+      fromPosition: this.camera.position.clone(), toPosition: new THREE.Vector3(...view.position),
+      fromTarget: this.controls.target.clone(), toTarget: new THREE.Vector3(...view.target),
+      fromZoom: this.camera.zoom, toZoom: view.zoom, radius: view.radius, start: performance.now(),
+    };
+  }
+
+  private viewAnimation: { fromPosition: THREE.Vector3; toPosition: THREE.Vector3; fromTarget: THREE.Vector3; toTarget: THREE.Vector3; fromZoom: number; toZoom: number; radius: number; start: number } | null = null;
+
+  private stepViewAnimation() {
+    const a = this.viewAnimation;
+    if (!a) return;
+    const t = Math.min((performance.now() - a.start) / 600, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    this.controls.target.lerpVectors(a.fromTarget, a.toTarget, eased);
+    this.camera.position.lerpVectors(a.fromPosition, a.toPosition, eased);
+    this.camera.zoom = a.fromZoom * Math.pow(a.toZoom / a.fromZoom, eased); // zoom is felt in ratios
+    if (t >= 1) { this.radius = a.radius; this.viewAnimation = null; this.resize(); } else this.camera.updateProjectionMatrix();
+    this.touchView();
   }
 
   /** Centres the view on a document item (double-click in the document list). */
@@ -1847,6 +1902,8 @@ export class StlViewer implements OnDestroy {
     if (this.viewFocus.target === this.host().nativeElement) this.viewFocus.target = null;
     this.store.showInAssembly = null;
     this.store.viewSvg = null;
+    this.store.captureView = null;
+    this.store.recallView = null;
     cancelAnimationFrame(this.frame);
     this.renderer?.domElement.removeEventListener('pointerdown', this.onCentreClick);
     this.renderer?.domElement.removeEventListener('pointerdown', this.stopFlight);

@@ -85,8 +85,9 @@
     }
   </div>
   <div class="stage">
-    <app-stl-viewer #v [data]="null" [mode]="mode()" [documentMode]="true" />
+    <app-stl-viewer #v [data]="null" [mode]="mode()" [documentMode]="true" (modeRequest)="setMode($event)" />
     <app-document-panel class="docpanel" [viewProvider]="v.viewParam" [lightProvider]="v.lightParam" (centerItem)="v.centerOnItem($event)" />
+    <app-views-panel />
     @if (error()) { <div class="overlay err">{{ error() }}</div> }
     @if (store.viewing(); as shown) {
       <div class="viewing" role="status">

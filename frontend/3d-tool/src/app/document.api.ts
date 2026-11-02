@@ -46,7 +46,7 @@ export class DocumentApi {
   /** `baseModified`: the `modified` this client last saw; the API refuses with 409 when the document changed since. */
   update(id: string, doc: RfDocument, baseModified?: number) {
     const params = baseModified === undefined ? undefined : new HttpParams().set('baseModified', baseModified);
-    return this.http.put<StoredDocument>(`/api/documents/${id}`, { name: doc.name, items: doc.items, groups: doc.groups ?? [], light: doc.light ?? null, view: doc.view ?? null, render: doc.render ?? null }, { params });
+    return this.http.put<StoredDocument>(`/api/documents/${id}`, { name: doc.name, items: doc.items, groups: doc.groups ?? [], views: doc.views ?? [], light: doc.light ?? null, view: doc.view ?? null, render: doc.render ?? null }, { params });
   }
 
   versions(id: string) {
@@ -59,7 +59,7 @@ export class DocumentApi {
   }
 
   getVersion(id: string, version: number) {
-    return this.http.get<VersionSummary & { items: DocItem[]; groups?: RfDocument["groups"] }>(`/api/documents/${id}/versions/${version}`);
+    return this.http.get<VersionSummary & { items: DocItem[]; groups?: RfDocument["groups"]; views?: RfDocument["views"] }>(`/api/documents/${id}/versions/${version}`);
   }
 
   /** Removes one saved version (not the newest). */

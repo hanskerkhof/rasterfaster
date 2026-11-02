@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Saved views (0.10.68)
+
+### Added
+- **FE** + **BE** (`views-panel.ts`, `document.store.ts`, `stl-viewer.ts`, `main.py`): **saved views**. A floating, movable and collapsible **Views** panel saves the camera (position, zoom, projection), display mode, light direction and ground / grid options under a name; click a view to go there (the camera glides), double-click renames it in place, ⟳ replaces it by what you see now, ✕ deletes it. Keys **1 – 9** go to the first nine. Views belong to the document (versions, document file, undo).
+
 ## 2026-11-02 - Pick one part of a group in the list (0.10.67)
 
 ### Changed

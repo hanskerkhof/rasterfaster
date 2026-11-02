@@ -104,6 +104,19 @@ export interface DocView {
   radius: number;
 }
 
+/** A view saved by name: the camera and how the scene was shown, to come back to. */
+export interface DocSavedView extends DocView {
+  id: string;
+  name: string;
+  /** The display mode (solid, wireframe …), the light, and the ground and grid options at the time. */
+  mode?: string | null;
+  light?: DocLight | null;
+  ground?: 'none' | 'grid' | 'solid' | null;
+  groundColor?: number | null;
+  grid3d?: boolean | null;
+  zGrid?: string | null;
+}
+
 /** What the Render dialog remembers for a document. */
 export interface DocRenderSettings {
   /** The Blender scene gets a depth of field, focused on the part nearest to the camera. */
@@ -129,6 +142,7 @@ export interface RfDocument {
   name: string;
   items: DocItem[];
   groups?: DocGroup[];
+  views?: DocSavedView[];
   light?: DocLight | null;
   view?: DocView | null;
   render?: DocRenderSettings | null;
@@ -318,7 +332,7 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items, groups: stored.groups, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+    this.resetTo(stored.id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
     this.takeVersionInfo(stored);
   }
 
@@ -384,7 +398,7 @@ export class DocumentStore {
       if (this.dirty) {
         this.conflict.set(stored);
       } else {
-        this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+        this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
         this.takeVersionInfo(stored);
         this.say('Updated from another window');
       }
@@ -395,7 +409,7 @@ export class DocumentStore {
   useRemoteVersion() {
     const remote = this.conflict();
     if (!remote) return;
-    this.resetTo(remote.id, { name: remote.name, items: remote.items, groups: remote.groups, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
+    this.resetTo(remote.id, { name: remote.name, items: remote.items, groups: remote.groups, views: remote.views, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
     this.takeVersionInfo(remote);
   }
 
@@ -444,7 +458,7 @@ export class DocumentStore {
     await this.flush();
     const stored = await firstValueFrom(this.api.getVersion(id, version));
     const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
-    this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, light: this.doc().light, view: this.doc().view, render: this.doc().render });
+    this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: this.doc().light, view: this.doc().view, render: this.doc().render });
     clearTimeout(this.saveTimer);
     this.dirty = false;
     this.saveState.set('saved');
@@ -493,7 +507,7 @@ export class DocumentStore {
     const id = this.docId();
     if (!id || version === null) return;
     const promoted = await firstValueFrom(this.api.promote(id, version));
-    this.resetTo(id, { name: promoted.name, items: promoted.items, groups: promoted.groups, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
+    this.resetTo(id, { name: promoted.name, items: promoted.items, groups: promoted.groups, views: promoted.views, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
     this.takeVersionInfo(promoted);
     this.say(`Promoted v${version} to v${promoted.version}`);
     await this.refreshVersions();
@@ -895,6 +909,44 @@ export class DocumentStore {
   viewCenter: (() => { x: number; y: number }) | null = null;
   /** The 3D view as an SVG drawing with hidden lines removed (set by the viewer); null when there is nothing to draw. */
   viewSvg: (() => { svg: string; mode: string } | null) | null = null;
+  /** Set by the 3D view: the camera and display of the moment (for saving a view) and the way back to a saved one (eased). */
+  captureView: (() => Omit<DocSavedView, 'id' | 'name'> | null) | null = null;
+  recallView: ((view: DocSavedView) => void) | null = null;
+
+  /** Saves the current camera and display as a named view, one undo step. Returns it, or null when there is no 3D view to take it from. */
+  saveCurrentView(name?: string): DocSavedView | null {
+    const captured = this.captureView?.();
+    if (!captured) return null;
+    const views = this.doc().views ?? [];
+    const number = views.reduce((max, v) => Math.max(max, Number(/^View (\d+)$/.exec(v.name)?.[1] ?? 0)), 0) + 1;
+    const view: DocSavedView = { ...captured, id: crypto.randomUUID(), name: (name?.trim() || `View ${number}`).slice(0, 80) };
+    this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), view] }));
+    return view;
+  }
+
+  /** Puts the current camera and display into a saved view (it keeps its name). */
+  updateSavedView(id: string) {
+    const captured = this.captureView?.();
+    if (!captured) return;
+    this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
+  }
+
+  renameSavedView(id: string, name: string) {
+    const clean = name.trim().slice(0, 80);
+    if (!clean) return;
+    this.mutate('Rename view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...v, name: clean } : v)) }));
+  }
+
+  removeSavedView(id: string) {
+    this.mutate('Delete view', d => ({ ...d, views: (d.views ?? []).filter(v => v.id !== id) }));
+  }
+
+  /** Goes to a saved view (the nth, 1 based, when `which` is a number). */
+  goToSavedView(which: string | number) {
+    const views = this.doc().views ?? [];
+    const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
+    if (view) this.recallView?.(view);
+  }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;
   /** Binary STL of these parts as placed (set by the 3D scene); null when none of them has geometry (a placeholder, still loading). */
