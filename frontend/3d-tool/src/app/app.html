@@ -115,8 +115,9 @@
           </div>
           <div class="line">
             <span class="spinner"></span>
-            <span>{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}</span>
-            <button type="button" (click)="render.cancel()">Cancel</button>
+            <span>{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · {{ render.percent() }}% · {{ time(render.elapsed()) }}{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}@if (render.waiting() > 0) { <b class="queue"> · {{ render.waiting() }} waiting</b> }</span>
+            <button type="button" (click)="render.cancel()" [title]="render.waiting() > 0 ? 'Stop this render; the next one in the queue starts' : 'Stop this render'">Cancel</button>
+            @if (render.waiting() > 0) { <button type="button" (click)="render.cancelAll()" title="Stop this render and empty the queue">Cancel all</button> }
           </div>
         </div>
       }

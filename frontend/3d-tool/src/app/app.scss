@@ -106,6 +106,8 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress .line { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .notice.render-progress .spinner { flex: none; width: 10px; height: 10px; border: 2px solid rgba(255,255,255,.3); border-top-color: #2f6fed; border-radius: 50%; animation: render-spin .8s linear infinite; }
 .notice.render-progress button { margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
+.notice.render-progress .queue { color: #e0a23a; font-weight: 600; }
+.notice.render-progress .line button + button { margin-left: 6px; }
 .notice.render-progress button:hover { background: #b03a3a; color: #fff; }
 @keyframes render-spin { to { transform: rotate(360deg); } }
 .notice.render-ready { color: inherit; font: inherit; font-size: 12px; cursor: pointer; background: rgba(35,38,45,.95); border: 1px solid #2f6fed; }

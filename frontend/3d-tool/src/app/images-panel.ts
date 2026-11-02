@@ -80,8 +80,8 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
         <button type="button" role="menuitem" (click)="menuRename(m.note)"><span class="icon">✎</span>Rename…</button>
         @if (m.note.settings?.view) {
           <div class="msep"></div>
-          <div class="mhead" [title]="render.running() ? 'A render is running already' : 'Render this picture again at full size, with the same camera, light and settings'">Render HD again{{ render.running() ? ' (a render is running)' : '' }}</div>
-          @for (size of hdSizes; track size.width) { <button type="button" role="menuitem" class="size" [disabled]="render.running()" (click)="menuRenderHd(m.note, size.width)">{{ size.label }}</button> }
+          <div class="mhead" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings (it joins the queue when a render is running)'">Render HD again{{ render.queueFull() ? ' (queue full)' : (render.running() ? ' (joins the queue)' : '') }}</div>
+          @for (size of hdSizes; track size.width) { <button type="button" role="menuitem" class="size" [disabled]="render.queueFull()" (click)="menuRenderHd(m.note, size.width)">{{ size.label }}</button> }
         }
         <div class="msep"></div>
         <button type="button" role="menuitem" class="danger" [class.sure]="menuConfirm()" (click)="menuDelete(m.note)"><span class="icon">✕</span>{{ menuConfirm() ? 'Really delete?' : 'Delete' }}</button>
@@ -97,7 +97,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
           <span class="meta">@if (service.images().length > 1) { <b class="pos">{{ position(note) }} / {{ service.images().length }}</b> · }{{ note.width }} × {{ note.height }} px · {{ note.samples }} samples · {{ minutes(note.elapsed) }} · {{ versionLabel(note) }}{{ note.edited && note.version ? ' (edited)' : '' }} · {{ megabytes(note.bytes) }}</span>
           @if (note.settings?.view) {
             <span class="hdmenu">
-              <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : 'Render this picture again at full size, with the same camera, light and settings'" (click)="hdOpen.set(!hdOpen())">Render HD ▾</button>
+              <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full' : 'Render this picture again at full size, with the same camera, light and settings'" (click)="hdOpen.set(!hdOpen())">Render HD ▾</button>
               @if (hdOpen()) {
                 <div class="hdlist" role="menu">
                   @for (size of hdSizes; track size.width) { <button type="button" role="menuitem" (click)="renderHd(note, size.width)">{{ size.label }}</button> }

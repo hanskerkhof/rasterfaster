@@ -19,7 +19,7 @@ export interface PartStyle {
   /** Draw as a barely visible ghost that doesn't hide what is behind it. */
   ghost?: boolean;
   /** Render mode's finish of the part (only the solid and shaded views show it; none or satin is the plain PLA look). */
-  finish?: 'satin' | 'metal' | 'glass' | 'mirror' | null;
+  finish?: 'satin' | 'metal' | 'glass' | 'mirror' | 'pei' | null;
   /** The reflections metal, glass and mirror need. */
   environment?: THREE.Texture | null;
 }
@@ -30,6 +30,7 @@ function finishMaterial(style: PartStyle, fallback: () => THREE.Material): THREE
   switch (style.finish) {
     case 'metal': return new THREE.MeshPhysicalMaterial({ ...base, metalness: 1, roughness: 0.3 });
     case 'mirror': return new THREE.MeshPhysicalMaterial({ ...base, color: new THREE.Color(style.solid).lerp(new THREE.Color(0xffffff), 0.75), metalness: 1, roughness: 0.02, envMapIntensity: 1.3 });
+    case 'pei': return new THREE.MeshStandardMaterial({ color: style.solid, roughness: 0.82, metalness: 0, flatShading: true }); // a dull powder-coated plate (the grain itself is in the Blender render)
     case 'glass': return new THREE.MeshPhysicalMaterial({ ...base, metalness: 0, roughness: 0.05, transparent: true, opacity: 0.35, depthWrite: false, envMapIntensity: 1, side: THREE.DoubleSide });
     default: return fallback();
   }

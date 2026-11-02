@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Render queue and the Textured PEI finish (0.11.3)
+
+### Added
+- **BE** + **FE** (`main.py`, `render.service.ts`, `app.html`): a **render queue**. A full-size render started while another runs waits its turn (first in, first out, at most 10 together with the running one; `RASTERFASTER_RENDER_QUEUE_MAX` changes it; the API says 409 when it is full). The progress message shows "N waiting", **Cancel** stops the running render (the next starts), **Cancel all** stops it and empties the queue; the buttons stay usable while a render runs (also *Render HD ▾* in the image viewer). The queue lives in memory. API: `DELETE /api/render-jobs` (all), `DELETE /api/render-jobs/{id}` also takes a waiting job out; job messages carry `waiting`, `position` and `queueMax`; the newest three finished renders are kept in memory (all of them are in the image library).
+- **BE** + **FE** (`blenderexport.py`, `object-menu.ts`, `model-render.ts`): the **Textured PEI** finish (*PEI* in the Finish row): a matte part with the sparkly powder-coat grain of a textured print plate in renders and the `.blend` (a Voronoi grain on the part's own coordinates, about 0.2 mm cells, each tilting the normal a bit so some flash in the lamp's light); the 3D view shows it as a dull matte surface. The colour is the part's render colour.
+
 ## 2026-11-02 - Smoother mirrors, render quality (0.11.2)
 
 ### Added

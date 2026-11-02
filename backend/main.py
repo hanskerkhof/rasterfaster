@@ -341,7 +341,7 @@ def get_file(path: str) -> FileResponse:
 class DocumentItemRender(BaseModel):
     """What Render mode changes for one part (all optional: a part without them is drawn as in Design mode)."""
     color: int | None = Field(default=None, ge=0, le=0xFFFFFF)  # the render colour; none: the part's design colour
-    finish: Literal["satin", "metal", "glass", "mirror"] | None = None  # none: satin (PLA, as renders always were)
+    finish: Literal["satin", "metal", "glass", "mirror", "pei"] | None = None  # none: satin (PLA, as renders always were)
     hidden: bool = False  # left out of Render mode: not in the view, the render or the Blender file
 
 
@@ -854,9 +854,10 @@ class RenderJob:
         self.settings = settings or {}  # the render settings, kept with the picture
         self.documentId, self.version, self.edited = documentId, version, edited  # what it is made from: kept with the picture in the image library
         self.imageId: str | None = None  # the picture's id in the library once it is done
-        self.state = "running"  # running | done | error | cancelled
+        self.state = "queued"  # queued | running | done | error | cancelled
         self.progress = 0.0
-        self.started = time.time()
+        self.created = time.time()
+        self.started = self.created  # when it began to run (it waits in the queue before that)
         self.finished: float | None = None
         self.png: bytes | None = None
         self.error = ""
@@ -864,6 +865,11 @@ class RenderJob:
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
         self.step: str | None = None
         self.megapixels = width * width * 9 / 16 / 1e6
+
+    def begin(self) -> None:
+        """The job leaves the queue: the clock starts and the first step begins."""
+        self.state = "running"
+        self.started = time.time()
         self.enter("prepare")
 
     def enter(self, name: str) -> None:
@@ -906,10 +912,16 @@ class RenderJob:
     def view(self) -> dict:
         return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error,
-                "documentId": self.documentId, "imageId": self.imageId, "version": self.version}
+                "documentId": self.documentId, "imageId": self.imageId, "version": self.version,
+                "waiting": len(renderQueue), "position": next((i + 1 for i, (queued, _) in enumerate(renderQueue) if queued is self), 0), "queueMax": renderQueueMax}
 
 
 renderJobs: dict[str, RenderJob] = {}
+# Full-size renders run one at a time (Cycles uses the whole machine); the others wait here, first in first out, with the scene already built for them.
+renderQueue: list[tuple[RenderJob, tuple]] = []
+renderQueueMax = max(1, int(os.environ.get("RASTERFASTER_RENDER_QUEUE_MAX", "10") or 10))  # the running job and the waiting ones together
+renderLock = threading.Lock()
+finishedKept = 3  # finished pictures kept in memory (they are in the image library too)
 
 
 class Notifier:
@@ -935,8 +947,37 @@ class Notifier:
 notifier = Notifier()
 
 
+def running_render() -> RenderJob | None:
+    return next((j for j in renderJobs.values() if j.state == "running"), None)
+
+
 def latest_render() -> RenderJob | None:
-    return max(renderJobs.values(), key=lambda j: j.started, default=None)
+    """What a page that connects should see: the running render, else the newest finished one, else the one that waits first."""
+    running = running_render()
+    if running:
+        return running
+    finished = [j for j in renderJobs.values() if j.state in ("done", "error", "cancelled")]
+    if finished:
+        return max(finished, key=lambda j: j.finished or j.created)
+    return renderQueue[0][0] if renderQueue else None
+
+
+def prune_finished() -> None:
+    """Keeps the newest few finished renders; older ones nobody collected are dropped."""
+    finished = sorted((j for j in renderJobs.values() if j.state in ("done", "error", "cancelled")), key=lambda j: j.finished or j.created, reverse=True)
+    for job in finished[finishedKept:]:
+        renderJobs.pop(job.id, None)
+
+
+def start_next_render() -> None:
+    """Starts the first waiting render when none runs (called when a render is queued and when one ends)."""
+    with renderLock:
+        if running_render() or not renderQueue:
+            return
+        job, args = renderQueue.pop(0)
+        job.begin()
+        threading.Thread(target=run_render_job, args=(job, *args), daemon=True).start()
+    notifier.notify({"type": "render", **job.view()})
 
 
 @app.websocket("/api/ws")
@@ -990,21 +1031,25 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         job.finished = time.time()
         job.close()
         notifier.notify({"type": "render", **job.view()})
+        start_next_render()  # the next waiting render begins
 
 
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4),
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024)) -> dict:
-    """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}."""
+    """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
+    wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam)
-    if any(j.state == "running" for j in renderJobs.values()):
-        raise HTTPException(status_code=409, detail="a render is running already: wait for it or cancel it")  # one at a time, for now
-    renderJobs.clear()  # an older picture nobody collected is dropped
-    job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
-                    render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light))
-    renderJobs[job.id] = job
-    threading.Thread(target=run_render_job, args=(job, blender, glb, sun, depthOfField, cropped), daemon=True).start()
+    with renderLock:
+        if (1 if running_render() else 0) + len(renderQueue) >= renderQueueMax:
+            raise HTTPException(status_code=409, detail=f"the render queue is full ({renderQueueMax} renders): wait for one to finish or cancel one")
+        prune_finished()
+        job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
+                        render_note(document, view, resolve_render_settings(document, dof, focus, strength, crop, ambient, lamp, bg, floor, beam), light))
+        renderJobs[job.id] = job
+        renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})
+    start_next_render()
     return job.view()
 
 
@@ -1038,16 +1083,42 @@ def get_render_job_image(jobId: str) -> Response:
 
 @app.delete("/api/render-jobs/{jobId}")
 def cancel_render_job(jobId: str) -> dict:
-    """Stops a running render (Blender is killed); a finished job is just forgotten."""
+    """Stops a running render (Blender is killed) or takes a waiting one out of the queue; a finished job is just forgotten."""
     job = render_job(jobId)
     if job.state == "running":
         job.state = "cancelled"
         if job.process is not None:
             job.process.kill()  # type: ignore[attr-defined]
+    elif job.state == "queued":
+        with renderLock:
+            renderQueue[:] = [(queued, args) for queued, args in renderQueue if queued is not job]
+        job.state, job.finished = "cancelled", time.time()
     else:
         renderJobs.pop(job.id, None)
-    notifier.notify({"type": "render", "state": "idle"} if job.state != "cancelled" else {"type": "render", **job.view()})
+    if job.state == "cancelled":
+        notifier.notify({"type": "render", **job.view()})
+    else:  # a forgotten picture: the page learns what is going on now (a render may run behind it)
+        current = latest_render()
+        notifier.notify({"type": "render", **current.view()} if current and current.state in ("running", "queued") else {"type": "render", "state": "idle"})
     return job.view()
+
+
+@app.delete("/api/render-jobs")
+def cancel_all_render_jobs() -> dict:
+    """Empties the queue and stops the running render."""
+    with renderLock:
+        waiting = [job for job, _ in renderQueue]
+        renderQueue.clear()
+    for job in waiting:
+        job.state, job.finished = "cancelled", time.time()
+    running = running_render()
+    if running:
+        running.state = "cancelled"
+        if running.process is not None:
+            running.process.kill()  # type: ignore[attr-defined]
+    last = running or (waiting[-1] if waiting else None)
+    notifier.notify({"type": "render", **last.view()} if last else {"type": "render", "state": "idle"})
+    return {"cancelled": len(waiting) + (1 if running else 0)}
 
 
 class ImageNote(BaseModel):

@@ -97,7 +97,7 @@ export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
 export interface RenderState {
   id: string;
   name: string;
-  state: 'running' | 'done' | 'error' | 'cancelled';
+  state: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
   progress: number;
   width: number;
   samples: number;
@@ -112,6 +112,10 @@ export interface RenderState {
   documentId?: string;
   version?: number;
   imageId?: string | null;
+  /** How many renders wait behind the running one, this one's place in the queue (0: not waiting), and how many renders the queue takes. */
+  waiting?: number;
+  position?: number;
+  queueMax?: number;
 }
 
 /**
@@ -123,6 +127,11 @@ export class RenderService {
   /** The render the API told us about last: running, or done and not yet looked at. Null when there is none. */
   readonly state = signal<RenderState | null>(null);
   readonly running = computed(() => this.state()?.state === 'running');
+  /** Renders waiting behind the running one, and how many the queue takes (running one included); the API says both with every message. */
+  readonly waiting = signal(0);
+  private readonly queueMax = signal(10);
+  /** No room for another render in the queue. */
+  readonly queueFull = computed(() => (this.running() ? 1 : 0) + this.waiting() >= this.queueMax());
   /**
    * The steps of the render for the progress bar. A step that is over has the time it took, the one running is estimated from the
    * samples done (or from the last render), the ones to come from the last render too.
@@ -247,17 +256,18 @@ export class RenderService {
     let message: Partial<RenderState> & { type?: string };
     try { message = JSON.parse(String(data)); } catch { return; }
     if (message.type !== 'render') return;
+    if (typeof message.waiting === 'number') this.waiting.set(message.waiting);
+    if (typeof message.queueMax === 'number') this.queueMax.set(message.queueMax);
+    if (message.state === 'queued') return; // a render joined the queue: only the count changes
+    if (message.state === 'cancelled' && this.running() && message.id !== this.state()?.id) return; // a waiting render was cancelled: the running one goes on
+    if (message.state === ('idle' as string)) this.waiting.set(0);
     const before = this.state();
     this.track(message as RenderState);
     const next = message.state && message.state !== ('idle' as string) ? (message as RenderState) : null;
     this.state.set(next && next.state !== 'cancelled' ? next : null);
     if (next?.state === 'done' && (before?.id !== next.id || before.state !== 'done')) this.toast.set(next);
     else if (next?.state === 'error') this.toast.set(next);
-    else if (!next || next.state === 'cancelled' || next.state === 'running') {
-      const shown = this.toast();
-      if (shown && 'id' in shown && shown.id !== next?.id) this.toast.set(null);
-      if (!next || next.state === 'cancelled') this.toast.set(null);
-    }
+    else if (!next || next.state === 'cancelled') this.toast.set(null); // a finished picture's message stays while the next render runs
   }
 
   /** Keeps the clock and the progress reports of the running render (a render that was running before this page opened counts from what the API says). */
@@ -399,10 +409,16 @@ export class RenderService {
   private async launch(url: URL) {
     const response = await fetch(url, { method: 'POST' });
     if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
-    const started = await response.json();
-    this.track(started);
-    this.state.set(started); // the WebSocket keeps it up to date from here
-    this.store.announce('Full-size render started in the background: you get a message when it is ready', 6000);
+    const started = await response.json() as RenderState;
+    if (typeof started.waiting === 'number') this.waiting.set(started.waiting);
+    if (typeof started.queueMax === 'number') this.queueMax.set(started.queueMax);
+    if (started.state === 'queued') { // another render runs: this one waits its turn (the running one stays on show)
+      this.store.announce(`Render queued: ${started.position === 1 ? 'next' : 'number ' + started.position} in line. It is saved to the image library when it is done`, 6000);
+    } else {
+      this.track(started);
+      this.state.set(started); // the WebSocket keeps it up to date from here
+      this.store.announce('Full-size render started in the background: you get a message when it is ready', 6000);
+    }
     void this.poll(); // and the polling does when there is no WebSocket
   }
 
@@ -434,6 +450,15 @@ export class RenderService {
   /** The picture has been looked at: the API can forget it. */
   async collect(jobId: string) {
     try { await fetch(`/api/render-jobs/${jobId}`, { method: 'DELETE' }); } catch { /* it is dropped with the next render */ }
+  }
+
+  /** "Cancel all": the running render stops and the queue is emptied. */
+  async cancelAll() {
+    this.track({ state: 'cancelled' });
+    this.state.set(null);
+    this.waiting.set(0);
+    this.store.announce('All renders cancelled');
+    try { await fetch('/api/render-jobs', { method: 'DELETE' }); } catch { /* they end on their own */ }
   }
 
   /** The Cancel button of the progress toast: Blender is stopped; the toast goes at once. */

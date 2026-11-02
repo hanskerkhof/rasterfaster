@@ -69,14 +69,14 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url()) {
-          <select class="focus size" [disabled]="render.running()" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
+          <select class="focus size" [value]="render.hdWidth()" title="The size of the full-size render: larger pictures take much longer" (change)="render.setHdWidth(+$any($event.target).value)">
             @for (size of hdSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.hdWidth()">{{ size.label }}</option> }
           </select>
-          <select class="focus size" [disabled]="render.running()" [value]="render.hdSamples()" title="The quality of the full-size render: more samples are cleaner (mirrors, metal and glass especially) and take longer" (change)="render.setHdSamples(+$any($event.target).value)">
+          <select class="focus size" [value]="render.hdSamples()" title="The quality of the full-size render: more samples are cleaner (mirrors, metal and glass especially) and take longer" (change)="render.setHdSamples(+$any($event.target).value)">
             @for (q of hdQualities; track q.samples) { <option [value]="q.samples" [selected]="q.samples === render.hdSamples()">{{ q.label }}</option> }
           </select>
-          <button type="button" [disabled]="render.running()" [title]="render.running() ? 'A render is running already' : render.hdWidth() + ' px, ' + render.hdSamples() + ' samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
-            @if (render.running()) { <span class="spinner small"></span> }Render HD
+          <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full: wait for a render to finish' : (render.running() ? 'It joins the queue and starts when the running render is done. ' : '') + render.hdWidth() + ' px, ' + render.hdSamples() + ' samples: in the background, about two minutes at 1920 px and longer for larger pictures (you get a message when it is ready)'" (click)="startFullSize()">
+            @if (render.running()) { <span class="spinner small"></span> }Render HD@if (render.waiting() > 0) { <small> (+{{ render.waiting() }})</small> }
           </button>
         }
         @if (url() && picture() && render.lastQuick && !busy()) {

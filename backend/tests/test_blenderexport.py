@@ -249,18 +249,22 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     assert client.get("/api/render-jobs/nope").status_code == 404
 
 
-def test_render_state_reaches_the_page_over_the_websocket_and_only_one_render_runs(tmp_path, monkeypatch):
+def test_render_state_reaches_the_page_over_the_websocket_and_renders_queue_up(tmp_path, monkeypatch):
     import time
     (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
     monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
     monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    monkeypatch.setattr(main, "renderQueueMax", 2)  # the running render and one waiting
     main.renderJobs.clear()
+    main.renderQueue.clear()
     client = TestClient(main.app)
     item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
     created = client.post("/api/documents", json={"name": "Socket", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    order = []
 
     def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+        order.append(width)
         progress(0.5)
         time.sleep(0.4)
         return b"\x89PNG-hd"
@@ -268,14 +272,48 @@ def test_render_state_reaches_the_page_over_the_websocket_and_only_one_render_ru
     monkeypatch.setattr(blenderexport, "build_render", fake)
     with client.websocket_connect("/api/ws") as socket:
         assert socket.receive_json() == {"type": "render", "state": "idle"}
-        job = client.post(f"/api/documents/{created['id']}/render-jobs").json()
-        assert client.post(f"/api/documents/{created['id']}/render-jobs").status_code == 409  # one render at a time
-        states = []
-        while not states or states[-1]["state"] == "running":
-            states.append(socket.receive_json())
-        assert all(m["type"] == "render" and m["id"] == job["id"] for m in states) and states[-1]["state"] == "done" and states[-1]["name"] == "Socket"
+        first = client.post(f"/api/documents/{created['id']}/render-jobs", params={"width": 1000}).json()
+        second = client.post(f"/api/documents/{created['id']}/render-jobs", params={"width": 2000})
+        assert second.status_code == 202 and second.json()["state"] == "queued" and second.json()["position"] == 1  # it waits its turn
+        full = client.post(f"/api/documents/{created['id']}/render-jobs", params={"width": 3000})
+        assert full.status_code == 409 and "queue is full" in full.json()["detail"]
+        messages = []
+        while not messages or messages[-1]["id"] != second.json()["id"] or messages[-1]["state"] != "done":
+            messages.append(socket.receive_json())
+        done_first = next(i for i, m in enumerate(messages) if m["id"] == first["id"] and m["state"] == "done")
+        running_second = next(i for i, m in enumerate(messages) if m["id"] == second.json()["id"] and m["state"] == "running")
+        assert done_first < running_second and order == [1000, 2000]  # one at a time, in the order they came
     with client.websocket_connect("/api/ws") as late:  # a page opened afterwards still hears that a render is ready
         assert late.receive_json()["state"] == "done"
+
+
+def test_waiting_renders_can_be_cancelled_one_by_one_or_all_at_once(tmp_path, monkeypatch):
+    import threading
+    (tmp_path / "a.stl").write_bytes(box_stl(20, 20, 10))
+    monkeypatch.setattr(main, "libraryRoot", tmp_path.resolve())
+    monkeypatch.setattr(main, "documentsRoot", (tmp_path / "docs").resolve())
+    main.renderJobs.clear()
+    main.renderQueue.clear()
+    client = TestClient(main.app)
+    item = {"id": "a", "path": "a.stl", "name": "A", "color": 255, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}
+    created = client.post("/api/documents", json={"name": "Cancel", "items": [item]}).json()
+    monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
+    release = threading.Event()
+
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None):
+        release.wait(5)
+        return b"\x89PNG-hd"
+
+    monkeypatch.setattr(blenderexport, "build_render", slow)
+    url = f"/api/documents/{created['id']}/render-jobs"
+    running = client.post(url).json()
+    waiting = [client.post(url).json() for _ in range(3)]
+    assert client.get(f"/api/render-jobs/{running['id']}").json()["state"] == "running" and client.get(f"/api/render-jobs/{waiting[2]['id']}").json()["position"] == 3
+    assert client.delete(f"/api/render-jobs/{waiting[1]['id']}").json()["state"] == "cancelled"
+    assert [main.renderQueue[i][0].id for i in range(2)] == [waiting[0]["id"], waiting[2]["id"]]  # the others close up
+    assert client.delete("/api/render-jobs").json() == {"cancelled": 3}
+    assert not main.renderQueue and client.get(f"/api/render-jobs/{waiting[0]['id']}").json()["state"] == "cancelled"
+    release.set()
 
 
 def test_depth_of_field_focus_comes_from_the_call_or_the_document(tmp_path, monkeypatch):
@@ -327,6 +365,8 @@ def test_render_job_reports_the_size_of_its_picture():
 
 def test_render_job_tracks_its_steps_and_learns_how_long_they_take():
     job = main.RenderJob("Steps", 1920, 96)
+    assert job.view()["state"] == "queued" and job.view()["phase"] is None  # nothing has begun while it waits
+    job.begin()
     assert [p["name"] for p in job.view()["phases"]] == ["prepare", "load", "render", "finish"]
     assert job.view()["phase"] == "prepare" and job.view()["phases"][0]["start"] is not None and job.view()["phases"][1]["start"] is None
     job.enter("load")
@@ -372,3 +412,9 @@ def test_render_view_uses_render_colours_and_leaves_hidden_parts_out():
     assert [i.color for i in document.items] == [0x111111] * 3  # the document itself is untouched
     with pytest.raises(main.HTTPException):
         main.render_view(document.model_copy(update={"items": [document.items[2]]}))
+
+
+def test_pei_finish_is_a_matte_material_named_for_the_grain_in_blender():
+    material = blenderexport.colour_material(0x336699, False, "pei")
+    assert material["name"].endswith("_pei") and material["pbrMetallicRoughness"]["metallicFactor"] == 0.0 and material["pbrMetallicRoughness"]["roughnessFactor"] > 0.5
+    assert "extensions" not in material  # no clear coat on a powder-coated plate

@@ -186,6 +186,7 @@ export class ObjectMenu {
     { id: 'metal', label: 'Metal', title: 'Brushed metal in the part\'s colour' },
     { id: 'glass', label: 'Transparent', title: 'See-through, like glass' },
     { id: 'mirror', label: 'Mirror', title: 'A perfect mirror (fun for a teapot)' },
+    { id: 'pei', label: 'PEI', title: 'Textured PEI: the fine powder-coat grain of a print plate, in the part\'s render colour' },
   ];
   protected finishIs(finish: Finish) {
     return this.items().length > 0 && this.items().every(i => (i.render?.finish ?? 'satin') === finish);

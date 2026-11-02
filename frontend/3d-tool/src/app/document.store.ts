@@ -73,8 +73,8 @@ export interface DocItem {
   render?: ItemRender | null;
 }
 
-export type Finish = 'satin' | 'metal' | 'glass' | 'mirror';
-export const finishes: readonly Finish[] = ['satin', 'metal', 'glass', 'mirror'];
+export type Finish = 'satin' | 'metal' | 'glass' | 'mirror' | 'pei';
+export const finishes: readonly Finish[] = ['satin', 'metal', 'glass', 'mirror', 'pei'];
 
 /** A part's own colour, finish and visibility in Render mode (every field optional). */
 export interface ItemRender {

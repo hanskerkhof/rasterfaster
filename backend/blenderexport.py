@@ -101,7 +101,7 @@ def quaternion(matrix: np.ndarray) -> list[float]:
 
 
 dimmedAlpha = 0.18  # a dimmed (muted) part: how much of it shows
-finishes = ("metal", "glass", "mirror")  # Render mode's finishes besides satin PLA
+finishes = ("metal", "glass", "mirror", "pei")  # Render mode's finishes besides satin PLA
 
 
 def colour_material(colour: int, dimmed: bool, finish: str | None) -> dict:
@@ -115,6 +115,8 @@ def colour_material(colour: int, dimmed: bool, finish: str | None) -> dict:
     if finish == "mirror":  # a polished mirror: almost white metal with only a trace of the colour
         tint = [0.85 + 0.15 * c for c in base]
         return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*tint, alpha], "metallicFactor": 1.0, "roughnessFactor": 0.0}, **extra}
+    if finish == "pei":  # a textured PEI print plate: matte, the fine grain itself is added in Blender (see grain_pei_parts)
+        return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*base, alpha], "metallicFactor": 0.0, "roughnessFactor": 0.62}, **extra}
     if finish == "glass":  # see-through plastic or glass in the colour of the part
         return {"name": name, "pbrMetallicRoughness": {"baseColorFactor": [*base, alpha], "metallicFactor": 0.0, "roughnessFactor": 0.04},
                 "extensions": {"KHR_materials_transmission": {"transmissionFactor": 1.0}}, **extra}
@@ -308,6 +310,45 @@ def let_light_through_glass():
         tree.links.new(mix.outputs[0], output.inputs["Surface"])
 
 let_light_through_glass()
+
+def grain_pei_parts():
+    # The finish of a textured PEI print plate: a coarse, sparkly powder-coat grain (a black part under a lamp glitters with tiny bright flecks). The parts
+    # have no UV coordinates, so the grain is made of tiny cells (about 0.3 mm) on the part's own coordinates: every cell tilts the normal a random bit,
+    # so some cells catch the light and flash and the rest stay dark.
+    for material in bpy.data.materials:
+        if "_pei" not in material.name or not material.use_nodes:
+            continue
+        tree = material.node_tree
+        principled = next((n for n in tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if principled is None:
+            continue
+        coordinates = tree.nodes.new("ShaderNodeTexCoord")
+        cells = tree.nodes.new("ShaderNodeTexVoronoi")
+        cells.voronoi_dimensions = "3D"
+        cells.feature = "F1"
+        cells.inputs["Scale"].default_value = 5200.0
+        cells.inputs["Randomness"].default_value = 1.0
+        tree.links.new(coordinates.outputs["Object"], cells.inputs["Vector"])
+        centred = tree.nodes.new("ShaderNodeVectorMath")
+        centred.operation = "SUBTRACT"
+        centred.inputs[1].default_value = (0.5, 0.5, 0.5)
+        tree.links.new(cells.outputs["Color"], centred.inputs[0])
+        tilt = tree.nodes.new("ShaderNodeVectorMath")
+        tilt.operation = "SCALE"
+        tilt.inputs["Scale"].default_value = 0.8  # how far a cell can tilt: the sparkle
+        tree.links.new(centred.outputs["Vector"], tilt.inputs[0])
+        geometry = tree.nodes.new("ShaderNodeNewGeometry")
+        tilted = tree.nodes.new("ShaderNodeVectorMath")
+        tilted.operation = "ADD"
+        tree.links.new(geometry.outputs["Normal"], tilted.inputs[0])
+        tree.links.new(tilt.outputs["Vector"], tilted.inputs[1])
+        unit = tree.nodes.new("ShaderNodeVectorMath")
+        unit.operation = "NORMALIZE"
+        tree.links.new(tilted.outputs["Vector"], unit.inputs[0])
+        tree.links.new(unit.outputs["Vector"], principled.inputs["Normal"])
+        principled.inputs["Roughness"].default_value = 0.38  # glossy enough for the flecks to flash
+
+grain_pei_parts()
 
 def smooth_shiny_parts():
     # The export has no normals, so every triangle shades flat: harmless on satin plastic, but a mirror or metal shows each facet as a patch of its
