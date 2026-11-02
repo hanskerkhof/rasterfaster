@@ -5,10 +5,10 @@
       "id": "c3fc2fa2-b65e-4ed1-85e3-38b61caa847c",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_BOTTOM - ALT IV",
-      "color": 0,
+      "color": 12745632,
       "position": [
         214.2,
-        51.108000000000004,
+        51.108,
         22.0
       ],
       "rotation": [
@@ -26,11 +26,11 @@
       "id": "9a6289c5-1a8a-4bfd-a269-4fb0daa86a3a",
       "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V.stl",
       "name": "5.25 AIR POMP POWER SUPPLY PSU 12V",
-      "color": 0,
+      "color": 14706278,
       "position": [
         140.0,
         -60.0,
-        50.0
+        42.0
       ],
       "rotation": [
         0.0,
@@ -47,7 +47,7 @@
       "id": "c2cc52e8-05ab-4309-8cec-45b7472a5ef6",
       "path": "MOUNTS/LM2596 - STEP DOWN BUCK CONVERTER DC-DC/LM25596 SCREWS - RF2.30.stl",
       "name": "LM25596 SCREWS - RF2.30",
-      "color": 0,
+      "color": 9338051,
       "position": [
         160.0,
         -60.0,
@@ -61,27 +61,6 @@
       ],
       "muted": false,
       "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "054d7a3d-167c-4968-a245-8be8094986d1",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
-      "color": 0,
-      "position": [
-        143.251,
-        -36.75,
-        22.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
       "noRender": false,
       "noExport": false
     },
@@ -191,41 +170,20 @@
       "noExport": false
     },
     {
-      "id": "47f9524d-6696-4074-9ec7-100b13f6705b",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
-      "color": 0,
-      "position": [
-        243.251,
-        -56.75,
-        22.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
       "id": "40daff68-139b-483e-87e1-97ae8d2c405c",
       "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV.stl",
       "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_TOP - ALT IV",
-      "color": 0,
+      "color": 12745632,
       "position": [
         214.2,
-        51.108000000000004,
-        54.0
+        51.108,
+        52.0
       ],
       "rotation": [
         0.0,
         0.0,
         -1.0,
-        -5.5511151231257815e-17
+        -2.2204460492503126e-16
       ],
       "muted": false,
       "centered": false,
@@ -362,7 +320,7 @@
       "id": "4eb5819b-5ce7-4515-88ab-f8f222ffec00",
       "path": "BOLTS/BOLT_S1.stl",
       "name": "BOLT_S1",
-      "color": 0,
+      "color": 16167531,
       "position": [
         162.345,
         -57.651,
@@ -383,7 +341,7 @@
       "id": "4c9b4acf-bd11-4748-8025-d0ef793ab16e",
       "path": "BOLTS/BOLT_S1.stl",
       "name": "BOLT_S1",
-      "color": 0,
+      "color": 16167531,
       "position": [
         222.345,
         -57.651,
@@ -425,11 +383,11 @@
       "id": "2a7003c4-a7cb-4d52-811c-427d83f30551",
       "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
       "name": "ESP32 devkit_RF2 v720_BOLT_S9",
-      "color": 0,
+      "color": 16167531,
       "position": [
-        222.345,
-        82.349,
-        18.0
+        242.343,
+        82.351,
+        16.0
       ],
       "rotation": [
         0.0,
@@ -438,7 +396,7 @@
         1.0
       ],
       "muted": false,
-      "centered": true,
+      "centered": false,
       "noRender": false,
       "noExport": false
     },
@@ -446,11 +404,11 @@
       "id": "8dd5f5ef-fe41-43f7-ae7e-41d55d498c2f",
       "path": "MOUNTS/ESP32 devkit 30pins w dupont lock/ESP32 devkit_RF2 v720_BOLT_S9.stl",
       "name": "ESP32 devkit_RF2 v720_BOLT_S9",
-      "color": 0,
+      "color": 16167531,
       "position": [
-        242.345,
-        82.349,
-        18.0
+        222.343,
+        82.351,
+        16.0
       ],
       "rotation": [
         0.0,
@@ -459,7 +417,7 @@
         1.0
       ],
       "muted": false,
-      "centered": true,
+      "centered": false,
       "noRender": false,
       "noExport": false
     },
@@ -950,17 +908,17 @@
       "id": "2ca48437-19a2-498d-84ef-de26bab320d6",
       "path": "MOUNTS/5.28 MP3 PLAYERS/5.28 MP3 HV20T HORIZONTAL SCREWS 5x3.stl",
       "name": "5.28 MP3 HV20T HORIZONTAL SCREWS 5x3",
-      "color": 0,
+      "color": 9338051,
       "position": [
-        120.0,
-        0.0,
+        140.004,
+        0.004,
         22.0
       ],
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        -5.5511151231257815e-17,
+        -1.0
       ],
       "muted": false,
       "centered": false,
@@ -973,15 +931,15 @@
       "name": "HV20T_model",
       "color": 9684093,
       "position": [
-        123.0,
-        24.7,
+        140.005,
+        20.002,
         26.6
       ],
       "rotation": [
-        0.5000000000000001,
-        -0.5,
+        -0.5000000000000003,
         0.5,
-        0.49999999999999994
+        -0.5,
+        -0.5
       ],
       "muted": false,
       "centered": false,
@@ -994,15 +952,15 @@
       "name": "micro USB Male",
       "color": 5526612,
       "position": [
-        139.0,
-        70.3,
+        159.004,
+        70.303,
         28.2
       ],
       "rotation": [
         0.0,
         0.0,
-        -1.0,
-        -5.551115123125783e-17
+        1.0,
+        0.0
       ],
       "muted": false,
       "centered": false,
@@ -1013,17 +971,17 @@
       "id": "9e4c5208-c11c-492b-9460-19a050b74a88",
       "path": "MOUNTS/5.28 MP3 PLAYERS/5.28 MP3 HV20T HORIZONTAL SCREWS 5x3.stl",
       "name": "5.28 MP3 HV20T HORIZONTAL SCREWS 5x3",
-      "color": 0,
+      "color": 9338051,
       "position": [
-        120.0,
-        0.0,
-        46.0
+        140.004,
+        0.004,
+        42.0
       ],
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        -5.5511151231257815e-17,
+        -1.0
       ],
       "muted": false,
       "centered": false,
@@ -1036,15 +994,15 @@
       "name": "HV20T_model",
       "color": 9684093,
       "position": [
-        123.0,
-        24.7,
-        50.6
+        143.005,
+        24.702,
+        46.6
       ],
       "rotation": [
-        0.5000000000000001,
-        -0.5,
+        -0.5000000000000003,
         0.5,
-        0.49999999999999994
+        -0.5,
+        -0.5
       ],
       "muted": false,
       "centered": false,
@@ -1057,15 +1015,15 @@
       "name": "micro USB Male",
       "color": 5526612,
       "position": [
-        139.0,
-        70.3,
-        52.2
+        159.004,
+        70.303,
+        48.2
       ],
       "rotation": [
         0.0,
         0.0,
-        -1.0,
-        -5.551115123125783e-17
+        1.0,
+        0.0
       ],
       "muted": false,
       "centered": false,
@@ -1097,10 +1055,52 @@
       "id": "d0bf27c1-79a9-4057-8395-aa907dc9506f",
       "path": "MOUNTS/3.3 WAGO 221/WAGO 221 4x ON SIDE 1x5w - 3.3.stl",
       "name": "WAGO 221 4x ON SIDE 1x5w - 3.3",
-      "color": 0,
+      "color": 16167531,
       "position": [
-        160.0,
-        -22.0,
+        118.0,
+        -60.003,
+        42.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.7071067811865474,
+        0.7071067811865478
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "1880d0cd-ae9c-4a1e-8ee9-d14c22548a73",
+      "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 TOP SHORT.stl",
+      "name": "3.9 - 2w NEEDLES 5x1 TOP SHORT",
+      "color": 7775663,
+      "position": [
+        220.0,
+        0.0,
+        27.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -1.6653345369377348e-16,
+        -1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "ab913751-66fc-41c6-bf37-af51b23e16e6",
+      "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 BOTTOM SHORT.stl",
+      "name": "3.9 - 2w NEEDLES 5x1 BOTTOM SHORT",
+      "color": 7775663,
+      "position": [
+        220.0,
+        0.0,
         22.0
       ],
       "rotation": [
@@ -1115,220 +1115,10 @@
       "noExport": false
     },
     {
-      "id": "1880d0cd-ae9c-4a1e-8ee9-d14c22548a73",
-      "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 TOP SHORT.stl",
-      "name": "3.9 - 2w NEEDLES 5x1 TOP SHORT",
-      "color": 0,
-      "position": [
-        180.0,
-        0.0,
-        27.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -0.7071067811865475,
-        -0.7071067811865477
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "ab913751-66fc-41c6-bf37-af51b23e16e6",
-      "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 BOTTOM SHORT.stl",
-      "name": "3.9 - 2w NEEDLES 5x1 BOTTOM SHORT",
-      "color": 0,
-      "position": [
-        180.0,
-        0.0,
-        22.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        -0.7071067811865475,
-        -0.7071067811865477
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "965d5bc3-4567-44f5-9894-cf5bb70c840b",
-      "path": "SPACERS/spacers_RF1 v236_20.stl",
-      "name": "spacers_RF1 v236_20",
-      "color": 0,
-      "position": [
-        123.251,
-        83.25,
-        26.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "230ef863-5361-4cce-9b92-44fbc005d336",
-      "path": "SPACERS/spacers_RF1 v236_20.stl",
-      "name": "spacers_RF1 v236_20",
-      "color": 0,
-      "position": [
-        163.251,
-        83.25,
-        26.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "9eee87df-db94-4398-bd00-fb0c859093a1",
-      "path": "SPACERS/spacers_RF1 v236_20.stl",
-      "name": "spacers_RF1 v236_20",
-      "color": 0,
-      "position": [
-        123.251,
-        3.25,
-        26.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "0391a167-6b98-457d-83e2-195ca234ddb4",
-      "path": "SPACERS/spacers_RF1 v236_20.stl",
-      "name": "spacers_RF1 v236_20",
-      "color": 0,
-      "position": [
-        163.251,
-        3.25,
-        26.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "256e026f-7db0-4489-9da7-9b5c65dfcd37",
-      "path": "BOLTS/BOLT_S7.stl",
-      "name": "BOLT_S7",
-      "color": 0,
-      "position": [
-        162.345,
-        82.349,
-        15.997
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "035b2ef4-d226-4e31-bb31-2e129c80c120",
-      "path": "BOLTS/BOLT_S7.stl",
-      "name": "BOLT_S7",
-      "color": 0,
-      "position": [
-        122.345,
-        82.349,
-        15.997
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "d49104fc-8729-46fd-8516-0e2eb6f408d0",
-      "path": "BOLTS/BOLT_S7.stl",
-      "name": "BOLT_S7",
-      "color": 0,
-      "position": [
-        162.345,
-        2.349,
-        15.997
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "fa2576d9-8980-425d-bc34-1d8ddcc97e84",
-      "path": "BOLTS/BOLT_S7.stl",
-      "name": "BOLT_S7",
-      "color": 0,
-      "position": [
-        122.345,
-        2.349,
-        15.997
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
       "id": "05b0140c-434d-40b5-8c03-09f43c61a419",
       "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 TOP SHORT.stl",
       "name": "3.9 - 2w NEEDLES 5x1 TOP SHORT",
-      "color": 0,
+      "color": 7775663,
       "position": [
         200.0,
         0.0,
@@ -1337,8 +1127,8 @@
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        0.7071067811865476,
+        0.7071067811865475
       ],
       "muted": false,
       "centered": false,
@@ -1349,7 +1139,7 @@
       "id": "850601d6-7fff-44bd-9bee-37e9d9cbef32",
       "path": "MOUNTS/3.9.PCB & NEEDLES/3.9 - 2w NEEDLES 5x1 BOTTOM SHORT.stl",
       "name": "3.9 - 2w NEEDLES 5x1 BOTTOM SHORT",
-      "color": 0,
+      "color": 7775663,
       "position": [
         200.0,
         0.0,
@@ -1358,8 +1148,8 @@
       "rotation": [
         0.0,
         0.0,
-        0.0,
-        1.0
+        0.7071067811865476,
+        0.7071067811865475
       ],
       "muted": false,
       "centered": false,
@@ -1370,11 +1160,11 @@
       "id": "c0903fb8-b2c9-4ef7-a0bf-787bb7035e26",
       "path": "MOUNTS/5.25 AIR POMP POWER SUPPLY PSU 12V/5.25 AIR POMP POWER SUPPLY PSU 12V COVER.stl",
       "name": "5.25 AIR POMP POWER SUPPLY PSU 12V COVER",
-      "color": 0,
+      "color": 14706278,
       "position": [
         140.0,
         -59.9,
-        54.0
+        46.0
       ],
       "rotation": [
         0.0,
@@ -1384,132 +1174,6 @@
       ],
       "muted": false,
       "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "c3d155c8-6fad-4e2f-9d45-18203dfa3eb6",
-      "path": "BOLTS/BOLT_S9.stl",
-      "name": "BOLT_S9",
-      "color": 0,
-      "position": [
-        242.345,
-        -37.651,
-        12.0
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "fc409816-4c26-47e2-8527-7aa36156e3de",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
-      "color": 0,
-      "position": [
-        143.251,
-        -56.75,
-        24.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "7660e2a3-184b-459e-834e-fd42c1ecd756",
-      "path": "SPACERS/spacers_RF1 v236_28.stl",
-      "name": "spacers_RF1 v236_28",
-      "color": 0,
-      "position": [
-        243.251,
-        -36.75,
-        24.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "be5c55f4-1e85-443b-bfa6-9149501c9a52",
-      "path": "BOLTS/BOLT_S9.stl",
-      "name": "BOLT_S9",
-      "color": 0,
-      "position": [
-        142.345,
-        -37.651,
-        16.0
-      ],
-      "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "35bc4a9d-0fb2-46f2-81ee-4b993e3ac951",
-      "path": "BOLTS/BOLT_S8.stl",
-      "name": "BOLT_S8",
-      "color": 0,
-      "position": [
-        142.345,
-        -57.651,
-        16.0
-      ],
-      "rotation": [
-        0.0,
-        1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "b94b0f1b-b05f-4430-bcd1-9765033235c1",
-      "path": "BOLTS/BOLT_S8.stl",
-      "name": "BOLT_S8",
-      "color": 0,
-      "position": [
-        242.345,
-        -57.651,
-        20.0
-      ],
-      "rotation": [
-        0.0,
-        1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": true,
       "noRender": false,
       "noExport": false
     },
@@ -1643,17 +1307,17 @@
       "id": "b4002198-4abf-4f9a-ad89-30d6cf18e1c6",
       "path": "BOLTS/BOLT_S2.stl",
       "name": "BOLT_S2",
-      "color": 0,
+      "color": 16167531,
       "position": [
-        202.349,
-        2.345,
+        202.345,
+        2.349,
         15.997
       ],
       "rotation": [
-        0.7071067811865477,
-        -0.7071067811865475,
-        -3.925231146709435e-17,
-        3.925231146709437e-17
+        1.0,
+        1.6653345369377348e-16,
+        2.1570415377137042e-32,
+        5.55111512312578e-17
       ],
       "muted": false,
       "centered": true,
@@ -1664,17 +1328,17 @@
       "id": "9246facb-c2c0-4724-be71-fe7358fbdd3d",
       "path": "BOLTS/BOLT_S2.stl",
       "name": "BOLT_S2",
-      "color": 0,
+      "color": 16167531,
       "position": [
-        182.345,
-        2.349,
+        222.349,
+        2.345,
         15.997
       ],
       "rotation": [
-        -1.0,
-        0.0,
-        0.0,
-        -5.5511151231257815e-17
+        -0.7071067811865478,
+        0.7071067811865474,
+        3.925231146709435e-17,
+        -3.92523114670944e-17
       ],
       "muted": false,
       "centered": true,
@@ -1722,6 +1386,468 @@
       "centered": false,
       "noRender": false,
       "noExport": false
+    },
+    {
+      "id": "dcc4c1c3-dedd-4a3b-b8f1-62f1fa7c09b7",
+      "path": "BOLTS/BOLT_S7.stl",
+      "name": "BOLT_S7",
+      "color": 16167531,
+      "position": [
+        142.345,
+        -37.651,
+        16.0
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "41f375a0-c231-4f11-9b47-e2a6eeb0607b",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        143.251,
+        -56.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "ae2fa1e5-7113-46f5-b1ce-4b2e828322c8",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 16167531,
+      "position": [
+        20.0,
+        140.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "2a0553bf-3b59-4e4c-9179-d21f387515e0",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 16167531,
+      "position": [
+        143.251,
+        83.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "3383c153-d26a-4aa2-8570-adffd2a9b3e6",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        142.345,
+        82.349,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "f1df8566-12ba-408a-b727-1a765bc1c8cb",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        142.345,
+        -57.651,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "501462d4-8d64-4edc-8e57-eb374df396b8",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        123.251,
+        -56.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "dfe9f8f7-91a7-46e3-ba6b-43815979848b",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        122.345,
+        -57.651,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "c183be44-b21a-4fc6-9d8a-7956e479c315",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 16167531,
+      "position": [
+        143.251,
+        3.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "0bc21bf6-c5c1-4488-bb54-8eb051a8b09a",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        142.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "15d34704-4910-4a19-a97d-e5ff41ee0f9d",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 16167531,
+      "position": [
+        183.251,
+        83.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "942fb3ad-61ba-4d06-ae00-5d1eb9f2fa8e",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        182.345,
+        82.349,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "a3070b36-b47b-437a-b36f-11f69c9845d1",
+      "path": "SPACERS/spacers_RF1 v236_16.stl",
+      "name": "spacers_RF1 v236_16",
+      "color": 16167531,
+      "position": [
+        183.251,
+        3.25,
+        26.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "0a008a7b-48b8-4482-aeac-6fbb8157e80c",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        182.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "c302bee9-1e0c-415a-bb3b-606b410b43e0",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        123.251,
+        3.25,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "84773526-1f13-4991-b4da-a3f327cbf489",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        123.251,
+        3.25,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "f4d2786c-6d4d-4ba5-a2d8-a78ebfbcea87",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        122.345,
+        2.349,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "824f7e12-6b61-4b3f-801f-fd7317de167d",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        143.251,
+        -36.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "ec1f61e9-5bb5-4e95-b263-c9885ee03b2d",
+      "path": "BOLTS/BOLT_S7.stl",
+      "name": "BOLT_S7",
+      "color": 16167531,
+      "position": [
+        242.345,
+        -57.651,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "0859466a-4857-455f-bdcb-32e165badb9e",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        243.251,
+        -56.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "34e9ea91-b9b2-4ba4-8b18-6c134300a52d",
+      "path": "BOLTS/BOLT_S6.stl",
+      "name": "BOLT_S6",
+      "color": 16167531,
+      "position": [
+        242.345,
+        -37.651,
+        15.997
+      ],
+      "rotation": [
+        0.0,
+        -1.0,
+        0.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
+    },
+    {
+      "id": "58afb88c-e5fc-4f58-be3d-2600b3588398",
+      "path": "SPACERS/spacers_RF1 v236_20.stl",
+      "name": "spacers_RF1 v236_20",
+      "color": 16167531,
+      "position": [
+        243.251,
+        -36.75,
+        22.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": true,
+      "noRender": false,
+      "noExport": false
     }
   ],
   "light": {
@@ -1733,19 +1859,19 @@
     "targetId": "daed045d-5fa4-4b52-8f01-ea115a85220d"
   },
   "view": {
-    "projection": "persp",
+    "projection": "ortho",
     "position": [
-      680.623,
-      671.693,
-      466.341
+      759.311,
+      529.978,
+      730.818
     ],
     "target": [
-      203.851,
-      25.992,
-      39.829
+      200.838,
+      2.602,
+      35.684
     ],
-    "zoom": 3.182,
-    "radius": 220.45
+    "zoom": 2.18,
+    "radius": 258.992
   },
   "render": {
     "depthOfField": false,
