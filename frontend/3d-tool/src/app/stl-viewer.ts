@@ -6,8 +6,8 @@ import { firstValueFrom } from 'rxjs';
 import { DocumentScene, axisAngles } from './document-scene';
 import { ColorPalette } from './color-palette';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { RenderService, aspectRatio, beamNames, turntableLengths } from './render.service';
-import { DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
+import { RenderService, aspectRatio, beamNames, turnDirections, turntableLengths } from './render.service';
+import { AppMode, DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
 import { LibraryService } from './library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
@@ -138,6 +138,14 @@ function readShowPath() {
   imports: [ReleaseFocus, ColorPalette],
   template: `
     <div #host class="host" tabindex="0"></div>
+    <div class="cube-arrows" aria-label="Turn the view">
+      <button type="button" class="ca up" releaseFocus title="Tilt the view to the next face above (towards TOP)" aria-label="Tilt up" (click)="stepView('up')"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5 21 19H3z" fill="currentColor"/></svg></button>
+      <button type="button" class="ca down" releaseFocus title="Tilt the view to the next face below (towards BOTTOM)" aria-label="Tilt down" (click)="stepView('down')"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 19 3 5h18z" fill="currentColor"/></svg></button>
+      <button type="button" class="ca left" releaseFocus title="Turn the view to the face on the left" aria-label="Turn left" (click)="stepView('left')"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M5 12 19 3v18z" fill="currentColor"/></svg></button>
+      <button type="button" class="ca right" releaseFocus title="Turn the view to the face on the right" aria-label="Turn right" (click)="stepView('right')"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M19 12 5 3v18z" fill="currentColor"/></svg></button>
+      <button type="button" class="ca spin-l" releaseFocus title="Turn the view 45° counter-clockwise, seen from above (Z stays up)" aria-label="Turn counter-clockwise" (click)="stepView('ccw')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-3-6.2"/><path d="M20 3v5h-5"/></svg></button>
+      <button type="button" class="ca spin-r" releaseFocus title="Turn the view 45° clockwise, seen from above (Z stays up)" aria-label="Turn clockwise" (click)="stepView('cw')"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="transform: scaleX(-1)"><path d="M20 12a8 8 0 1 1-3-6.2"/><path d="M20 3v5h-5"/></svg></button>
+    </div>
     <div #cross class="centre-cross" hidden><button type="button" class="hit" releaseFocus title="Make the middle of the objects the centre of the view" aria-label="Centre the view on the objects" (click)="centreOnObjects()"></button></div>
     @if (pictureFrame(); as frame) {
       <div class="picture-frame" [style.left.px]="frame.x" [style.top.px]="frame.y" [style.width.px]="frame.w" [style.height.px]="frame.h" title="What the render will show ({{ renderSettings.aspect() }})"></div>
@@ -229,7 +237,8 @@ function readShowPath() {
     @if (lightMenu(); as menu) {
       <div class="menu-backdrop" (mousedown)="lightMenu.set(null)" (contextmenu)="$event.preventDefault(); lightMenu.set(null)"></div>
       <div class="cube-menu" role="menu" [style.left.px]="menu.x" [style.top.px]="menu.y">
-        <button type="button" role="menuitem" (click)="startPointAtObject()"><span class="tick"></span>Point at object</button>
+        <button type="button" role="menuitem" (click)="startPointAtObject()"><span class="tick"></span>Point at object<span class="hint target" [title]="lightTargetText()">{{ lightTargetText() }}</span></button>
+        <button type="button" role="menuitem" (click)="pointAtCentre()"><span class="tick">{{ lightAtCentre() ? '✓' : '' }}</span>Point at the objects' centre<span class="hint">keeps the direction</span></button>
         <div class="submenu-host" (mouseenter)="beamMenuOpen.set(true)" (mouseleave)="beamMenuOpen.set(false)">
           <button type="button" role="menuitem" aria-haspopup="menu" [attr.aria-expanded]="beamMenuOpen()" (click)="beamMenuOpen.set(!beamMenuOpen())">
             <span class="tick"></span>Type of light<span class="hint">{{ beamName() }} ◂</span>
@@ -354,6 +363,10 @@ function readShowPath() {
               <button type="button" role="menuitem" (click)="stopTurntablePreview(); flyMenuOpen.set(false)"><span class="tick"></span>End the preview<span class="hint">Esc</span></button>
             }
             <div class="row">
+              <span class="label">Direction</span>
+              @for (d of turnDirections; track d.id) { <button type="button" role="menuitemradio" [title]="d.title" [attr.aria-checked]="renderSettings.turntable().direction === d.id" [class.on]="renderSettings.turntable().direction === d.id" (click)="renderSettings.setTurntable({ direction: d.id })">{{ d.label }}</button> }
+            </div>
+            <div class="row">
               <span class="label">One turn takes</span>
               @for (n of turnLengths; track n) { <button type="button" role="menuitemradio" [attr.aria-checked]="renderSettings.turntable().seconds === n" [class.on]="renderSettings.turntable().seconds === n" (click)="renderSettings.setTurntable({ seconds: n })">{{ n }} s</button> }
             </div>
@@ -377,6 +390,12 @@ function readShowPath() {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v10h13V10"/></svg>
     </button>`,
   styles: `
+    .cube-menu .hint.target { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cube-arrows { position: absolute; right: 12px; top: 42px; width: 150px; height: 150px; pointer-events: none; z-index: 2; }
+    .ca { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; background: transparent; color: #8a93a2; border: 0; border-radius: 4px; cursor: pointer; }
+    .ca:hover { color: #fff; background: #2f6fed; }
+    .ca.up { left: 65px; top: 0; } .ca.down { left: 65px; bottom: 0; } .ca.left { left: 0; top: 65px; } .ca.right { right: 0; top: 65px; }
+    .ca.spin-l { left: 0; top: 0; width: 24px; height: 24px; } .ca.spin-r { right: 0; top: 0; width: 24px; height: 24px; }
     .centre-cross { position: absolute; left: 0; top: 0; width: 0; height: 0; pointer-events: none; z-index: 1; }
     .centre-cross .hit { position: absolute; left: -11px; top: -11px; width: 23px; height: 23px; padding: 0; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
     .centre-cross .hit:hover { border-radius: 50%; background: rgba(255, 214, 10, 0.22); box-shadow: 0 0 0 1.5px #ffd60a; }
@@ -685,6 +704,7 @@ export class StlViewer implements OnDestroy {
       this.mode();
       if (this.ready()) this.applyMode();
     });
+    effect(() => { const appMode = this.store.appMode(), kept = this.store.doc().cameraModes, ready = this.ready(); this.store.docId(); if (ready) untracked(() => this.followAppMode(appMode, kept)); });
     effect(() => {
       const documentMode = this.documentMode();
       if (this.ready()) untracked(() => this.enterMode(documentMode));
@@ -759,6 +779,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.domElement.addEventListener('contextmenu', this.onLightContext, true); // the light's own menu: capture phase, so the parts' menu does not open
     this.renderer.domElement.addEventListener('pointerdown', this.onPointAtDown, true);
     this.renderer.domElement.addEventListener('pointermove', this.onPointAtMove);
+    this.renderer.domElement.addEventListener('pointermove', this.onLightHover);
     this.renderer.domElement.addEventListener('pointerdown', () => this.touchView(), true); // any press on the view may move the camera
     this.renderer.domElement.addEventListener('pointerdown', this.onLightDown); // before the parts and the orbit controls: the light source can be grabbed
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
@@ -854,6 +875,8 @@ export class StlViewer implements OnDestroy {
    * The turntable of the video, live in the 3D view: the camera circles the point it looks at (about the upright line through it, at its own height), or the
    * parts turn about the middle of their footprint in front of the camera. One turn takes the length of the video; it loops until something is clicked.
    */
+  protected readonly turnDirections = turnDirections;
+
   protected startTurntablePreview(motion: 'orbit' | 'spin') {
     if (!this.documentMode() || !this.documentScene.bounds()) return;
     this.stopTurntablePreview();
@@ -928,7 +951,7 @@ export class StlViewer implements OnDestroy {
     if (!this.documentMode()) { this.stopTurntablePreview(); return; }
     if (this.turntablePaused()) return;
     const now = performance.now();
-    const step = Math.min((now - state.last) / 1000, 0.1) / this.renderSettings.turntable().seconds * Math.PI * 2;
+    const step = Math.min((now - state.last) / 1000, 0.1) / this.renderSettings.turntable().seconds * Math.PI * 2 * (this.renderSettings.turntable().direction === 'cw' ? -1 : 1);
     state.last = now;
     state.angle += step;
     if (preview.motion === 'orbit') {
@@ -1074,6 +1097,27 @@ export class StlViewer implements OnDestroy {
     const offset = this.camera.position.clone().sub(this.controls.target);
     const from = offset.clone().normalize();
     this.snapAnimation = { from, rotation: new THREE.Quaternion().setFromUnitVectors(from, dir), start: performance.now(), distance: offset.length() };
+  }
+
+  /** The arrows round the view cube: a step to the next face (tilt up or down, turn left or right) or a 45° turn about the vertical axis; the view keeps Z up. */
+  protected stepView(step: 'up' | 'down' | 'left' | 'right' | 'ccw' | 'cw') {
+    this.touchView();
+    this.panAnimation = null; this.pivotGoal = null;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const distance = offset.length();
+    if (distance < 1e-6) return;
+    const quarter = Math.PI / 2, eighth = Math.PI / 4, epsilon = 1e-4;
+    let azimuth = Math.atan2(offset.y, offset.x);
+    let elevation = Math.asin(THREE.MathUtils.clamp(offset.z / distance, -1, 1));
+    const next = (value: number, direction: 1 | -1, size: number) => (direction > 0 ? Math.floor((value + epsilon) / size + 1) : Math.ceil((value - epsilon) / size - 1)) * size; // the next multiple of `size` in that direction
+    if (step === 'up' || step === 'down') elevation = THREE.MathUtils.clamp(next(elevation, step === 'up' ? 1 : -1, quarter), -quarter, quarter);
+    else if (step === 'left' || step === 'right') azimuth = next(azimuth, step === 'right' ? 1 : -1, quarter);
+    else azimuth = next(azimuth, step === 'ccw' ? 1 : -1, eighth);
+    const hair = 0.001; // straight over the object Z-up has no screen direction: keep a hair off the pole, on the side that sets it
+    const flat = Math.min(Math.abs(elevation), quarter - hair) * Math.sign(elevation || 1);
+    const target = new THREE.Vector3(Math.cos(flat) * Math.cos(azimuth), Math.cos(flat) * Math.sin(azimuth), Math.sin(flat));
+    const from = offset.clone().normalize();
+    this.snapAnimation = { from, rotation: new THREE.Quaternion().setFromUnitVectors(from, target), start: performance.now(), distance };
   }
 
   goHome() {
@@ -1469,6 +1513,7 @@ export class StlViewer implements OnDestroy {
     if (view.projection !== this.projection) {
       this.setProjection(view.projection);
       this.cameraMode.set(view.projection === 'persp' ? 'perspective' : 'orthographic');
+      this.rememberCameraMode();
     }
     this.viewAnimation = {
       fromPosition: this.camera.position.clone(), toPosition: new THREE.Vector3(...view.position),
@@ -1538,15 +1583,17 @@ export class StlViewer implements OnDestroy {
   private readonly cross = viewChild<ElementRef<HTMLElement>>('cross');
   private readonly crossPoint = new THREE.Vector3();
 
-  /** A thin cross on the middle of the box round all the objects (what Camera circles goes round by default): drawn with the picture frame in Render mode. */
+  /** A thin cross on the middle of the box round all the objects (what Camera circles goes round by default): in Design mode always, in Render mode with the picture frame. */
   private objectsBox: THREE.Box3Helper | null = null;
 
   private updateCentreCross() {
     const element = this.cross()?.nativeElement;
     if (!element) return;
-    const box = this.documentMode() && this.store.appMode() === 'render' ? this.documentScene.bounds() : null;
+    const bounds = this.documentMode() ? this.documentScene.bounds() : null;
+    const render = this.store.appMode() === 'render';
+    const box = render ? bounds : null; // the outline is for Render mode
     const outline = box && this.renderSettings.showBox();
-    const mark = box && this.renderSettings.showFrame() ? box : null; // the cross goes with the frame, the outline has its own switch
+    const mark = bounds && (!render || this.renderSettings.showFrame()) ? bounds : null; // the cross is in Design mode too; in Render mode it goes with the frame
     if (outline && !this.objectsBox) { // the outline round the sum of all the objects
       this.objectsBox = new THREE.Box3Helper(new THREE.Box3(), 0xffffff);
       const material = this.objectsBox.material as THREE.LineBasicMaterial;
@@ -1694,9 +1741,33 @@ export class StlViewer implements OnDestroy {
     this.setProjection(alongAxis ? 'ortho' : 'persp');
   }
 
+  /** The camera mode is kept in the document for the mode (Design or Render) that is on, and as the browser's last choice (for documents that have none). */
+  private rememberCameraMode() {
+    const mode = this.cameraMode();
+    try { localStorage.setItem(cameraModeStorageKey, mode); } catch { /* storage unavailable */ }
+    if (!this.documentMode()) return;
+    this.store.setCameraModes({ ...this.store.doc().cameraModes, [this.store.appMode()]: mode });
+  }
+
+  private lastAppMode = this.store.appMode();
+
+  /** Design and Render mode each have their own camera mode: when the mode changes (or another document opens) the one kept for it comes back. */
+  private followAppMode(appMode: AppMode, kept: { design?: string | null; render?: string | null } | null | undefined) {
+    if (!this.ready() || !this.documentMode()) return;
+    if (appMode !== this.lastAppMode) {
+      if (!kept?.[this.lastAppMode]) this.store.setCameraModes({ ...kept, [this.lastAppMode]: this.cameraMode() }); // the mode we leave keeps what it had
+      this.lastAppMode = appMode;
+    }
+    const wanted = kept?.[appMode];
+    if (wanted && wanted !== this.cameraMode() && cameraModes.some(m => m.id === wanted)) {
+      this.cameraMode.set(wanted as CameraMode);
+      this.applyCameraMode();
+    }
+  }
+
   protected setCameraMode(mode: CameraMode) {
     this.cameraMode.set(mode);
-    try { localStorage.setItem(cameraModeStorageKey, mode); } catch { /* storage unavailable */ }
+    this.rememberCameraMode();
     this.applyCameraMode();
     this.cameraMenuOpen.set(false);
     this.cubeMenu.set(null);
@@ -1987,8 +2058,22 @@ export class StlViewer implements OnDestroy {
     if (this.groundPlane) { this.scene.remove(this.groundPlane); this.groundPlane.geometry.dispose(); (this.groundPlane.material as THREE.Material).dispose(); this.groundPlane = null; }
   }
 
+  private readonly lightMaterial = new THREE.LineBasicMaterial({ color: 0xffd98a, depthTest: false, transparent: true });
+  private lightHover = false;
+
+  /** The pointer is over the light source (not while dragging it or choosing a part): it lights up white and a little bigger, and shows the grab cursor. */
+  private readonly onLightHover = (e: PointerEvent) => {
+    if (this.lightDrag || this.pointMode || e.buttons) return;
+    const over = this.overLight(e);
+    if (over === this.lightHover) return;
+    this.lightHover = over;
+    this.lightMaterial.color.set(over ? 0xffffff : 0xffd98a);
+    this.lightDisk.scale.multiplyScalar(over ? 1.25 : 1 / 1.25);
+    this.renderer.domElement.style.cursor = over ? 'grab' : '';
+  };
+
   private buildLightGizmo() {
-    const material = new THREE.LineBasicMaterial({ color: 0xffd98a, depthTest: false, transparent: true });
+    const material = this.lightMaterial;
     const segments = (points: number[]) => {
       const line = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(points, 3)), material);
       line.renderOrder = 30;
@@ -2042,7 +2127,7 @@ export class StlViewer implements OnDestroy {
     const out = at.clone().addScaledVector(this.lightDir, this.lightReach);
     this.lightGizmo.position.copy(out);
     this.lightGizmo.lookAt(at);
-    this.lightDisk.scale.setScalar(radius * 0.09);
+    this.lightDisk.scale.setScalar(radius * 0.09 * (this.lightHover ? 1.25 : 1));
     this.lightBeam.scale.setScalar(out.distanceTo(at) * 0.62);
     // the build plate: z = 0 under the parts, as wide as the shadows can reach
     this.shadowFloor.position.set(centre.x, centre.y, Math.min(0, box.min.z));
@@ -2120,6 +2205,7 @@ export class StlViewer implements OnDestroy {
     const mode = this.pointMode;
     if (!mode) return;
     this.pointMode = null;
+    this.showPointBox(null);
     this.renderer.domElement.style.cursor = '';
     window.removeEventListener('keydown', this.onPointAtKey, true);
     if (!keep) { this.lightDir.copy(mode.dir); this.lightAt = mode.at; this.lightTargetId = mode.id; this.updateShadowRig(); }
@@ -2135,9 +2221,24 @@ export class StlViewer implements OnDestroy {
     return id && box ? { id, centre: box.getCenter(new THREE.Vector3()) } : null;
   }
 
+  private pointBox: THREE.Box3Helper | null = null;
+
+  /** The outline of the part the pointer is over while choosing what the light points at (null: none). */
+  private showPointBox(id: string | null) {
+    const box = id ? this.documentScene.boundsOf([id]) : null;
+    if (box && !this.pointBox) {
+      this.pointBox = new THREE.Box3Helper(new THREE.Box3(), 0xffd98a);
+      Object.assign(this.pointBox.material as THREE.LineBasicMaterial, { depthTest: false });
+      this.pointBox.renderOrder = 31;
+      this.scene.add(this.pointBox);
+    }
+    if (this.pointBox) { this.pointBox.visible = !!box; if (box) this.pointBox.box.copy(box); }
+  }
+
   private readonly onPointAtMove = (e: PointerEvent) => {
     if (!this.pointMode) return;
     const part = this.partUnder(e);
+    this.showPointBox(part?.id ?? null);
     if (!part) return;
     this.lightTargetId = part.id; // a preview: the light turns to whatever the pointer is over
     this.updateShadowRig();
@@ -2193,6 +2294,26 @@ export class StlViewer implements OnDestroy {
     this.lightAt = null;
     this.updateShadowRig();
     this.store.announce(`The light points at ${this.store.doc().items.find(i => i.id === id)?.name ?? 'the part'}`);
+  }
+
+  /** What the light points at, for its menu: the part's name, a point, or the middle of all the objects. */
+  protected lightTargetText(): string {
+    if (this.lightTargetId) return this.store.doc().items.find(i => i.id === this.lightTargetId)?.name ?? 'a part';
+    return this.lightAt ? 'a point' : "objects' centre";
+  }
+
+  protected lightAtCentre(): boolean {
+    return !this.lightTargetId && !this.lightAt;
+  }
+
+  /** The light keeps its direction and points at the middle of all the objects. */
+  protected pointAtCentre() {
+    this.lightMenu.set(null);
+    this.lightAt = null;
+    this.lightTargetId = null;
+    this.updateShadowRig();
+    this.commitLight();
+    this.store.announce("The light points at the objects' centre");
   }
 
   /** Back to the light's own direction, pointing at the middle of the scene. */

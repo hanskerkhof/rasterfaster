@@ -1,9 +1,9 @@
 import { Component, input, output } from '@angular/core';
 import { itemColors } from './document.store';
-import { plaColors } from './pla-colors';
+import { pcbColors, plaColors } from './pla-colors';
 
 /**
- * The colours to choose from: the app's own eight, and under them a PLA section with the colours of Bambu Lab PLA Basic. Used by the Color
+ * The colours to choose from: the app's own eight, under them a PLA section with the colours of Bambu Lab PLA Basic, and a PCB section with the common circuit board colours. Used by the Color
  * flyout of the object menu and by the Solid ground of the view cube menu. It lays out as a grid six swatches wide; the place it sits in
  * (a flyout) gives it its frame.
  */
@@ -15,6 +15,10 @@ import { plaColors } from './pla-colors';
     }
     <div class="section">PLA <small>Bambu Lab Basic</small></div>
     @for (c of pla; track c.color) {
+      <button type="button" class="swatch" role="menuitem" [class.on]="isOn()(c.color)" [style.background]="hex(c.color)" [title]="c.name + ' ' + hex(c.color)" [attr.aria-label]="c.name" (click)="picked.emit(c.color)"></button>
+    }
+    <div class="section">PCB <small>solder mask, board and pads</small></div>
+    @for (c of pcb; track c.color) {
       <button type="button" class="swatch" role="menuitem" [class.on]="isOn()(c.color)" [style.background]="hex(c.color)" [title]="c.name + ' ' + hex(c.color)" [attr.aria-label]="c.name" (click)="picked.emit(c.color)"></button>
     }
   `,
@@ -32,6 +36,7 @@ export class ColorPalette {
   readonly picked = output<number>();
   protected readonly colors = itemColors;
   protected readonly pla = plaColors;
+  protected readonly pcb = pcbColors;
 
   protected hex(c: number) {
     return '#' + c.toString(16).padStart(6, '0');

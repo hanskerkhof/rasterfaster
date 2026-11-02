@@ -32,7 +32,7 @@ export interface RenderSettingsNote {
   view?: string | null;
   light?: string | null;
   /** A turntable video: how it moves, how long and at what frame rate. */
-  turntable?: { motion: 'orbit' | 'spin'; seconds: number; fps: number };
+  turntable?: { motion: 'orbit' | 'spin'; seconds: number; fps: number; direction?: 'ccw' | 'cw' };
   /** The view of the 3D view the picture was made from, as the Views panel would save it. */
   savedView?: Record<string, unknown> | null;
   crop?: boolean;

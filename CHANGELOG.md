@@ -2,6 +2,20 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Turntable direction, cube arrows, light menu, saving fix (0.11.12)
+
+### Added
+- **FE** + **BE** (`stl-viewer.ts`, `render-dialog.ts`, `render.service.ts`, `blenderexport.py`, `main.py`): the turntable's **Direction**, CCW or CW (seen from above): in the play button's menu and in the Render dialog; for the live preview, quick and draft videos and queued turntables (`direction=ccw|cw`), shown in the Gallery notes.
+- **FE** (`stl-viewer.ts`): arrows round the **view cube**: triangles step to the next face (up, down, left, right), the two curved arrows turn the view 45° about the vertical axis (Z stays up).
+- **FE** (`stl-viewer.ts`): the **centre cross** (hover, click to centre the view) also in Design mode.
+- **FE** (`stl-viewer.ts`): the **light**: it lights up when the pointer is over it; its menu has *Point at the objects' centre* and shows what the light points at; *Point at object* outlines the part under the pointer.
+- **FE** (`color-palette.ts`, `pla-colors.ts`): a **PCB** section in the Color menu (solder masks, bare board, pads); Black is the first PLA colour.
+- **FE** + **BE** (`document.store.ts`, `main.py`): Design and Render mode each keep their own **camera mode** (orthographic, perspective, perspective with ortho faces), saved in the document (`cameraModes`).
+- **FE** (`document.store.ts`): ⌘-click with only some parts of a group selected adds or removes single parts.
+
+### Fixed
+- **FE** (`document.store.ts`): reloading the page while a save was pending wiped the document's **groups and views** (the last save on closing the tab left them out). It now sends everything.
+
 ## 2026-11-02 - Picture frame, Transform panel, Reflects None (0.11.11)
 
 ### Added

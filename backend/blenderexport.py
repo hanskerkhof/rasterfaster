@@ -688,6 +688,7 @@ if render_spec:  # a picture of this size and with this many samples: the settin
         fields = turntable_spec.split(",")
         frames_text, motion, fps_text = fields[:3]
         track_id = fields[3] if len(fields) > 3 else ""  # the item id of the part the camera tracks
+        direction_cw = len(fields) > 6 and fields[6] == "cw"  # the way round: counter-clockwise (the default) or clockwise, seen from above
         look_at = fields[5] if len(fields) > 5 else ("part" if track_id else "view")  # what the camera keeps looking at: "part", "all" (the middle of all the objects) or "view" (where it points now)
         track_pivot = fields[4] if len(fields) > 4 else "all"  # "part": the camera goes round that part; "all": round the middle of all the objects, "view": round the point the view looks at; a tracked part is looked at in every case
         frames, fps = int(frames_text), int(fps_text)
@@ -755,7 +756,7 @@ if render_spec:  # a picture of this size and with this many samples: the settin
         # keyframes ease in and out whatever interpolation is asked for, and a turntable that starts and ends slowly does not loop smoothly.
         driver = pivot.driver_add("rotation_euler", 2).driver
         driver.type = "SCRIPTED"
-        turn_sign = -1 if motion == "spin" else 1  # parts turning clockwise look the same as a camera circling counter-clockwise: switching the motion keeps the look of the turn
+        turn_sign = (-1 if motion == "spin" else 1) * (-1 if direction_cw else 1)  # parts turning clockwise look the same as a camera circling counter-clockwise: switching the motion keeps the look of the turn
         driver.expression = f"{turn_sign} * (frame - 1) / {frames} * {2 * math.pi!r}"
         if hasattr(scene.render.image_settings, "media_type"):
             scene.render.image_settings.media_type = "VIDEO"
@@ -785,7 +786,7 @@ def find_blender() -> str | None:
 
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part", direction: str = "ccw") -> bytes:
     """Background Blender runs: the .blend (render is None), or, for `render` = (width, samples), that .blend rendered to a PNG.
     `progress` gets 0..1 while it renders (read from Blender's "Sample 24/96" lines); `started` gets the rendering process (so it can be stopped)."""
     import os
@@ -804,7 +805,7 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         deadline = time.monotonic() + timeout
         made = subprocess.run([blender, "--background", "--factory-startup", "--python", str(script), "--", str(source), str(target), "1" if studio else "0", spec,
                                f"{render[0]},{render[1]}" if render else "", dof, "1" if crop else "0",
-                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track},{track_pivot},{look_at}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
+                               f"{turntable[0]},{turntable[1]},{turntable[2]},{track},{track_pivot},{look_at},{direction}" if turntable else ""], capture_output=True, text=True, timeout=timeout)
         if not target.is_file():
             raise RuntimeError(f"Blender could not write the .blend: {(made.stderr or made.stdout)[-300:]}")
         if not render:
@@ -871,7 +872,7 @@ def build_blend(glb: bytes, blender: str, studio: bool = True, light: dict | Non
 
 def build_render(glb: bytes, blender: str, studio: bool = True, light: dict | None = None, width: int = 800, samples: int = 24,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, timeout: int = 180, dof: str = "0", crop: bool = False,
-                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part") -> bytes:
+                 phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part", direction: str = "ccw") -> bytes:
     """A PNG of the scene (`width` pixels wide, Cycles with `samples` samples): a quick look at the light and the colours. With `turntable` = (frames, "orbit" | "spin", fps)
     an MP4 of that many frames instead: the camera circles the scene once, or the parts turn once in front of the camera."""
-    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track, track_pivot, look_at)
+    return _run_blender(glb, blender, studio, light, (width, samples), timeout, progress, started, dof, crop, phase, turntable, track, track_pivot, look_at, direction)

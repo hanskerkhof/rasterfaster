@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, focusCentre, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turntableLengths, turntableMotions, turntableQualities } from './render.service';
+import { Aspect, RenderService, focusCentre, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -106,6 +106,9 @@ import { ColorPalette } from './color-palette';
           <span class="bar-title">Turntable video</span>
           <select class="focus size" [value]="render.turntable().motion" title="How it moves" (change)="render.setTurntable({ motion: $any($event.target).value })">
             @for (m of motions; track m.id) { <option [value]="m.id" [selected]="m.id === render.turntable().motion" [title]="m.title">{{ m.label }}</option> }
+          </select>
+          <select class="focus size" [value]="render.turntable().direction" title="The way round, seen from above: counter-clockwise or clockwise" (change)="render.setTurntable({ direction: $any($event.target).value })">
+            @for (d of directions; track d.id) { <option [value]="d.id" [selected]="d.id === render.turntable().direction" [title]="d.title">{{ d.label }}</option> }
           </select>
           <select class="focus size" [value]="render.tracked()?.id ?? ''" title="The part the camera can look at (and go round with Camera circles)" (change)="render.setTrack($any($event.target).value || null)">
             <option value="" [selected]="!render.tracked()">Track: the view's centre</option>
@@ -212,6 +215,7 @@ export class RenderDialog implements OnInit, OnDestroy {
   }
   protected readonly hdSizes = hdWidths;
   protected readonly motions = turntableMotions;
+  protected readonly directions = turnDirections;
   protected readonly lengths = turntableLengths;
   protected readonly turntableQualities = turntableQualities;
   /** "about 4 min" for the video as it is set up now; nothing while the API has no guess. */
@@ -385,6 +389,7 @@ export class RenderDialog implements OnInit, OnDestroy {
       const choice = this.render.turntable();
       if (draft) { quickUrl.searchParams.set('width', '320'); quickUrl.searchParams.set('samples', '2'); quickUrl.searchParams.set('fps', '12'); }
       quickUrl.searchParams.set('motion', choice.motion);
+      quickUrl.searchParams.set('direction', choice.direction);
       quickUrl.searchParams.set('seconds', String(Math.min(choice.seconds, 5)));
       if (this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
       quickUrl.searchParams.set('trackPivot', this.render.trackPivot());

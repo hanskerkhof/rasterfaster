@@ -252,6 +252,16 @@ describe('Groups', () => {
     expect(store.doc().groups?.length).toBe(0);
   });
 
+  it('⌘-click with only some parts of a group selected adds or removes single parts of it', () => {
+    store.selectMany([ids[0], ids[1], ids[2]]);
+    store.groupSelected();
+    store.selectPart(ids[0]);
+    store.toggleSelect(ids[1]);
+    expect([...store.selectedIds()].sort()).toEqual([ids[0], ids[1]].sort()); // not the whole group
+    store.toggleSelect(ids[0]);
+    expect(store.selectedIds()).toEqual([ids[1]]);
+  });
+
   it('regrouping moves parts out of their old group, ⌘-click toggles a whole group, pasted parts are not grouped', () => {
     store.selectMany([ids[0], ids[1]]);
     store.groupSelected();

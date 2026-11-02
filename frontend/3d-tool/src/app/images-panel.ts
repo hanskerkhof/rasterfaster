@@ -329,7 +329,7 @@ export class ImagesPanel {
     else if (s.background !== undefined) lines.push(s.background === null ? { label: 'Background', value: 'studio' } : { label: 'Background', value: hex(s.background), swatch: hex(s.background) });
     if (s.ground !== undefined && !s.transparent) lines.push(s.ground === null ? { label: 'Ground', value: 'studio' } : { label: 'Ground', value: hex(s.ground), swatch: hex(s.ground) });
     if (s.aspect && s.aspect !== '16:9') lines.push({ label: 'Shape', value: s.aspect });
-    if (s.turntable) lines.push({ label: 'Turntable', value: `${s.turntable.motion === 'spin' ? 'objects turn' : 'camera circles'} · ${s.turntable.seconds} s · ${s.turntable.fps} fps` });
+    if (s.turntable) lines.push({ label: 'Turntable', value: `${s.turntable.motion === 'spin' ? 'objects turn' : 'camera circles'} · ${s.turntable.direction === 'cw' ? 'CW' : 'CCW'} · ${s.turntable.seconds} s · ${s.turntable.fps} fps` });
     if (s.crop !== undefined && !s.turntable) lines.push({ label: 'Crop', value: s.crop ? 'on' : 'off' });
     return lines;
   }

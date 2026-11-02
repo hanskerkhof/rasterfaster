@@ -174,11 +174,13 @@ export interface RfDocument {
   light?: DocLight | null;
   view?: DocView | null;
   render?: DocRenderSettings | null;
+  /** The camera mode of Design mode and of Render mode, each on its own. */
+  cameraModes?: { design?: string | null; render?: string | null } | null;
 }
 
 /** What the undo history compares and stores: the document without its camera view (moving the camera is not an edit). */
 function historyOf(doc: RfDocument): string {
-  return JSON.stringify({ ...doc, view: undefined, render: undefined });
+  return JSON.stringify({ ...doc, view: undefined, render: undefined, cameraModes: undefined });
 }
 
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
@@ -314,8 +316,8 @@ export class DocumentStore {
     addEventListener('pagehide', () => {
       const id = this.docId();
       if (!id || !this.dirty) return;
-      const { name, items, light, view, render } = this.doc();
-      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items, light, view, render }) });
+      const { name, items, groups, views, light, view, render, cameraModes } = this.doc();
+      fetch(`/api/documents/${id}?baseModified=${this.modified}`, { method: 'PUT', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, items, groups: groups ?? [], views: views ?? [], light, view, render, cameraModes }) }); // everything: a field left out would be wiped on disk
     });
   }
 
@@ -381,7 +383,7 @@ export class DocumentStore {
   async open(id: string) {
     await this.flush();
     const stored = await firstValueFrom(this.api.get(id));
-    this.resetTo(stored.id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+    this.resetTo(stored.id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render, cameraModes: stored.cameraModes }, stored.modified);
     this.takeVersionInfo(stored);
   }
 
@@ -447,7 +449,7 @@ export class DocumentStore {
       if (this.dirty) {
         this.conflict.set(stored);
       } else {
-        this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render }, stored.modified);
+        this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: stored.light, view: stored.view, render: stored.render, cameraModes: stored.cameraModes }, stored.modified);
         this.takeVersionInfo(stored);
         this.say('Updated from another window');
       }
@@ -458,7 +460,7 @@ export class DocumentStore {
   useRemoteVersion() {
     const remote = this.conflict();
     if (!remote) return;
-    this.resetTo(remote.id, { name: remote.name, items: remote.items, groups: remote.groups, views: remote.views, light: remote.light, view: remote.view, render: remote.render }, remote.modified);
+    this.resetTo(remote.id, { name: remote.name, items: remote.items, groups: remote.groups, views: remote.views, light: remote.light, view: remote.view, render: remote.render, cameraModes: remote.cameraModes }, remote.modified);
     this.takeVersionInfo(remote);
   }
 
@@ -507,7 +509,7 @@ export class DocumentStore {
     await this.flush();
     const stored = await firstValueFrom(this.api.getVersion(id, version));
     const keepVersion = this.version(), keepChanged = this.changedSinceVersion();
-    this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: this.doc().light, view: this.doc().view, render: this.doc().render });
+    this.resetTo(id, { name: stored.name, items: stored.items, groups: stored.groups, views: stored.views, light: this.doc().light, view: this.doc().view, render: this.doc().render, cameraModes: this.doc().cameraModes });
     clearTimeout(this.saveTimer);
     this.dirty = false;
     this.saveState.set('saved');
@@ -556,7 +558,7 @@ export class DocumentStore {
     const id = this.docId();
     if (!id || version === null) return;
     const promoted = await firstValueFrom(this.api.promote(id, version));
-    this.resetTo(id, { name: promoted.name, items: promoted.items, groups: promoted.groups, views: promoted.views, light: this.doc().light, view: this.doc().view, render: this.doc().render }, promoted.modified);
+    this.resetTo(id, { name: promoted.name, items: promoted.items, groups: promoted.groups, views: promoted.views, light: this.doc().light, view: this.doc().view, render: this.doc().render, cameraModes: this.doc().cameraModes }, promoted.modified);
     this.takeVersionInfo(promoted);
     this.say(`Promoted v${version} to v${promoted.version}`);
     await this.refreshVersions();
@@ -647,6 +649,17 @@ export class DocumentStore {
     this.dirty = true;
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => void this.flush(), viewSaveDelayMs);
+  }
+
+  /** The camera mode of a mode (Design or Render) was chosen: kept in the document, quietly like the camera view. */
+  setCameraModes(modes: { design?: string | null; render?: string | null }) {
+    if (this.viewing() !== null || !this.docId()) return;
+    const current = this.doc();
+    if (JSON.stringify(current.cameraModes ?? null) === JSON.stringify(modes)) return;
+    this.doc.set({ ...current, cameraModes: modes });
+    this.dirty = true;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => void this.flush(), 800);
   }
 
   /** A setting of the Render dialog changed: kept in the document, quietly like the camera view (no undo step, no version diamond). */
@@ -892,10 +905,13 @@ export class DocumentStore {
     this.selectedIds.set(add ? [...this.selectedIds().filter(id => !all.includes(id)), ...all] : all);
   }
 
-  /** ⌘-click: add the item to the selection, or take it out when it is already selected. */
+  /** ⌘-click: add the item to the selection, or take it out when it is already selected. A group with only some parts selected is worked on part by part (so one part of a group can be joined by others); otherwise the whole group goes in or out. */
   toggleSelect(id: string, wholeGroup = true) {
-    if (!wholeGroup) { this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])); return; }
     const group = this.withGroup([id]);
+    const chosen = this.selectedIds();
+    const partly = group.length > 1 && group.some(g => chosen.includes(g)) && !group.every(g => chosen.includes(g)); // only some of the group's parts are selected: work part by part
+    if (partly) wholeGroup = false;
+    if (!wholeGroup) { this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => x !== id) : [...ids, id])); return; }
     this.selectedIds.update(ids => (ids.includes(id) ? ids.filter(x => !group.includes(x)) : [...ids.filter(x => !group.includes(x)), ...group]));
   }
 
@@ -1271,7 +1287,7 @@ export class DocumentStore {
 
   private restore(json: string) {
     this.committed = json;
-    this.doc.set({ ...JSON.parse(json), view: this.doc().view, render: this.doc().render }); // undoing does not move the camera or change the render settings
+    this.doc.set({ ...JSON.parse(json), view: this.doc().view, render: this.doc().render, cameraModes: this.doc().cameraModes }); // undoing does not move the camera or change the render settings
     const present = new Set(this.doc().items.map(i => i.id));
     this.selectedIds.update(ids => ids.filter(id => present.has(id)));
     this.updateFlags();

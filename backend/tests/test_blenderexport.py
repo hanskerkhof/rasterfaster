@@ -220,7 +220,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     created = client.post("/api/documents", json={"name": "Job", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view"):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw"):
         progress(0.5)
         time.sleep(0.2)
         return b"\x89PNG-hd"
@@ -236,7 +236,7 @@ def test_render_jobs_run_report_progress_and_can_be_cancelled(tmp_path, monkeypa
     assert status["state"] == "done" and status["progress"] == 1.0
     assert client.get(f"/api/render-jobs/{job['id']}/image.png").content == b"\x89PNG-hd"
 
-    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view"):
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw"):
         time.sleep(0.3)
         raise RuntimeError("killed")
 
@@ -263,7 +263,7 @@ def test_render_state_reaches_the_page_over_the_websocket_and_renders_queue_up(t
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     order = []
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view"):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw"):
         order.append(width)
         progress(0.5)
         time.sleep(0.4)
@@ -300,7 +300,7 @@ def test_waiting_renders_can_be_cancelled_one_by_one_or_all_at_once(tmp_path, mo
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     release = threading.Event()
 
-    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view"):
+    def slow(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw"):
         release.wait(5)
         return b"\x89PNG-hd"
 
@@ -452,7 +452,7 @@ def test_turntable_renders_a_video_into_the_library_and_is_checked(tmp_path, mon
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
 
-    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view"):
+    def fake(glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw"):
         seen.append((width, samples, turntable, crop))
         return b"\x00\x00\x00\x18ftypisom" + b"\x00" * 40 if turntable else b"\x89PNG-hd"
 
@@ -472,7 +472,7 @@ def test_turntable_renders_a_video_into_the_library_and_is_checked(tmp_path, mon
     assert client.get(f"/api/render-jobs/{job['id']}/video.mp4").headers["content-type"] == "video/mp4"
     assert client.get(f"/api/render-jobs/{job['id']}/image.png").status_code == 409
     note = client.get(f"/api/documents/{created['id']}/images").json()[0]
-    assert note["kind"] == "turntable" and note["media"] == "mp4" and note["settings"]["turntable"] == {"motion": "spin", "seconds": 3, "fps": 24} and note["width"] == 960
+    assert note["kind"] == "turntable" and note["media"] == "mp4" and note["settings"]["turntable"] == {"motion": "spin", "seconds": 3, "fps": 24, "direction": "ccw"} and note["width"] == 960
     assert client.get(f"/api/documents/{created['id']}/images/{note['id']}.mp4").headers["content-type"] == "video/mp4"
     assert client.get(f"/api/documents/{created['id']}/images/{note['id']}.png").status_code == 404
     assert client.delete(f"/api/documents/{created['id']}/images/{note['id']}").status_code == 204
@@ -509,11 +509,11 @@ def test_quick_video_is_a_small_synchronous_turntable(tmp_path, monkeypatch):
     created = client.post("/api/documents", json={"name": "Quick", "items": [item]}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view": seen.append((width, samples, turntable, crop)) or b"\x00\x00\x00\x18ftypisom")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view", direction="ccw": seen.append((width, samples, turntable, crop)) or b"\x00\x00\x00\x18ftypisom")
     url = f"/api/documents/{created['id']}/render.mp4"
     answer = client.get(url, params={"motion": "spin", "seconds": 2, "crop": "true", "transparent": "true"})
     assert answer.status_code == 200 and answer.headers["content-type"] == "video/mp4" and seen[-1] == (640, 8, (48, "spin", 24), False)
-    assert json.loads(answer.headers["x-render-settings"])["turntable"] == {"motion": "spin", "seconds": 2, "fps": 24}
+    assert json.loads(answer.headers["x-render-settings"])["turntable"] == {"motion": "spin", "seconds": 2, "fps": 24, "direction": "ccw"}
     assert client.get(url, params={"seconds": 9}).status_code == 422 and client.get(url, params={"width": 2000}).status_code == 422
 
 
@@ -526,7 +526,7 @@ def test_a_turntable_can_track_a_part_and_the_note_names_it(tmp_path, monkeypatc
     created = client.post("/api/documents", json={"name": "Track", "items": items, "render": {"trackId": "b"}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view": seen.append(track) or b"\x00\x00\x00\x18ftypisom")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view", direction="ccw": seen.append(track) or b"\x00\x00\x00\x18ftypisom")
     url = f"/api/documents/{created['id']}/render.mp4"
     answer = client.get(url)
     assert answer.status_code == 200 and seen[-1] == "b" and json.loads(answer.headers["x-render-settings"])["track"] == "Knob"  # the document's choice
@@ -546,7 +546,7 @@ def test_the_camera_can_go_round_the_view_or_the_tracked_part(tmp_path, monkeypa
     round_part = client.post("/api/documents", json={"name": "Pivot2", "items": [item], "render": {"trackId": "a", "trackPivot": "part"}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view": seen.append((track, track_pivot)) or b"\x00\x00\x00\x18ftypisom")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="view", look_at="view", direction="ccw": seen.append((track, track_pivot)) or b"\x00\x00\x00\x18ftypisom")
     client.get(f"/api/documents/{plain['id']}/render.mp4")
     assert seen[-1] == ("a", "all")  # the default: round the view, looking at the part
     client.get(f"/api/documents/{round_part['id']}/render.mp4")
@@ -574,7 +574,7 @@ def test_where_the_camera_goes_round_and_what_it_looks_at_are_two_settings(tmp_p
     explicit = client.post("/api/documents", json={"name": "E", "items": [item], "render": {"trackId": "a", "trackPivot": "view", "lookAt": "all"}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view": seen.append((track_pivot, look_at)) or b"\x00\x00\x00\x18ftypisom")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw": seen.append((track_pivot, look_at)) or b"\x00\x00\x00\x18ftypisom")
     get = lambda document, **params: client.get(f"/api/documents/{document['id']}/render.mp4", params=params)
     get(untracked)
     assert seen[-1] == ("all", "view")  # nothing tracked: it keeps the angle it has
@@ -595,7 +595,7 @@ def test_reflections_preset_comes_from_the_call_or_the_document(tmp_path, monkey
     created = client.post("/api/documents", json={"name": "Refl", "items": [item], "render": {"reflections": 1}}).json()
     monkeypatch.setattr(blenderexport, "find_blender", lambda: "/fake/blender")
     seen = []
-    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view": seen.append(dof) or b"\x89PNG")
+    monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw": seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
     client.get(url)
     assert seen[-1].endswith(",16:9,0,1")  # the document's

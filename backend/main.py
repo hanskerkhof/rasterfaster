@@ -415,6 +415,12 @@ class DocumentRenderSettings(BaseModel):
     transparent: bool = False  # no background in the picture (the ground stays invisible, its shadows show)
 
 
+class DocumentCameraModes(BaseModel):
+    """The camera mode (orthographic, perspective or perspective with orthographic faces) of Design mode and of Render mode, each on its own."""
+    design: Literal["orthographic", "perspective", "perspective-ortho-faces"] | None = None
+    render: Literal["orthographic", "perspective", "perspective-ortho-faces"] | None = None
+
+
 class DocumentBody(BaseModel):
     name: str = Field(default="Untitled", min_length=1, max_length=120)
     items: list[DocumentItem] = Field(default_factory=list, max_length=2000)
@@ -423,6 +429,7 @@ class DocumentBody(BaseModel):
     light: DocumentLight | None = None  # none: the default light
     view: DocumentView | None = None  # the camera of the 3D view; none: the document is fitted into the view
     render: DocumentRenderSettings | None = None  # the settings of the Render dialog; none: the defaults
+    cameraModes: DocumentCameraModes | None = None  # the camera mode of Design mode and of Render mode; none: the browser's last choice
 
 
 class DocumentOut(DocumentBody):
@@ -625,6 +632,7 @@ class DocumentFile(BaseModel):
     light: DocumentLight | None = None
     view: DocumentView | None = None
     render: DocumentRenderSettings | None = None
+    cameraModes: DocumentCameraModes | None = None
     versions: list[StoredVersion] = Field(default_factory=list, max_length=1000)
 
 
@@ -635,7 +643,7 @@ def export_document_file(documentId: str) -> Response:
     directory = versions.versions_dir(documentsRoot, documentId)
     history = [data for number in versions.numbers(directory) if (data := versions.read(directory, number))]
     payload = DocumentFile(format=documentFileFormat, formatVersion=1, exportedAt=time.time(), id=documentId, name=document.name,
-                           items=document.items, groups=document.groups, views=document.views, light=document.light, view=document.view, render=document.render, versions=history)
+                           items=document.items, groups=document.groups, views=document.views, light=document.light, view=document.view, render=document.render, cameraModes=document.cameraModes, versions=history)
     label = (f"-v{document.version}" + ("-edited" if document.changedSinceVersion else "")) if document.version else ""  # e.g. Name-v3 (or Name-v3-edited: the working copy is ahead of v3)
     filename = re.sub(r"[^\w.-]+", "_", document.name) + label + ".rasterfaster.json"
     return Response(payload.model_dump_json(indent=2), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
@@ -657,7 +665,7 @@ def import_document(file: DocumentFile, onConflict: Literal["ask", "replace", "c
         stored = [{"version": v.version, "savedAt": v.savedAt, "name": v.name, "items": [i.model_dump() for i in v.items]} for v in sorted(file.versions, key=lambda v: v.version)]
         if len({v["version"] for v in stored}) != len(stored):
             raise HTTPException(status_code=422, detail="the file has duplicate version numbers")
-        write_document(documentId, DocumentBody(name=file.name, items=file.items, groups=file.groups, views=file.views, light=file.light, view=file.view, render=file.render))
+        write_document(documentId, DocumentBody(name=file.name, items=file.items, groups=file.groups, views=file.views, light=file.light, view=file.view, render=file.render, cameraModes=file.cameraModes))
         versions.replace_all(versions.versions_dir(documentsRoot, documentId), stored)
         return read_document(documentId)
 
@@ -867,18 +875,18 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
 @app.get("/api/documents/{documentId}/render.mp4")
 def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
-                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4)) -> Response:
+                        motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), direction: Literal["ccw", "cw"] = "ccw") -> Response:
     """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
     document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, reflections=reflections)
     try:
         tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["trackId"] or ""
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["lookAt"])
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["lookAt"], direction=direction)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
         raise HTTPException(status_code=500, detail=str(error))
     filename = re.sub(r"[^\w.-]+", "_", document.name) + "-quick.mp4"
-    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps}}
+    note = {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections), light), "turntable": {"motion": motion, "seconds": seconds, "fps": fps, "direction": direction}}
     return Response(data, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store", "X-Render-Settings": json.dumps(note)})
 
 
@@ -916,6 +924,7 @@ class RenderJob:
         self.track = ""  # the item id of the part a turntable follows
         self.track_pivot = "all"
         self.look_at = "view"
+        self.direction = "ccw"  # the way a turntable goes round (seen from above)
         self.turntable = turntable  # (frames, "orbit" | "spin", fps) for a turntable video, else None
         self.aspect = aspect
         self.dimensions = (width, round(width / aspect))  # of one picture or video frame
@@ -1077,7 +1086,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 
     try:
         job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=4 * 3600 if job.turntable else 1800, dof=dof, crop=crop, phase=phase,
-                                             turntable=job.turntable, track=job.track, track_pivot=job.track_pivot, look_at=job.look_at)  # (job.png holds the MP4 of a turntable)
+                                             turntable=job.turntable, track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)  # (job.png holds the MP4 of a turntable)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
         if job.state == "done" and job.documentId:
             try:  # a finished full-size render goes into the document's image library
@@ -1104,7 +1113,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
 @app.post("/api/documents/{documentId}/render-jobs", status_code=202)
 def start_render_job(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                      width: int = Query(default=1920, ge=160, le=7680), samples: int = Query(default=96, ge=1, le=1024), savedView: str | None = Query(default=None, max_length=4000),
-                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4)) -> dict:
+                     turntable: Literal["orbit", "spin"] | None = None, seconds: int = Query(default=5, ge=1, le=30), fps: int = Query(default=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), direction: Literal["ccw", "cw"] = "ccw") -> dict:
     """A full-size render (default 1920 px wide, 96 samples; takes minutes): returns a job to follow with GET /api/render-jobs/{id}. One render runs at a time; the others
     wait in a queue (at most `RASTERFASTER_RENDER_QUEUE_MAX`, default 10, together with the running one)."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, reflections=reflections)
@@ -1118,10 +1127,11 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
         prune_finished()
         job = RenderJob(document.name, width, samples, documentId, document.version, document.changedSinceVersion,
                         {**render_note(document, view, resolve_render_settings(document, dof, focus, strength, False if turntable else crop, ambient, lamp, bg, floor, beam, aspect, False if turntable else transparent, track, trackPivot, lookAt, reflections=reflections), light, parse_saved_view(savedView)),
-                           **({"turntable": {"motion": turntable, "seconds": seconds, "fps": fps}} if turntable else {})},
+                           **({"turntable": {"motion": turntable, "seconds": seconds, "fps": fps, "direction": direction}} if turntable else {})},
                         aspect_ratio(aspect or (document.render.aspect if document.render else "16:9")), (seconds * fps, turntable, fps) if turntable else None)
         job.track = (resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["trackId"] or "") if turntable else ""
         job.track_pivot = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["trackPivot"]
+        job.direction = direction
         job.look_at = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections)["lookAt"]
         renderJobs[job.id] = job
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))

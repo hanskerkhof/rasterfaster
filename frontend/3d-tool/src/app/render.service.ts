@@ -33,10 +33,15 @@ export const turntableMotions: { id: 'orbit' | 'spin'; label: string; title: str
   { id: 'orbit', label: 'Camera circles', title: 'The camera goes once around the scene at its height; the light stays where it is' },
   { id: 'spin', label: 'Objects turn', title: 'The parts turn once in front of the camera, which stays where it is; the light stays too, like a photo turntable' },
 ];
-interface TurntableChoice { seconds: number; samples: number; motion: 'orbit' | 'spin' }
+export type TurnDirection = 'ccw' | 'cw';
+export const turnDirections: { id: TurnDirection; label: string; title: string }[] = [
+  { id: 'ccw', label: 'CCW', title: 'Counter-clockwise, seen from above (Camera circles: the camera goes that way round; Objects turn: the scene appears to go that way)' },
+  { id: 'cw', label: 'CW', title: 'Clockwise, seen from above' },
+];
+interface TurntableChoice { seconds: number; samples: number; motion: 'orbit' | 'spin'; direction: TurnDirection }
 
 function readTurntable(): TurntableChoice {
-  const fallback: TurntableChoice = { seconds: 5, samples: 48, motion: 'orbit' };
+  const fallback: TurntableChoice = { seconds: 5, samples: 48, motion: 'orbit', direction: 'ccw' };
   try {
     const stored = JSON.parse(localStorage.getItem(turntableStorageKey) ?? 'null') ?? {};
     // each setting on its own: one that is no longer on offer (the Draft replaced a quality) must not make the others forgotten
@@ -44,6 +49,7 @@ function readTurntable(): TurntableChoice {
       seconds: turntableLengths.includes(stored.seconds) ? stored.seconds : fallback.seconds,
       samples: turntableQualities.some(q => q.samples === stored.samples) ? stored.samples : fallback.samples,
       motion: stored.motion === 'orbit' || stored.motion === 'spin' ? stored.motion : fallback.motion,
+      direction: stored.direction === 'cw' ? 'cw' : 'ccw',
     };
   } catch { return fallback; }
 }
@@ -317,7 +323,7 @@ export class RenderService {
     const choice = this.turntable();
     const draft = turntableQualities.find(q => q.samples === choice.samples)?.draft ?? false;
     const fps = draft ? 24 : 30;
-    return { width: Math.min(this.hdWidth(), draft ? 960 : 3840), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion };
+    return { width: Math.min(this.hdWidth(), draft ? 960 : 3840), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion, direction: choice.direction };
   }
 
   /** About how long the video takes (seconds), asked from the API (it knows what the last renders took); null while unknown. */
@@ -594,6 +600,7 @@ export class RenderService {
       url.searchParams.set('width', String(spec.width));
       url.searchParams.set('samples', String(spec.samples));
       url.searchParams.set('turntable', spec.motion);
+      url.searchParams.set('direction', spec.direction);
       url.searchParams.set('seconds', String(spec.seconds));
       url.searchParams.set('fps', String(spec.fps));
       if (this.tracked()) url.searchParams.set('track', this.tracked()!.id); // the camera looks at it (both motions) ...
