@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-02 - Floating panels stay in view (0.11.4)
+
+### Fixed
+- **FE** (`views-panel.ts`, `images-panel.ts`): the Views and Images panels stay inside the 3D view when it gets narrower (the file browser opens, the window shrinks) and return to their own place when there is room again.
+
 ## 2026-11-02 - Render queue and the Textured PEI finish (0.11.3)
 
 ### Added

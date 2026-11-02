@@ -10,6 +10,7 @@ const storageKey = 'rasterfaster.imagesPanel';
 interface Geometry { left: number; top: number; width?: number; height?: number }
 
 const minWidth = 220, minHeight = 150;
+const defaultWidth = 280; // as in the styles
 
 function read(): { geom: Geometry | null; collapsed: boolean } {
   try {
@@ -29,7 +30,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
   selector: 'app-images-panel',
   imports: [ReleaseFocus],
   host: {
-    '[style.left.px]': 'geom()?.left', '[style.top.px]': 'geom()?.top', '[style.width.px]': 'geom()?.width', '[style.height.px]': 'collapsed() ? null : geom()?.height',
+    '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[style.width.px]': 'geom()?.width', '[style.height.px]': 'collapsed() ? null : geom()?.height',
     '[class.placed]': 'geom() !== null', '[class.sized]': 'geom()?.height !== undefined', '[class.collapsed]': 'collapsed()', '[style.max-height]': "geom()?.height !== undefined ? 'none' : null",
   },
   template: `
@@ -330,6 +331,10 @@ export class ImagesPanel {
   protected away(event: PointerEvent) {
     if (this.confirming() && !(event.target as HTMLElement | null)?.closest('.clean')) this.confirming.set(null);
   }
+
+  /** Where the panel is, as the 3D view allows: when the view gets narrower (the file panel opens) the panel keeps inside it, and goes back when the view is wide again. */
+  protected readonly leftCss = computed(() => (this.geom() ? `min(${this.geom()!.left}px, calc(100% - ${this.geom()!.width ?? defaultWidth}px))` : null));
+  protected readonly topCss = computed(() => (this.geom() ? `min(${this.geom()!.top}px, calc(100% - 40px))` : null));
 
   protected resetGeometry() {
     this.geom.set(null);

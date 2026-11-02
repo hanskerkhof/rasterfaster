@@ -3,6 +3,7 @@ import { DocumentStore } from './document.store';
 import { ReleaseFocus } from './release-focus';
 
 const storageKey = 'rasterfaster.viewsPanel';
+const panelWidth = 230; // as in the styles
 
 interface Spot { left: number; top: number }
 
@@ -18,7 +19,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
 @Component({
   selector: 'app-views-panel',
   imports: [ReleaseFocus],
-  host: { '[style.left.px]': 'spot()?.left', '[style.top.px]': 'spot()?.top', '[class.placed]': 'spot() !== null', '[class.collapsed]': 'collapsed()' },
+  host: { '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[class.placed]': 'spot() !== null', '[class.collapsed]': 'collapsed()' },
   template: `
     <div class="head" (pointerdown)="startDrag($event)" title="Drag to move the panel">
       <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the views' : 'Collapse the views'" (pointerdown)="$event.stopPropagation()" (click)="toggle()">{{ collapsed() ? '▸' : '▾' }}</button>
@@ -77,6 +78,10 @@ export class ViewsPanel {
   constructor() {
     effect(() => this.remember(this.spot(), this.collapsed()));
   }
+
+  /** Where the panel is, as the 3D view allows: when the view gets narrower (the file panel opens) the panel keeps inside it, and goes back when the view is wide again. */
+  protected readonly leftCss = computed(() => (this.spot() ? `min(${this.spot()!.left}px, calc(100% - ${panelWidth}px))` : null));
+  protected readonly topCss = computed(() => (this.spot() ? `min(${this.spot()!.top}px, calc(100% - 40px))` : null));
 
   private remember(spot: Spot | null, collapsed: boolean) {
     try { localStorage.setItem(storageKey, JSON.stringify({ ...spot, collapsed })); } catch { /* storage unavailable */ }
