@@ -22,7 +22,7 @@ Tree keyboard (Finder-style): ↑/↓ move, → expand / step into folder, ← c
 
 ## Documents (assemblies)
 
-Saved as JSON in `documents/` (override with `RF_DOCS`). The UI autosaves ~0.4 s after each edit.
+Saved as JSON in `~/Documents/RASTERFASTER_APP` (override with `RF_DOCS`), together with the gallery (`<id>.images/`: pictures, videos and their notes) and the versions (`<id>.versions/`). The UI autosaves ~0.4 s after each edit.
 
 ```
 GET    /api/documents        list   [{id, name, itemCount, modified}]
@@ -121,7 +121,7 @@ Click **Rasterfaster Server**: it starts the API (which also serves the web app 
 
 One-time setup: install the PWA from the *production* address: start the server app, open http://localhost:8100/ in Chrome and use *Install Rasterfaster* (uninstall the old one that was installed from http://localhost:4200/ first; that is the `ng serve` dev address). Without an installed PWA the server app opens http://localhost:8100/ in Chrome instead and keeps a Dock icon (Quit stops the API); it also keeps its Dock icon if the PWA never shows up within a minute. After a new build the PWA shows the "Update available" button.
 
-Paths in the packaged app (`backend/appconfig.py`): documents in `~/Library/Application Support/Rasterfaster/documents` (the documents that exist at build time are copied there on the first run, nothing is overwritten), the STL library from `config.json` in that folder (`libraryRoot`, default `~/Documents/3D/RASTERFASTER`), `RF_ROOT` / `RF_DOCS` / `RF_FRONTEND` / `PORT` still override. If an API already answers on port 8100 (for example `python main.py`), the app uses that one and does not start a second; if something else holds the port it picks a free one (the PWA then has a different address). The app is unsigned: the first time, open it with right-click > Open. Blender export needs Blender installed (found at /Applications/Blender.app).
+Paths in the packaged app (`backend/appconfig.py`): documents, images, videos and notes in `~/Documents/RASTERFASTER_APP` (the documents that exist at build time are copied there on the first run when the folder does not exist yet, nothing is overwritten), the STL library from `config.json` in `~/Library/Application Support/Rasterfaster` (`libraryRoot`, default `~/Documents/3D/RASTERFASTER`), `RF_ROOT` / `RF_DOCS` / `RF_FRONTEND` / `PORT` still override. If an API already answers on port 8100 (for example `python main.py`), the app uses that one and does not start a second; if something else holds the port it picks a free one (the PWA then has a different address). The app is unsigned: the first time, open it with right-click > Open. Blender export needs Blender installed (found at /Applications/Blender.app).
 
 Development is unchanged: `cd backend && .venv1/bin/python main.py` and `cd frontend/3d-tool && npm start -- --open`. The build uses its own `backend/.venv-app` (PyInstaller and the macOS Cocoa bindings, see `backend/requirements-app.txt`). `python app.py` (in that venv) runs the same server app without packaging. If the STL library folder does not exist on another machine, put its path in `~/Library/Application Support/Rasterfaster/config.json` as `{"libraryRoot": "/path"}`.
 

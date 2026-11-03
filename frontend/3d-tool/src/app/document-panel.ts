@@ -633,7 +633,7 @@ export class DocumentPanel {
   }
 
   protected statusTitle() {
-    const saving = this.store.saveState() === 'error' ? 'Saving to the API failed; the next edit retries.' : 'Documents are saved as JSON files in the documents folder of the repo.';
+    const saving = this.store.saveState() === 'error' ? 'Saving to the API failed; the next edit retries.' : 'Documents, with their images, videos and notes, are saved in ~/Documents/RASTERFASTER_APP.';
     const state = this.versionState(), v = this.store.version();
     const version = state === 'none' ? 'No version saved yet (⌘S saves v1).' : state === 'edited' ? `Changes since v${v} (⌘S saves a new version).` : `Same as the newest version, v${v}.`;
     return `${version} ${saving}`;

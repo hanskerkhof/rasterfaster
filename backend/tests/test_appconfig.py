@@ -4,9 +4,9 @@ from pathlib import Path
 import appconfig
 
 
-def test_from_source_the_paths_are_the_repo_ones(tmp_path):
+def test_from_source_the_frontend_is_the_repo_one_and_the_data_is_in_documents(tmp_path):
     paths = appconfig.resolve_paths({}, tmp_path / "repo", tmp_path / "home")
-    assert paths["documentsRoot"] == (tmp_path / "repo" / "documents").resolve()
+    assert paths["documentsRoot"] == (tmp_path / "home" / "Documents" / "RASTERFASTER_APP").resolve()
     assert paths["frontendDist"] == (tmp_path / "repo" / "frontend" / "3d-tool" / "dist" / "3d-tool" / "browser").resolve()
     assert paths["libraryRoot"] == (tmp_path / "home" / "Documents" / "3D" / "RASTERFASTER").resolve()
 
@@ -18,11 +18,11 @@ def test_environment_wins_everywhere(tmp_path):
         assert {k: paths[k] for k in ("libraryRoot", "documentsRoot", "frontendDist")} == {"libraryRoot": (tmp_path / "lib").resolve(), "documentsRoot": (tmp_path / "docs").resolve(), "frontendDist": (tmp_path / "web").resolve()}
 
 
-def test_packaged_app_uses_the_bundle_and_application_support(tmp_path):
+def test_packaged_app_uses_the_bundle_and_keeps_its_data_in_documents(tmp_path):
     home = tmp_path / "home"
     paths = appconfig.resolve_paths({}, tmp_path / "repo", home, True, tmp_path / "bundle")
     assert paths["frontendDist"] == (tmp_path / "bundle" / "frontend").resolve()
-    assert paths["documentsRoot"] == (home / "Library" / "Application Support" / "Rasterfaster" / "documents").resolve()
+    assert paths["documentsRoot"] == (home / "Documents" / "RASTERFASTER_APP").resolve()
     appconfig.save_library_root(home, tmp_path / "my stl")
     assert json.loads(appconfig.config_file(home).read_text())["libraryRoot"] == str(tmp_path / "my stl")
     assert appconfig.resolve_paths({}, tmp_path / "repo", home, True, tmp_path / "bundle")["libraryRoot"] == (tmp_path / "my stl").resolve()

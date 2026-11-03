@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Data in ~/Documents/RASTERFASTER_APP (0.11.20)
+
+### Changed
+- **BE** (`appconfig.py`) + **FE** (`document-panel.ts`): the documents, with their images, videos, versions and notes, are kept in `~/Documents/RASTERFASTER_APP` (from source and in the packaged app; `RF_DOCS` still overrides it). It used to be the repo's `documents/` folder (and `~/Library/Application Support/Rasterfaster/documents` in the packaged app). Existing data has to be moved there once; the document panel says where files are saved.
+
 ## 2026-11-03 - Smaller render sizes (0.11.19)
 
 ### Added

@@ -1,8 +1,8 @@
 """Where the API finds its files: the library, the saved documents, the built frontend and the backup folder of renamed files.
 
-From source (`python main.py`) everything is as it always was (the repo's documents/ and frontend/3d-tool/dist, the library under ~/Documents).
-In the packaged macOS app (PyInstaller sets `sys.frozen`) the frontend comes from inside the bundle, and documents and settings live in
-~/Library/Application Support/Rasterfaster. The environment variables RF_ROOT, RF_DOCS and RF_FRONTEND win in both cases.
+From source (`python main.py`) the frontend is the repo's frontend/3d-tool/dist and the library is under ~/Documents. The documents, with their
+images, videos, versions and notes, live in ~/Documents/RASTERFASTER_APP, in the packaged app too. In the packaged macOS app (PyInstaller sets
+`sys.frozen`) the frontend comes from inside the bundle and the settings live in ~/Library/Application Support/Rasterfaster. The environment variables RF_ROOT, RF_DOCS and RF_FRONTEND win in both cases.
 """
 import json
 import shutil
@@ -15,6 +15,11 @@ appName = "Rasterfaster"
 
 def support_dir(home: Path) -> Path:
     return home / "Library" / "Application Support" / appName
+
+
+def dataDir(home: Path) -> Path:
+    """Where the documents are kept, with everything that belongs to them: images, videos, versions and notes."""
+    return home / "Documents" / "RASTERFASTER_APP"
 
 
 def config_file(home: Path) -> Path:
@@ -45,11 +50,11 @@ def resolve_paths(env: Mapping[str, str], repoDir: Path, home: Path, frozen: boo
         configured = read_config(home).get("libraryRoot")
         library = env.get("RF_ROOT") or configured or str(defaultLibrary)
         frontend = env.get("RF_FRONTEND") or str((bundleDir or Path(".")) / "frontend")
-        documents = env.get("RF_DOCS") or str(support_dir(home) / "documents")
+        documents = env.get("RF_DOCS") or str(dataDir(home))
     else:
         library = env.get("RF_ROOT") or str(defaultLibrary)
         frontend = env.get("RF_FRONTEND") or str(repoDir / "frontend" / "3d-tool" / "dist" / "3d-tool" / "browser")
-        documents = env.get("RF_DOCS") or str(repoDir / "documents")
+        documents = env.get("RF_DOCS") or str(dataDir(home))
     return {"libraryRoot": Path(library).resolve(), "frontendDist": Path(frontend).resolve(), "documentsRoot": Path(documents).resolve(), "backupRoot": Path(backup).resolve()}
 
 
