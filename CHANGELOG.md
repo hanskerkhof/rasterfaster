@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - FX styles respect Transparent (0.11.23)
+
+### Fixed
+- **BE** (`blenderexport.py`): the FX styles that put their own paper behind the picture (X-ray, Outline, Sketch, Blueprint, Isometric, Hidden lines, Watercolour) now leave the background transparent when **Transparent** is on, instead of always painting the paper.
+
 ## 2026-11-03 - Draft cards in the Gallery, zoom, Views "changed" mark (0.11.22)
 
 ### Added

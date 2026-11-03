@@ -1104,7 +1104,7 @@ def apply_fx():
         if floor:
             floor.hide_render = True
         world = scene.world
-        if world and world.use_nodes:
+        if world and world.use_nodes and not transparent_background:  # with a transparent background there is no paper: the picture has only the parts (and their lines)
             tree = world.node_tree
             output = next((n for n in tree.nodes if n.type == "OUTPUT_WORLD"), None)
             if output and output.inputs["Surface"].links:
@@ -1116,7 +1116,7 @@ def apply_fx():
                 tree.links.new(lighting.outputs[0], mix.inputs[1])
                 tree.links.new(plain.outputs[0], mix.inputs[2])
                 tree.links.new(mix.outputs[0], output.inputs["Surface"])
-        scene.render.film_transparent = False
+        scene.render.film_transparent = transparent_background  # (False: the paper is the background)
     if lines is not None:  # lines along the silhouettes, the borders and the sharp edges
         thickness, ink, drawn = lines
         scene.render.use_freestyle = True
