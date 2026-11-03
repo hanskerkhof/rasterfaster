@@ -26,3 +26,6 @@ build/
 
 # dev_stack.py logs
 tmp/
+
+# The documents (with their images, videos and notes) live in ~/Documents/RASTERFASTER_APP, not in the repo
+/documents/
