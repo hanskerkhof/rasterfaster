@@ -34,7 +34,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
             @if (editing() === view.id) {
               <input #nameInput class="rename" [value]="view.name" maxlength="80" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()" (keydown)="onKey($event, view.id, nameInput)" (blur)="commit(view.id, nameInput.value)" />
-            } @else { <span class="label">{{ view.name }}</span> }
+            } @else if (view.id === fromId()) { <span class="label back"><span class="was">{{ view.name }}</span><span class="now">Restore</span></span> } @else { <span class="label">{{ view.name }}</span> }
             @if (view.id === fromId()) { <button type="button" class="changed" title="The camera has moved on from this view: click to save the view as you see it now (the same as ⟳)" (click)="update($event, view.id)"><span class="was">changed</span><span class="now">save</span></button> }
             <button type="button" class="x replace" title="Replace this view by what you see now (⇧ + its number)" (click)="update($event, view.id)">⟳</button>
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
@@ -68,6 +68,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .changed { flex: none; font: inherit; font-size: 10px; letter-spacing: .02em; color: #e0a030; background: transparent; border: 1px dashed #e0a030; border-radius: 8px; padding: 0 6px; cursor: pointer; }
     .changed { display: inline-grid; } .changed span { grid-area: 1 / 1; text-align: center; } .changed .now { visibility: hidden; } /* both words in one cell: the tag keeps its width when "changed" turns into "save" */
     .changed:hover { background: #e0a030; color: #1b1d23; border-style: solid; } .changed:hover .was { visibility: hidden; } .changed:hover .now { visibility: visible; font-weight: 600; }
+    .label.back { display: inline-grid; } .label.back span { grid-area: 1 / 1; } .label.back .now { visibility: hidden; font-style: italic; color: #e0a030; } .view.from:hover .label.back .was { visibility: hidden; } .view.from:hover .label.back .now { visibility: visible; } /* the name is swapped for a hint, in the same space */
     .view.from .replace { opacity: 1; color: #e0a030; }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

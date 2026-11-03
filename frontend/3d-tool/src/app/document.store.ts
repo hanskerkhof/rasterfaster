@@ -420,6 +420,7 @@ export class DocumentStore {
     this.viewing.set(null);
     this.docId.set(id);
     this.lastViewId.set(null);
+    this.viewDirty.set(false);
     this.writeCurrentId(id);
     this.doc.set(doc);
     this.selectedIds.set([]);
@@ -1060,18 +1061,31 @@ export class DocumentStore {
   recallView: ((view: DocSavedView) => void) | null = null;
 
   /** Saves the current camera and display as a named view, one undo step. Returns it, or null when there is no 3D view to take it from. */
+  /** An animation (the fly-around or the turntable preview) is moving things: no saved view counts as the one the camera is on. */
+  readonly animating = signal(false);
+
+  /** An animation has run since a saved view was last chosen, saved or replaced: that view shows as changed until the user does one of those again (never by itself). */
+  readonly viewDirty = signal(false);
+
+  /** Where the 3D view's camera is right now (the viewer says it every frame; it is not the debounced copy kept in the document). */
+  readonly livePose = signal<DocView | null>(null);
+
   /** The saved view the camera is on now (to a hair), or null. */
   readonly activeViewId = computed(() => {
-    const now = this.doc().view;
-    if (!now) return null;
+    const now = this.livePose() ?? this.doc().view;
+    if (!now || this.animating() || this.viewDirty()) return null; // while an animation runs the view shows as changed, and is not updated by it
     const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
     return this.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
   });
 
   /** The saved view the camera came from, when it is no longer on it: shown as changed. */
+  /** The camera glides to a chosen view: the "changed" mark waits until it has arrived. */
+  readonly settling = signal(false);
+  private settleTimer: ReturnType<typeof setTimeout> | undefined;
+  private holdOff() { this.settling.set(true); clearTimeout(this.settleTimer); this.settleTimer = setTimeout(() => this.settling.set(false), 1200); }
   readonly fromViewId = computed(() => {
     const id = this.lastViewId();
-    return id && !this.activeViewId() && this.doc().views?.some(v => v.id === id) ? id : null;
+    return !this.settling() && id && !this.activeViewId() && this.doc().views?.some(v => v.id === id) ? id : null;
   });
 
   /** The saved view the camera was last put on (saved, gone to or replaced): when the camera has moved on from it, the Views panel shows it as changed. */
@@ -1086,6 +1100,7 @@ export class DocumentStore {
     this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), view] }));
     this.setView(cameraOf(view)); // the camera is on this view now: the panel marks it
     this.lastViewId.set(view.id);
+    this.viewDirty.set(false);
     return view;
   }
 
@@ -1097,6 +1112,7 @@ export class DocumentStore {
     this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
     this.setView(cameraOf(captured));
     this.lastViewId.set(id);
+    this.viewDirty.set(false);
     this.announce(`View "${name ?? ''}" replaced by the current view`, 2500); // also when nothing differed: the click is answered
   }
 
@@ -1134,7 +1150,7 @@ export class DocumentStore {
   goToSavedView(which: string | number) {
     const views = this.doc().views ?? [];
     const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
-    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); this.lastViewId.set(view.id); } // the panel marks it at once, the camera glides there
+    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); this.holdOff(); this.lastViewId.set(view.id); this.viewDirty.set(false); } // the panel marks it at once, the camera glides there
   }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;

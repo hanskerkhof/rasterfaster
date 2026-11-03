@@ -688,6 +688,14 @@ export class StlViewer implements OnDestroy {
   private readonly homeDirection = new THREE.Vector3(1, -1, 0.3).normalize();
 
   constructor() {
+    let animationWas = false;
+    effect(() => { // the animations (fly-around, turntable preview) do not touch the document's view; when one ends the camera is where it is, and that is kept then
+      const on = this.animationRunning(); // (a paused preview does not move anything: the camera is where it is and is kept)
+      this.store.animating.set(on);
+      if (on) this.store.viewDirty.set(true); // the view it started from stays marked as changed until the user chooses, saves or replaces a view
+      if (animationWas && !on && this.ready()) untracked(() => { this.touchView(); this.scheduleSaveView(); });
+      animationWas = on;
+    });
     effect(() => { this.renderSettings.trackPivot(); this.renderSettings.lookAt(); this.renderSettings.trackId(); untracked(() => this.refreshPreviewPivot()); }); // the choice of what Camera circles goes round counts at once, also while it plays
     effect(() => { // picking the part a turntable tracks: a cross-hair, and a hint until a part is clicked
       const picking = this.store.trackPick();
@@ -830,6 +838,7 @@ export class StlViewer implements OnDestroy {
       this.keepPerspectiveNatural();
       this.documentScene.tick();
       this.controls.update();
+      this.publishPose();
       this.renderer.clear();
       this.renderer.render(this.scene, this.camera);
       this.viewCube.render(this.renderer, this.camera, this.controls.target);
@@ -1210,9 +1219,25 @@ export class StlViewer implements OnDestroy {
   }
 
   /** The view of the open document (where the camera is, its zoom) is kept in the document file and in local storage, so a reload shows the document as it was left. */
+  private lastPose = '';
+
+  /** The camera as it is, for the Views panel (it marks the saved view the camera is on, or has left): every frame, but only said when it changed. */
+  private publishPose() {
+    if (!this.documentMode() || !this.ready()) return;
+    const p = this.camera.position, t = this.controls.target;
+    const key = `${this.projection},${p.x.toFixed(3)},${p.y.toFixed(3)},${p.z.toFixed(3)},${t.x.toFixed(3)},${t.y.toFixed(3)},${t.z.toFixed(3)},${this.camera.zoom.toFixed(4)}`;
+    if (key === this.lastPose) return;
+    this.lastPose = key;
+    this.store.livePose.set({ projection: this.projection, position: [p.x, p.y, p.z], target: [t.x, t.y, t.z], zoom: this.camera.zoom, radius: this.radius });
+  }
+
+  /** The fly-around moves, or the turntable preview plays (not while it is paused). */
+  private animationRunning() { return this.flying() || (!!this.turntablePreview() && !this.turntablePaused()); }
+
   private scheduleSaveView() {
     const id = this.store.docId();
     if (!id || !this.documentMode() || !this.ready() || this.restoreSavedView || this.needsDocumentFit) return; // not before the document has been put in view
+    if (this.animationRunning()) return; // an animation moves the camera (or the parts): the document keeps the view it had; the Views panel shows it as changed
     if (Date.now() - this.viewTouchedAt > 4000) return; // the camera moved by itself (the fit on opening, a flight): nothing to keep
     clearTimeout(this.saveViewTimer);
     this.saveViewTimer = setTimeout(() => this.saveView(id), 400);
