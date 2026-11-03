@@ -137,9 +137,10 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .fx-select + .open-render { margin-left: 8px; }
 
 /* The progress toast: the numbers have room reserved, so the text and the buttons stay where they are while the values change. */
-.notice.render-progress .line .text { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notice.render-progress .line .text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; } /* two rows: what it is, and how far it is: nothing is cut off */
+.notice.render-progress .line .text > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notice.render-progress .line .v { display: inline-block; text-align: right; vertical-align: bottom; }
-.notice.render-progress .line .v.n4 { min-width: 4ch; } .notice.render-progress .line .v.n3 { min-width: 3ch; }
+.notice.render-progress .line .v.n3 { min-width: 3ch; }
 .notice.render-progress .line .v.pct { min-width: 5ch; } .notice.render-progress .line .v.clock { min-width: 7ch; }
 .notice.render-progress .line .v.frames { min-width: 15ch; text-align: left; } .notice.render-progress .line .v.eta { min-width: 21ch; text-align: left; }
 .notice.render-progress .line button { flex: none; }

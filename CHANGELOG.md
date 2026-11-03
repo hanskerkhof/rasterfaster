@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Two-row progress toast, video size in the badge (0.11.26)
+
+### Changed
+- **FE** (`app.html`, `app.scss`): the progress toast has two rows (what is rendering, and the percentage, time and time left), so nothing at the end of the line is cut off with an ellipsis any more.
+- **FE** (`images-panel.ts`): the badge of a **video** in the Gallery shows a video icon and the name of its size (nHD, qHD, HD, FHD; the width in px for a quick draft video), as pictures do, instead of the word Video; the cards of running and waiting videos too.
+
 ## 2026-11-03 - A steady progress toast, "changed" saves (0.11.25)
 
 ### Changed

@@ -67,7 +67,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
               @if (job.preview && job.media === 'mp4') { <video [src]="'/api/render-jobs/' + job.id + '/preview.mp4'" autoplay loop muted playsinline></video> }
               @else if (job.preview) { <img [src]="'/api/render-jobs/' + job.id + '/preview.png'" [alt]="job.name" /> }
               <span class="over"><span class="spinner big"></span></span>
-              <span class="kind">{{ job.kind === 'turntable' ? 'Video' : 'HD' }}</span>
+              <span class="kind">@if (job.kind === 'turntable') { <svg class="vicon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Video"><rect x="2.5" y="5" width="14" height="14" rx="2.5"/><path d="m16.5 10 5-3v10l-5-3"/></svg> } {{ job.kind === 'turntable' ? videoSizeName(job.width) : 'HD' }}</span>
               @if (job.preview) { <span class="draft">preliminary draft</span> }
               <span class="eta">{{ job.state === 'running' ? (etaText() || 'working…') : 'queued · ' + job.position }}</span>
             </div>
@@ -78,7 +78,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
           <div class="card" (click)="show(note)" (contextmenu)="openMenu($event, note)" [title]="note.name + ' · ' + note.width + ' × ' + note.height + ' px · click to view large · right-click: menu'">
             <div class="thumb" [style.aspect-ratio]="note.width + ' / ' + note.height">
               @if (note.thumb) { <img [src]="service.thumbSrc(note)" [alt]="note.name" loading="lazy" /> } @else { <span class="spinner"></span> }
-              <span class="kind">{{ badge(note) }}</span>
+              <span class="kind">@if (note.media === 'mp4') { <svg class="vicon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Video"><rect x="2.5" y="5" width="14" height="14" rx="2.5"/><path d="m16.5 10 5-3v10l-5-3"/></svg> } {{ badge(note) }}</span>
             </div>
             <div class="caption"><span class="name">{{ note.name }}</span><span class="ver" [class.current]="note.version === store.version()" [title]="'Made from version ' + note.version + (note.edited ? ' (with changes after it)' : '')">{{ versionLabel(note) }}</span></div>
           </div>
@@ -224,6 +224,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .spinner.big { width: 26px; height: 26px; border-width: 3px; }
     .draft { position: absolute; left: 3px; bottom: 3px; padding: 0 5px; font-size: 10px; border-radius: 3px; background: rgba(224,160,48,.9); color: #1b1d23; }
     .eta { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; font-size: 10px; border-radius: 3px; background: rgba(0,0,0,.7); color: #dde1e8; }
+    .kind .vicon { vertical-align: -2px; margin-right: 1px; }
     .kind { position: absolute; left: 3px; top: 3px; padding: 0 4px; font-size: 10px; border-radius: 3px; background: rgba(0,0,0,.6); }
     .caption { display: flex; align-items: center; gap: 4px; padding: 3px 5px; } .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ver { flex: none; font-size: 10px; padding: 0 5px; border-radius: 8px; background: #3b404c; color: #b9c0cc; } .ver.current { background: #1f6b4a; color: #fff; }
@@ -330,9 +331,9 @@ export class ImagesPanel {
   protected readonly pending = computed(() => {
     const docId = this.store.docId();
     const r = this.render.state();
-    const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; media: 'png' | 'mp4'; position: number; aspect: number }[] = [];
-    if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, media: r.previewMedia ?? 'png', position: 0, aspect: r.aspect ?? 16 / 9 });
-    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, media: 'png', position: i + 1, aspect: q.aspect ?? 16 / 9 }); });
+    const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; media: 'png' | 'mp4'; position: number; aspect: number; width: number }[] = [];
+    if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, media: r.previewMedia ?? 'png', position: 0, aspect: r.aspect ?? 16 / 9, width: r.width });
+    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, media: 'png', position: i + 1, aspect: q.aspect ?? 16 / 9, width: q.width }); });
     return jobs;
   });
 
@@ -473,8 +474,14 @@ export class ImagesPanel {
     return lines;
   }
   /** The tag on a thumbnail: the resolution's name (HD, QHD, 4K UHD …, found by the height, which a cropped picture keeps), or Quick. */
+  /** The name of the size of a video, as for pictures (nHD, qHD, HD ...); the width in pixels when it has no name (a quick draft video). */
+  protected videoSizeName(width: number): string {
+    const name = hdWidths.find(w => w.width === width)?.label.split(' · ')[1];
+    return name === 'Full HD' ? 'FHD' : name ?? `${width} px`;
+  }
+
   protected badge(note: ImageNote) {
-    if (note.media === 'mp4') return 'Video';
+    if (note.media === 'mp4') return this.videoSizeName(note.width); // with the video icon beside it
     if (note.kind === 'file') return 'File';
     if (note.kind !== 'hd') return 'Quick';
     const ratio = aspectRatio(note.settings?.aspect);

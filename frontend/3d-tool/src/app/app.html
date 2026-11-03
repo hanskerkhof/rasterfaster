@@ -130,7 +130,10 @@
           </div>
           <div class="line">
             <span class="spinner"></span>
-            <span class="text">@if (r.kind === 'turntable') { <b>Turntable</b> · }{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }} · @if (r.kind === 'turntable') { frame <span class="v n4">{{ render.frameNow() }}</span> of {{ r.frames }}, sample <span class="v n3">{{ r.sample ?? 0 }}</span>/{{ r.samples }}<span class="v frames">{{ r.frameSeconds ? ' (' + r.frameSeconds + ' s a frame)' : '' }}</span> · }<span class="v pct">{{ render.percentText() }}</span>% · <span class="v clock">{{ time(render.elapsed()) }}</span><span class="v eta">{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}</span>@if (render.waiting() > 0) { <b class="queue"> · {{ render.waiting() }} waiting</b> }</span>
+            <span class="text">
+              <span class="r1">@if (r.kind === 'turntable') { <b>Turntable</b> · }{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }}@if (r.kind === 'turntable') { · frame <span class="v n3">{{ render.frameNow() }}</span> of {{ r.frames }}, sample <span class="v n3">{{ r.sample ?? 0 }}</span>/{{ r.samples }}<span class="v frames">{{ r.frameSeconds ? ' (' + r.frameSeconds + ' s a frame)' : '' }}</span> }</span>
+              <span class="r2"><span class="v pct">{{ render.percentText() }}</span>% · <span class="v clock">{{ time(render.elapsed()) }}</span><span class="v eta">{{ ' · about ' + time(render.eta() ?? 0) + ' left' }}</span>@if (render.waiting() > 0) { <b class="queue"> · {{ render.waiting() }} waiting</b> }</span>
+            </span>
             <button type="button" (click)="render.cancel()" [title]="render.waiting() > 0 ? 'Stop this render; the next one in the queue starts' : 'Stop this render'">Cancel</button>
             @if (render.waiting() > 0) { <button type="button" (click)="render.cancelAll()" title="Stop this render and empty the queue">Cancel all</button> }
           </div>
