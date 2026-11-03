@@ -279,6 +279,9 @@ function readShowPath() {
           }
         </div>
         @if (mode() === 'shaded') {
+          <button type="button" role="menuitem" (click)="cubeMenu.set(null); startPointAtObject()"><span class="tick"></span>Light: point at object<span class="hint">{{ lightTargetText() }}</span></button>
+          <button type="button" role="menuitem" (click)="cubeMenu.set(null); pointAtCentre()"><span class="tick">{{ lightAtCentre() ? '✓' : '' }}</span>Light: point at the objects' centre<span class="hint">keeps the direction</span></button>
+          <button type="button" role="menuitem" (click)="cubeMenu.set(null); lightFromView()"><span class="tick"></span>Light: shine from where I look<span class="hint">the lamp comes to the camera</span></button>
           <button type="button" role="menuitem" (click)="resetLight(); cubeMenu.set(null)"><span class="tick"></span>Reset the light<span class="hint">default direction</span></button>
         }
         <button type="button" role="menuitem" (click)="toggleGrid3d()">
@@ -824,6 +827,7 @@ export class StlViewer implements OnDestroy {
       this.updatePathLine();
       this.updateCentreCross();
       this.updateAutoProjection();
+      this.keepPerspectiveNatural();
       this.documentScene.tick();
       this.controls.update();
       this.renderer.clear();
@@ -1712,8 +1716,10 @@ export class StlViewer implements OnDestroy {
     const next = kind === 'persp' ? this.perspectiveCamera : this.orthoCamera;
     next.up.copy(this.camera.up);
     if (kind === 'persp') {
-      next.zoom = 1;
-      next.position.copy(target).add(direction.multiplyScalar(halfHeight / Math.tan(THREE.MathUtils.degToRad(perspectiveFovDegrees / 2))));
+      const natural = halfHeight / Math.tan(THREE.MathUtils.degToRad(perspectiveFovDegrees / 2)); // the distance that gives the same visible size at the centre
+      const distance = Math.max(natural, this.fitDistance()); // a zoomed-in view must not put the camera right next to the parts: narrow the lens instead
+      next.zoom = distance / natural;
+      next.position.copy(target).add(direction.multiplyScalar(distance));
     } else {
       next.zoom = (this.radius * 1.3) / halfHeight; // visible half height = frustum half height / zoom
       next.position.copy(target).add(direction.multiplyScalar(Math.max(offset.length(), 1)));
@@ -1735,6 +1741,21 @@ export class StlViewer implements OnDestroy {
   }
 
   /** "Perspective with ortho faces": orthographic while the view looks straight along an axis (a cube face), perspective otherwise. */
+  /**
+   * A perspective camera zoomed out below 1 would only widen its lens (a fish-eye with an extreme perspective, the parts near the camera huge).
+   * Zooming out moves the camera back instead, with the same picture: the visible size at the centre stays, the lens stays at its natural angle.
+   */
+  private keepPerspectiveNatural() {
+    if (this.projection !== 'persp' || this.camera.zoom >= 1 - 1e-6) return;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    if (offset.lengthSq() < 1e-9) return;
+    const far = offset.length() / this.camera.zoom; // d / zoom: the same visible height at the centre
+    const limit = this.fitDistance() * 20; // as far out as the old zoom limit (a twentieth) allowed; beyond it zooming out stops
+    this.camera.position.copy(this.controls.target).add(offset.setLength(Math.max(Math.min(far, limit), offset.length())));
+    this.camera.zoom = 1;
+    this.camera.updateProjectionMatrix();
+  }
+
   private updateAutoProjection() {
     if (this.cameraMode() !== 'perspective-ortho-faces') return;
     const direction = this.camera.position.clone().sub(this.controls.target).normalize();
@@ -2305,6 +2326,16 @@ export class StlViewer implements OnDestroy {
 
   protected lightAtCentre(): boolean {
     return !this.lightTargetId && !this.lightAt;
+  }
+
+  /** The light comes from the camera's side (a way to reach a lamp that is out of the picture): it shines the way the view looks; the target stays. */
+  protected lightFromView() {
+    const direction = this.camera.position.clone().sub(this.controls.target);
+    if (direction.lengthSq() < 1e-9) return;
+    this.lightDir.copy(direction.normalize());
+    this.updateShadowRig();
+    this.commitLight();
+    this.store.announce('The light now shines from where you look');
   }
 
   /** The light keeps its direction and points at the middle of all the objects. */

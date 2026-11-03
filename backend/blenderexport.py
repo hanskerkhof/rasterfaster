@@ -261,6 +261,7 @@ AMBIENT_PRESETS = [(2, (0.85, 0.9, 1.0), 0.15), (4, (0.92, 0.95, 1.0), 0.3), (7,
 CROP_PADDING = 0.04  # room left on each side of the parts when the picture is cropped to them, as a share of their width
 DOF_BLUR_SHARES = [0.003, 0.006, 0.012, 0.025, 0.05]  # the five strengths: how blurred the part farthest from the focus is, as a share of the picture width (the third: unsharp, still recognizable)
 SUN_STRENGTH = 6.0  # W/m² (a clear day is ~ 5 in Blender; stronger washes the colours out)
+SOFTBOX_POWER = 0.3  # how bright the Softbox panels are: bright enough for a clear reflection in a mirror, not so bright that satin and PEI parts glow grey from the sheen of the panels
 SUPPORT_SCALE = 0.35  # with the app's light as key, the fill, rim and under lights are turned down to this share so the key light shows
 
 # the arguments: the glTF, the .blend to write, "1" with the studio setup, the app's light ("dx,dy,dz;tx,ty,tz" in mm, or ""), "width,samples" to render a PNG
@@ -346,7 +347,7 @@ def grain_pei_parts():
         tree.links.new(cells.outputs["Color"], centred.inputs[0])
         tilt = tree.nodes.new("ShaderNodeVectorMath")
         tilt.operation = "SCALE"
-        tilt.inputs["Scale"].default_value = 0.8  # how far a cell can tilt: the sparkle
+        tilt.inputs["Scale"].default_value = 0.65  # how far a cell can tilt: the fine glitter (more, and a bright light in a mirror turns the whole black part grey)
         tree.links.new(centred.outputs["Vector"], tilt.inputs[0])
         geometry = tree.nodes.new("ShaderNodeNewGeometry")
         tilted = tree.nodes.new("ShaderNodeVectorMath")
@@ -357,7 +358,11 @@ def grain_pei_parts():
         unit.operation = "NORMALIZE"
         tree.links.new(tilted.outputs["Vector"], unit.inputs[0])
         tree.links.new(unit.outputs["Vector"], principled.inputs["Normal"])
-        principled.inputs["Roughness"].default_value = 0.38  # glossy enough for the flecks to flash
+        principled.inputs["Roughness"].default_value = 0.5  # a powder coat: a soft sheen, with a few flecks that flash
+        for name in ("Specular IOR Level", "Specular"):  # a dull coat reflects little: black stays black when a bright panel is reflected in it
+            if name in principled.inputs:
+                principled.inputs[name].default_value = 0.18
+                break
 
 grain_pei_parts()
 
@@ -580,7 +585,7 @@ if studio == "1":
         def panel(name, location, size, size_y, power):
             data = bpy.data.lights.new(name, "AREA")
             data.shape, data.size, data.size_y, data.color = "RECTANGLE", size, size_y, (1.0, 1.0, 1.0)
-            data.energy = power * (r * 3) ** 2 * 10
+            data.energy = power * SOFTBOX_POWER * (r * 3) ** 2 * 10
             panel_object = bpy.data.objects.new(name, data)
             panel_object.location = location
             panel_object.visible_camera = False  # not seen by the camera ...

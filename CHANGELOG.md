@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Calmer PEI and softbox, no fish-eye perspective (0.11.18)
+
+### Fixed
+- **FE** (`stl-viewer.ts`): zooming out with the perspective camera no longer widens its lens into a fish-eye (an extreme perspective, parts near the camera huge): the camera moves back instead and the lens stays at its natural angle (as far out as the old zoom limit). Switching from a zoomed-in orthographic view to perspective no longer puts the camera right next to the parts.
+- **BE** (`blenderexport.py`): black **PEI** and **satin** parts turned grey on a mirror under *Reflects: Softbox*. The PEI grain is now a duller, quieter powder coat (less glitter), and the Softbox panels are 0.3 times as bright: still a clear softbox in mirrors, metal and glass, without the grey sheen on glossy plastic.
+
+### Added
+- **FE** (`stl-viewer.ts`): the view cube's right-click menu (Shaded with light) has *Light: point at object*, *Light: point at the objects' centre* and *Light: shine from where I look*, to reach a light that is out of the picture.
+
 ## 2026-11-03 - Hidden lines, fog, watercolour and a smarter Thermal (0.11.17)
 
 ### Added
