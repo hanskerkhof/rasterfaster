@@ -431,6 +431,13 @@ export class DocumentPanel {
   }
   protected readonly bomOpen = signal(false);
   protected readonly render = inject(RenderService);
+  /** The Render dialog can ask for a new quick render of the view as it is now (when a view of its views column is clicked). */
+  private readonly quickUrl = (() => {
+    this.render.quickUrlProvider = () => {
+      const id = this.store.docId();
+      return id ? `/api/documents/${id}/` + this.blenderEndpoint().replace('export.blend', 'render.png') : null;
+    };
+  })();
 
   protected async openRender() {
     const id = this.store.docId();

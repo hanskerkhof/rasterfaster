@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Views in the Render dialog, Full HD videos (0.11.27)
+
+### Added
+- **FE** (`render-dialog.ts`, `render.service.ts`, `document-panel.ts`): the **Render dialog** has a **Views** column at its left side: it lists the document's saved views; clicking one sends the 3D view there and renders a quick render from that camera.
+- **FE** (`render.service.ts`): **1920 × 1080 (Full HD)** in the video size menu (the Draft quality stays at 960 px at most).
+
 ## 2026-11-03 - Two-row progress toast, video size in the badge (0.11.26)
 
 ### Changed

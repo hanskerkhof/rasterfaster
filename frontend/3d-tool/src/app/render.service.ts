@@ -83,8 +83,8 @@ function readHdSamples(): number {
 /** The widths the full-size render can be made at (16:9): the first is the default. */
 export const hdWidths = [{ width: 480, label: '480 × 270 · small' }, { width: 640, label: '640 × 360 · nHD' }, { width: 960, label: '960 × 540 · qHD' }, { width: 1280, label: '1280 × 720 · HD' }, { width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
 
-/** The sizes of a turntable video: a video has hundreds of frames, so it stays small (1280 px at most). */
-export const videoWidths = hdWidths.filter(w => w.width <= 1280);
+/** The sizes of a turntable video: a video has hundreds of frames, so it stays small (Full HD at most, and that takes long). */
+export const videoWidths = hdWidths.filter(w => w.width <= 1920);
 const videoWidthStorageKey = 'rasterfaster.renderVideoWidth';
 
 function readVideoWidth(): number {
@@ -379,7 +379,7 @@ export class RenderService {
     const choice = this.turntable();
     const draft = turntableQualities.find(q => q.samples === choice.samples)?.draft ?? false;
     const fps = draft ? 24 : 30;
-    return { width: Math.min(this.videoWidth(), draft ? 960 : 1280), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion, direction: choice.direction };
+    return { width: Math.min(this.videoWidth(), draft ? 960 : 1920), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion, direction: choice.direction };
   }
 
   /** About how long the video takes (seconds), asked from the API (it knows what the last renders took); null while unknown. */
@@ -633,6 +633,9 @@ export class RenderService {
 
   /** The last quick picture with what it was made from: while that is unchanged (view, light, parts, render settings) the dialog shows it again instead of rendering. */
   lastQuick: { key: string; blob: Blob; detail: string; settings: string } | null = null;
+
+  /** Set by the document panel: the address of a quick render of the 3D view as it is now (camera and light), for the views column of the Render dialog. */
+  quickUrlProvider: (() => string | null) | null = null;
 
   /** The Render button: a quick picture (shown at once by the dialog). */
   openQuick(url: string) {
