@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Smaller render sizes (0.11.19)
+
+### Added
+- **FE** (`render.service.ts`): four smaller sizes in the size menu of the Render dialog: 480 × 270, 640 × 360 (nHD), 960 × 540 (qHD) and 1280 × 720 (HD), for quick turntable videos and small pictures (the turntable follows the menu; Draft stays at 960 px at most).
+
 ## 2026-11-03 - Calmer PEI and softbox, no fish-eye perspective (0.11.18)
 
 ### Fixed

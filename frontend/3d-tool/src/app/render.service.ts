@@ -81,7 +81,7 @@ function readHdSamples(): number {
   return 96;
 }
 /** The widths the full-size render can be made at (16:9): the first is the default. */
-export const hdWidths = [{ width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
+export const hdWidths = [{ width: 480, label: '480 × 270 · small' }, { width: 640, label: '640 × 360 · nHD' }, { width: 960, label: '960 × 540 · qHD' }, { width: 1280, label: '1280 × 720 · HD' }, { width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
 
 /** The common name of a render width: "Full HD", "4K UHD" … (empty for a width without one). */
 export function sizeName(width: number): string {
