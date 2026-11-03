@@ -441,29 +441,60 @@
       "groundColor": 6120823,
       "grid3d": false,
       "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        498.92,
+        -333.64,
+        218.574
+      ],
+      "target": [
+        186.465,
+        94.929,
+        14.808
+      ],
+      "zoom": 2.019,
+      "radius": 133.908,
+      "id": "dba76195-e697-45b5-bc15-07c209b2d156",
+      "name": "View 6",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.489,
+          -0.633,
+          0.601
+        ],
+        "targetId": "80d3a140-d1ba-4243-909a-3d8f226abf55"
+      },
+      "ground": "grid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
     }
   ],
   "light": {
     "direction": [
-      0.033,
-      -0.626,
-      0.779
+      0.489,
+      -0.633,
+      0.601
     ],
-    "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+    "targetId": "80d3a140-d1ba-4243-909a-3d8f226abf55"
   },
   "view": {
     "projection": "persp",
     "position": [
-      589.56,
-      -244.403,
-      178.327
+      498.92,
+      -333.64,
+      218.574
     ],
     "target": [
-      187.583,
-      93.821,
-      8.478
+      186.465,
+      94.929,
+      14.808
     ],
-    "zoom": 1.853,
+    "zoom": 2.019,
     "radius": 133.908
   },
   "render": {
