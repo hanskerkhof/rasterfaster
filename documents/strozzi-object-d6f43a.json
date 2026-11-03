@@ -107,6 +107,8 @@
       "noExport": true
     }
   ],
+  "groups": [],
+  "views": [],
   "light": {
     "direction": [
       0.673,
@@ -118,16 +120,16 @@
   "view": {
     "projection": "persp",
     "position": [
-      69.783,
-      -923.886,
-      273.386
+      467.374,
+      921.753,
+      684.865
     ],
     "target": [
-      159.0,
-      98.336,
-      210.657
+      16.455,
+      112.526,
+      239.155
     ],
-    "zoom": 1.106,
+    "zoom": 0.53,
     "radius": 249.334
   },
   "render": {
@@ -137,6 +139,8 @@
     "beam": 1,
     "lamp": 40,
     "ambient": 1,
-    "dofStrength": 3
+    "dofStrength": 3,
+    "aspect": "16:9",
+    "transparent": false
   }
 }

@@ -652,6 +652,40 @@
       "noExport": true
     }
   ],
+  "groups": [],
+  "views": [
+    {
+      "projection": "persp",
+      "position": [
+        1896.0,
+        -1318.336,
+        894.27
+      ],
+      "target": [
+        188.73,
+        -44.737,
+        853.981
+      ],
+      "zoom": 1.341,
+      "radius": 895.171,
+      "id": "39978a01-208a-49b5-bcfb-67775ab2b718",
+      "name": "View 1",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.574,
+          0.158,
+          0.803
+        ],
+        "targetId": "a9be37ee-a97b-4bbb-9b4f-c3d6addf6bed"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  ],
   "light": {
     "direction": [
       0.574,
@@ -663,25 +697,32 @@
   "view": {
     "projection": "persp",
     "position": [
-      1633.206,
-      -1623.218,
-      885.201
+      1896.0,
+      -1318.336,
+      894.27
     ],
     "target": [
-      263.679,
-      5.268,
-      989.484
+      188.73,
+      -44.737,
+      853.981
     ],
-    "zoom": 1.821,
+    "zoom": 1.341,
     "radius": 895.171
   },
   "render": {
-    "depthOfField": true,
+    "depthOfField": false,
     "focusId": "d806e4b6-18dd-4229-afe4-054f90c38146",
     "crop": false,
     "beam": 1,
     "lamp": 40,
     "ambient": 2,
-    "dofStrength": 5
+    "dofStrength": 5,
+    "aspect": "16:9",
+    "trackPivot": "all",
+    "lookAt": "view",
+    "fx": "xray",
+    "cut": "z:50:0",
+    "reflections": 0,
+    "transparent": false
   }
 }

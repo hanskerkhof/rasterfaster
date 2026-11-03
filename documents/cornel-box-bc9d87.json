@@ -164,7 +164,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "glass",
+        "hidden": false
+      }
     },
     {
       "id": "47394a52-0a2f-49dc-ad8c-aaf54d8368bf",
@@ -217,6 +221,58 @@
         0.3026,
         0.3026
       ]
+    },
+    {
+      "id": "5b5825a3-594c-4e60-857c-87f2b344c703",
+      "path": "RF1.11 PRIMITIVES/plane 200x200x4mm.stl",
+      "name": "plane 200x200x4mm",
+      "color": 9684093,
+      "position": [
+        -99.995,
+        -279.995,
+        0.0
+      ],
+      "rotation": [
+        -0.6532814824381884,
+        -0.27059805007309845,
+        -0.6532814824381883,
+        0.27059805007309845
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 2249906,
+        "finish": "mirror",
+        "hidden": false
+      }
+    },
+    {
+      "id": "0da34d7a-12ad-4583-8110-9d924c02fe5e",
+      "path": "RF1.11 PRIMITIVES/Stanford dragon.stl",
+      "name": "Stanford dragon",
+      "color": 7317724,
+      "position": [
+        -120.00200000000001,
+        -119.995,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        1.0,
+        -5.5511151231257815e-17
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 15561523,
+        "finish": "metal",
+        "hidden": false
+      }
     }
   ],
   "groups": [],
@@ -224,80 +280,18 @@
     {
       "projection": "persp",
       "position": [
-        434.52,
-        -786.827,
-        145.457
+        824.104,
+        -46.844,
+        272.432
       ],
       "target": [
-        24.975,
-        -128.63,
-        67.227
+        -45.587,
+        -127.403,
+        79.09
       ],
-      "zoom": 3.249,
-      "radius": 188.972,
-      "id": "3fe05448-3ef7-4341-a943-6c55497ef6f2",
-      "name": "View 1",
-      "mode": "shaded",
-      "appMode": "render",
-      "light": {
-        "direction": [
-          -0.2,
-          0.174,
-          0.964
-        ],
-        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
-      },
-      "ground": "solid",
-      "groundColor": 6120823,
-      "grid3d": false,
-      "zGrid": "baseplate"
-    },
-    {
-      "projection": "persp",
-      "position": [
-        273.364,
-        -622.192,
-        99.777
-      ],
-      "target": [
-        21.309,
-        -43.848,
-        56.043
-      ],
-      "zoom": 1.704,
-      "radius": 153.38,
-      "id": "08be7fd8-9863-4a3e-ac3f-6ff0d395c6a0",
-      "name": "View 2",
-      "mode": "shaded",
-      "appMode": "render",
-      "light": {
-        "direction": [
-          -0.12,
-          -0.595,
-          0.795
-        ],
-        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
-      },
-      "ground": "solid",
-      "groundColor": 6120823,
-      "grid3d": false,
-      "zGrid": "baseplate"
-    },
-    {
-      "projection": "persp",
-      "position": [
-        142.192,
-        -668.367,
-        245.147
-      ],
-      "target": [
-        -109.863,
-        -90.023,
-        201.413
-      ],
-      "zoom": 0.605,
-      "radius": 153.38,
-      "id": "7fb955ba-b7c6-48c8-a432-817ff03e9e13",
+      "zoom": 1.946,
+      "radius": 216.964,
+      "id": "c3052dcc-76d0-42c7-8d5f-2f29143977c4",
       "name": "View 3",
       "mode": "shaded",
       "appMode": "render",
@@ -307,7 +301,7 @@
           -0.208,
           0.944
         ],
-        "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
+        "targetId": "17f9993e-7af2-4602-847a-1bf6436c4da9"
       },
       "ground": "solid",
       "groundColor": 6120823,
@@ -317,34 +311,45 @@
   ],
   "light": {
     "direction": [
-      -0.2,
-      0.174,
-      0.964
+      0.255,
+      -0.208,
+      0.944
     ],
-    "targetId": "ab308e75-58f2-44cc-b3f8-6f74d58346ee"
+    "targetId": "17f9993e-7af2-4602-847a-1bf6436c4da9"
   },
   "view": {
     "projection": "persp",
     "position": [
-      434.52,
-      -786.827,
-      145.457
+      824.104,
+      -46.844,
+      272.432
     ],
     "target": [
-      24.975,
-      -128.63,
-      67.227
+      -45.587,
+      -127.403,
+      79.09
     ],
-    "zoom": 3.249,
-    "radius": 188.972
+    "zoom": 1.946,
+    "radius": 216.964
   },
   "render": {
-    "depthOfField": false,
+    "depthOfField": true,
     "focusId": "47394a52-0a2f-49dc-ad8c-aaf54d8368bf",
     "crop": false,
     "beam": 1,
-    "lamp": 30,
+    "lamp": 49,
     "ambient": 2,
-    "dofStrength": 4
+    "dofStrength": 4,
+    "aspect": "16:9",
+    "trackPivot": "all",
+    "lookAt": "view",
+    "fx": "lowfog",
+    "cut": "z:50:0",
+    "reflections": 0,
+    "transparent": false
+  },
+  "cameraModes": {
+    "design": "orthographic",
+    "render": "perspective"
   }
 }

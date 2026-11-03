@@ -44,27 +44,6 @@
       "noExport": false
     },
     {
-      "id": "9386a8c9-b997-4653-b6d8-8dbf5c3a764f",
-      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II.stl",
-      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II",
-      "color": 0,
-      "position": [
-        280.0,
-        100.0,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
       "id": "7147850b-6c20-4574-90be-6dec808a000c",
       "path": "BOLTS/BOLT_S9.stl",
       "name": "BOLT_S9",
@@ -112,7 +91,7 @@
       "name": "15.1 KIOSK REMOTE BASE",
       "color": 0,
       "position": [
-        100.0,
+        104.0,
         80.0,
         0.0
       ],
@@ -180,62 +159,20 @@
       }
     },
     {
-      "id": "af86ba3d-8c2d-4ce5-8e92-c5ebad121c72",
-      "path": "MOUNTS/2.21.ESP32 devkit 30pins/2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II.stl",
-      "name": "2.21.ESP32 devkit_RF2 MNTS ACTIVE v854_LOCK CAP ALT II",
-      "color": 0,
-      "position": [
-        280.0,
-        80.0,
-        0.0
-      ],
-      "rotation": [
-        0.0,
-        -1.0,
-        0.0,
-        -5.5511151231257815e-17
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "6acc62aa-f519-4743-8ff4-ffa4ecde3b62",
-      "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
-      "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 0,
-      "position": [
-        302.55,
-        42.55,
-        1.01
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
-    },
-    {
       "id": "a4f15c9d-3062-458c-94c8-386dce635fb5",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
       "color": 0,
       "position": [
-        282.55,
-        42.55,
-        1.01
+        139.998,
+        -0.003,
+        0.0
       ],
       "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
+        0.46535644019693406,
+        0.7161340869953821,
+        -0.1009424065203054,
+        0.5102998957244822
       ],
       "muted": false,
       "centered": true,
@@ -248,9 +185,9 @@
       "name": "BOLT_S1_BLIND - NEW HEAD",
       "color": 0,
       "position": [
-        302.55,
-        22.55,
-        1.01
+        178.20000000000002,
+        4.3,
+        0.0
       ],
       "rotation": [
         0.0,
@@ -267,43 +204,53 @@
       "id": "c99bdfe8-745e-4170-886d-cb626a36a7d0",
       "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
       "name": "BOLT_S1_BLIND - NEW HEAD",
-      "color": 0,
+      "color": 16767334,
       "position": [
-        282.55,
-        22.55,
-        1.01
+        100.01,
+        82.55,
+        8.649
       ],
       "rotation": [
         0.0,
+        0.7071067811865476,
         0.0,
-        0.0,
-        1.0
+        0.7071067811865475
       ],
       "muted": false,
       "centered": true,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "groupId": "772be08e-8896-4e9a-ad1b-200d9a386e4f",
+      "render": {
+        "color": 0,
+        "hidden": false
+      }
     },
     {
-      "id": "6470b3c2-f350-4d0d-9cd5-a0c836c54730",
-      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/models/rotary-encoders-1.snapshot.1/rotary+encoder_14mm_hole_spc.stl",
-      "name": "rotary+encoder_14mm_hole_spc",
-      "color": 10987946,
+      "id": "2f68bc33-6cbd-4361-9e41-93a0ff9fea36",
+      "path": "BOLTS/BOLT_S1_BLIND - NEW HEAD.stl",
+      "name": "BOLT_S1_BLIND - NEW HEAD",
+      "color": 16767334,
       "position": [
-        173.4,
-        46.8,
-        27.0
+        100.11,
+        182.55,
+        8.55
       ],
       "rotation": [
-        0.25881904510252074,
         0.0,
+        0.7071067811865476,
         0.0,
-        0.9659258262890684
+        0.7071067811865475
       ],
       "muted": false,
-      "centered": false,
+      "centered": true,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "groupId": "772be08e-8896-4e9a-ad1b-200d9a386e4f",
+      "render": {
+        "color": 0,
+        "hidden": false
+      }
     },
     {
       "id": "26fb9ea5-6af8-4156-9c82-2bf65008588d",
@@ -369,73 +316,62 @@
       "noExport": false
     },
     {
-      "id": "faf346bf-0c1c-4b98-9152-b0f1ad7b48b5",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 0,
+      "id": "80d3a140-d1ba-4243-909a-3d8f226abf55",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/Rotary_Encoder_KY-040_knob_model.stl",
+      "name": "Rotary_Encoder_KY-040_knob_model",
+      "color": 12745632,
       "position": [
-        282.345,
-        122.349,
-        1.997
+        173.3,
+        45.298,
+        22.004
       ],
       "rotation": [
+        0.25881904510252074,
         0.0,
         0.0,
-        0.0,
-        1.0
+        0.9659258262890683
       ],
       "muted": false,
-      "centered": true,
+      "centered": false,
       "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "aca65f79-d516-47bc-847a-ae30dd0ecf47",
-      "path": "BOLTS/BOLT_S1.stl",
-      "name": "BOLT_S1",
-      "color": 0,
-      "position": [
-        282.345,
-        142.349,
-        1.997
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "muted": false,
-      "centered": true,
-      "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "finish": "metal",
+        "hidden": false
+      }
     }
   ],
-  "groups": [],
+  "groups": [
+    {
+      "id": "772be08e-8896-4e9a-ad1b-200d9a386e4f",
+      "name": "Group 1"
+    }
+  ],
   "views": [
     {
       "projection": "persp",
       "position": [
-        -275.07,
-        -236.798,
-        276.044
+        -299.412,
+        -235.167,
+        209.759
       ],
       "target": [
-        179.474,
-        68.578,
-        25.063
+        159.531,
+        111.548,
+        30.826
       ],
-      "zoom": 4.334,
+      "zoom": 3.15,
       "radius": 146.099,
-      "id": "6cb1757c-2a20-495e-bb83-38f978f3174f",
-      "name": "View 1",
+      "id": "0d2f0fbe-9a89-456b-9ceb-435fbd3c83b0",
+      "name": "View 3",
       "mode": "shaded",
       "appMode": "render",
       "light": {
         "direction": [
-          0.534,
-          0.704,
-          0.468
+          -0.673,
+          -0.434,
+          0.599
         ],
         "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
       },
@@ -447,30 +383,61 @@
     {
       "projection": "persp",
       "position": [
-        -315.624,
-        -203.477,
-        234.244
+        2025.463,
+        -750.546,
+        1231.945
       ],
       "target": [
-        179.205,
-        72.471,
-        29.662
+        11.749,
+        15.442,
+        39.685
       ],
-      "zoom": 4.334,
-      "radius": 146.099,
-      "id": "89aba756-c5f7-4427-a3cd-07f5e488dce2",
-      "name": "View 2",
+      "zoom": 0.911,
+      "radius": 597.217,
+      "id": "525a2734-880b-4c22-a803-8fd0a7a3ffc1",
+      "name": "View 4",
       "mode": "shaded",
       "appMode": "render",
       "light": {
         "direction": [
-          0.534,
-          0.704,
-          0.468
+          0.033,
+          -0.626,
+          0.779
         ],
         "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
       },
-      "ground": "solid",
+      "ground": "grid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        2108.668,
+        -676.986,
+        1138.672
+      ],
+      "target": [
+        94.955,
+        89.002,
+        -53.587
+      ],
+      "zoom": 9.241,
+      "radius": 597.217,
+      "id": "2e558d47-08fb-4bf2-aea7-deff6f361e55",
+      "name": "View 5",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.033,
+          -0.626,
+          0.779
+        ],
+        "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+      },
+      "ground": "grid",
       "groundColor": 6120823,
       "grid3d": false,
       "zGrid": "baseplate"
@@ -478,34 +445,45 @@
   ],
   "light": {
     "direction": [
-      0.534,
-      0.704,
-      0.468
+      0.033,
+      -0.626,
+      0.779
     ],
     "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
   },
   "view": {
     "projection": "persp",
     "position": [
-      -276.752,
-      -235.31,
-      274.809
+      589.56,
+      -244.403,
+      178.327
     ],
     "target": [
-      177.792,
-      70.066,
-      23.828
+      187.583,
+      93.821,
+      8.478
     ],
-    "zoom": 4.334,
-    "radius": 146.099
+    "zoom": 1.853,
+    "radius": 133.908
   },
   "render": {
-    "depthOfField": true,
-    "focusId": "6470b3c2-f350-4d0d-9cd5-a0c836c54730",
+    "depthOfField": false,
+    "focusId": "80d3a140-d1ba-4243-909a-3d8f226abf55",
     "crop": false,
-    "beam": 1,
+    "beam": 2,
     "lamp": 40,
-    "ambient": 3,
-    "dofStrength": 3
+    "ambient": 2,
+    "dofStrength": 3,
+    "aspect": "16:9",
+    "trackPivot": "all",
+    "lookAt": "view",
+    "fx": "none",
+    "cut": "z:50:0",
+    "reflections": 1,
+    "transparent": false
+  },
+  "cameraModes": {
+    "design": "orthographic",
+    "render": "perspective"
   }
 }

@@ -20,7 +20,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "metal",
+        "hidden": false
+      }
     },
     {
       "id": "908fc3d4-5a4a-4cf4-85e9-a66e90d0081e",
@@ -41,7 +45,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "metal",
+        "hidden": false
+      }
     },
     {
       "id": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
@@ -62,7 +70,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "metal",
+        "hidden": false
+      }
     },
     {
       "id": "dc6c67f1-a941-43de-90ca-fca3cb42fff3",
@@ -171,6 +183,101 @@
     }
   ],
   "groups": [],
+  "views": [
+    {
+      "projection": "persp",
+      "position": [
+        933.608,
+        -204.263,
+        -54.695
+      ],
+      "target": [
+        226.615,
+        37.437,
+        64.768
+      ],
+      "zoom": 3.104,
+      "radius": 183.518,
+      "id": "d96de5b3-4a13-454d-a89e-e8a51fd54def",
+      "name": "View 1",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.024,
+          -0.712,
+          -0.702
+        ],
+        "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        893.571,
+        -62.783,
+        351.264
+      ],
+      "target": [
+        194.307,
+        60.985,
+        90.035
+      ],
+      "zoom": 2.259,
+      "radius": 183.518,
+      "id": "6f2eff77-5022-4a42-b0a1-8e65ffcf9cc6",
+      "name": "View 2",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.024,
+          -0.712,
+          -0.702
+        ],
+        "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        931.481,
+        -208.27,
+        -57.254
+      ],
+      "target": [
+        -21.258,
+        227.622,
+        66.001
+      ],
+      "zoom": 2.882,
+      "radius": 183.518,
+      "id": "ab91560a-5932-43cc-8d8c-53e1b4a398e1",
+      "name": "View 3",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.024,
+          -0.712,
+          -0.702
+        ],
+        "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  ],
   "light": {
     "direction": [
       -0.024,
@@ -182,16 +289,16 @@
   "view": {
     "projection": "persp",
     "position": [
-      826.458,
-      -192.632,
-      -45.165
+      931.481,
+      -208.27,
+      -57.254
     ],
     "target": [
-      125.753,
-      62.29,
-      83.506
+      -21.258,
+      227.622,
+      66.001
     ],
-    "zoom": 2.84,
+    "zoom": 2.882,
     "radius": 183.518
   },
   "render": {
@@ -201,6 +308,14 @@
     "beam": 2,
     "lamp": 40,
     "ambient": 2,
-    "dofStrength": 4
+    "dofStrength": 4,
+    "aspect": "16:9",
+    "trackId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
+    "trackPivot": "all",
+    "lookAt": "part",
+    "fx": "watercolour",
+    "cut": "z:50:0",
+    "reflections": 2,
+    "transparent": false
   }
 }

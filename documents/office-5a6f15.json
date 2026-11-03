@@ -41,7 +41,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "pei",
+        "hidden": false
+      }
     },
     {
       "id": "7b4369d7-3644-421f-a98e-cda60dc43a4e",
@@ -62,28 +66,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
-    },
-    {
-      "id": "6e0fb7e1-9552-467c-b329-e37563566be9",
-      "path": "15.1 KIOSK REMOTE/rotary+encoder_14mm_hole_spc.stl",
-      "name": "rotary+encoder_14mm_hole_spc",
-      "color": 12745632,
-      "position": [
-        -120.0,
-        -126.0,
-        650.4
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.7071067811865476,
-        0.7071067811865475
-      ],
-      "muted": false,
-      "centered": false,
-      "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "finish": "pei",
+        "hidden": false
+      }
     },
     {
       "id": "bbccd9c8-4638-475a-9f9d-d23552fc3976",
@@ -210,6 +197,66 @@
       "centered": false,
       "noRender": false,
       "noExport": false
+    },
+    {
+      "id": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/Rotary_Encoder_KY-040_knob_model.stl",
+      "name": "Rotary_Encoder_KY-040_knob_model",
+      "color": 16167531,
+      "position": [
+        -123.825,
+        -126.673,
+        643.533
+      ],
+      "rotation": [
+        0.0,
+        0.2588190451025207,
+        0.0,
+        0.9659258262890683
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "finish": "metal",
+        "hidden": false
+      }
+    }
+  ],
+  "groups": [],
+  "views": [
+    {
+      "projection": "persp",
+      "position": [
+        -2384.476,
+        -3058.488,
+        1846.285
+      ],
+      "target": [
+        -334.154,
+        -374.538,
+        402.028
+      ],
+      "zoom": 1.347,
+      "radius": 890.918,
+      "id": "732dbf16-ac4f-4055-9f59-c3407db8febd",
+      "name": "View 1",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.278,
+          -0.253,
+          0.927
+        ],
+        "targetId": "57a7615d-3d0a-484e-8255-1e4c89c6ee46"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
     }
   ],
   "light": {
@@ -218,30 +265,41 @@
       -0.253,
       0.927
     ],
-    "targetId": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e"
+    "targetId": "57a7615d-3d0a-484e-8255-1e4c89c6ee46"
   },
   "view": {
     "projection": "persp",
     "position": [
-      2292.919,
-      1984.136,
-      1638.29
+      -2384.476,
+      -3058.488,
+      1846.285
     ],
     "target": [
-      -249.866,
-      -328.003,
-      335.261
+      -334.154,
+      -374.538,
+      402.028
     ],
-    "zoom": 1.504,
-    "radius": 891.457
+    "zoom": 1.347,
+    "radius": 890.918
   },
   "render": {
-    "depthOfField": true,
-    "focusId": "6e0fb7e1-9552-467c-b329-e37563566be9",
+    "depthOfField": false,
+    "focusId": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
     "crop": false,
     "beam": 1,
     "lamp": 40,
     "ambient": 1,
-    "dofStrength": 4
+    "dofStrength": 4,
+    "aspect": "1:1",
+    "trackId": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+    "trackPivot": "part",
+    "lookAt": "view",
+    "fx": "watercolourink",
+    "cut": "z:50:0",
+    "reflections": 0,
+    "transparent": true
+  },
+  "cameraModes": {
+    "render": "perspective"
   }
 }

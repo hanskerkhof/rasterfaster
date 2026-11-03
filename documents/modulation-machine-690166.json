@@ -20,7 +20,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "color": 0,
+        "hidden": false
+      }
     },
     {
       "id": "4e673465-ef61-4c13-a352-aa2a7c5010a6",
@@ -125,7 +129,11 @@
       "muted": false,
       "centered": false,
       "noRender": false,
-      "noExport": false
+      "noExport": false,
+      "render": {
+        "color": 15766587,
+        "hidden": false
+      }
     },
     {
       "id": "b180c9aa-0274-49a5-849a-dcfdc1c16a89",
@@ -422,35 +430,50 @@
       "noExport": false
     }
   ],
+  "groups": [],
+  "views": [],
   "light": {
     "direction": [
-      0.729,
-      -0.349,
-      0.589
+      0.381,
+      -0.786,
+      0.486
     ],
-    "targetId": "8210cfe8-2bda-4e3d-89f4-14033b2a1718"
+    "targetId": "d13cb253-dbee-4d1a-b542-d752701f239b"
   },
   "view": {
-    "projection": "persp",
+    "projection": "ortho",
     "position": [
-      2422.302,
-      -1529.509,
-      1108.627
+      1763.437,
+      -1262.684,
+      1336.709
     ],
     "target": [
-      249.998,
-      48.66,
-      972.0
+      440.753,
+      60.0,
+      939.904
     ],
-    "zoom": 2.961,
+    "zoom": 1.406,
     "radius": 652.069
   },
   "render": {
     "depthOfField": true,
     "focusId": "8210cfe8-2bda-4e3d-89f4-14033b2a1718",
     "crop": false,
+    "beam": 1,
     "lamp": 40,
-    "ambient": 0,
-    "dofStrength": 5
+    "ambient": 1,
+    "dofStrength": 5,
+    "aspect": "16:9",
+    "trackId": "382930df-cc7f-4969-8ca1-33c84f8729d0",
+    "trackPivot": "view",
+    "lookAt": "all",
+    "fx": "watercolourink",
+    "cut": "z:50:0",
+    "reflections": 1,
+    "transparent": false
+  },
+  "cameraModes": {
+    "design": "orthographic",
+    "render": "orthographic"
   }
 }

@@ -8,7 +8,7 @@
       "color": 7317724,
       "position": [
         21.193,
-        23.922,
+        3.922,
         0.0
       ],
       "rotation": [
@@ -110,16 +110,16 @@
   "view": {
     "projection": "persp",
     "position": [
-      961.559,
-      -621.747,
-      219.0
+      1215.301,
+      -200.07,
+      176.887
     ],
     "target": [
-      276.467,
-      63.345,
-      13.473
+      265.72,
+      49.855,
+      47.366
     ],
-    "zoom": 3.237,
+    "zoom": 1.239,
     "radius": 240.215
   },
   "render": {
@@ -129,6 +129,12 @@
     "beam": 1,
     "lamp": 40,
     "ambient": 2,
-    "dofStrength": 3
+    "dofStrength": 3,
+    "aspect": "16:9",
+    "trackPivot": "all",
+    "lookAt": "view",
+    "fx": "clay",
+    "reflections": 0,
+    "transparent": false
   }
 }
