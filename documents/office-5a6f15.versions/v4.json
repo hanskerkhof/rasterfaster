@@ -1,0 +1,302 @@
+{
+  "version": 4,
+  "savedAt": 1793651364.532725,
+  "name": "office-desk",
+  "items": [
+    {
+      "id": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e",
+      "path": "office-desk.stl",
+      "name": "office-desk",
+      "color": 7317724,
+      "position": [
+        -880.0,
+        -900.0,
+        0.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "b51be9c5-df91-4517-989c-7e598d54d432",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE COVER.stl",
+      "name": "15.1 KIOSK REMOTE COVER",
+      "color": 0,
+      "position": [
+        -248.1,
+        -200.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865476
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": {
+        "color": null,
+        "finish": "pei",
+        "hidden": false
+      }
+    },
+    {
+      "id": "7b4369d7-3644-421f-a98e-cda60dc43a4e",
+      "path": "15.1 KIOSK REMOTE/15.1 KIOSK REMOTE FRONT.stl",
+      "name": "15.1 KIOSK REMOTE FRONT",
+      "color": 0,
+      "position": [
+        -124.0,
+        -200.0,
+        624.8
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": {
+        "color": null,
+        "finish": "pei",
+        "hidden": false
+      }
+    },
+    {
+      "id": "bbccd9c8-4638-475a-9f9d-d23552fc3976",
+      "path": "15.1 KIOSK REMOTE/TM1637.stp.stl",
+      "name": "TM1637.stp",
+      "color": 14706278,
+      "position": [
+        -120.0,
+        -183.1,
+        655.3
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.7071067811865476,
+        0.7071067811865475
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "57a7615d-3d0a-484e-8255-1e4c89c6ee46",
+      "path": "office_chair_repaired_mm.stl",
+      "name": "office_chair_repaired_mm",
+      "color": 7775663,
+      "position": [
+        -220.0,
+        -740.0,
+        0.0
+      ],
+      "rotation": [
+        -0.7010573846499778,
+        0.09229595564125725,
+        0.09229595564125728,
+        -0.701057384649978
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "4026dc66-eb47-4680-a864-df05b9c3749c",
+      "path": "office-uperfect_monitor.stl",
+      "name": "office-uperfect_monitor",
+      "color": 0,
+      "position": [
+        -720.0,
+        -700.0,
+        701.995
+      ],
+      "rotation": [
+        0.405579787672639,
+        0.4055797876726387,
+        0.5792279653395691,
+        0.5792279653395694
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+      "path": "office-optiplex_3060_micro.stl",
+      "name": "office-optiplex_3060_micro",
+      "color": 0,
+      "position": [
+        -855.0,
+        -159.5,
+        746.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5000000000000001,
+        0.4999999999999999,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "b550f785-bbc3-47a6-b091-674c3b226d0d",
+      "path": "RF1.11 PRIMITIVES/RF1.11 PRIMITIVES CUBE 20mm.stl",
+      "name": "RF1.11 PRIMITIVES CUBE 20mm",
+      "color": 9684093,
+      "position": [
+        -680.0,
+        -60.0,
+        750.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": true,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "f5a03ced-ea78-4c4b-8c19-94fee8e25ce4",
+      "path": "office-optiplex_3060_micro.stl",
+      "name": "office-optiplex_3060_micro",
+      "color": 0,
+      "position": [
+        -856.0,
+        -160.0,
+        706.0
+      ],
+      "rotation": [
+        0.5000000000000002,
+        0.5000000000000001,
+        0.4999999999999999,
+        0.5
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": null
+    },
+    {
+      "id": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
+      "path": "MOUNTS/11.14.KY-040 ROTARY ENCODER/Rotary_Encoder_KY-040_knob_model.stl",
+      "name": "Rotary_Encoder_KY-040_knob_model",
+      "color": 16167531,
+      "position": [
+        -123.825,
+        -126.673,
+        643.533
+      ],
+      "rotation": [
+        0.0,
+        0.2588190451025207,
+        0.0,
+        0.9659258262890683
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": null,
+      "origin": null,
+      "groupId": null,
+      "render": {
+        "color": 0,
+        "finish": "metal",
+        "hidden": false
+      }
+    },
+    {
+      "id": "dd675892-bf36-4f15-89db-bf36dbd05198",
+      "path": "RF1.11 PRIMITIVES/Utah Teapot.stl",
+      "name": "Utah Teapot",
+      "color": 16167531,
+      "position": [
+        -499.997,
+        -520.005,
+        700.001
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        -0.46174861323503397,
+        -0.8870108331782218
+      ],
+      "muted": false,
+      "centered": false,
+      "noRender": false,
+      "noExport": false,
+      "scale": [
+        4.4277,
+        4.4277,
+        4.4277
+      ],
+      "origin": null,
+      "groupId": null,
+      "render": {
+        "color": null,
+        "finish": "mirror",
+        "hidden": false
+      }
+    }
+  ]
+}

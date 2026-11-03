@@ -1,0 +1,63 @@
+{
+  "id": "2c4f0be98af4",
+  "name": "STROZZI DY PLAYERS",
+  "kind": "hd",
+  "created": 1793655242.022536,
+  "width": 1920,
+  "height": 1080,
+  "samples": 512,
+  "elapsed": 108.4,
+  "version": 19,
+  "edited": true,
+  "settings": {
+    "depthOfField": false,
+    "focusId": "558019da-62f4-4a67-b277-fd9a8f6fe135",
+    "dofStrength": 3,
+    "crop": false,
+    "lamp": 24,
+    "background": null,
+    "ground": null,
+    "beam": 2,
+    "ambient": 1,
+    "aspect": "16:9",
+    "transparent": false,
+    "reflections": 0,
+    "trackId": null,
+    "trackPivot": "all",
+    "lookAt": "view",
+    "focus": null,
+    "track": null,
+    "projection": "persp",
+    "view": "0.692,-0.692,0.208;193.808,19.055,41.429;158.342;persp;16.701",
+    "light": "-0.284,-0.175,0.943;110.903,-23.75,31.9",
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        590.703,
+        -377.841,
+        160.498
+      ],
+      "target": [
+        193.808,
+        19.055,
+        41.429
+      ],
+      "zoom": 2.148,
+      "radius": 139.164,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.284,
+          -0.175,
+          0.943
+        ],
+        "targetId": "daed045d-5fa4-4b52-8f01-ea115a85220d"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

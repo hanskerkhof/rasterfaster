@@ -1,0 +1,62 @@
+{
+  "id": "0fa2267ab08a",
+  "name": "office-desk",
+  "kind": "hd",
+  "created": 1793651392.1134322,
+  "width": 1920,
+  "height": 1080,
+  "samples": 512,
+  "elapsed": 51.7,
+  "version": 3,
+  "edited": true,
+  "settings": {
+    "depthOfField": true,
+    "focusId": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
+    "dofStrength": 4,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 1,
+    "aspect": "16:9",
+    "transparent": false,
+    "trackId": null,
+    "trackPivot": "all",
+    "lookAt": "view",
+    "focus": "Rotary_Encoder_KY-040_knob_model",
+    "track": null,
+    "projection": "ortho",
+    "view": "0.118,0.976,0.185;-188.398,-258.372,749.988;791.692;ortho",
+    "light": "0.278,-0.253,0.927;-500,-420,350",
+    "savedView": {
+      "projection": "ortho",
+      "position": [
+        250.631,
+        3360.51,
+        1436.663
+      ],
+      "target": [
+        -188.398,
+        -258.372,
+        749.988
+      ],
+      "zoom": 2.955,
+      "radius": 899.699,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.278,
+          -0.253,
+          0.927
+        ],
+        "targetId": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

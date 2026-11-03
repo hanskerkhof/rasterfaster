@@ -1,0 +1,66 @@
+{
+  "id": "159de17396da",
+  "name": "DADA",
+  "kind": "quick",
+  "created": 1793666091.849183,
+  "width": 800,
+  "height": 450,
+  "samples": 24,
+  "elapsed": 0.0,
+  "version": 14,
+  "edited": true,
+  "settings": {
+    "depthOfField": false,
+    "focusId": "d806e4b6-18dd-4229-afe4-054f90c38146",
+    "dofStrength": 5,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 2,
+    "aspect": "16:9",
+    "transparent": false,
+    "reflections": 0,
+    "fx": "xray",
+    "cut": "z:50:0",
+    "trackId": null,
+    "trackPivot": "all",
+    "lookAt": "view",
+    "focus": null,
+    "track": null,
+    "projection": "persp",
+    "view": "0.801,-0.598,0.019;188.73,-44.737,853.981;941.632;persp;24.924",
+    "light": "0.574,0.158,0.803;515.703,-470.345,853.056",
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        1896,
+        -1318.336,
+        894.27
+      ],
+      "target": [
+        188.73,
+        -44.737,
+        853.981
+      ],
+      "zoom": 1.341,
+      "radius": 895.171,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.574,
+          0.158,
+          0.803
+        ],
+        "target": null,
+        "targetId": "a9be37ee-a97b-4bbb-9b4f-c3d6addf6bed"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "efa3a4b787d5",
+  "name": "MODULATION_MACHINE",
+  "kind": "hd",
+  "created": 1793648082.7255511,
+  "width": 1920,
+  "height": 1080,
+  "samples": 512,
+  "elapsed": 193.5,
+  "version": 3,
+  "edited": true,
+  "settings": {
+    "depthOfField": true,
+    "focusId": "8210cfe8-2bda-4e3d-89f4-14033b2a1718",
+    "dofStrength": 5,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 0,
+    "aspect": "16:9",
+    "transparent": false,
+    "focus": "RF1.11 PRIMITIVES PRISM 20mm",
+    "projection": "persp",
+    "view": "0.852,0.448,-0.271;389.519,131.654,929.153;174.099;persp;3.709",
+    "light": "0.729,-0.349,0.589;249.998,48.66,972",
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        2679.838,
+        1337.044,
+        201.373
+      ],
+      "target": [
+        389.519,
+        131.654,
+        929.153
+      ],
+      "zoom": 9.738,
+      "radius": 652.069,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.729,
+          -0.349,
+          0.589
+        ],
+        "targetId": "8210cfe8-2bda-4e3d-89f4-14033b2a1718"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "id": "bed50e8ca7b6",
+  "name": "KIOSK-REMOTE",
+  "kind": "hd",
+  "created": 1793645418.188848,
+  "width": 1920,
+  "height": 1920,
+  "samples": 512,
+  "elapsed": 199.9,
+  "version": 10,
+  "edited": true,
+  "settings": {
+    "depthOfField": false,
+    "focusId": "80d3a140-d1ba-4243-909a-3d8f226abf55",
+    "dofStrength": 3,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 3,
+    "aspect": "1:1",
+    "transparent": true,
+    "focus": null,
+    "projection": "persp",
+    "view": "-0.709,-0.623,0.331;163.028,105.763,26.119;133.779;persp;12.673",
+    "light": "-0.673,-0.434,0.599;184,140,25",
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        -263.979,
+        -269.28,
+        225.78
+      ],
+      "target": [
+        163.028,
+        105.763,
+        26.119
+      ],
+      "zoom": 2.839,
+      "radius": 146.099,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.673,
+          -0.434,
+          0.599
+        ],
+        "targetId": "733f6af5-0723-4617-8dbf-277d56dc9927"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

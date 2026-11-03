@@ -1,0 +1,27 @@
+{
+  "id": "9c84af674b8e",
+  "name": "CORNEL BOX",
+  "kind": "hd",
+  "created": 1793643552.323335,
+  "width": 1920,
+  "height": 1080,
+  "samples": 512,
+  "elapsed": 369.9,
+  "version": 7,
+  "edited": true,
+  "settings": {
+    "depthOfField": false,
+    "focusId": "47394a52-0a2f-49dc-ad8c-aaf54d8368bf",
+    "dofStrength": 4,
+    "crop": false,
+    "lamp": 30,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 2,
+    "focus": null,
+    "projection": "persp",
+    "view": "0.399,-0.915,0.069;-5.357,-53.717,79.219;78.275;persp;7.083",
+    "light": "0.255,-0.208,0.944;0,0,130.5"
+  }
+}

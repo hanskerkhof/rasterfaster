@@ -1,0 +1,69 @@
+{
+  "id": "9235477c24f8",
+  "name": "MODULATION_MACHINE quick",
+  "kind": "turntable",
+  "media": "mp4",
+  "created": 1793652792.779542,
+  "width": 320,
+  "height": 180,
+  "samples": 0,
+  "elapsed": 0.0,
+  "version": 3,
+  "edited": true,
+  "settings": {
+    "depthOfField": true,
+    "focusId": "8210cfe8-2bda-4e3d-89f4-14033b2a1718",
+    "dofStrength": 5,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 1,
+    "aspect": "16:9",
+    "transparent": false,
+    "reflections": 1,
+    "trackId": "382930df-cc7f-4969-8ca1-33c84f8729d0",
+    "trackPivot": "view",
+    "lookAt": "all",
+    "focus": "RF1.11 PRIMITIVES PRISM 20mm",
+    "track": "RF7 CONNECTOR MID CIRCLE",
+    "projection": "ortho",
+    "view": "0.825,-0.533,0.189;440.753,60,939.904;814.813;ortho",
+    "light": "0.529,-0.597,0.603;676.795,60,939.904",
+    "turntable": {
+      "motion": "spin",
+      "seconds": 5,
+      "fps": 12
+    },
+    "savedView": {
+      "projection": "ortho",
+      "position": [
+        2790.81,
+        -1459.582,
+        1479.762
+      ],
+      "target": [
+        440.753,
+        60,
+        939.904
+      ],
+      "zoom": 2.081,
+      "radius": 652.069,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.529,
+          -0.597,
+          0.603
+        ],
+        "targetId": "ae17319b-01f3-42c9-8c70-e2424864a7ad"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

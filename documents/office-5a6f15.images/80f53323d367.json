@@ -1,0 +1,70 @@
+{
+  "id": "80f53323d367",
+  "name": "office-desk quick",
+  "kind": "turntable",
+  "media": "mp4",
+  "created": 1793654879.675891,
+  "width": 320,
+  "height": 320,
+  "samples": 0,
+  "elapsed": 0.0,
+  "version": 4,
+  "edited": true,
+  "settings": {
+    "depthOfField": true,
+    "focusId": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
+    "dofStrength": 4,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 1,
+    "aspect": "1:1",
+    "transparent": false,
+    "reflections": 0,
+    "trackId": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+    "trackPivot": "part",
+    "lookAt": "view",
+    "focus": "Rotary_Encoder_KY-040_knob_model",
+    "track": "office-optiplex_3060_micro",
+    "projection": "persp",
+    "view": "0.514,0.853,0.087;-277.717,-420,447.873;1505.812;persp;24.601",
+    "light": "0.278,-0.253,0.927;-500,-420,350",
+    "turntable": {
+      "motion": "spin",
+      "seconds": 5,
+      "fps": 12
+    },
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        1610.076,
+        2714.706,
+        769.04
+      ],
+      "target": [
+        -277.717,
+        -420,
+        447.873
+      ],
+      "zoom": 1.446,
+      "radius": 890.918,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.278,
+          -0.253,
+          0.927
+        ],
+        "target": null,
+        "targetId": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}

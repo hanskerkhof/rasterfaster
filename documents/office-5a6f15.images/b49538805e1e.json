@@ -1,0 +1,65 @@
+{
+  "id": "b49538805e1e",
+  "name": "office-desk",
+  "kind": "hd",
+  "created": 1793665102.6425369,
+  "width": 1920,
+  "height": 1080,
+  "samples": 256,
+  "elapsed": 68.9,
+  "version": 4,
+  "edited": true,
+  "settings": {
+    "depthOfField": false,
+    "focusId": "f506aa2b-36e1-4d7b-b6f0-c26206aed98d",
+    "dofStrength": 4,
+    "crop": false,
+    "lamp": 40,
+    "background": null,
+    "ground": null,
+    "beam": 1,
+    "ambient": 1,
+    "aspect": "16:9",
+    "transparent": false,
+    "reflections": 0,
+    "fx": "thermal",
+    "cut": "z:50:0",
+    "trackId": "fa2792be-f88d-4d4e-b385-57e6c06b9baa",
+    "trackPivot": "part",
+    "lookAt": "view",
+    "focus": null,
+    "track": "office-optiplex_3060_micro",
+    "projection": "persp",
+    "view": "0.303,0.793,0.529;-311.168,-379.049,405.643;1516.298;persp;23.323",
+    "light": "0.278,-0.253,0.927;-500,-420,350",
+    "savedView": {
+      "projection": "persp",
+      "position": [
+        802.829,
+        2533.327,
+        2347.385
+      ],
+      "target": [
+        -311.168,
+        -379.049,
+        405.643
+      ],
+      "zoom": 1.436,
+      "radius": 890.918,
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.278,
+          -0.253,
+          0.927
+        ],
+        "targetId": "dccfecd7-7825-4c4e-b82e-f98a942a8b2e"
+      },
+      "ground": "solid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    }
+  }
+}
