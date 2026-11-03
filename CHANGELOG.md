@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Views stay as saved while animations run (0.11.29)
+
+### Changed
+- **FE** (`stl-viewer.ts`, `document.store.ts`, `views-panel.ts`): a saved view is only ever changed by save or replace. The Views panel follows the live camera: moving the view by hand, or running an animation, marks the view as **changed**; stopping the animation keeps it marked and saves nothing into the preset. Clicking the name goes back to the saved view (it reads **Restore** on hover); the mark waits 1.2 s while the camera glides to a chosen view.
+
 ## 2026-11-03 - The Render dialog marks the active view (0.11.28)
 
 ### Changed
