@@ -144,8 +144,8 @@ export const beamNames = ['Spot', 'Direct', 'Soft', 'Diffuse', 'Flood'];
 export const strengthNames = ['Subtle', 'Soft', 'Medium', 'Strong', 'Extreme'];
 /** What metal, mirror and glass reflect (the dark studio is what renders always had). */
 /** The styles of a picture (FX): the ids the API takes and the names the toolbar shows. */
-export const fxIds = ['none', 'cartoon', 'outline', 'sketch', 'clay', 'blueprint', 'isometric', 'xray', 'lowpoly', 'wireframe', 'thermal', 'cutaway', 'clayrough', 'clayroughcolour'];
-export const fxNames = ['None', 'Cartoon', 'Outline', 'Sketch', 'Clay', 'Blueprint', 'Isometric', 'X-ray', 'Low poly', 'Wireframe', 'Thermal', 'Cut-away', 'Clay rough', 'Clay rough colour'];
+export const fxIds = ['none', 'cartoon', 'outline', 'sketch', 'clay', 'blueprint', 'isometric', 'xray', 'lowpoly', 'wireframe', 'thermal', 'cutaway', 'clayrough', 'clayroughcolour', 'hiddenlines', 'fog', 'lowfog', 'watercolour', 'watercolourintense', 'watercolourink'];
+export const fxNames = ['None', 'Cartoon', 'Outline', 'Sketch', 'Clay', 'Blueprint', 'Isometric', 'X-ray', 'Low poly', 'Wireframe', 'Thermal', 'Cut-away', 'Clay rough', 'Clay rough colour', 'Hidden lines', 'Depth fog', 'Low fog', 'Watercolour', 'Watercolour intense', 'Watercolour with ink'];
 export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral grey', 'None'];
 
 /** A render that waits in the queue. */

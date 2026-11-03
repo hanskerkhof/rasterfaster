@@ -327,13 +327,13 @@ def test_depth_of_field_focus_comes_from_the_call_or_the_document(tmp_path, monk
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40,,,1,16:9,0,0,none,z:50:0"  # what the document says
+    assert client.get(url).status_code == 200 and seen[-1] == "1|3|a#0,40,,,1,16:9,0,0,none,z:50:0,a"  # what the document says
     client.get(url, params={"dof": "false"})
-    assert seen[-1] == "0#0,40,,,1,16:9,0,0,none,z:50:0"
+    assert seen[-1] == "0#0,40,,,1,16:9,0,0,none,z:50:0,a"  # the focus travels with it (the Thermal style is hottest there)
     client.get(url, params={"dof": "true", "focus": "other-part"})
-    assert seen[-1] == "1|3|other-part#0,40,,,1,16:9,0,0,none,z:50:0"
+    assert seen[-1] == "1|3|other-part#0,40,,,1,16:9,0,0,none,z:50:0,other-part"
     client.get(url, params={"dof": "true", "strength": 5})
-    assert seen[-1] == "1|5|a#0,40,,,1,16:9,0,0,none,z:50:0"
+    assert seen[-1] == "1|5|a#0,40,,,1,16:9,0,0,none,z:50:0,a"
     assert client.get(url, params={"dof": "true", "strength": 6}).status_code == 422
     assert client.get(url, params={"dof": "true", "focus": "not a part"}).status_code == 422
 
@@ -349,10 +349,10 @@ def test_ambient_preset_comes_from_the_call_or_the_document(tmp_path, monkeypatc
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40,,,1,16:9,0,0,none,z:50:0"  # what the document says
-    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40,,,1,16:9,0,0,none,z:50:0"
+    assert client.get(url).status_code == 200 and seen[-1] == "0#2,40,,,1,16:9,0,0,none,z:50:0,"  # what the document says
+    assert client.get(url + "?ambient=5").status_code == 200 and seen[-1] == "0#5,40,,,1,16:9,0,0,none,z:50:0,"
     assert client.get(url + "?ambient=6").status_code == 422
-    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20,,,1,16:9,0,0,none,z:50:0"
+    assert client.get(url + "?lamp=20").status_code == 200 and seen[-1] == "0#2,20,,,1,16:9,0,0,none,z:50:0,"
     assert client.get(url + "?lamp=61").status_code == 422
 
 
@@ -431,9 +431,9 @@ def test_picture_shape_and_transparent_background_reach_the_blender_script(tmp_p
     seen = []
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None: seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
-    assert client.get(url).status_code == 200 and seen[-1].endswith(",4:5,1,0,none,z:50:0")  # what the document says
+    assert client.get(url).status_code == 200 and seen[-1].endswith(",4:5,1,0,none,z:50:0,")  # what the document says
     client.get(url, params={"aspect": "1:1", "transparent": "false"})
-    assert seen[-1].endswith(",1:1,0,0,none,z:50:0")
+    assert seen[-1].endswith(",1:1,0,0,none,z:50:0,")
     assert client.get(url, params={"aspect": "7:3"}).status_code == 422
     assert main.aspect_ratio("9:16") == 9 / 16 and abs(main.RenderJob("S", 1920, 96, aspect=1.0).megapixels - 3.6864) < 1e-6
     assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"aspect": "2:1"}}).status_code == 422
@@ -598,7 +598,7 @@ def test_reflections_preset_comes_from_the_call_or_the_document(tmp_path, monkey
     monkeypatch.setattr(blenderexport, "build_render", lambda glb, blender, studio=True, light=None, width=800, samples=24, progress=None, started=None, timeout=180, dof="0", crop=False, phase=None, turntable=None, track="", track_pivot="all", look_at="view", direction="ccw": seen.append(dof) or b"\x89PNG")
     url = f"/api/documents/{created['id']}/render.png"
     client.get(url)
-    assert seen[-1].endswith(",16:9,0,1,none,z:50:0")  # the document's
+    assert seen[-1].endswith(",16:9,0,1,none,z:50:0,")  # the document's
     client.get(url, params={"reflections": 3})
-    assert seen[-1].endswith(",16:9,0,3,none,z:50:0") and client.get(url, params={"reflections": 5}).status_code == 422
+    assert seen[-1].endswith(",16:9,0,3,none,z:50:0,") and client.get(url, params={"reflections": 5}).status_code == 422
     assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"reflections": 9}}).status_code == 422

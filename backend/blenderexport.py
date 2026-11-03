@@ -275,9 +275,10 @@ beam_text, _, rest_text = rest_text.partition(",")
 aspect_text, _, rest_text = rest_text.partition(",")  # the shape of the picture ("16:9", "1:1" ...)
 transparent_text, _, rest_text = rest_text.partition(",")  # "1" for a transparent background
 reflections_text, _, rest_text = rest_text.partition(",")  # what metal, mirror and glass reflect (0 to 4)
-fx_text, _, cut_text = rest_text.partition(",")  # the style of the picture, and where the cut-away cuts ("z:50:0")
+fx_text, _, rest_text = rest_text.partition(",")  # the style of the picture
+cut_text, _, focus_text = rest_text.partition(",")  # where the cut-away cuts ("z:50:0"), and the part the focus menu chose (the Thermal style is hottest there)
 reflections = min(max(int(reflections_text or 0), 0), 4)
-fx = fx_text if fx_text in ("cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour") else "none"
+fx = fx_text if fx_text in ("cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour", "hiddenlines", "fog", "lowfog", "watercolour", "watercolourintense", "watercolourink") else "none"
 aspect_w, _, aspect_h = (aspect_text or "16:9").partition(":")
 aspect_ratio = max(0.2, min(5.0, int(aspect_w or 16) / max(int(aspect_h or 9), 1)))
 transparent_background = transparent_text == "1"
@@ -672,6 +673,12 @@ def apply_fx():
         "cutaway": (None, None, None, 0),
         "clayrough": (None, None, None, 0),
         "clayroughcolour": (None, None, None, 0),
+        "fog": (None, None, None, 0),
+        "watercolour": (None, (0.97, 0.95, 0.9), None, 0),
+        "watercolourintense": (None, (0.97, 0.95, 0.9), None, 0),
+        "watercolourink": (None, (0.97, 0.95, 0.9), (2.6, (0.02, 0.02, 0.03), True), 0),  # intense watercolour with black marker lines on top  # cream paper, no lines: the edges are where the colour stops
+        "lowfog": (None, None, None, 0),
+        "hiddenlines": (None, (0x1b / 255, 0x1d / 255, 0x22 / 255), (0.7, (0.8, 0.8, 0.8), False), 0),  # the studio background; the lines take the colour of their part
     }[fx]
     colour, paper, lines, steps = style
     if fx == "xray":  # see-through parts whose edges glow: the more a surface turns away from the camera, the more it shines
@@ -773,6 +780,186 @@ def apply_fx():
                     shader.inputs["Metallic"].default_value = 0.0
                     shader.inputs["Coat Weight"].default_value = 0.0
                     roughen(material.node_tree, shader, False)
+    if fx in ("fog", "lowfog"):  # mist: it thickens with distance (parts fade into it), or lies low on the ground (up to half the height of the parts)
+        parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Studio floor", "Camera path") and not o.hide_render]
+        corners = [o.matrix_world @ Vector(c) for o in parts for c in o.bound_box]
+        if corners and scene.camera:
+            low = Vector(map(min, *[tuple(c) for c in corners]))
+            high = Vector(map(max, *[tuple(c) for c in corners]))
+            mist = (0.82, 0.86, 0.92, 1) if fx == "fog" else (0.8, 0.82, 0.88, 1)
+            if fx == "fog":  # the whole air in front of the camera: thicker the farther away
+                camera_at = scene.camera.matrix_world.translation
+                distances = [(c - camera_at).length for c in corners]
+                near, reach = min(distances), max(distances)
+                world = scene.world
+                if world and world.use_nodes:
+                    tree = world.node_tree
+                    output = next((n for n in tree.nodes if n.type == "OUTPUT_WORLD"), None)
+                    if output is not None:
+                        # the air in front of the nearest part is clear, then the mist thickens towards the farthest part (and stays as thick behind it): like the haze of a real landscape
+                        where = tree.nodes.new("ShaderNodeNewGeometry")
+                        away = tree.nodes.new("ShaderNodeVectorMath")
+                        away.operation = "DISTANCE"
+                        away.inputs[1].default_value = camera_at
+                        build_up = tree.nodes.new("ShaderNodeMapRange")
+                        build_up.clamp = True
+                        build_up.inputs["From Min"].default_value = near
+                        build_up.inputs["From Max"].default_value = max(reach, near + 0.01)
+                        build_up.inputs["To Min"].default_value = 0.0
+                        build_up.inputs["To Max"].default_value = 1.0
+                        thick = tree.nodes.new("ShaderNodeMath")
+                        thick.operation = "MULTIPLY"
+                        thick.inputs[1].default_value = 3.2 / max(reach - near, 0.01)  # through the whole depth of the scene about a quarter of the light gets through
+                        glow = tree.nodes.new("ShaderNodeMath")  # the mist glows a little by itself: far parts fade into a light grey, not into black smoke
+                        glow.operation = "MULTIPLY"
+                        glow.inputs[1].default_value = 0.75
+                        air = tree.nodes.new("ShaderNodeVolumePrincipled")
+                        air.inputs["Color"].default_value = mist
+                        air.inputs["Emission Color"].default_value = mist
+                        air.inputs["Anisotropy"].default_value = 0.25
+                        tree.links.new(where.outputs["Position"], away.inputs[0])
+                        tree.links.new(away.outputs["Value"], build_up.inputs["Value"])
+                        tree.links.new(build_up.outputs["Result"], thick.inputs[0])
+                        tree.links.new(thick.outputs[0], air.inputs["Density"])
+                        tree.links.new(thick.outputs[0], glow.inputs[0])
+                        tree.links.new(glow.outputs[0], air.inputs["Emission Strength"])
+                        tree.links.new(air.outputs[0], output.inputs["Volume"])
+            else:  # a layer of mist on the ground: densest at the floor, thinning out upwards and with wisps
+                import bmesh
+                height = (high.z - low.z) / 2
+                span = max(high.x - low.x, high.y - low.y, height) * 1.6
+                shape = bmesh.new()
+                bmesh.ops.create_cube(shape, size=1.0)
+                body = bpy.data.meshes.new("FX fog")
+                shape.to_mesh(body)
+                shape.free()
+                layer = bpy.data.objects.new("FX fog", body)
+                scene.collection.objects.link(layer)
+                layer.scale = Vector((span, span, height))
+                layer.location = Vector(((low.x + high.x) / 2, (low.y + high.y) / 2, low.z + height / 2))
+                layer.visible_shadow = False
+                material = bpy.data.materials.new("FX fog")
+                material.use_nodes = True
+                tree = material.node_tree
+                for node in list(tree.nodes):
+                    if node.type != "OUTPUT_MATERIAL":
+                        tree.nodes.remove(node)
+                output = next(n for n in tree.nodes if n.type == "OUTPUT_MATERIAL")
+                coords = tree.nodes.new("ShaderNodeTexCoord")
+                split = tree.nodes.new("ShaderNodeSeparateXYZ")
+                tree.links.new(coords.outputs["Generated"], split.inputs[0])
+                thin = tree.nodes.new("ShaderNodeMath")  # 1 at the floor, 0 at the top of the layer, falling off smoothly
+                thin.operation = "SUBTRACT"
+                thin.inputs[0].default_value = 1.0
+                tree.links.new(split.outputs["Z"], thin.inputs[1])
+                soft = tree.nodes.new("ShaderNodeMath")
+                soft.operation = "POWER"
+                soft.inputs[1].default_value = 1.1  # thins out gently, so the mist is still there near the top of the layer
+                tree.links.new(thin.outputs[0], soft.inputs[0])
+                wisps = tree.nodes.new("ShaderNodeTexNoise")
+                wisps.inputs["Scale"].default_value = 3.5
+                wisps.inputs["Detail"].default_value = 4.0
+                tree.links.new(coords.outputs["Object"], wisps.inputs["Vector"])
+                patchy = tree.nodes.new("ShaderNodeMath")
+                patchy.operation = "MULTIPLY_ADD"  # 0.45 + 1.1 x noise: thicker and thinner patches
+                patchy.inputs[1].default_value = 1.1
+                patchy.inputs[2].default_value = 0.0
+                tree.links.new(wisps.outputs["Fac"], patchy.inputs[0])
+                flat = tree.nodes.new("ShaderNodeCombineXYZ")  # across the layer: thickest in the middle, thinning out to nothing at the edges
+                flat.inputs["Z"].default_value = 0.5
+                tree.links.new(split.outputs["X"], flat.inputs["X"])
+                tree.links.new(split.outputs["Y"], flat.inputs["Y"])
+                wide = tree.nodes.new("ShaderNodeMapping")
+                wide.inputs["Location"].default_value = (-1.0, -1.0, -0.5)
+                wide.inputs["Scale"].default_value = (2.0, 2.0, 2.0)
+                tree.links.new(flat.outputs[0], wide.inputs["Vector"])
+                round_ = tree.nodes.new("ShaderNodeTexGradient")
+                round_.gradient_type = "SPHERICAL"
+                tree.links.new(wide.outputs[0], round_.inputs["Vector"])
+                edge = tree.nodes.new("ShaderNodeMath")
+                edge.operation = "POWER"
+                edge.inputs[1].default_value = 0.8
+                tree.links.new(round_.outputs["Fac"], edge.inputs[0])
+                height_part = tree.nodes.new("ShaderNodeMath")
+                height_part.operation = "MULTIPLY"
+                tree.links.new(soft.outputs[0], height_part.inputs[0])
+                tree.links.new(edge.outputs[0], height_part.inputs[1])
+                density = tree.nodes.new("ShaderNodeMath")
+                density.operation = "MULTIPLY"
+                tree.links.new(height_part.outputs[0], density.inputs[0])
+                tree.links.new(patchy.outputs[0], density.inputs[1])
+                air = tree.nodes.new("ShaderNodeVolumeScatter")
+                air.inputs["Color"].default_value = mist
+                air.inputs["Anisotropy"].default_value = 0.2
+                scale = tree.nodes.new("ShaderNodeMath")
+                scale.operation = "MULTIPLY"
+                scale.inputs[1].default_value = 9.0 / max(height, 1e-6)  # looking down through the layer lets little of the light through where it is densest
+                tree.links.new(density.outputs[0], scale.inputs[0])
+                tree.links.new(scale.outputs[0], air.inputs["Density"])
+                tree.links.new(air.outputs[0], output.inputs["Volume"])
+                layer.data.materials.append(material)
+    if fx in ("watercolour", "watercolourintense", "watercolourink"):  # washes of colour on paper: the pigment varies a little in every part, the colours are smeared into patches and pale
+        for material in list(bpy.data.materials):
+            if not material.use_nodes or material.name.startswith("FX"):
+                continue
+            tree = material.node_tree
+            shader = next((n for n in tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+            if shader is None:
+                continue
+            shader.inputs["Roughness"].default_value = 1.0
+            shader.inputs["Metallic"].default_value = 0.0
+            shader.inputs["Coat Weight"].default_value = 0.0
+            base = tuple(shader.inputs["Base Color"].default_value)
+            coords = tree.nodes.new("ShaderNodeTexCoord")
+            blotches = tree.nodes.new("ShaderNodeTexNoise")
+            blotches.inputs["Scale"].default_value = 6.0 if fx != "watercolour" else 9.0
+            blotches.inputs["Detail"].default_value = 7.0 if fx != "watercolour" else 5.0
+            tree.links.new(coords.outputs["Object"], blotches.inputs["Vector"])
+            ramp = tree.nodes.new("ShaderNodeValToRGB")  # more and less pigment
+            ramp.color_ramp.elements[0].color = (0.2, 0.2, 0.2, 1) if fx != "watercolour" else (0.4, 0.4, 0.4, 1)
+            ramp.color_ramp.elements[1].color = (1.0, 1.0, 1.0, 1)
+            ramp.color_ramp.elements[0].position, ramp.color_ramp.elements[1].position = (0.3, 0.7) if fx != "watercolour" else (0.0, 1.0)  # intense: more contrast between the pale and the dark patches
+            tree.links.new(blotches.outputs["Fac"], ramp.inputs["Factor"])
+            wash = tree.nodes.new("ShaderNodeMix")
+            wash.data_type = "RGBA"
+            wash.blend_type = "MULTIPLY"
+            wash.inputs["Factor"].default_value = 1.0
+            wash.inputs[6].default_value = base
+            tree.links.new(ramp.outputs["Color"], wash.inputs[7])
+            tree.links.new(wash.outputs[2], shader.inputs["Base Color"])
+        tree = bpy.data.node_groups.new("FX compositing", "CompositorNodeTree")
+        tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
+        scene.compositing_node_group = tree
+        layers = tree.nodes.new("CompositorNodeRLayers")
+        paint = tree.nodes.new("CompositorNodeKuwahara")
+        paint.inputs["Size"].default_value = 14 if fx != "watercolour" else 9  # intense: bigger, wetter patches
+        pale = tree.nodes.new("CompositorNodeHueSat")
+        pale.inputs["Saturation"].default_value = 1.7 if fx != "watercolour" else 0.85  # intense: deep, juicy colours
+        pale.inputs["Value"].default_value = 1.25 if fx != "watercolour" else 1.35
+        out = tree.nodes.new("NodeGroupOutput")
+        tree.links.new(layers.outputs["Image"], paint.inputs["Image"])
+        tree.links.new(paint.outputs["Image"], pale.inputs["Image"])
+        tree.links.new(pale.outputs["Image"], out.inputs[0])
+    if fx == "hiddenlines":  # the "Hidden lines removed" look of the design view: faces in the background colour, only the visible edges drawn, in the colour of their part
+        scene.view_settings.view_transform = "Standard"  # the colours as they are, not tone mapped
+        scene.view_settings.look = "None"
+        flat = (tuple(background_colour[:3]) if background_colour is not None else tuple((c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4) for c in paper)) + (1,)
+        for material in list(bpy.data.materials):
+            if not material.use_nodes or material.name.startswith("FX"):
+                continue
+            tree = material.node_tree
+            shader = next((n for n in tree.nodes if n.type == "BSDF_PRINCIPLED"), None)
+            base = tuple(shader.inputs["Base Color"].default_value)[:3] if shader is not None else (0.8, 0.8, 0.8)
+            material.line_color = (*base, 1.0)  # the Freestyle lines read it
+            output = next((n for n in tree.nodes if n.type == "OUTPUT_MATERIAL"), None)
+            for node in list(tree.nodes):
+                if output is None or node.name != output.name:
+                    tree.nodes.remove(node)
+            if output is not None:
+                fill = tree.nodes.new("ShaderNodeEmission")
+                fill.inputs["Color"].default_value = flat
+                fill.inputs["Strength"].default_value = 1.0
+                tree.links.new(fill.outputs[0], output.inputs["Surface"])
     if fx == "wireframe":  # light parts with the triangles of their meshes drawn on them
         material = bpy.data.materials.new("FX wireframe")
         material.use_nodes = True
@@ -833,23 +1020,45 @@ def apply_fx():
                     cut.material_mode = "TRANSFER"  # the cut faces take the cutter's colour
                 except (TypeError, AttributeError):
                     pass
-    if fx == "thermal":  # false colour by distance from the camera: warm near, cold far
+    if fx == "thermal":  # false colour by distance from the focused part, else what the lamp points at (the hottest): warm close to it, cold far from it
         camera = scene.camera
         if camera:
-            view_layer.use_pass_z = True
-            forward = -(camera.matrix_world.to_3x3() @ Vector((0, 0, 1)))
-            parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Camera path",) and not o.hide_render]
-            depths = [(o.matrix_world @ Vector(c) - camera.matrix_world.translation).dot(forward) for o in parts if o.name != "Studio floor" for c in o.bound_box]
-            near, far = (min(depths), max(depths)) if depths else (0.1, 10.0)
-            far = max(far, near + 0.01)
+            view_layer.use_pass_position = True
+            view_layer.use_pass_z = True  # the depth tells the sky (nothing there) from the parts
+            parts = [o for o in bpy.data.objects if o.type == "MESH" and o.name not in ("Studio floor", "Camera path") and not o.hide_render]
+
+            def box(o):
+                corners = [o.matrix_world @ Vector(c) for c in o.bound_box]
+                return Vector(map(min, *[tuple(c) for c in corners])), Vector(map(max, *[tuple(c) for c in corners]))
+
+            all_corners = [c for o in parts for c in box(o)]
+            low = Vector(map(min, *[tuple(c) for c in all_corners])) if all_corners else Vector()
+            high = Vector(map(max, *[tuple(c) for c in all_corners])) if all_corners else Vector()
+            chosen = next((o for o in parts if o.get("itemId") == focus_text), None) if focus_text and focus_text != "_centre" else None
+            aim = light_spec.split(";")[1] if light_spec else ""  # where the lamp points: a part, a point, or (nothing set) the middle of the scene
+            lit_part = next((o for o in parts if o.get("itemId") == aim[5:]), None) if aim.startswith("part:") else None
+            if focus_text == "_centre":  # the focus menu says: the middle of all the objects
+                heat_at, heat_radius = (low + high) / 2, 0.0
+            elif chosen is not None or lit_part is not None:  # the focused part, else the part the lamp points at: the whole part is at its hottest
+                a_, b_ = box(chosen if chosen is not None else lit_part)
+                heat_at, heat_radius = (a_ + b_) / 2, (b_ - a_).length / 2
+            elif aim and not aim.startswith("part:"):  # the lamp points at a point
+                heat_at, heat_radius = Vector(float(v) for v in aim.split(",")) * 0.001, 0.0
+            else:
+                heat_at, heat_radius = (low + high) / 2, 0.0
+            farthest = max((c - heat_at).length for c in all_corners) if all_corners else 1.0
+            farthest = max(farthest, heat_radius + 0.01)
             tree = bpy.data.node_groups.new("FX compositing", "CompositorNodeTree")
             tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")
             scene.compositing_node_group = tree
             layers = tree.nodes.new("CompositorNodeRLayers")
+            away = tree.nodes.new("ShaderNodeVectorMath")
+            away.operation = "DISTANCE"
+            away.inputs[1].default_value = heat_at
             ranged = tree.nodes.new("ShaderNodeMapRange")
-            ranged.inputs["From Min"].default_value = near
-            ranged.inputs["From Max"].default_value = far
-            ranged.inputs["To Min"].default_value = 1.0  # near is hot
+            ranged.inputs["From Min"].default_value = heat_radius
+            ranged.inputs["From Max"].default_value = farthest
+            ranged.inputs["To Min"].default_value = 1.0  # at the part: hot
             ranged.inputs["To Max"].default_value = 0.0
             ranged.clamp = True
             ramp = tree.nodes.new("ShaderNodeValToRGB")
@@ -860,10 +1069,25 @@ def apply_fx():
                 element = ramp.color_ramp.elements.new(position)
                 element.color = colour_
             out = tree.nodes.new("NodeGroupOutput")
-            tree.links.new(layers.outputs["Depth"], ranged.inputs["Value"])
-            tree.links.new(ranged.outputs["Result"], ramp.inputs["Factor"])
+            sky = tree.nodes.new("ShaderNodeMath")
+            sky.operation = "GREATER_THAN"
+            sky.inputs[1].default_value = ((camera.matrix_world.translation - heat_at).length + farthest) * 3  # nothing of the scene is this far away
+            keep = tree.nodes.new("ShaderNodeMath")
+            keep.operation = "SUBTRACT"
+            keep.inputs[0].default_value = 1.0
+            cold_sky = tree.nodes.new("ShaderNodeMath")
+            cold_sky.operation = "MULTIPLY"
+            tree.links.new(layers.outputs["Depth"], sky.inputs[0])
+            tree.links.new(sky.outputs[0], keep.inputs[1])
+            tree.links.new(layers.outputs["Position"], away.inputs[0])
+            tree.links.new(away.outputs["Value"], ranged.inputs["Value"])
+            tree.links.new(ranged.outputs["Result"], cold_sky.inputs[0])
+            tree.links.new(keep.outputs[0], cold_sky.inputs[1])
+            tree.links.new(cold_sky.outputs[0], ramp.inputs["Factor"])
             tree.links.new(ramp.outputs["Color"], out.inputs[0])
-    if paper is not None:  # the camera sees the paper, everything else the studio's lighting
+    if paper is not None:  # the camera sees the paper
+        to_linear = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+        paper_linear = tuple(background_colour[:3]) if (fx == "hiddenlines" and background_colour is not None) else tuple(to_linear(c) for c in paper)  # the chosen background colour wins for the design-view look, everything else the studio's lighting
         floor = bpy.data.objects.get("Studio floor")
         if floor:
             floor.hide_render = True
@@ -874,7 +1098,7 @@ def apply_fx():
             if output and output.inputs["Surface"].links:
                 lighting = output.inputs["Surface"].links[0].from_node
                 plain = tree.nodes.new("ShaderNodeBackground")
-                plain.inputs["Color"].default_value = (*(c ** 2.2 for c in paper), 1)
+                plain.inputs["Color"].default_value = (*paper_linear, 1)
                 path, mix = tree.nodes.new("ShaderNodeLightPath"), tree.nodes.new("ShaderNodeMixShader")
                 tree.links.new(path.outputs["Is Camera Ray"], mix.inputs[0])
                 tree.links.new(lighting.outputs[0], mix.inputs[1])
@@ -888,11 +1112,11 @@ def apply_fx():
         scene.render.line_thickness_mode = "ABSOLUTE"
         scene.render.line_thickness = thickness
         settings = view_layer.freestyle_settings
-        settings.crease_angle = math.radians(115)
+        settings.crease_angle = math.radians(155 if fx == "hiddenlines" else 115)  # the design view draws every edge where the faces turn more than 25 degrees
         for old in list(settings.linesets):
             settings.linesets.remove(old)
         lineset = settings.linesets.new("FX lines")
-        for name in ("select_silhouette", "select_border", "select_crease", "select_material_boundary", "select_external_contour"):
+        for name in (("select_silhouette", "select_border", "select_crease") if fx == "hiddenlines" else ("select_silhouette", "select_external_contour", "select_border") if fx == "watercolourink" else ("select_silhouette", "select_border", "select_crease", "select_material_boundary", "select_external_contour")):  # the ink drawing keeps to the contours: no lines on every little edge
             setattr(lineset, name, True)
         lineset.select_by_visibility = True
         drawn_parts = bpy.data.collections.new("FX parts")  # the lines belong to the parts, not to the studio floor (its rim would be a line across the picture)
@@ -904,7 +1128,24 @@ def apply_fx():
         lineset.collection = drawn_parts
         style_ = bpy.data.linestyles.new("FX line style")
         style_.color = ink
-        style_.thickness = thickness
+        style_.thickness = thickness * (max(scene.render.resolution_x, 1000) / 1000 if fx == "hiddenlines" else 1.0)
+        if fx == "hiddenlines":  # each line in the colour of its part
+            by_part = style_.color_modifiers.new("Part colour", "MATERIAL")
+            by_part.material_attribute = "LINE"
+        if fx == "watercolourink":  # a marker pen: broad and thin with the direction of the stroke, swelling and thinning along it, and no tiny scraps
+            scale_ = max(scene.render.resolution_x, 1000) / 1000
+            style_.thickness = 1.0
+            scene.render.line_thickness = 1.0  # the pen modifiers set the width
+            try:
+                style_.use_length_min = True
+                style_.length_min = 45.0 * scale_
+                pen = style_.thickness_modifiers.new("Pen", "CALLIGRAPHY")
+                pen.thickness_min, pen.thickness_max, pen.orientation = 0.5 * scale_, 3.2 * scale_, math.radians(40)
+                swell = style_.thickness_modifiers.new("Swell", "NOISE")
+                swell.amplitude, swell.period, swell.seed = 0.9 * scale_, 40.0, 7
+                swell.use_asymmetric = False
+            except (RuntimeError, TypeError, AttributeError):
+                pass
         if drawn:  # a wobbly, hand-drawn line
             try:
                 style_.thickness_position = "CENTER"
@@ -915,6 +1156,19 @@ def apply_fx():
             except (RuntimeError, TypeError, AttributeError):
                 pass
         lineset.linestyle = style_
+        if fx == "watercolourink":  # the marker lines stay out of the smeared picture and go over it afterwards, sharp
+            settings.as_render_pass = True
+            scene.render.use_freestyle = True
+            group = scene.compositing_node_group
+            if group is not None:
+                layers = next((n for n in group.nodes if n.bl_idname == "CompositorNodeRLayers"), None)
+                pale = next((n for n in group.nodes if n.bl_idname == "CompositorNodeHueSat"), None)
+                out = next((n for n in group.nodes if n.bl_idname == "NodeGroupOutput"), None)
+                if layers is not None and pale is not None and out is not None and "Freestyle" in layers.outputs:
+                    over = group.nodes.new("CompositorNodeAlphaOver")
+                    group.links.new(pale.outputs["Image"], over.inputs["Background"])
+                    group.links.new(layers.outputs["Freestyle"], over.inputs["Foreground"])
+                    group.links.new(over.outputs["Image"], out.inputs[0])
     if steps:  # flat bands of colour: the compositor posterizes the picture and makes it a little livelier
         tree = bpy.data.node_groups.new("FX compositing", "CompositorNodeTree")
         tree.interface.new_socket("Image", in_out="OUTPUT", socket_type="NodeSocketColor")

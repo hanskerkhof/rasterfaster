@@ -2,6 +2,15 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Hidden lines, fog, watercolour and a smarter Thermal (0.11.17)
+
+### Added
+- **FE** + **BE** (`blenderexport.py`, `main.py`, `render.service.ts`): more **FX** styles. **Hidden lines**: the "Hidden lines removed" look of the design view as a render (faces in the background colour, only visible edges, in the colour of their part, edges beyond 25 degrees). **Depth fog**: the air in front of the nearest part is clear, then a mist thickens towards the farthest part and the background. **Low fog**: a layer of patchy mist on the ground, up to half the height of the parts. **Watercolour**, **Watercolour intense** (deep colours, bigger patches, more pigment contrast) and **Watercolour with ink** (the intense one with sparse black marker lines, thick and thin like a pen, laid over the smeared colour so they stay sharp).
+
+### Changed
+- **FE** + **BE**: **Thermal** is hottest at the part chosen in the Focus menu; with none chosen, at the part the lamp points at (or a point, or the middle of the scene); the whole part is at its hottest and the colour cools with 3D distance from it. The Focus menu is usable with Thermal even when depth of field is off.
+- **FE** (`images-panel.ts`): the Gallery notes call the style **FX** (for example "FX Thermal").
+
 ## 2026-11-03 - More FX styles and a cut-away section (0.11.16)
 
 ### Added

@@ -25,7 +25,7 @@ import { ColorPalette } from './color-palette';
           <input type="checkbox" [checked]="render.depthOfField()" (change)="toggleDepthOfField($any($event.target).checked)" /> Depth of field
         </label>
         @if (render.depthOfField() && orthographic()) { <span class="dofnote" title="An orthographic view has no depth of field: switch the 3D view to the perspective camera">⚠ needs a perspective view</span> }
-          <select class="focus" [disabled]="!render.depthOfField()" [value]="focusValue()" title="The part that is sharp. Automatic: the part nearest to the camera that is in the picture. Or the middle of the box round all the objects." (change)="chooseFocus($any($event.target).value)">
+          <select class="focus" [disabled]="!render.depthOfField() && render.fx() !== 'thermal'" [value]="focusValue()" title="The part that is sharp (with the Thermal style: the hottest part; with none chosen the lamp decides). Automatic: the part nearest to the camera that is in the picture. Or the middle of the box round all the objects." (change)="chooseFocus($any($event.target).value)">
             <option value="" [selected]="!focusValue()">Focus: nearest in the picture</option>
             <option [value]="focusCentre" [selected]="focusValue() === focusCentre">Focus: centre of the objects</option>
             @for (part of parts(); track part.id) { <option [value]="part.id" [selected]="part.id === focusValue()">Focus: {{ part.label }}</option> }
