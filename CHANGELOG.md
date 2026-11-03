@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - A steady progress toast, "changed" saves (0.11.25)
+
+### Changed
+- **FE** (`app.html`, `app.scss`): the **progress toast** of a render no longer jumps: it has a fixed width, the numbers (frame, sample, percentage, time, time left) have room reserved, and a long name is cut off with an ellipsis, so the text and the Cancel button stay where they are while the values change.
+- **FE** (`views-panel.ts`): the **changed** tag of the Views panel is a button: it turns into **save** on hover and saves the view as you see it now (the same as the replace button next to it).
+
 ## 2026-11-03 - Video progress, draft videos, own video size (0.11.24)
 
 ### Added

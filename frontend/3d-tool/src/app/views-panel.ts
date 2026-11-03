@@ -35,7 +35,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
             @if (editing() === view.id) {
               <input #nameInput class="rename" [value]="view.name" maxlength="80" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()" (keydown)="onKey($event, view.id, nameInput)" (blur)="commit(view.id, nameInput.value)" />
             } @else { <span class="label">{{ view.name }}</span> }
-            @if (view.id === fromId()) { <span class="changed" title="The camera has moved on from this view: ⟳ replaces it by what you see now">changed</span> }
+            @if (view.id === fromId()) { <button type="button" class="changed" title="The camera has moved on from this view: click to save the view as you see it now (the same as ⟳)" (click)="update($event, view.id)"><span class="was">changed</span><span class="now">save</span></button> }
             <button type="button" class="x replace" title="Replace this view by what you see now (⇧ + its number)" (click)="update($event, view.id)">⟳</button>
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
           </div>
@@ -65,7 +65,9 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .view { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; border-radius: 4px; } .view:hover { background: rgba(255,255,255,.08); }
     .view.active { background: rgba(47,111,237,.35); box-shadow: inset 3px 0 0 #2f6fed; } .view.active:hover { background: rgba(47,111,237,.45); } .view.active .num { color: #fff; }
     .view.from { background: rgba(224,160,48,.14); box-shadow: inset 3px 0 0 #e0a030; } .view.from:hover { background: rgba(224,160,48,.24); } .view.from .num { color: #e0a030; }
-    .changed { flex: none; font-size: 10px; letter-spacing: .02em; color: #e0a030; border: 1px dashed #e0a030; border-radius: 8px; padding: 0 6px; }
+    .changed { flex: none; font: inherit; font-size: 10px; letter-spacing: .02em; color: #e0a030; background: transparent; border: 1px dashed #e0a030; border-radius: 8px; padding: 0 6px; cursor: pointer; }
+    .changed { display: inline-grid; } .changed span { grid-area: 1 / 1; text-align: center; } .changed .now { visibility: hidden; } /* both words in one cell: the tag keeps its width when "changed" turns into "save" */
+    .changed:hover { background: #e0a030; color: #1b1d23; border-style: solid; } .changed:hover .was { visibility: hidden; } .changed:hover .now { visibility: visible; font-weight: 600; }
     .view.from .replace { opacity: 1; color: #e0a030; }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
