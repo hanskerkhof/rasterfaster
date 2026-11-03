@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - The render's floor at the height of the app's ground (0.11.21)
+
+### Fixed
+- **BE** (`blenderexport.py`): the studio floor of the Blender scene sat under the lowest part of the document, so with a part below z = 0 (a 4 mm mirror plate, for example) the other parts seemed to float. It now sits where the app puts its grid and ground, a hair below z = 0, so a render shows the parts at the same height as the view does.
+
 ## 2026-11-03 - Data in ~/Documents/RASTERFASTER_APP (0.11.20)
 
 ### Changed

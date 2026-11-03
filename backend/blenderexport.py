@@ -471,8 +471,9 @@ if studio == "1":
             low, high = Vector(map(min, low, w)), Vector(map(max, high, w))
     centre, r = (low + high) / 2, (high - low).length / 2
 
-    # Studio floor: a dark matte disc just under the parts, so they sit on something and cast soft shadows.
-    bpy.ops.mesh.primitive_circle_add(vertices=96, radius=r * 6, fill_type="NGON", location=(centre.x, centre.y, low.z - 0.0005))
+    # Studio floor: a dark matte disc at the height of the ground of the app (the build plate, z = 0: a hair below it, as the app puts its grid and ground), so the
+    # parts sit where they sit in the app and cast soft shadows. Parts that hover above z = 0 hover here too.
+    bpy.ops.mesh.primitive_circle_add(vertices=96, radius=r * 6, fill_type="NGON", location=(centre.x, centre.y, -0.00005))
     floor = bpy.context.active_object
     floor.name = "Studio floor"
     floor.is_shadow_catcher = transparent_background  # with a transparent background the floor is invisible but still shows the shadows of the parts
