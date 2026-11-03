@@ -102,22 +102,13 @@ export class ViewsPanel {
   protected save() { this.store.saveCurrentView(); }
   protected update(event: Event, id: string) { event.stopPropagation(); this.store.updateSavedView(id); }
   protected remove(event: Event, id: string) { event.stopPropagation(); this.store.removeSavedView(id); }
-  /** The saved view the camera is on now (the camera of the document is kept a moment after it moves, so this follows it). */
-  protected readonly activeId = computed(() => {
-    const now = this.store.doc().view;
-    if (!now) return null;
-    const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
-    return this.store.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
-  });
+  /** The saved view the camera is on now, and the one it came from when it has moved on (both from the store: the Render dialog marks them too). */
+  protected readonly activeId = this.store.activeViewId;
 
   /** The numbers of the keys 1 – 9 that have no view yet: shown as placeholders. */
   protected readonly freeSlots = computed(() => Array.from({ length: Math.max(0, 9 - (this.store.doc().views?.length ?? 0)) }, (_, i) => (this.store.doc().views?.length ?? 0) + i + 1));
 
-  /** The view the camera came from when it is no longer on it (the camera has been moved): shown as changed, a candidate for replacing. */
-  protected readonly fromId = computed(() => {
-    const id = this.store.lastViewId();
-    return id && !this.activeId() && this.store.doc().views?.some(v => v.id === id) ? id : null;
-  });
+  protected readonly fromId = this.store.fromViewId;
 
   /** The view whose name is being edited in place. */
   protected readonly editing = signal<string | null>(null);

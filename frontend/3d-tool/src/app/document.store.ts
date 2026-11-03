@@ -1060,6 +1060,20 @@ export class DocumentStore {
   recallView: ((view: DocSavedView) => void) | null = null;
 
   /** Saves the current camera and display as a named view, one undo step. Returns it, or null when there is no 3D view to take it from. */
+  /** The saved view the camera is on now (to a hair), or null. */
+  readonly activeViewId = computed(() => {
+    const now = this.doc().view;
+    if (!now) return null;
+    const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
+    return this.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
+  });
+
+  /** The saved view the camera came from, when it is no longer on it: shown as changed. */
+  readonly fromViewId = computed(() => {
+    const id = this.lastViewId();
+    return id && !this.activeViewId() && this.doc().views?.some(v => v.id === id) ? id : null;
+  });
+
   /** The saved view the camera was last put on (saved, gone to or replaced): when the camera has moved on from it, the Views panel shows it as changed. */
   readonly lastViewId = signal<string | null>(null);
 

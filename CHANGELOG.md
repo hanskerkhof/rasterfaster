@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - The Render dialog marks the active view (0.11.28)
+
+### Changed
+- **FE** (`render-dialog.ts`, `document.store.ts`, `views-panel.ts`): the **Views** column of the Render dialog marks the same view as the Views panel: blue for the view the camera is on, amber for the view it came from when it has moved on (the marks now come from the store, shared by both).
+
 ## 2026-11-03 - Views in the Render dialog, Full HD videos (0.11.27)
 
 ### Added
