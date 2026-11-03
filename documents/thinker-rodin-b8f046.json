@@ -276,6 +276,68 @@
       "groundColor": 6120823,
       "grid3d": false,
       "zGrid": "baseplate"
+    },
+    {
+      "projection": "ortho",
+      "position": [
+        922.682,
+        -12.991,
+        254.347
+      ],
+      "target": [
+        61.448,
+        103.073,
+        70.0
+      ],
+      "zoom": 1.279,
+      "radius": 222.089,
+      "id": "0fdc1081-e0e9-484e-9aeb-28e659721edd",
+      "name": "View 4",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.024,
+          -0.712,
+          -0.702
+        ],
+        "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
+      },
+      "ground": "grid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
+    },
+    {
+      "projection": "ortho",
+      "position": [
+        917.477,
+        -64.292,
+        239.278
+      ],
+      "target": [
+        65.78,
+        108.35,
+        54.931
+      ],
+      "zoom": 4.116,
+      "radius": 222.089,
+      "id": "8ee1bcde-5b9b-4a70-9e56-2805ff9b6127",
+      "name": "View 5",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          -0.024,
+          -0.712,
+          -0.702
+        ],
+        "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
+      },
+      "ground": "grid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
     }
   ],
   "light": {
@@ -287,19 +349,19 @@
     "targetId": "341599db-c95b-41a1-9457-53c17ece2fc2"
   },
   "view": {
-    "projection": "persp",
+    "projection": "ortho",
     "position": [
-      931.481,
-      -208.27,
-      -57.254
+      917.477,
+      -64.292,
+      239.278
     ],
     "target": [
-      -21.258,
-      227.622,
-      66.001
+      65.78,
+      108.35,
+      54.931
     ],
-    "zoom": 2.882,
-    "radius": 183.518
+    "zoom": 4.116,
+    "radius": 222.089
   },
   "render": {
     "depthOfField": true,
@@ -310,10 +372,9 @@
     "ambient": 2,
     "dofStrength": 4,
     "aspect": "16:9",
-    "trackId": "1c9318cc-24e4-4c5a-af68-ce69cfd7891c",
     "trackPivot": "all",
-    "lookAt": "part",
-    "fx": "watercolour",
+    "lookAt": "view",
+    "fx": "fog",
     "cut": "z:50:0",
     "reflections": 2,
     "transparent": false

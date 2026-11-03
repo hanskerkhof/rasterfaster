@@ -127,8 +127,8 @@
       "noRender": false,
       "noExport": false,
       "render": {
-        "color": 0,
-        "finish": "pei",
+        "color": 16050143,
+        "finish": "glass",
         "hidden": false
       }
     },
@@ -153,8 +153,8 @@
       "noRender": false,
       "noExport": false,
       "render": {
-        "color": 0,
-        "finish": "pei",
+        "color": 16050143,
+        "finish": "glass",
         "hidden": false
       }
     },
@@ -472,6 +472,37 @@
       "groundColor": 6120823,
       "grid3d": false,
       "zGrid": "baseplate"
+    },
+    {
+      "projection": "persp",
+      "position": [
+        640.411,
+        324.843,
+        238.549
+      ],
+      "target": [
+        187.671,
+        104.581,
+        17.362
+      ],
+      "zoom": 2.232,
+      "radius": 133.908,
+      "id": "be834371-5b0a-48aa-b8db-3fb0001fa6bf",
+      "name": "View 7",
+      "mode": "shaded",
+      "appMode": "render",
+      "light": {
+        "direction": [
+          0.489,
+          -0.633,
+          0.601
+        ],
+        "targetId": "80d3a140-d1ba-4243-909a-3d8f226abf55"
+      },
+      "ground": "grid",
+      "groundColor": 6120823,
+      "grid3d": false,
+      "zGrid": "baseplate"
     }
   ],
   "light": {
@@ -485,16 +516,16 @@
   "view": {
     "projection": "persp",
     "position": [
-      498.92,
-      -333.64,
-      218.574
+      640.411,
+      324.843,
+      238.549
     ],
     "target": [
-      186.465,
-      94.929,
-      14.808
+      187.671,
+      104.581,
+      17.362
     ],
-    "zoom": 2.019,
+    "zoom": 2.232,
     "radius": 133.908
   },
   "render": {
@@ -506,6 +537,7 @@
     "ambient": 2,
     "dofStrength": 3,
     "aspect": "16:9",
+    "trackId": "80d3a140-d1ba-4243-909a-3d8f226abf55",
     "trackPivot": "all",
     "lookAt": "view",
     "fx": "none",
