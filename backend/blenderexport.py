@@ -714,7 +714,14 @@ def apply_fx():
         tree.links.new(clear.outputs[0], mix.inputs[1])
         tree.links.new(glow.outputs[0], mix.inputs[2])
         tree.links.new(mix.outputs[0], output.inputs["Surface"])
-        view_layer.material_override = material
+        for obj in bpy.data.objects:  # every part turns see-through except the mirrors: they stay mirrors, so they still reflect the glowing parts
+            if obj.type != "MESH" or obj.name in ("Studio floor", "Camera path"):
+                continue
+            if not obj.material_slots:
+                obj.data.materials.append(material)
+            for slot in obj.material_slots:
+                if not (slot.material and "_mirror" in slot.material.name):
+                    slot.material = material
         scene.cycles.transparent_max_bounces = 32
     if fx == "lowpoly":  # few, flat facets: the meshes are reduced and every face shades on its own
         for obj in bpy.data.objects:

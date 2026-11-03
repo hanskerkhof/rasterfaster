@@ -860,13 +860,46 @@ def export_document_blend(documentId: str, colours: bool = True, studio: bool = 
     return Response(data, media_type="application/x-blender", headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
+quickRuns: dict[str, object] = {}  # token -> the Blender process of a quick render (or True: cancelled before it started)
+quickRunsLock = threading.Lock()
+
+
+def quick_started(token: str | None):
+    """The `started` hook of a quick render: remembers its Blender process under the client's token so it can be cancelled."""
+    if not token:
+        return None
+
+    def started(process) -> None:
+        with quickRunsLock:
+            if quickRuns.pop(token, None) is True:
+                process.kill()  # cancelled while the .blend was still being made
+            else:
+                quickRuns[token] = process
+    return started
+
+
+@app.post("/api/quick-render/cancel")
+def cancel_quick_render(token: str = Query(max_length=64, pattern=r"^[A-Za-z0-9_-]+$")) -> dict:
+    """Stops a quick picture or video that is rendering (the dialog's Cancel)."""
+    with quickRunsLock:
+        process = quickRuns.pop(token, None)
+        if process is None:
+            quickRuns[token] = True  # not started yet: it stops as soon as it does
+            if len(quickRuns) > 50:
+                quickRuns.pop(next(iter(quickRuns)))
+            return {"cancelled": False}
+    process.kill()
+    return {"cancelled": True}
+
+
+
 @app.get("/api/documents/{documentId}/render.png")
-def render_document_png(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
+def render_document_png(documentId: str, token: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=800, ge=160, le=1920), samples: int = Query(default=24, ge=1, le=128), reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour", "hiddenlines", "fog", "lowfog", "watercolour", "watercolourintense", "watercolourink"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$")) -> Response:
     """A quick picture of the scene as Blender renders it (Cycles, the studio setup, the app's camera and light): see the light and the colours without opening Blender."""
     document, blender, glb, sun, depthOfField, cropped = blender_scene(documentId, colours, view, light, dof, focus, strength, crop, ambient, lamp, bg, floor, beam, aspect, transparent, reflections=reflections, fx=fx, cut=cut)
     try:
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped)
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, crop=cropped, **({"started": quick_started(token)} if token else {}))
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:
@@ -877,14 +910,14 @@ def render_document_png(documentId: str, colours: bool = True, view: str | None 
 
 
 @app.get("/api/documents/{documentId}/render.mp4")
-def render_document_mp4(documentId: str, colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
+def render_document_mp4(documentId: str, token: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), colours: bool = True, view: str | None = None, light: str | None = None, dof: bool | None = None, focus: str | None = None, strength: int | None = Query(default=None, ge=1, le=5), crop: bool | None = None, ambient: int | None = Query(default=None, ge=0, le=5), lamp: int | None = Query(default=None, ge=0, le=60), bg: int | None = Query(default=None, ge=0, le=0xFFFFFF), floor: int | None = Query(default=None, ge=0, le=0xFFFFFF), beam: int | None = Query(default=None, ge=0, le=4), aspect: Literal["16:9", "1:1", "4:5", "9:16"] | None = None, transparent: bool | None = None,
                         width: int = Query(default=640, ge=160, le=960), samples: int = Query(default=8, ge=1, le=48),
                         motion: Literal["orbit", "spin"] = "orbit", seconds: int = Query(default=3, ge=1, le=5), fps: int = Query(default=24, ge=12, le=30), track: str | None = Query(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]*$"), trackPivot: Literal["part", "all", "view"] | None = None, lookAt: Literal["part", "all", "view"] | None = None, reflections: int | None = Query(default=None, ge=0, le=4), fx: Literal["none", "cartoon", "outline", "sketch", "clay", "blueprint", "isometric", "xray", "lowpoly", "wireframe", "thermal", "cutaway", "clayrough", "clayroughcolour", "hiddenlines", "fog", "lowfog", "watercolour", "watercolourintense", "watercolourink"] | None = None, cut: str | None = Query(default=None, pattern=r"^[xyz]:\d{1,3}:[01]$"), direction: Literal["ccw", "cw"] = "ccw") -> Response:
     """A quick turntable video (one turn in a few seconds, small and with few samples: it takes up to a minute): see the motion without queueing a real render."""
     document, blender, glb, sun, depthOfField, _ = blender_scene(documentId, colours, view, light, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, reflections=reflections, fx=fx, cut=cut)
     try:
         tracked = resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackId"] or ""
-        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["lookAt"], direction=direction)
+        data = blenderexport.build_render(glb, blender, True, sun, width, samples, dof=depthOfField, turntable=(seconds * fps, motion, fps), timeout=900, **({"started": quick_started(token)} if token else {}), track=tracked, track_pivot=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["trackPivot"], look_at=resolve_render_settings(document, dof, focus, strength, False, ambient, lamp, bg, floor, beam, aspect, False, track, trackPivot, lookAt, reflections=reflections, fx=fx, cut=cut)["lookAt"], direction=direction)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
     except (RuntimeError, OSError, subprocess.SubprocessError) as error:

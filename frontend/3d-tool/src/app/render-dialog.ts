@@ -165,7 +165,7 @@ import { ColorPalette } from './color-palette';
       <div class="frame">
         @if (picture() && isVideo()) { <video [src]="picture()" controls autoplay loop muted playsinline [style.width]="frameWidth()"></video> }
         @else if (picture()) { <img [src]="picture()" alt="Render of the document" [class.dim]="busy()" [class.checker]="render.transparent()" [style.width]="frameWidth()" /> } @else { <div class="placeholder" [style.aspect-ratio]="frameRatio()" [style.width]="frameWidth()"></div> }
-        @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span></div> }
+        @if (busy()) { <div class="over"><span class="spinner big"></span><span>{{ busyText() }}</span>@if (cancellable()) { <button type="button" class="cancel" (click)="cancelQuick()" title="Stop this render (change a setting, then render again)">Cancel</button> }</div> }
       </div>
     </section>
     </div>
@@ -207,6 +207,7 @@ import { ColorPalette } from './color-palette';
     img { display: block; margin: 0 auto; width: 100%; height: auto; border-radius: 4px; background: #000; }
     img.checker { background: repeating-conic-gradient(#2a2d34 0 25%, #1e2026 0 50%) 0 / 20px 20px; } /* a transparent picture shows its transparency */
     .frame { position: relative; } .placeholder { margin: 0 auto; width: 100%; aspect-ratio: 16 / 9; border-radius: 4px; background: #0b0c0f; border: 1px dashed rgba(255,255,255,.12); box-sizing: border-box; } img.dim { filter: brightness(.45) blur(1px); transition: filter .2s; }
+    .over .cancel { margin-top: 4px; padding: 5px 16px; }
     .over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #fff; text-shadow: 0 1px 4px #000; }
     .spinner.big { width: 44px; height: 44px; border-width: 4px; }
     .busy { display: flex; align-items: center; gap: 10px; padding: 24px 4px; opacity: .85; }
@@ -230,6 +231,10 @@ export class RenderDialog implements OnInit, OnDestroy {
   protected readonly busy = signal(false);
   protected readonly error = signal('');
   protected readonly detail = signal('');
+  /** The token of the quick render on its way (the API can stop it by it), and the request to drop. */
+  private quickToken = '';
+  private quickAbort: AbortController | null = null;
+  protected readonly cancellable = signal(false);
   protected readonly busyText = signal('Rendering a preview with Blender (800 px, a few seconds)…');
   protected readonly store = inject(DocumentStore);
   /** The parts of the document to choose the focus from (equal names are numbered). */
@@ -456,17 +461,34 @@ export class RenderDialog implements OnInit, OnDestroy {
       if (this.render.tracked()) quickUrl.searchParams.set('track', this.render.tracked()!.id);
       quickUrl.searchParams.set('trackPivot', this.render.trackPivot());
       quickUrl.searchParams.set('lookAt', this.render.lookAt());
-      const response = await fetch(quickUrl, { cache: 'no-store' });
+      const response = await fetch(quickUrl, { cache: 'no-store', signal: this.beginQuick(quickUrl) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();
       this.videoQuick = { blob, settings: response.headers.get('X-Render-Settings') ?? '' };
       this.isVideo.set(true);
       this.show(blob, `${draft ? 320 : 640} px · ${draft ? 'draft' : 'quick'} video · ${this.quickVideoText(draft)}`);
     } catch (error) {
-      this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);
+      if (!(error instanceof DOMException && error.name === 'AbortError')) this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`); // a cancel is no failure
     } finally {
+      this.cancellable.set(false);
       this.busy.set(false);
     }
+  }
+
+  /** Starts the bookkeeping of a quick render: the address gets a token the API stops it by. */
+  private beginQuick(url: URL): AbortSignal {
+    this.quickToken = crypto.randomUUID().replace(/-/g, '');
+    this.quickAbort = new AbortController();
+    url.searchParams.set('token', this.quickToken);
+    this.cancellable.set(true);
+    return this.quickAbort.signal;
+  }
+
+  protected cancelQuick() {
+    const token = this.quickToken;
+    this.quickAbort?.abort();
+    if (token) void fetch(`/api/quick-render/cancel?token=${token}`, { method: 'POST' }).catch(() => undefined); // Blender stops, too
+    this.error.set('');
   }
 
   protected async quick(force = false) {
@@ -487,7 +509,7 @@ export class RenderDialog implements OnInit, OnDestroy {
     this.busy.set(true);
     this.error.set('');
     try {
-      const response = await fetch(quickUrl, { cache: 'no-store' });
+      const response = await fetch(quickUrl, { cache: 'no-store', signal: this.beginQuick(quickUrl) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();
       const detail = `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`;
@@ -495,8 +517,9 @@ export class RenderDialog implements OnInit, OnDestroy {
       this.show(blob, detail);
       this.quickReady.set(true);
     } catch (error) {
-      this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`);
+      if (!(error instanceof DOMException && error.name === 'AbortError')) this.error.set(`Render failed: ${error instanceof Error ? error.message : error}`); // a cancel is no failure
     } finally {
+      this.cancellable.set(false);
       this.busy.set(false);
     }
   }

@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Cancel a quick render, mirrors in X-Ray (0.11.30)
+
+### Added
+- **FE** (`render-dialog.ts`), **BE** (`main.py`): a **Cancel** button on the render overlay of the quick picture and the quick videos. It drops the request and `POST /api/quick-render/cancel?token=…` kills that render's Blender process, so a render with a heavy FX can be stopped, a setting changed and Quick render pressed again.
+
+### Fixed
+- **BE** (`blenderexport.py`): the X-Ray FX keeps parts with the mirror finish as mirrors (they reflect the glowing parts) instead of making every part see-through.
+
 ## 2026-11-03 - Views stay as saved while animations run (0.11.29)
 
 ### Changed
