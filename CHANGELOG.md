@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Video progress, draft videos, own video size (0.11.24)
+
+### Added
+- **FE** + **BE** (`main.py`, `images-panel.ts`): a turntable video also gets a **preliminary draft** in the Gallery: a quick draft video (320 px, one turn in at most 5 s) made just before the real render starts and shown looping on the card, with the spinner and the time left (`GET /api/render-jobs/{id}/preview.mp4`).
+- **FE** (`render-dialog.ts`, `render.service.ts`): the turntable video has its **own size** (480 × 270 up to 1280 × 720, default 960), apart from the size of a picture; videos no longer follow the picture size menu (and no 1920+ sizes).
+
+### Fixed
+- **BE** (`blenderexport.py`, `main.py`) + **FE**: the progress of a **video** stayed at about 1 % for the whole render: Blender 5 no longer prints the frame number (`Fra:12`) the progress was read from, so the render was taken to be on its first frame for ever. The frames are now counted from the sample counter (`ProgressReader`), the API says the frame, the sample and how long a frame takes (every new frame and every 2 seconds), and the toast and Gallery card show "frame 12 of 300, sample 31/48 (4.6 s a frame)", one decimal of the percentage and a time left measured from the real frame times.
+- **FE** (`images-panel.ts`): Gallery thumbnails kept their 16:9 box and overlapped; they now show in full, in the shape of their picture, at least 150 px wide, and the grid scrolls.
+
 ## 2026-11-03 - FX styles respect Transparent (0.11.23)
 
 ### Fixed

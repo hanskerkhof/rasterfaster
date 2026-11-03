@@ -6,6 +6,7 @@ or at the isometric Home view when none is given. There is no camera animation a
 """
 import json
 import math
+import re
 import struct
 from typing import Callable
 
@@ -1334,6 +1335,36 @@ def find_blender() -> str | None:
     return next((c for c in candidates if c and Path(c).is_file()), None)
 
 
+class ProgressReader:
+    """Reads the progress of a Blender render from its output. Blender 5 prints lines like `00:06.314  render | Mem: 103M | Sample 48/48` (no frame number any more,
+    which older versions printed as `Fra:12`): a new frame has begun when the sample counter goes back down, so the frames are counted."""
+
+    sample = re.compile(rb"Sample (\d+)/(\d+)")
+
+    def __init__(self, frames: int = 1) -> None:
+        self.frames = max(frames, 1)
+        self.frame = 1
+        self.last = -1
+        self.pending = b""
+
+    def feed(self, chunk: bytes) -> list[tuple[float, int, int, int]]:
+        """What the new output says: for every sample line (progress 0 to 1, the frame, the sample, the samples of the frame)."""
+        self.pending += chunk
+        found = []
+        matches = list(self.sample.finditer(self.pending))
+        for match in matches:
+            done, total = int(match.group(1)), int(match.group(2))
+            if done < self.last:
+                self.frame += 1
+            self.last = done
+            frame = min(self.frame, self.frames)
+            found.append((min(((frame - 1) + min(done / max(total, 1), 1.0)) / self.frames, 1.0), frame, done, total))
+        if matches:
+            self.pending = self.pending[matches[-1].end():]
+        self.pending = self.pending[-120:]  # a line that is not complete yet
+        return found
+
+
 def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, render: tuple[int, int] | None, timeout: int,
                  progress: "Callable[[float], None] | None" = None, started: "Callable[[object], None] | None" = None, dof: str = "0", crop: bool = False,
                  phase: "Callable[[str], None] | None" = None, turntable: "tuple[int, str, int] | None" = None, track: str = "", track_pivot: str = "all", look_at: str = "part", direction: str = "ccw") -> bytes:
@@ -1373,11 +1404,9 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
         if started:
             started(process)
         tail = b""
-        sample = re.compile(rb"Sample (\d+)/(\d+)")
-        frame = re.compile(rb"Fra:(\d+)")
-        frames = turntable[0] if turntable else 1
+        reader = ProgressReader(turntable[0] if turntable else 1)
+        frames = reader.frames
         try:
-            buffer = b""
             while True:
                 try:
                     chunk = os.read(master, 4096)
@@ -1386,16 +1415,12 @@ def _run_blender(glb: bytes, blender: str, studio: bool, light: dict | None, ren
                 if not chunk:
                     break
                 tail = (tail + chunk)[-600:]
-                buffer = (buffer + chunk)[-4096:]
                 if progress:
-                    found = sample.findall(buffer)
-                    if found:
-                        done, total = (int(v) for v in found[-1])
-                        current = int((frame.findall(buffer) or [b"1"])[-1])  # the frame of a turntable (always 1 for a picture)
+                    for value, current, done, total in reader.feed(chunk):
                         if phase and "render" not in seen:
                             seen.add("render")
                             phase("render")
-                        progress(min(((current - 1) + min(done / max(total, 1), 1.0)) / frames, 1.0))
+                        progress(value)
                         if phase and current >= frames and done >= total and "finish" not in seen:
                             seen.add("finish")
                             phase("finish")  # all samples are in: denoising, saving the picture (or encoding the video)

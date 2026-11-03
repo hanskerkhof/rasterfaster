@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { ImagesService } from './images.service';
-import { Aspect, RenderService, focusCentre, fxIds, fxNames, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
+import { Aspect, RenderService, focusCentre, fxIds, fxNames, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, videoWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
 
@@ -141,7 +141,10 @@ import { ColorPalette } from './color-palette';
           <select class="focus size" [value]="render.turntable().samples" title="Samples per frame: more is cleaner and takes longer (every frame is rendered)" (change)="render.setTurntable({ samples: +$any($event.target).value })">
             @for (q of turntableQualities; track q.samples) { <option [value]="q.samples" [selected]="q.samples === render.turntable().samples">{{ q.label }}</option> }
           </select>
-          <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full: wait for a render to finish' : 'Render an MP4 of one turn in the background, as wide as the size menu (4K at most) and in the chosen shape. It joins the queue and is kept in the gallery'" (click)="startTurntable()">Render turntable</button>
+          <select class="focus size" [value]="render.videoWidth()" title="The size of the video (apart from the size of a picture): a video has hundreds of frames, so it stays small" (change)="render.setVideoWidth(+$any($event.target).value)">
+            @for (size of videoSizes; track size.width) { <option [value]="size.width" [selected]="size.width === render.videoWidth()">Video: {{ size.label }}</option> }
+          </select>
+          <button type="button" [disabled]="render.queueFull()" [title]="render.queueFull() ? 'The render queue is full: wait for a render to finish' : 'Render an MP4 of one turn in the background, as wide as the video size next to it and in the chosen shape. It joins the queue and is kept in the gallery'" (click)="startTurntable()">Render turntable</button>
           <span class="estimate" [title]="'A rough guess from what the last renders took. A draft is small (960 px, 12 samples, 24 frames per second) and quick: use it to see the motion first'">{{ turntableText() }}</span>
         </div>
       }
@@ -225,6 +228,7 @@ export class RenderDialog implements OnInit, OnDestroy {
     if (this.url() && !this.busy()) void this.quick();
   }
   protected readonly hdSizes = hdWidths;
+  protected readonly videoSizes = videoWidths;
   protected readonly motions = turntableMotions;
   protected readonly directions = turnDirections;
   protected readonly lengths = turntableLengths;

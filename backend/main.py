@@ -921,7 +921,8 @@ class RenderJob:
         self.started = self.created  # when it began to run (it waits in the queue before that)
         self.finished: float | None = None
         self.png: bytes | None = None
-        self.preview: bytes | None = None  # a small preliminary picture, made just before a full-size picture starts (the gallery shows it while the render runs)
+        self.preview: bytes | None = None  # a small preliminary picture (a short quick video for a turntable), made just before a full-size render starts (the gallery shows it while the render runs)
+        self.previewMedia = "png"  # "png" or "mp4"
         self.error = ""
         self.process: object | None = None
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
@@ -972,6 +973,21 @@ class RenderJob:
     def phases(self) -> list[dict]:
         return [{"name": name, "start": (self.marks.get(name) or [None, None])[0], "end": (self.marks.get(name) or [None, None])[1], "estimate": round(self.estimate(name), 1)} for name in renderPhases]
 
+    def frame_info(self) -> dict:
+        """For a turntable video: the frame it is on, how long a frame takes (measured since the first frame began) and how long is left (null until a frame is in)."""
+        if not self.turntable:
+            return {}
+        frames = self.turntable[0]
+        begun = (self.marks.get("render") or [None])[0]
+        done = self.progress * frames  # frames finished, with the part of the one that runs
+        into = self.progress * frames - int(self.progress * frames)  # how far the frame that runs is (its samples)
+        info: dict = {"frame": min(frames, int(self.progress * frames) + 1) if self.state == "running" else frames, "sample": round(into * self.samples) if self.state == "running" else 0, "frameSeconds": None, "etaSeconds": None}
+        if self.state == "running" and begun is not None and done >= 0.2:
+            taken = max(time.time() - self.started - begun, 0.0)
+            info["frameSeconds"] = round(taken / done, 1)
+            info["etaSeconds"] = round(taken / done * (frames - done) + phaseHistory["finish"] * self.megapixels, 0)
+        return info
+
     def size(self) -> list[int] | None:
         """Width and height of the finished picture (read from the PNG header)."""
         if self.turntable:
@@ -983,7 +999,7 @@ class RenderJob:
     def view(self) -> dict:
         return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error,
-                "documentId": self.documentId, "imageId": self.imageId, "version": self.version, "preview": self.preview is not None, "aspect": round(self.aspect, 4),
+                "documentId": self.documentId, "imageId": self.imageId, "version": self.version, "preview": self.preview is not None, "previewMedia": self.previewMedia, "aspect": round(self.aspect, 4), **self.frame_info(),
                 "kind": "turntable" if self.turntable else "picture", "frames": self.turntable[0] if self.turntable else 1, "motion": self.turntable[1] if self.turntable else None,
                 "queue": [{"id": q.id, "name": q.name, "kind": "turntable" if q.turntable else "picture", "width": q.width, "samples": q.samples, "frames": q.turntable[0] if q.turntable else 1,
                            "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}", "documentId": q.documentId, "aspect": round(q.aspect, 4)} for q, _ in renderQueue],
@@ -1077,12 +1093,15 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         if job.state == "cancelled":  # cancelled before Blender had started
             process.kill()  # type: ignore[attr-defined]
 
-    last = [-1.0]
+    last = [-1.0, 0, 0.0]  # the last progress, the last frame and the time of the last message
 
     def progress(value: float) -> None:
         job.progress = value
-        if value - last[0] >= 0.01:  # a message per percent is plenty
-            last[0] = value
+        frame = int(value * job.turntable[0]) + 1 if job.turntable else 0
+        now = time.time()
+        # a message per percent is plenty for a picture; a video says it at every new frame (and every 2 seconds), so a long render is seen to be alive
+        if (value - last[0] >= 0.01) if not job.turntable else (value > last[0] and (frame != last[1] or now - last[2] >= 2.0)):
+            last[0], last[1], last[2] = value, frame, now
             notifier.notify({"type": "render", **job.view()})
 
     def phase(name: str) -> None:
@@ -1090,9 +1109,16 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         notifier.notify({"type": "render", **job.view()})
 
     try:
-        if not job.turntable and job.documentId and job.state == "running":  # a small preliminary picture first: the gallery shows it, with a spinner, while the real one renders
+        if job.documentId and job.state == "running":  # a small preliminary picture first (for a turntable: a quick draft video of one turn): the gallery shows it, with a spinner, while the real one renders
             try:
-                job.preview = blenderexport.build_render(glb, blender, True, sun, 480, 8, None, started, timeout=300, dof=dof, crop=crop)
+                if job.turntable:
+                    frames, motion, fps = job.turntable
+                    seconds = max(1, min(round(frames / fps), 5))
+                    job.preview = blenderexport.build_render(glb, blender, True, sun, 320, 2, None, started, timeout=900, dof=dof, crop=crop, turntable=(seconds * 12, motion, 12),
+                                                             track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)
+                    job.previewMedia = "mp4"
+                else:
+                    job.preview = blenderexport.build_render(glb, blender, True, sun, 480, 8, None, started, timeout=300, dof=dof, crop=crop)
                 notifier.notify({"type": "render", **job.view()})
             except Exception:  # noqa: BLE001 - the preview is a bonus: the render goes on without it
                 job.preview = None
@@ -1188,12 +1214,13 @@ def get_render_job_video(jobId: str) -> Response:
 
 
 @app.get("/api/render-jobs/{jobId}/preview.png")
+@app.get("/api/render-jobs/{jobId}/preview.mp4")
 def render_job_preview(jobId: str) -> Response:
-    """The small preliminary picture of a render that runs (404 while there is none)."""
+    """The small preliminary picture of a render that runs, or the quick draft video of a turntable (404 while there is none)."""
     job = render_job(jobId)
     if job.preview is None:
         raise HTTPException(status_code=404, detail="there is no preview (yet)")
-    return Response(job.preview, media_type="image/png", headers={"Cache-Control": "no-store"})
+    return Response(job.preview, media_type="video/mp4" if job.previewMedia == "mp4" else "image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/render-jobs/{jobId}/image.png")

@@ -25,7 +25,7 @@ const turntableStorageKey = 'rasterfaster.renderTurntable';
 /** The turntable video: how long (seconds, at 30 frames per second), how good (samples per frame: each frame is cheaper than a still) and how it moves. */
 export const turntableLengths = [3, 5, 10, 30];
 export const turntableQualities = [
-  { samples: 12, label: 'Draft · 960 px, 12 samples', draft: true }, // small and quick: a few minutes, to see the motion; the other two use the size menu's width
+  { samples: 12, label: 'Draft · 960 px, 12 samples', draft: true }, // small and quick: a few minutes, to see the motion; the other two use the video size
   { samples: 48, label: 'Standard · 48 samples', draft: false },
   { samples: 96, label: 'Fine · 96 samples', draft: false },
 ];
@@ -82,6 +82,18 @@ function readHdSamples(): number {
 }
 /** The widths the full-size render can be made at (16:9): the first is the default. */
 export const hdWidths = [{ width: 480, label: '480 × 270 · small' }, { width: 640, label: '640 × 360 · nHD' }, { width: 960, label: '960 × 540 · qHD' }, { width: 1280, label: '1280 × 720 · HD' }, { width: 1920, label: '1920 × 1080 · Full HD' }, { width: 2560, label: '2560 × 1440 · QHD' }, { width: 3200, label: '3200 × 1800 · QHD+' }, { width: 3840, label: '3840 × 2160 · 4K UHD' }, { width: 5120, label: '5120 × 2880 · 5K' }, { width: 7680, label: '7680 × 4320 · 8K UHD' }];
+
+/** The sizes of a turntable video: a video has hundreds of frames, so it stays small (1280 px at most). */
+export const videoWidths = hdWidths.filter(w => w.width <= 1280);
+const videoWidthStorageKey = 'rasterfaster.renderVideoWidth';
+
+function readVideoWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(videoWidthStorageKey));
+    if (videoWidths.some(w => w.width === stored)) return stored;
+  } catch { /* storage unavailable */ }
+  return 960;
+}
 
 /** The common name of a render width: "Full HD", "4K UHD" … (empty for a width without one). */
 export function sizeName(width: number): string {
@@ -183,11 +195,19 @@ export interface RenderState {
   imageId?: string | null;
   /** The API has made the small preliminary picture of this render (see /api/render-jobs/{id}/preview.png). */
   preview?: boolean;
+  /** What the preliminary preview is: a picture, or a quick draft video (a turntable). */
+  previewMedia?: 'png' | 'mp4';
   aspect?: number;
   /** How many renders wait behind the running one, this one's place in the queue (0: not waiting), and how many renders the queue takes. */
   /** A picture or a turntable video, the frames of the video, and how it moves (the camera circles, or the parts turn). */
   kind?: 'picture' | 'turntable';
   frames?: number;
+  /** A video: the frame being rendered, how long a frame takes (seconds, measured) and how long is left (seconds); null until a frame is in. */
+  frame?: number;
+  /** The sample of that frame that Blender is on (of `samples`). */
+  sample?: number;
+  frameSeconds?: number | null;
+  etaSeconds?: number | null;
   motion?: 'orbit' | 'spin' | null;
   /** The renders that wait, in order (the API says it with every message). */
   queue?: QueuedRender[];
@@ -243,6 +263,8 @@ export class RenderService {
   /** When the running render started (this page's clock), and the progress reports so far: the estimate comes from how fast they came in. */
   private startedAt = 0;
   private reports: { at: number; progress: number }[] = [];
+  /** When the latest message about the running render came in (this page's clock): the seconds left count down from it. */
+  private lastMessageAt = Date.now();
   private ticker?: ReturnType<typeof setInterval>;
   /** Seconds the running render has taken. */
   readonly elapsed = computed(() => (this.running() ? Math.max(0, (this.now() - this.startedAt) / 1000) : 0));
@@ -251,6 +273,8 @@ export class RenderService {
    * the speed between the first and the latest report, applied to what is left, minus the time since the latest report.
    */
   readonly eta = computed(() => {
+    const measured = this.state()?.etaSeconds; // a video: the API measures how long its frames take
+    if (this.running() && measured !== null && measured !== undefined) return Math.max(0, measured - (this.now() - this.lastMessageAt) / 1000);
     const steps = this.steps();
     if (this.running() && steps.length) return Math.max(0, steps.reduce((sum, s) => sum + s.duration * (1 - s.fill), 0));
     const now = this.now();
@@ -283,6 +307,13 @@ export class RenderService {
   readonly ground = signal<number | null>(readColour(groundStorageKey));
   /** The width of the full-size render (its height follows at 16:9). */
   readonly hdWidth = signal(readHdWidth());
+  /** The size of a turntable video: its own setting, apart from the size of a picture. */
+  readonly videoWidth = signal(readVideoWidth());
+
+  setVideoWidth(width: number) {
+    this.videoWidth.set(width);
+    try { localStorage.setItem(videoWidthStorageKey, String(width)); } catch { /* storage unavailable */ }
+  }
   readonly hdSamples = signal(readHdSamples());
   readonly turntable = signal<TurntableChoice>(readTurntable());
   /** The part a turntable with Camera circles goes round (an item id of the open document); null: the point the view looks at. */
@@ -348,7 +379,7 @@ export class RenderService {
     const choice = this.turntable();
     const draft = turntableQualities.find(q => q.samples === choice.samples)?.draft ?? false;
     const fps = draft ? 24 : 30;
-    return { width: Math.min(this.hdWidth(), draft ? 960 : 3840), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion, direction: choice.direction };
+    return { width: Math.min(this.videoWidth(), draft ? 960 : 1280), fps, frames: choice.seconds * fps, samples: choice.samples, seconds: choice.seconds, motion: choice.motion, direction: choice.direction };
   }
 
   /** About how long the video takes (seconds), asked from the API (it knows what the last renders took); null while unknown. */
@@ -369,7 +400,13 @@ export class RenderService {
   /** The frame the running turntable is on (1 to its frames). */
   readonly frameNow = computed(() => {
     const s = this.state();
-    return s?.kind === 'turntable' && s.frames ? Math.min(s.frames, Math.floor((this.percent() / 100) * s.frames) + 1) : 0;
+    if (s?.kind !== 'turntable' || !s.frames) return 0;
+    return s.frame ?? Math.min(s.frames, Math.floor((this.percent() / 100) * s.frames) + 1);
+  });
+  /** The progress as shown: a video takes minutes per percent, so it has a decimal ("1.3 %"). */
+  readonly percentText = computed(() => {
+    const s = this.state();
+    return s?.kind === 'turntable' ? (Math.floor((s.progress ?? 0) * 1000) / 10).toFixed(1) : String(this.percent());
   });
   /** The Crop checkbox: the picture is as wide as the parts. */
   readonly crop = signal(readCrop());
@@ -452,6 +489,7 @@ export class RenderService {
       return;
     }
     const now = Date.now();
+    this.lastMessageAt = now;
     if (this.state()?.id !== message.id || !this.ticker) {
       this.startedAt = now - (message.elapsed ?? 0) * 1000;
       this.reports = [];

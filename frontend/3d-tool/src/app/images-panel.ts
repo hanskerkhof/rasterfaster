@@ -62,9 +62,10 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
       }
       <div class="grid">
         @for (job of pending(); track job.id) {
-          <div class="card pending" [title]="job.state === 'running' ? job.name + ' · rendering now' + (job.preview ? ': the picture is a preliminary draft' : '') : job.name + ' · waiting in the queue'">
+          <div class="card pending" [title]="job.state === 'running' ? job.name + ' · rendering now' + (job.preview ? ': the ' + (job.media === 'mp4' ? 'video' : 'picture') + ' is a preliminary draft' : '') : job.name + ' · waiting in the queue'">
             <div class="thumb" [style.aspect-ratio]="job.aspect">
-              @if (job.preview) { <img [src]="'/api/render-jobs/' + job.id + '/preview.png'" [alt]="job.name" /> }
+              @if (job.preview && job.media === 'mp4') { <video [src]="'/api/render-jobs/' + job.id + '/preview.mp4'" autoplay loop muted playsinline></video> }
+              @else if (job.preview) { <img [src]="'/api/render-jobs/' + job.id + '/preview.png'" [alt]="job.name" /> }
               <span class="over"><span class="spinner big"></span></span>
               <span class="kind">{{ job.kind === 'turntable' ? 'Video' : 'HD' }}</span>
               @if (job.preview) { <span class="draft">preliminary draft</span> }
@@ -216,6 +217,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .grid { overflow-y: auto; min-height: 0; align-items: start; grid-auto-rows: max-content; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 0 6px 6px; }
     .card { display: flex; flex-direction: column; cursor: pointer; border-radius: 4px; background: rgba(255,255,255,.04); overflow: hidden; } .card:hover { background: rgba(255,255,255,.1); }
     .thumb { position: relative; flex: none; aspect-ratio: 16 / 9; max-height: 300px; width: 100%; box-sizing: border-box; background: #16181d; display: flex; align-items: center; justify-content: center; }
+    .thumb video { width: 100%; height: 100%; object-fit: contain; display: block; }
     .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .card.pending { cursor: default; } .card.pending:hover { background: rgba(255,255,255,.04); }
     .over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15,17,21,.35); }
@@ -328,9 +330,9 @@ export class ImagesPanel {
   protected readonly pending = computed(() => {
     const docId = this.store.docId();
     const r = this.render.state();
-    const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; position: number; aspect: number }[] = [];
-    if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, position: 0, aspect: r.aspect ?? 16 / 9 });
-    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, position: i + 1, aspect: q.aspect ?? 16 / 9 }); });
+    const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; media: 'png' | 'mp4'; position: number; aspect: number }[] = [];
+    if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, media: r.previewMedia ?? 'png', position: 0, aspect: r.aspect ?? 16 / 9 });
+    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, media: 'png', position: i + 1, aspect: q.aspect ?? 16 / 9 }); });
     return jobs;
   });
 

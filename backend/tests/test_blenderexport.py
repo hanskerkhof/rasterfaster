@@ -473,6 +473,9 @@ def test_turntable_renders_a_video_into_the_library_and_is_checked(tmp_path, mon
             break
         time.sleep(0.05)
     assert status["state"] == "done" and seen[-1] == (960, 16, (72, "spin", 24), False)  # a video has no crop
+    assert seen[0] == (320, 2, (36, "spin", 12), False)  # first a quick draft video of one turn (3 s at 12 frames per second), for the gallery card
+    preview = client.get(f"/api/render-jobs/{job['id']}/preview.mp4")
+    assert preview.status_code == 200 and preview.headers["content-type"] == "video/mp4" and status["previewMedia"] == "mp4" and status["preview"] is True
     assert client.get(f"/api/render-jobs/{job['id']}/video.mp4").headers["content-type"] == "video/mp4"
     assert client.get(f"/api/render-jobs/{job['id']}/image.png").status_code == 409
     note = client.get(f"/api/documents/{created['id']}/images").json()[0]
@@ -606,3 +609,15 @@ def test_reflections_preset_comes_from_the_call_or_the_document(tmp_path, monkey
     client.get(url, params={"reflections": 3})
     assert seen[-1].endswith(",16:9,0,3,none,z:50:0,") and client.get(url, params={"reflections": 5}).status_code == 422
     assert client.post("/api/documents", json={"name": "Bad", "items": [item], "render": {"reflections": 9}}).status_code == 422
+
+
+def test_the_progress_of_blender_5_counts_frames_by_the_sample_counter():
+    """Blender 5 prints `Sample 48/48` without a frame number: a new frame has begun when the counter goes back down (a video used to stay on its first frame, at about 1 %)."""
+    reader = blenderexport.ProgressReader(frames=3)
+    lines = b"".join(b"00:01.0  render | Mem: 66M | Sample %d/48\r" % n for n in (0, 1, 48, 0, 1, 48, 0, 1))  # frame 1 done, frame 2 done, frame 3 begun
+    values = reader.feed(lines)
+    assert [v[1] for v in values] == [1, 1, 1, 2, 2, 2, 3, 3]  # the frame of each line
+    assert values[2][0] == pytest.approx(1 / 3) and values[5][0] == pytest.approx(2 / 3) and values[-1][0] > 2 / 3
+    split = blenderexport.ProgressReader(frames=2)
+    assert split.feed(b"render | Samp") == [] and [v[2] for v in split.feed(b"le 5/10\n")] == [5]  # a line cut in two reads
+    assert [v[0] for v in blenderexport.ProgressReader(frames=1).feed(b"Sample 24/96")] == [0.25]  # a picture
