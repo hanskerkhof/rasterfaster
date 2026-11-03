@@ -419,6 +419,7 @@ export class DocumentStore {
     this.conflict.set(null);
     this.viewing.set(null);
     this.docId.set(id);
+    this.lastViewId.set(null);
     this.writeCurrentId(id);
     this.doc.set(doc);
     this.selectedIds.set([]);
@@ -1059,6 +1060,9 @@ export class DocumentStore {
   recallView: ((view: DocSavedView) => void) | null = null;
 
   /** Saves the current camera and display as a named view, one undo step. Returns it, or null when there is no 3D view to take it from. */
+  /** The saved view the camera was last put on (saved, gone to or replaced): when the camera has moved on from it, the Views panel shows it as changed. */
+  readonly lastViewId = signal<string | null>(null);
+
   saveCurrentView(name?: string): DocSavedView | null {
     const captured = this.captureView?.();
     if (!captured) return null;
@@ -1067,6 +1071,7 @@ export class DocumentStore {
     const view: DocSavedView = { ...captured, id: crypto.randomUUID(), name: (name?.trim() || `View ${number}`).slice(0, 80) };
     this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), view] }));
     this.setView(cameraOf(view)); // the camera is on this view now: the panel marks it
+    this.lastViewId.set(view.id);
     return view;
   }
 
@@ -1077,6 +1082,7 @@ export class DocumentStore {
     const name = this.doc().views?.find(v => v.id === id)?.name;
     this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
     this.setView(cameraOf(captured));
+    this.lastViewId.set(id);
     this.announce(`View "${name ?? ''}" replaced by the current view`, 2500); // also when nothing differed: the click is answered
   }
 
@@ -1114,7 +1120,7 @@ export class DocumentStore {
   goToSavedView(which: string | number) {
     const views = this.doc().views ?? [];
     const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
-    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); } // the panel marks it at once, the camera glides there
+    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); this.lastViewId.set(view.id); } // the panel marks it at once, the camera glides there
   }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;

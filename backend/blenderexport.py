@@ -478,6 +478,12 @@ if studio == "1":
     floor.name = "Studio floor"
     floor.is_shadow_catcher = transparent_background  # with a transparent background the floor is invisible but still shows the shadows of the parts
     floor.visible_shadow = False  # the floor receives shadows but casts none: a light below the ground (the app allows it) still reaches the parts
+    bpy.context.view_layer.update()
+    if transparent_background and any(o.type == "CAMERA" and o.matrix_world.translation.z < -0.00005 for o in bpy.data.objects):
+        # looking up from below the ground with a transparent background: a shadow catcher would hide everything above it (it is a visible object to the camera),
+        # and from below there is no ground to see or shadow to show anyway
+        floor.is_shadow_catcher = False
+        floor.hide_render = True
     mat = bpy.data.materials.new("Studio floor")
     mat.use_nodes = True
     tree = mat.node_tree

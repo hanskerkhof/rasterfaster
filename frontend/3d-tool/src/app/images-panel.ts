@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal } from '@angular/core';
+import { Component, untracked, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { closeOnEscape } from './escape-close';
 import { DocumentStore } from './document.store';
 import { ImageNote, ImagesService } from './images.service';
@@ -61,9 +61,21 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
         </div>
       }
       <div class="grid">
+        @for (job of pending(); track job.id) {
+          <div class="card pending" [title]="job.state === 'running' ? job.name + ' · rendering now' + (job.preview ? ': the picture is a preliminary draft' : '') : job.name + ' · waiting in the queue'">
+            <div class="thumb" [style.aspect-ratio]="job.aspect">
+              @if (job.preview) { <img [src]="'/api/render-jobs/' + job.id + '/preview.png'" [alt]="job.name" /> }
+              <span class="over"><span class="spinner big"></span></span>
+              <span class="kind">{{ job.kind === 'turntable' ? 'Video' : 'HD' }}</span>
+              @if (job.preview) { <span class="draft">preliminary draft</span> }
+              <span class="eta">{{ job.state === 'running' ? (etaText() || 'working…') : 'queued · ' + job.position }}</span>
+            </div>
+            <div class="caption"><span class="name">{{ job.name }}</span></div>
+          </div>
+        }
         @for (note of service.images(); track note.id) {
           <div class="card" (click)="show(note)" (contextmenu)="openMenu($event, note)" [title]="note.name + ' · ' + note.width + ' × ' + note.height + ' px · click to view large · right-click: menu'">
-            <div class="thumb">
+            <div class="thumb" [style.aspect-ratio]="note.width + ' / ' + note.height">
               @if (note.thumb) { <img [src]="service.thumbSrc(note)" [alt]="note.name" loading="lazy" /> } @else { <span class="spinner"></span> }
               <span class="kind">{{ badge(note) }}</span>
             </div>
@@ -133,7 +145,18 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
             <button type="button" class="nav next" title="Next picture (→)" aria-label="Next picture" (click)="step(1)">›</button>
           }
           @if (note.media === 'mp4') { <video [src]="service.src(note)" controls autoplay loop muted playsinline></video> }
-          @else { <img [src]="service.src(note)" [alt]="note.name" /> }
+          @else {
+            <div class="zoomarea" [class.zoomed]="zoom() > 1" [class.panning]="panning()" (wheel)="onZoomWheel($event)" (pointerdown)="onPanDown($event)" (dblclick)="onZoomDouble($event)" title="Scroll or pinch to zoom, drag to move the picture, double-click for actual size">
+              <img [src]="service.src(note)" [alt]="note.name" [style.transform]="zoomTransform()" draggable="false" />
+            </div>
+            <div class="zoombar" aria-label="Zoom">
+              <button type="button" title="Zoom out" (click)="zoomBy(1 / 1.5)" [disabled]="zoom() <= 1">−</button>
+              <button type="button" title="Fit the picture in the window" (click)="zoomFit()" [class.on]="zoom() === 1">Fit</button>
+              <button type="button" title="Actual size: one picture pixel per screen pixel (double-click does the same)" (click)="zoomActual()">100%</button>
+              <button type="button" title="Zoom in" (click)="zoomBy(1.5)" [disabled]="zoom() >= maxZoom">+</button>
+              @if (zoom() > 1) { <span class="zoomtext">×{{ zoom().toFixed(1) }}</span> }
+            </div>
+          }
         </div>
       </section>
     }
@@ -160,6 +183,12 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 56px; padding: 0; font-size: 30px; line-height: 1; background: rgba(0,0,0,.45); border: 0; border-radius: 6px; opacity: .55; }
     .nav:hover { opacity: 1; background: rgba(47,111,237,.85); } .nav.prev { left: 6px; } .nav.next { right: 6px; } .pos { color: #dde1e8; }
     .viewer video { max-width: 100%; max-height: calc(92vh - 130px); align-self: center; background: #16181d; border-radius: 4px; }
+    .zoomarea { width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; max-width: 100%; max-height: calc(92vh - 130px); touch-action: none; border-radius: 4px; background: #16181d; }
+    .zoomarea.zoomed { cursor: grab; } .zoomarea.panning { cursor: grabbing; }
+    .zoomarea img { user-select: none; transform-origin: center center; will-change: transform; }
+    .zoombar { position: absolute; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 4px; padding: 3px 4px; background: rgba(35,38,45,.85); border: 1px solid rgba(255,255,255,.14); border-radius: 6px; }
+    .zoombar button { padding: 1px 8px; min-width: 26px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; } .zoombar button:hover:not(:disabled) { background: #2f6fed; color: #fff; } .zoombar button:disabled { opacity: .35; cursor: default; } .zoombar button.on { background: #2f6fed; color: #fff; }
+    .zoomtext { font-size: 11px; color: #dde1e8; padding: 0 4px; }
     .viewer img { max-width: 100%; max-height: calc(92vh - 130px); object-fit: contain; align-self: center; background: #16181d; border-radius: 4px; }
     .viewer .rename { font: inherit; font-size: 14px; color: inherit; background: #1b1d23; border: 1px solid #2f6fed; border-radius: 3px; padding: 1px 4px; outline: none; min-width: 200px; }
     .button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; text-decoration: none; } .button:hover { background: #2f6fed; color: #fff; }
@@ -184,10 +213,15 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .error { margin: 0 6px 6px; padding: 4px 6px; background: #3a2323; border: 1px solid #7a3030; border-radius: 4px; }
     .clean { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 6px 6px; } .clean .label { color: #8a93a2; } .muted { color: #8a93a2; }
     .clean button { padding: 1px 6px; font-size: 11px; } .clean button.sure { background: #a33a3a; color: #fff; }
-    .grid { overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; padding: 0 6px 6px; }
-    .card { cursor: pointer; border-radius: 4px; background: rgba(255,255,255,.04); overflow: hidden; } .card:hover { background: rgba(255,255,255,.1); }
-    .thumb { position: relative; aspect-ratio: 16 / 9; background: #16181d; display: flex; align-items: center; justify-content: center; }
+    .grid { overflow-y: auto; min-height: 0; align-items: start; grid-auto-rows: max-content; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; padding: 0 6px 6px; }
+    .card { display: flex; flex-direction: column; cursor: pointer; border-radius: 4px; background: rgba(255,255,255,.04); overflow: hidden; } .card:hover { background: rgba(255,255,255,.1); }
+    .thumb { position: relative; flex: none; aspect-ratio: 16 / 9; max-height: 300px; width: 100%; box-sizing: border-box; background: #16181d; display: flex; align-items: center; justify-content: center; }
     .thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .card.pending { cursor: default; } .card.pending:hover { background: rgba(255,255,255,.04); }
+    .over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15,17,21,.35); }
+    .spinner.big { width: 26px; height: 26px; border-width: 3px; }
+    .draft { position: absolute; left: 3px; bottom: 3px; padding: 0 5px; font-size: 10px; border-radius: 3px; background: rgba(224,160,48,.9); color: #1b1d23; }
+    .eta { position: absolute; right: 3px; bottom: 3px; padding: 0 5px; font-size: 10px; border-radius: 3px; background: rgba(0,0,0,.7); color: #dde1e8; }
     .kind { position: absolute; left: 3px; top: 3px; padding: 0 4px; font-size: 10px; border-radius: 3px; background: rgba(0,0,0,.6); }
     .caption { display: flex; align-items: center; gap: 4px; padding: 3px 5px; } .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ver { flex: none; font-size: 10px; padding: 0 5px; border-radius: 8px; background: #3b404c; color: #b9c0cc; } .ver.current { background: #1f6b4a; color: #fff; }
@@ -207,11 +241,113 @@ export class ImagesPanel {
   protected readonly confirming = signal<'older' | 'quick' | null>(null);
   /** The picture shown large. */
   protected readonly viewing = signal<ImageNote | null>(null);
+  /** The zoom of the picture on show: 1 fits it in the window; the picture is moved by (panX, panY) screen pixels about its middle. */
+  protected readonly zoom = signal(1);
+  private readonly panX = signal(0);
+  private readonly panY = signal(0);
+  protected readonly panning = signal(false);
+  protected readonly maxZoom = 16;
+  protected readonly zoomTransform = computed(() => (this.zoom() === 1 ? 'none' : `translate(${this.panX()}px, ${this.panY()}px) scale(${this.zoom()})`));
+
+  private pictureBox(area: HTMLElement) {
+    const img = area.querySelector('img');
+    const box = img ? { width: img.offsetWidth, height: img.offsetHeight, natural: img.naturalWidth } : null;
+    const rect = area.getBoundingClientRect();
+    return { box, centreX: rect.left + rect.width / 2, centreY: rect.top + rect.height / 2 };
+  }
+
+  /** Zooms to `target` keeping the point under (clientX, clientY) where it is. */
+  private zoomTo(target: number, area: HTMLElement, clientX?: number, clientY?: number) {
+    const { box, centreX, centreY } = this.pictureBox(area);
+    const next = Math.min(Math.max(target, 1), this.maxZoom);
+    if (next === this.zoom()) return;
+    if (next === 1) { this.zoomFit(); return; }
+    const old = this.zoom();
+    const px = (clientX ?? centreX) - centreX, py = (clientY ?? centreY) - centreY;
+    this.panX.set(px - (px - this.panX()) * (next / old));
+    this.panY.set(py - (py - this.panY()) * (next / old));
+    this.zoom.set(next);
+    this.keepInside(box);
+  }
+
+  /** The picture cannot be moved off: its middle stays within its own half size. */
+  private keepInside(box: { width: number; height: number } | null) {
+    if (!box) return;
+    const limitX = (box.width * this.zoom()) / 2, limitY = (box.height * this.zoom()) / 2;
+    this.panX.update(v => Math.min(Math.max(v, -limitX), limitX));
+    this.panY.update(v => Math.min(Math.max(v, -limitY), limitY));
+  }
+
+  protected zoomFit() { this.zoom.set(1); this.panX.set(0); this.panY.set(0); }
+
+  protected zoomBy(factor: number) {
+    const area = this.element.nativeElement.querySelector<HTMLElement>('.zoomarea');
+    if (area) this.zoomTo(this.zoom() * factor, area);
+  }
+
+  /** Actual size: one picture pixel per screen pixel (at least twice the fit, so it always magnifies). */
+  protected zoomActual(event?: { clientX: number; clientY: number }) {
+    const area = this.element.nativeElement.querySelector<HTMLElement>('.zoomarea');
+    if (!area) return;
+    const { box } = this.pictureBox(area);
+    const actual = box && box.width ? Math.max(box.natural / box.width, 2) : 2;
+    this.zoomTo(actual, area, event?.clientX, event?.clientY);
+  }
+
+  protected onZoomWheel(event: WheelEvent) {
+    event.preventDefault(); // the picture zooms, the page does not scroll
+    const area = event.currentTarget as HTMLElement;
+    this.zoomTo(this.zoom() * Math.exp(-event.deltaY * (event.ctrlKey ? 0.01 : 0.0025)), area, event.clientX, event.clientY);
+  }
+
+  protected onZoomDouble(event: MouseEvent) {
+    if (this.zoom() > 1) this.zoomFit(); else this.zoomActual(event);
+  }
+
+  protected onPanDown(event: PointerEvent) {
+    if (event.button !== 0 || this.zoom() <= 1) return;
+    const area = event.currentTarget as HTMLElement;
+    area.setPointerCapture(event.pointerId);
+    this.panning.set(true);
+    let last = { x: event.clientX, y: event.clientY };
+    const { box } = this.pictureBox(area);
+    const move = (e: PointerEvent) => {
+      this.panX.update(v => v + e.clientX - last.x);
+      this.panY.update(v => v + e.clientY - last.y);
+      last = { x: e.clientX, y: e.clientY };
+      this.keepInside(box);
+    };
+    const up = () => { area.removeEventListener('pointermove', move); area.removeEventListener('pointerup', up); area.removeEventListener('pointercancel', up); this.panning.set(false); };
+    area.addEventListener('pointermove', move);
+    area.addEventListener('pointerup', up);
+    area.addEventListener('pointercancel', up);
+    event.preventDefault();
+  }
+
+  /** The renders of this document that are running or waiting: shown in the grid before the finished pictures (the small preliminary picture of a running one, a spinner on it, and what is left of the time). */
+  protected readonly pending = computed(() => {
+    const docId = this.store.docId();
+    const r = this.render.state();
+    const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; position: number; aspect: number }[] = [];
+    if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, position: 0, aspect: r.aspect ?? 16 / 9 });
+    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, position: i + 1, aspect: q.aspect ?? 16 / 9 }); });
+    return jobs;
+  });
+
+  /** "about 1:52 left" for the render that runs (empty while the API has not said enough to tell). */
+  protected etaText(): string {
+    const seconds = this.render.eta();
+    if (seconds === null) return '';
+    const s = Math.round(seconds);
+    return `about ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')} left`;
+  }
+
   protected readonly olderCount = computed(() => this.service.images().filter(n => n.version < this.store.version()).length);
   protected readonly quickCount = computed(() => this.service.images().filter(n => n.kind === 'quick').length);
 
   constructor() {
     effect(() => this.remember(this.geom(), this.collapsed()));
+    effect(() => { this.viewing(); untracked(() => this.zoomFit()); }); // another picture (or none): back to fitting it
     closeOnEscape(() => this.closeMenu(), () => this.menu() !== null);
     closeOnEscape(() => this.viewing.set(null), () => this.viewing() !== null && !this.renaming());
     // ← and → go through the pictures while one is shown (before the 3D view's arrow keys, which would move parts)

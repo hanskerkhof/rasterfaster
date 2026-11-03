@@ -418,6 +418,7 @@ describe('Saved views', () => {
     expect(store.doc().views?.[1].position).toEqual([3, 0, 0]);
     store.goToSavedView(9); // there is no ninth
     expect(recalled).toEqual(['Top', 'Front']);
+    expect(store.lastViewId()).toBe(second.id); // the view the camera came from, for the panel's "changed" mark
     store.removeSavedView(first.id);
     expect(store.doc().views?.length).toBe(1);
     store.undo();

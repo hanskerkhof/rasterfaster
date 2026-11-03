@@ -2,6 +2,19 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-03 - Draft cards in the Gallery, zoom, Views "changed" mark (0.11.22)
+
+### Added
+- **FE** + **BE** (`images-panel.ts`, `main.py`): a render that runs or waits shows in the **Gallery** at once: a card with a small **preliminary draft** picture (made just before a full-size picture starts: 480 px, 8 samples, the same camera and settings; `GET /api/render-jobs/{id}/preview.png`), a spinner over it and "about 1:13 left"; a waiting render shows a spinner and "queued · 2". The card has the shape of the picture and turns into the finished picture when the render is done.
+- **FE** (`images-panel.ts`): the Gallery's image viewer **zooms**: scroll or pinch (around the pointer, up to x16), drag to move, double-click for actual size and back, and a Fit / 100% / - / + bar.
+- **FE** (`views-panel.ts`, `document.store.ts`): the Views panel keeps the view the camera came from marked when the camera has moved on from it: an amber bar, a dashed **changed** tag and an amber replace button, so you can see which view to update.
+
+### Changed
+- **FE** (`images-panel.ts`): Gallery thumbnails are at least 150 px wide and keep the shape of their picture; the grid scrolls vertically when they do not fit.
+
+### Fixed
+- **BE** (`blenderexport.py`): a render with a **transparent** background seen from below the ground came out empty (the studio floor, a shadow catcher, hid everything above it); the floor is left out when the camera is under the ground.
+
 ## 2026-11-03 - The render's floor at the height of the app's ground (0.11.21)
 
 ### Fixed

@@ -30,11 +30,12 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     @if (!collapsed()) {
       <div class="list">
         @for (view of store.doc().views ?? []; track view.id; let i = $index) {
-          <div class="view" [class.active]="view.id === activeId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" title="Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept">
+          <div class="view" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" title="Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept">
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
             @if (editing() === view.id) {
               <input #nameInput class="rename" [value]="view.name" maxlength="80" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()" (keydown)="onKey($event, view.id, nameInput)" (blur)="commit(view.id, nameInput.value)" />
             } @else { <span class="label">{{ view.name }}</span> }
+            @if (view.id === fromId()) { <span class="changed" title="The camera has moved on from this view: ⟳ replaces it by what you see now">changed</span> }
             <button type="button" class="x replace" title="Replace this view by what you see now (⇧ + its number)" (click)="update($event, view.id)">⟳</button>
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
           </div>
@@ -63,6 +64,9 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .list { overflow-y: auto; padding: 0 4px 6px; display: flex; flex-direction: column; gap: 2px; }
     .view { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; border-radius: 4px; } .view:hover { background: rgba(255,255,255,.08); }
     .view.active { background: rgba(47,111,237,.35); box-shadow: inset 3px 0 0 #2f6fed; } .view.active:hover { background: rgba(47,111,237,.45); } .view.active .num { color: #fff; }
+    .view.from { background: rgba(224,160,48,.14); box-shadow: inset 3px 0 0 #e0a030; } .view.from:hover { background: rgba(224,160,48,.24); } .view.from .num { color: #e0a030; }
+    .changed { flex: none; font-size: 10px; letter-spacing: .02em; color: #e0a030; border: 1px dashed #e0a030; border-radius: 8px; padding: 0 6px; }
+    .view.from .replace { opacity: 1; color: #e0a030; }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; } .x:hover { opacity: 1; background: transparent; color: #fff; }
@@ -106,6 +110,12 @@ export class ViewsPanel {
 
   /** The numbers of the keys 1 – 9 that have no view yet: shown as placeholders. */
   protected readonly freeSlots = computed(() => Array.from({ length: Math.max(0, 9 - (this.store.doc().views?.length ?? 0)) }, (_, i) => (this.store.doc().views?.length ?? 0) + i + 1));
+
+  /** The view the camera came from when it is no longer on it (the camera has been moved): shown as changed, a candidate for replacing. */
+  protected readonly fromId = computed(() => {
+    const id = this.store.lastViewId();
+    return id && !this.activeId() && this.store.doc().views?.some(v => v.id === id) ? id : null;
+  });
 
   /** The view whose name is being edited in place. */
   protected readonly editing = signal<string | null>(null);

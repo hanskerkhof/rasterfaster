@@ -921,6 +921,7 @@ class RenderJob:
         self.started = self.created  # when it began to run (it waits in the queue before that)
         self.finished: float | None = None
         self.png: bytes | None = None
+        self.preview: bytes | None = None  # a small preliminary picture, made just before a full-size picture starts (the gallery shows it while the render runs)
         self.error = ""
         self.process: object | None = None
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
@@ -982,10 +983,10 @@ class RenderJob:
     def view(self) -> dict:
         return {"size": self.size(), "phases": self.phases(), "phase": self.step, "id": self.id, "name": self.name, "state": self.state, "progress": round(self.progress, 4), "width": self.width, "samples": self.samples,
                 "elapsed": round((self.finished or time.time()) - self.started, 1), "error": self.error,
-                "documentId": self.documentId, "imageId": self.imageId, "version": self.version,
+                "documentId": self.documentId, "imageId": self.imageId, "version": self.version, "preview": self.preview is not None, "aspect": round(self.aspect, 4),
                 "kind": "turntable" if self.turntable else "picture", "frames": self.turntable[0] if self.turntable else 1, "motion": self.turntable[1] if self.turntable else None,
                 "queue": [{"id": q.id, "name": q.name, "kind": "turntable" if q.turntable else "picture", "width": q.width, "samples": q.samples, "frames": q.turntable[0] if q.turntable else 1,
-                           "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}"} for q, _ in renderQueue],
+                           "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}", "documentId": q.documentId, "aspect": round(q.aspect, 4)} for q, _ in renderQueue],
                 "waiting": len(renderQueue), "position": next((i + 1 for i, (queued, _) in enumerate(renderQueue) if queued is self), 0), "queueMax": renderQueueMax}
 
 
@@ -1089,6 +1090,12 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         notifier.notify({"type": "render", **job.view()})
 
     try:
+        if not job.turntable and job.documentId and job.state == "running":  # a small preliminary picture first: the gallery shows it, with a spinner, while the real one renders
+            try:
+                job.preview = blenderexport.build_render(glb, blender, True, sun, 480, 8, None, started, timeout=300, dof=dof, crop=crop)
+                notifier.notify({"type": "render", **job.view()})
+            except Exception:  # noqa: BLE001 - the preview is a bonus: the render goes on without it
+                job.preview = None
         job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=4 * 3600 if job.turntable else 1800, dof=dof, crop=crop, phase=phase,
                                              turntable=job.turntable, track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)  # (job.png holds the MP4 of a turntable)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
@@ -1178,6 +1185,15 @@ def get_render_job_video(jobId: str) -> Response:
         raise HTTPException(status_code=409, detail="there is no finished video")
     filename = re.sub(r"[^\w.-]+", "_", job.name) + f"-{job.width}px.mp4"
     return Response(job.png, media_type="video/mp4", headers={"Content-Disposition": f'inline; filename="{filename}"', "Cache-Control": "no-store"})
+
+
+@app.get("/api/render-jobs/{jobId}/preview.png")
+def render_job_preview(jobId: str) -> Response:
+    """The small preliminary picture of a render that runs (404 while there is none)."""
+    job = render_job(jobId)
+    if job.preview is None:
+        raise HTTPException(status_code=404, detail="there is no preview (yet)")
+    return Response(job.preview, media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/render-jobs/{jobId}/image.png")

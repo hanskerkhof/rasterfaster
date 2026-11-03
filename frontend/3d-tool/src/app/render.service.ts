@@ -158,6 +158,9 @@ export interface QueuedRender {
   frames: number;
   motion: 'orbit' | 'spin' | null;
   size: string;
+  documentId?: string;
+  /** Width over height of the picture. */
+  aspect?: number;
 }
 
 export interface RenderState {
@@ -178,6 +181,9 @@ export interface RenderState {
   documentId?: string;
   version?: number;
   imageId?: string | null;
+  /** The API has made the small preliminary picture of this render (see /api/render-jobs/{id}/preview.png). */
+  preview?: boolean;
+  aspect?: number;
   /** How many renders wait behind the running one, this one's place in the queue (0: not waiting), and how many renders the queue takes. */
   /** A picture or a turntable video, the frames of the video, and how it moves (the camera circles, or the parts turn). */
   kind?: 'picture' | 'turntable';
