@@ -1,4 +1,4 @@
-# Library catalog ("Parts archive") — plan
+# Library catalog ("Parts catalog") — plan
 
 Status: phase 0a (backend) and 0b (frontend folder + barrel) done on branch `library-extract`; the rest is plan only. Inspired by https://bernies.audio/pages/speaker-archive.
 
@@ -51,7 +51,7 @@ No new metadata store in v1; everything is derived.
 New standalone component `catalog-dialog.ts` inside the library package (`projects/rf-library/src/lib/catalog/`, exported as `RfCatalogDialog`; same pattern as `trash-dialog.ts`), opened from a **Catalog** button near the Trash button in the app shell, key `⌘K`-style shortcut TBD. The endpoints named in this plan (`/api/catalog`, thumbnails) are routes of the `rf_library` router.
 
 ```
-┌ PARTS ARCHIVE ─────────────────────────── 6 476 parts · 325 folders ┐
+┌ PARTS CATALOG ─────────────────────────── 6 476 parts · 325 folders ┐
 │ FOLDER  [ALL 6476] [1.4 BOLTS & NUTS 312] [10.17 FRAME … 88] …      │
 │ SORT    NAME · DATE · SIZE  |  GRID · LIST                           │
 │ FIND    > name, folder …                                  [ / ]     │

@@ -31,7 +31,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
 }
 
 /**
- * The parts archive: every STL of the library as a numbered card, in a near full-screen dialog. Filter by folder, find by name (the file list's
+ * The parts catalog: every STL of the library as a numbered card, in a near full-screen dialog. Filter by folder, find by name (the file list's
  * syntax), sort by name, date or size. A click (or Enter) opens the part's page: a large drawing and the facts about the file, with Add to document
  * (`add`), Find in browser (`findInBrowser`) and Reveal in Finder, and ← / → for the previous and next part. Its address is `#part=<path>`.
  * Only the cards in view exist in the page, so a library of thousands of files scrolls smoothly.
@@ -41,9 +41,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
   imports: [DatePipe, ManageToggle],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
-    <section class="dialog" role="dialog" aria-label="Parts archive">
+    <section class="dialog" role="dialog" aria-label="Parts catalog">
       <header>
-        <h2>PARTS ARCHIVE</h2>
+        <h2>PARTS CATALOG</h2>
         <span class="stats">{{ entries().length }} parts · {{ folders().length }} folders</span>
         <app-manage-toggle />
         <button type="button" class="close" (click)="close.emit()">CLOSE [ESC]</button>
@@ -188,13 +188,18 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 <button type="button" class="add" (click)="add.emit(d.path)">ADD TO DOCUMENT</button>
                 <button type="button" class="ghost" (click)="findInBrowser.emit(d.path)">FIND IN BROWSER</button>
                 <button type="button" class="ghost" (click)="finder(d)">REVEAL IN FINDER</button>
-                @if (manage.enabled()) {
-                  <button type="button" class="ghost" (click)="openRename(d)">RENAME…</button>
-                  <button type="button" class="ghost" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
-                  <button type="button" class="ghost" (click)="openMover([d.path])">MOVE…</button>
-                  <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
-                }
               </div>
+              @if (manage.enabled()) {
+                <div class="manage">
+                  <div class="mlabel"><span>MANAGE</span><span>CHANGES THE LIBRARY</span></div>
+                  <div class="actions">
+                    <button type="button" class="mg" (click)="openRename(d)">RENAME…</button>
+                    <button type="button" class="mg" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
+                    <button type="button" class="mg" (click)="openMover([d.path])">MOVE…</button>
+                    <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
+                  </div>
+                </div>
+              }
               @if (actionNote()) { <p class="empty">{{ actionNote() }}</p> }
             </div>
           </div>
@@ -292,6 +297,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .shade { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 5; }
     .confirm { position: absolute; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(520px, 90%); padding: 16px 18px; background: #1c1d21; border: 1px solid #3a3b40; border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
     .confirm h4 { margin: 0 0 8px; font-size: 12px; font-weight: 400; letter-spacing: .1em; } .confirm p { margin: 6px 0; color: #aaa; word-break: break-word; } .confirm .n { color: #e6e6e6; } .confirm .warn { color: #e8c470; }
+    .manage { margin-top: 18px; padding: 8px 10px 10px; border: 1px dashed #6b5a2a; border-radius: 4px; background: rgba(232,196,112,.04); }
+    .mlabel { display: flex; justify-content: space-between; color: #c9a64e; font-size: 10px; letter-spacing: .1em; } .mlabel span:last-child { color: #7d6a3a; }
+    .manage .actions { margin-top: 8px; }
+    .mg { padding: 3px 10px; border: 1px solid #6b5a2a; color: #e8c470; } .mg:hover:not(:disabled) { background: #3a3320; color: #ffe27a; border-color: #c9a64e; } .mg:disabled { opacity: .4; }
     .confirm .field { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 6px 8px; background: #111; border: 1px solid #3a3b40; color: #e6e6e6; } .confirm .field:focus { border-color: #2f6fed; }
     .confirm .hint { font-size: 10px; color: #777; } .folders-list { max-height: 240px; overflow: auto; margin-top: 6px; border: 1px solid #2c2d31; }
     .pick { display: block; width: 100%; box-sizing: border-box; padding: 4px 10px; text-align: left; color: #ccc; word-break: break-all; } .pick:hover:not(:disabled) { background: #26324a; color: #fff; } .pick:disabled { opacity: .35; cursor: default; } .pick.create { color: #9ad29a; }

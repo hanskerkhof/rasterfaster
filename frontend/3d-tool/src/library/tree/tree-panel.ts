@@ -186,7 +186,7 @@ export class TreePanel {
   readonly openTrash = output<void>();
   /** The notice's "Relink…" button: the parts (document item ids) that were looked up get another file. */
   readonly relink = output<string[]>();
-  /** "Open in Catalog": show this file on its page in the parts archive. */
+  /** "Open in Catalog": show this file on its page in the parts catalog. */
   readonly openInCatalog = output<string>();
   /** Ids of the document parts the notice is about (for its Relink button); null when the notice has none. */
   protected readonly noticeRelink = signal<string[] | null>(null);

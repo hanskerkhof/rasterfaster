@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Parts archive is now Parts catalog (0.11.57)
+
+### Changed
+- **FE** (`catalog-dialog.ts`, `app.html`, `tree-panel.ts`), README, `docs/library-catalog-plan.md`: the dialog is called **PARTS CATALOG** (heading, accessible label, the tooltip of the Catalog button and the comments); the word "archive" is no longer used for it. Earlier entries of this changelog keep the name they had.
+
+## 2026-11-05 - Catalog: the management buttons set apart (0.11.56)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): on a part's page the management buttons (Rename…, Duplicate, Move…, Move to Trash) are in their own dashed amber box labelled `MANAGE · CHANGES THE LIBRARY`, with amber buttons (Move to Trash stays red), apart from the three plain buttons (Add to document, Find in browser, Reveal in Finder).
+
 ## 2026-11-05 - Catalog: rename, duplicate, move, new folder (0.11.55)
 
 ### Added
