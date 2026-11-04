@@ -235,7 +235,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                           }
                         </span>
                         <span class="name">{{ fileTitle(s) }}</span>
-                        <span class="meta">{{ meta(s) }}</span>
+                        <span class="meta">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ meta(s) }}</span>
                       </button>
                     }
                   </div>
@@ -365,7 +365,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .shead > span:first-child { min-width: 0; } .crumbs { flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .crumbs::-webkit-scrollbar { display: none; }
     .crumb { padding: 0 5px; color: #aaa; } .crumb:hover { color: #fff; } .crumb.on { background: #e6e6e6; color: #111; } .crumb.ahead { color: #666; } .crumb.ahead:hover { color: #fff; } .sepc { color: #555; }
-    .sib.dirrow .n { color: #9db7f0; } .sib.current { background: #26324a; color: #fff; } .tile.current { background: #26324a; } .tile.dirtile .art { color: #9db7f0; } .folder-glyph { font-size: 40px; }
+    .sib.dirrow .n { color: #9db7f0; } .sib.current { background: #26324a; color: #fff; } .tile.current { background: #26324a; outline: 2px solid #2f6fed; outline-offset: -2px; } .tile.current .name { color: #fff; } .tile.current .meta { color: #9db7f0; } .tile.dirtile .art { color: #9db7f0; } .folder-glyph { font-size: 40px; }
     .shead .right { display: flex; align-items: baseline; gap: 14px; } .shead .chips button { color: #888; } .shead .chips button.on { background: #e6e6e6; color: #111; }
     .stripbox { position: relative; flex: 1 1 auto; min-height: 0; } .strip { height: 100%; display: flex; overflow-x: auto; scrollbar-width: none; } .strip::-webkit-scrollbar { display: none; }
     .tile { flex: none; box-sizing: border-box; width: ${tileWidth}px; display: flex; flex-direction: column; padding: 8px 12px; text-align: left; border: 0; box-shadow: inset -1px 0 #2c2d31; background: transparent; overflow: hidden; }
@@ -556,8 +556,9 @@ export class CatalogDialog implements OnInit {
   protected readonly browse = signal('');
   protected readonly trail = signal('');
   protected readonly crumbs = computed(() => crumbsOf(this.trail()));
-  protected readonly browseFolders = computed(() => (this.detail() ? childFolders(this.entries(), this.browse()) : []));
-  protected readonly browseFiles = computed(() => (this.detail() ? filesIn(this.entries(), this.browse()) : []));
+  private readonly pageOpen = computed(() => !!this.detail()); // the lists below must not be made again for every other part that is opened: the strip would jump
+  protected readonly browseFolders = computed(() => (this.pageOpen() ? childFolders(this.entries(), this.browse()) : []));
+  protected readonly browseFiles = computed(() => (this.pageOpen() ? filesIn(this.entries(), this.browse()) : []));
   protected readonly previous = computed(() => this.shown()[this.detailIndex() - 1] ?? null);
   protected readonly following = computed(() => (this.detailIndex() < 0 ? null : this.shown()[this.detailIndex() + 1] ?? null));
   protected readonly selectedEntry = computed(() => this.shown().find(e => e.path === this.selected()) ?? null);
@@ -576,11 +577,10 @@ export class CatalogDialog implements OnInit {
       if (this.detail() && this.siblingView() === 'strip') this.thumbs.want(this.stripWanted());
       else this.thumbs.want(this.cards().map(card => card.entry));
     });
-    effect(onCleanup => { // measure the strip when it appears, changes its files or its width; a new folder starts at its first file
+    effect(onCleanup => { // measure the strip when it appears, changes its files or its width
       this.browseFiles(); this.browseFolders(); this.siblingView();
       const element = this.stripRef()?.nativeElement;
       if (!element) return;
-      element.scrollLeft = 0;
       const observer = new ResizeObserver(() => this.measureStrip());
       observer.observe(element);
       const timer = setTimeout(() => this.measureStrip());
@@ -600,6 +600,11 @@ export class CatalogDialog implements OnInit {
       const observer = new ResizeObserver(() => this.size.set({ width: element.clientWidth, height: element.clientHeight }));
       observer.observe(element);
       onCleanup(() => observer.disconnect());
+    });
+    effect(() => { // the open part stays in view in the strip or the list of its folder (and a new folder starts at its beginning)
+      const open = this.detail(), folder = this.browse(), view = this.siblingView();
+      this.stripRef(); this.browseFiles(); this.browseFolders();
+      if (open) untracked(() => setTimeout(() => this.revealCurrent(folder, view)));
     });
     effect(() => { // a page opens on its own folder, with the whole path as the trail
       const path = this.detail();
@@ -1014,6 +1019,25 @@ export class CatalogDialog implements OnInit {
   }
   /** The place of the open part in the list ('—' when the filter has left it out, which a part picked from its folder can be). */
   protected number() { return this.detailIndex() < 0 ? '—' : this.pad(this.detailIndex() + 1); }
+  private lastRevealed = '';
+  /** Scrolls the strip (or the list) of the folder panel so that the open part is in view, one tile of context before it; leaves it alone when it is already there. */
+  private revealCurrent(folder: string, view: 'list' | 'strip') {
+    const open = this.detail();
+    const folderChanged = this.lastRevealed !== `${folder}|${view}`;
+    this.lastRevealed = `${folder}|${view}`;
+    const index = this.browseFiles().findIndex(file => file.path === open);
+    if (view === 'list') {
+      (this.host.nativeElement.querySelector('.listbox .sib.current') as HTMLElement | null)?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const element = this.stripRef()?.nativeElement;
+    if (!element) return;
+    if (index < 0) { if (folderChanged) element.scrollLeft = 0; return; } // another folder than the part's: from its start
+    const left = (this.browseFolders().length + index) * tileWidth;
+    if (left >= element.scrollLeft && left + tileWidth <= element.scrollLeft + element.clientWidth) return; // in view already: a click on a tile must not move the strip
+    element.scrollTo({ left: Math.max(0, Math.min(element.scrollWidth - element.clientWidth, left - tileWidth)), behavior: folderChanged ? 'auto' : 'smooth' });
+  }
+
   /** Shows another folder in the folder panel without leaving the page. Going up the trail keeps the crumbs below it; going elsewhere changes the trail. */
   protected goFolder(path: string) {
     this.browse.set(path);

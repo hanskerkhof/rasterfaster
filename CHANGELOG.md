@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: the open part stays in view in the strip (0.11.63)
+
+### Fixed
+- **FE** (`src/library/catalog/catalog-dialog.ts`): in the strip of a part's page, clicking a tile made the strip jump back to its start, so the part you had just opened scrolled out of view. The strip now stays where it is when the part is already in view, scrolls it into view (with one tile of context before it) when it is not (previous / next, a click in the list of doubles), and starts at the beginning in another folder. The open tile is highlighted (blue frame, `OPEN` before its size); the list keeps the open row in view too.
+
 ## 2026-11-05 - Catalog: a breadcrumb trail on a part's page (0.11.62)
 
 ### Added
