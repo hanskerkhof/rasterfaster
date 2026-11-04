@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -62,5 +62,25 @@ describe('catalog logic', () => {
     expect(siblingsOf(files, 'loose.stl')).toEqual([]);
     expect(siblingsOf(files, 'A/sub/y.stl')).toEqual([]);
     expect(siblingsOf([entry('A/b.stl'), entry('A/a.stl'), entry('A/c.stl')], 'A/b.stl').map(e => e.name)).toEqual(['a.stl', 'c.stl']);
+  });
+
+  it('leaves out what went to the Trash', () => {
+    const files = [entry('A/x.stl'), entry('A/sub/y.stl'), entry('B/z.stl'), entry('AB/w.stl')];
+    expect(withoutPaths(files, ['A/x.stl']).map(e => e.path)).toEqual(['A/sub/y.stl', 'B/z.stl', 'AB/w.stl']);
+    expect(withoutPaths(files, ['A']).map(e => e.path)).toEqual(['B/z.stl', 'AB/w.stl']); // a folder takes everything in it, not a folder that only starts with its name
+    expect(withoutPaths(files, [])).toHaveLength(4);
+  });
+
+  it('lists the folders parts can be moved to', () => {
+    const files = [entry('B/x.stl'), entry('A/sub/deep/y.stl'), entry('A/z.stl'), entry('root.stl')];
+    expect(folderPaths(files)).toEqual(['A', 'A/sub', 'A/sub/deep', 'B']);
+    expect(folderPaths([])).toEqual([]);
+  });
+
+  it('cleans a typed folder path', () => {
+    expect(cleanFolderPath(' a // b/ c ')).toBe('a/b/c');
+    expect(cleanFolderPath('')).toBe('');
+    expect(cleanFolderPath('a/../b')).toBeNull();
+    expect(cleanFolderPath('.hidden')).toBeNull();
   });
 });

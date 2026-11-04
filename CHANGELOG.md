@@ -2,6 +2,21 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: rename, duplicate, move, new folder (0.11.55)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): with Manage on, a part's page has **Rename…** (the .stl is added when left out; documents that use the file follow), **Duplicate** (the copy opens) and **Move…**; the bar for ticked parts has **Move…**. Move opens a folder list with a box to filter it; typing a path that does not exist (`new/folder`) offers **Create … and move here** (Enter does it). All of it uses the existing library endpoints (backups, documents follow); the catalog and the file list read the library again afterwards, and a note says what happened (and how many parts in documents were updated). The drawing of a renamed or moved part is made again.
+
+## 2026-11-05 - Catalog: selection and Move to Trash (0.11.54)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`, `app.html`): with Manage on, the cards of the parts archive have a tick box (Shift ticks a range, ⌘-click on a card ticks it, ⌘A ticks everything shown); a bar at the bottom shows `N SELECTED` with **Select all shown**, **Clear** and **Move to Trash** (also ⌘⌫). A part's page has **Move to Trash** too. Before anything moves, a dry run asks which documents use the files and the confirmation names them; the same Trash as the file list is used (one batch, one Put Back), the catalog and the file list update, and the bottom bar offers **Undo**. The Manage switch is in the catalog's header as well; with Manage off the tick boxes and buttons are gone.
+
+## 2026-11-05 - Manage switch for the library (0.11.53)
+
+### Added
+- **FE** (`src/library/core/manage.service.ts`, `manage-toggle.ts`, `library.config.ts`, `app.html`, `app.ts`): the **Manage** switch in the header of the file panel (on by default, remembered as `rasterfaster.manage`). It belongs to the library only: with Manage off the file list is read-only (no Rename, Duplicate, New Folder, Move to Trash or Delete, no drag-and-drop moves, no top-level New Folder button; the shortcuts ⌘⌫, ⌥⌘⌫, Enter and F2 do nothing); browsing, Add to Document, Reveal in Finder, Copy Path, the Trash dialog and Open in Catalog stay. Documents, the parts list and exports are not affected. A host can make the library read-only for good with `provideRfLibrary({ readOnly: true })`: the switch is then off and not shown.
+
 ## 2026-11-05 - Open in Catalog (0.11.51, 0.11.52)
 
 ### Added

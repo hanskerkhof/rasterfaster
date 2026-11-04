@@ -2,7 +2,7 @@ import { Component, DestroyRef, HostListener, computed, effect, inject, signal, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult, TrashDialog, TreePanel, CatalogDialog } from '@rasterfaster/library';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult, TrashDialog, TreePanel, CatalogDialog, ManageService, ManageToggle } from '@rasterfaster/library';
 import { DocumentPanel } from './document-panel';
 import { ViewsPanel } from './views-panel';
 import { ImagesPanel } from './images-panel';
@@ -55,7 +55,7 @@ function readCatalogOpen(): boolean {
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, CatalogDialog, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
+  imports: [TreePanel, TrashDialog, CatalogDialog, ManageToggle, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
@@ -308,6 +308,8 @@ export class App {
     this.store.announce(`Moved ${result.results.length} item${result.results.length === 1 ? '' : 's'}${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}${backups ? `; ${backups} original${backups === 1 ? '' : 's'} kept in the backup folder` : ''}`, 7000);
   }
 
+  /** The Manage switch of the library (the file list and the catalog follow it). */
+  protected readonly manage = inject(ManageService);
   protected readonly trashOpen = signal(false);
   /** The catalog stays open when the page is reloaded (kept per browser tab). */
   protected readonly catalogOpen = signal(readCatalogOpen());

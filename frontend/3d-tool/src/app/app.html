@@ -6,6 +6,7 @@
   <div class="panel-inner">
   <header>
     <span>RASTERFASTER <small class="version" title="Version of this build">v{{ appVersion }}</small></span>
+    <app-manage-toggle class="manage" />
     <button class="panel-toggle" type="button" title="Hide the panel (⌘B)" aria-label="Hide the panel" (click)="togglePanel()">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="m16 10-2 2 2 2"/></svg>
     </button>
@@ -23,9 +24,11 @@
       Sort
       <button [class.on]="sortKey() === 'name'" (click)="setSort('name')">Name {{ sortKey() === 'name' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
       <button [class.on]="sortKey() === 'date'" (click)="setSort('date')">Date {{ sortKey() === 'date' ? (sortAscending() ? '↑' : '↓') : '' }}</button>
+      @if (manage.enabled()) {
       <button class="reload" type="button" title="New folder at the top level" aria-label="New folder at the top level" (click)="newTopLevelFolder()">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>
       </button>
+      }
       <button class="reload" type="button" title="Reload the file list" aria-label="Reload the file list" [class.spin]="reloading()" [disabled]="reloading()" (click)="reloadFiles()">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>
       </button>
@@ -172,7 +175,7 @@
       </div>
     }
     @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }
-    @if (catalogOpen()) { <app-catalog-dialog (close)="setCatalogOpen(false)" (add)="addFromCatalog($event)" (findInBrowser)="findFromCatalog($event)" /> }
+    @if (catalogOpen()) { <app-catalog-dialog (close)="setCatalogOpen(false)" (add)="addFromCatalog($event)" (findInBrowser)="findFromCatalog($event)" (changed)="onTrashChanged()" /> }
     @if (trashOpen()) { <app-trash-dialog (close)="trashOpen.set(false)" (changed)="onTrashChanged()" /> }
     @if (store.conflict()) {
       <div class="conflict" role="alert">

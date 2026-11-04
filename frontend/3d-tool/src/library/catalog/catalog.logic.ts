@@ -90,3 +90,26 @@ export function siblingsOf(entries: readonly CatalogEntry[], path: string): Cata
   const folder = parentFolder(path);
   return sortCatalog(entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder), 'name', true);
 }
+
+/** The entries that are left after these library paths (files, or folders with everything in them) have gone to the Trash. */
+export function withoutPaths(entries: readonly CatalogEntry[], gone: readonly string[]): CatalogEntry[] {
+  if (!gone.length) return [...entries];
+  const files = new Set(gone);
+  return entries.filter(entry => !files.has(entry.path) && !gone.some(path => entry.path.startsWith(path + '/')));
+}
+
+/** Every folder that has a part in it, or in a folder below it (`a`, `a/b`), in natural order: where a part can be moved to. */
+export function folderPaths(entries: readonly CatalogEntry[]): string[] {
+  const found = new Set<string>();
+  for (const entry of entries) {
+    for (let folder = parentFolder(entry.path); folder; folder = parentFolder(folder)) found.add(folder);
+  }
+  return [...found].sort(naturalCompare);
+}
+
+/** What a typed folder path means for a move: tidy slashes, no empty parts, none of `.` or `..`; null when it is not usable. */
+export function cleanFolderPath(text: string): string | null {
+  const parts = text.trim().split('/').map(part => part.trim()).filter(Boolean);
+  if (parts.some(part => part === '.' || part === '..' || part.startsWith('.'))) return null;
+  return parts.join('/');
+}

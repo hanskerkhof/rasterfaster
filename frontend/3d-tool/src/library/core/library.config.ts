@@ -4,6 +4,8 @@ import { InjectionToken } from '@angular/core';
 export interface RfLibraryConfig {
   /** Where the library API (the `rf_library` router) is served from, without a trailing slash. */
   apiBase: string;
+  /** The library is only to be browsed: Manage is off for good and its switch is not shown (the API should refuse changes too). */
+  readOnly?: boolean;
 }
 
 export const defaultRfLibraryConfig: RfLibraryConfig = { apiBase: '/api' };

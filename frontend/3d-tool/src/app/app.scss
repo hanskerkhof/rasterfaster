@@ -7,6 +7,7 @@
 .panel.hidden .panel-resize { pointer-events: none; }
 :host(.sliding) { transition: grid-template-columns 160ms cubic-bezier(.2, .8, .2, 1); }
 :host(.sliding) .panel { transition: border-width 160ms; }
+.manage { margin-left: auto; margin-right: 6px; }
 .panel-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; cursor: pointer; opacity: .75; }
 .panel-toggle:hover { opacity: 1; background: #31353f; border-color: #000; }
 .panel-toggle.show { margin-right: 4px; }

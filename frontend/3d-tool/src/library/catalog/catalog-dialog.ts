@@ -1,12 +1,15 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, output, signal, untracked, viewChild } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { LibraryService } from '../core/library.service';
+import { ManageService } from '../core/manage.service';
+import { ManageToggle } from '../core/manage-toggle';
+import { rangeBetween } from '../tree/tree-selection';
 import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath } from './catalog.logic';
 
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
@@ -35,13 +38,14 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
  */
 @Component({
   selector: 'app-catalog-dialog',
-  imports: [DatePipe],
+  imports: [DatePipe, ManageToggle],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <section class="dialog" role="dialog" aria-label="Parts archive">
       <header>
         <h2>PARTS ARCHIVE</h2>
         <span class="stats">{{ entries().length }} parts · {{ folders().length }} folders</span>
+        <app-manage-toggle />
         <button type="button" class="close" (click)="close.emit()">CLOSE [ESC]</button>
       </header>
 
@@ -77,8 +81,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
         <div class="space" [style.height.px]="window().rows * rowHeight">
           <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', ' + columnWidth() + 'px)'">
             @for (card of cards(); track card.entry.path) {
-              <button type="button" class="card" [class.selected]="card.entry.path === selected()" (click)="openDetail(card.entry.path)" [title]="card.entry.path">
-                <span class="top"><span>NO.{{ pad(card.number) }}</span><span>{{ code(card.entry.folder) }}</span></span>
+              <button type="button" class="card" [class.selected]="card.entry.path === selected()" [class.picked]="isPicked(card.entry.path)" (click)="onCardClick($event, card.entry)" [title]="card.entry.path">
+                <span class="top"><span class="l">@if (manage.enabled()) { <span class="check" role="checkbox" [attr.aria-checked]="isPicked(card.entry.path)" [class.on]="isPicked(card.entry.path)" title="Select (Shift: a range)" (click)="pick($event, card.entry)">{{ isPicked(card.entry.path) ? '✓' : '' }}</span> }NO.{{ pad(card.number) }}</span><span>{{ code(card.entry.folder) }}</span></span>
                 <span class="art">
                   @switch (thumbs.state(card.entry)) {
                     @case ('drawn') { <img [src]="thumbs.url(card.entry)" alt="" loading="lazy" draggable="false" /> }
@@ -98,10 +102,21 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
           </div>
         </div>
       </div>
-      <footer>
-        <span>{{ selectedEntry()?.path ?? 'Click a part to open its page; arrow keys move, Enter opens it.' }}</span>
-        @if (selectedEntry()) { <button type="button" class="add" (click)="add.emit(selectedEntry()!.path)">ADD TO DOCUMENT</button> }
-      </footer>
+      @if (manage.enabled() && picked().size) {
+        <footer class="bar">
+          <span><b>{{ picked().size }}</b> SELECTED{{ picked().size === shown().length ? ' (ALL SHOWN)' : '' }}</span>
+          <button type="button" class="ghost" (click)="pickAll()">SELECT ALL {{ shown().length }} SHOWN</button>
+          <button type="button" class="ghost" (click)="picked.set(none)">CLEAR</button>
+          <button type="button" class="ghost" (click)="openMover(pickedPaths())">MOVE…</button>
+          <button type="button" class="danger" (click)="requestTrash(pickedPaths())">MOVE TO TRASH</button>
+        </footer>
+      } @else {
+        <footer>
+          <span>{{ undoable() ? undoable()!.label : actionNote() || (selectedEntry()?.path ?? 'Click a part to open its page; arrow keys move, Enter opens it.') }}</span>
+          @if (undoable()) { <button type="button" class="ghost" (click)="undoTrash()">UNDO</button> }
+          @else if (selectedEntry()) { <button type="button" class="add" (click)="add.emit(selectedEntry()!.path)">ADD TO DOCUMENT</button> }
+        </footer>
+      }
       </div>
 
       @if (detailEntry(); as d) {
@@ -173,6 +188,12 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 <button type="button" class="add" (click)="add.emit(d.path)">ADD TO DOCUMENT</button>
                 <button type="button" class="ghost" (click)="findInBrowser.emit(d.path)">FIND IN BROWSER</button>
                 <button type="button" class="ghost" (click)="finder(d)">REVEAL IN FINDER</button>
+                @if (manage.enabled()) {
+                  <button type="button" class="ghost" (click)="openRename(d)">RENAME…</button>
+                  <button type="button" class="ghost" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
+                  <button type="button" class="ghost" (click)="openMover([d.path])">MOVE…</button>
+                  <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
+                }
               </div>
               @if (actionNote()) { <p class="empty">{{ actionNote() }}</p> }
             </div>
@@ -182,6 +203,45 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             <button type="button" [disabled]="!following()" (click)="step(1)">{{ following() ? pad(detailIndex() + 2) + ' ' + short(following()!.name) + ' →' : '' }}</button>
           </div>
         </section>
+      }
+      @if (renaming(); as r) {
+        <div class="shade"></div>
+        <div class="confirm" role="dialog" aria-label="Rename">
+          <h4>RENAME</h4>
+          <p class="n">{{ r.path }}</p>
+          <input class="field" type="text" spellcheck="false" autocomplete="off" [value]="r.name" (input)="renameText($any($event.target).value)" (keydown.enter)="renameNow()" />
+          <p class="hint">The .stl is added when it is left out. Documents that use the file follow the new name.</p>
+          @if (r.error) { <p class="warn">{{ r.error }}</p> }
+          <div class="actions"><button type="button" class="add" [disabled]="busy()" (click)="renameNow()">RENAME</button><button type="button" class="ghost" (click)="renaming.set(null)">CANCEL [ESC]</button></div>
+        </div>
+      }
+      @if (mover(); as m) {
+        <div class="shade"></div>
+        <div class="confirm mover" role="dialog" aria-label="Move">
+          <h4>MOVE {{ m.paths.length === 1 ? '1 PART' : m.paths.length + ' PARTS' }} TO …</h4>
+          <input class="field" type="text" spellcheck="false" autocomplete="off" placeholder="a folder, or a new one: new/folder" [value]="m.text" (input)="moverText($any($event.target).value)" (keydown.enter)="moveFirst()" />
+          <div class="folders-list">
+            @if (moverCreate(); as create) { <button type="button" class="pick create" (click)="moveTo(create, true)">CREATE “{{ create }}” AND MOVE HERE</button> }
+            @for (f of moverFolders(); track f.path) {
+              <button type="button" class="pick" [disabled]="f.here" (click)="moveTo(f.path, false)">{{ f.path || 'LIBRARY ROOT' }}@if (f.here) { <small> · already there</small> }</button>
+            } @empty { @if (!moverCreate()) { <p class="hint">No folder matches.</p> } }
+          </div>
+          @if (m.error) { <p class="warn">{{ m.error }}</p> }
+          <div class="actions"><button type="button" class="ghost" (click)="mover.set(null)">CANCEL [ESC]</button></div>
+        </div>
+      }
+      @if (confirm(); as c) {
+        <div class="shade"></div>
+        <div class="confirm" role="alertdialog" aria-label="Move to Trash">
+          <h4>MOVE {{ c.paths.length === 1 ? '1 PART' : c.paths.length + ' PARTS' }} TO THE TRASH?</h4>
+          @if (c.paths.length === 1) { <p class="n">{{ c.paths[0] }}</p> }
+          @if (c.documents.length) {
+            <p class="warn">{{ c.parts }} part{{ c.parts === 1 ? '' : 's' }} in {{ c.documents.length }} document{{ c.documents.length === 1 ? '' : 's' }} use{{ c.parts === 1 ? 's' : '' }} {{ c.paths.length === 1 ? 'it' : 'these' }} ({{ c.documents.join(', ') }}): they will show a ⚠ until you Put Back.</p>
+          } @else {
+            <p>No document uses {{ c.paths.length === 1 ? 'it' : 'them' }}. Put Back in the Trash undoes this.</p>
+          }
+          <div class="actions"><button type="button" class="danger" [disabled]="busy()" (click)="trashNow(c.paths)">MOVE TO TRASH</button><button type="button" class="ghost" (click)="confirm.set(null)">CANCEL [ESC]</button></div>
+        </div>
       }
     </section>
   `,
@@ -225,6 +285,17 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; } .ghost { border: 1px solid #444; padding: 3px 10px; color: #ccc; } .ghost:hover { border-color: #888; color: #fff; }
     .dnav { display: flex; justify-content: space-between; padding-top: 10px; border-top: 1px solid #2c2d31; color: #888; } .dnav button:disabled { visibility: hidden; } .dnav button:hover { color: #fff; }
     .card .plus { position: absolute; right: 8px; bottom: 8px; display: none; padding: 1px 6px; background: #e6e6e6; color: #111; } .card { position: relative; } .card:hover .plus { display: block; } .plus:hover { background: #fff; }
+    .card .l { display: inline-flex; align-items: center; gap: 6px; } .check { display: inline-flex; align-items: center; justify-content: center; width: 12px; height: 12px; box-sizing: border-box; border: 1px solid #555; color: #111; font-size: 10px; line-height: 10px; } .check:hover { border-color: #aaa; } .check.on { background: #e6e6e6; border-color: #e6e6e6; }
+    .card.picked { background: #1f2a3e; }
+    footer.bar { gap: 14px; } footer.bar b { color: #e6e6e6; font-weight: 400; } footer.bar span { flex: 1; }
+    .danger { border: 1px solid #7a3a3a; padding: 3px 10px; color: #f0b4b4; } .danger:hover:not(:disabled) { background: #b03a3a; color: #fff; } .danger:disabled { opacity: .4; }
+    .shade { position: absolute; inset: 0; background: rgba(0,0,0,.55); z-index: 5; }
+    .confirm { position: absolute; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(520px, 90%); padding: 16px 18px; background: #1c1d21; border: 1px solid #3a3b40; border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
+    .confirm h4 { margin: 0 0 8px; font-size: 12px; font-weight: 400; letter-spacing: .1em; } .confirm p { margin: 6px 0; color: #aaa; word-break: break-word; } .confirm .n { color: #e6e6e6; } .confirm .warn { color: #e8c470; }
+    .confirm .field { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 6px 8px; background: #111; border: 1px solid #3a3b40; color: #e6e6e6; } .confirm .field:focus { border-color: #2f6fed; }
+    .confirm .hint { font-size: 10px; color: #777; } .folders-list { max-height: 240px; overflow: auto; margin-top: 6px; border: 1px solid #2c2d31; }
+    .pick { display: block; width: 100%; box-sizing: border-box; padding: 4px 10px; text-align: left; color: #ccc; word-break: break-all; } .pick:hover:not(:disabled) { background: #26324a; color: #fff; } .pick:disabled { opacity: .35; cursor: default; } .pick.create { color: #9ad29a; }
+    .confirm .actions { display: flex; gap: 8px; margin-top: 14px; }
     .scroller { flex: 1; min-height: 0; overflow: auto; border: 1px solid #2c2d31; outline: 0; }
     .space { position: relative; } .grid { position: absolute; left: 0; right: 0; top: 0; display: grid; }
     .card { height: ${rowHeight}px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 11px 8px 10px; border: 0; border-right: 1px solid #2c2d31; border-bottom: 1px solid #2c2d31; background: transparent; overflow: hidden; }
@@ -243,11 +314,15 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
 export class CatalogDialog implements OnInit {
   private readonly lib = inject(LibraryService);
   protected readonly thumbs = inject(ThumbnailService);
+  protected readonly manage = inject(ManageService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly close = output<void>();
   /** The part to add to the document (its library path). */
   readonly add = output<string>();
   /** Show this part in the file list of the app (the dialog closes). */
   readonly findInBrowser = output<string>();
+  /** Parts were moved to the Trash or put back: the app refreshes the file list. */
+  readonly changed = output<void>();
 
   protected readonly rowHeight = rowHeight;
   protected readonly sorts: { key: CatalogSortKey; label: string }[] = [{ key: 'name', label: 'NAME' }, { key: 'date', label: 'DATE' }, { key: 'size', label: 'SIZE' }];
@@ -267,6 +342,32 @@ export class CatalogDialog implements OnInit {
   protected readonly bigState = signal<'loading' | 'ready' | 'none'>('loading');
   protected readonly usedIn = signal<number | null>(null);
   protected readonly actionNote = signal('');
+  /** The parts ticked for Manage actions (their library paths). */
+  protected readonly picked = signal<ReadonlySet<string>>(new Set());
+  protected readonly none: ReadonlySet<string> = new Set();
+  private pickAnchor: string | null = null;
+  protected readonly pickedPaths = computed(() => this.shown().filter(e => this.picked().has(e.path)).map(e => e.path));
+  /** The Move to Trash waiting for a yes: what it is, and which documents use those files (from a dry run). */
+  protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number } | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly renaming = signal<{ path: string; name: string; error: string } | null>(null);
+  protected readonly mover = signal<{ paths: string[]; text: string; error: string } | null>(null);
+  /** The folders a move can go to: those matching what was typed, and whether the parts are all there already. */
+  protected readonly moverFolders = computed(() => {
+    const m = this.mover();
+    if (!m) return [];
+    const needle = m.text.trim().toLowerCase();
+    const here = new Set(m.paths.map(parentFolder));
+    return ['', ...folderPaths(this.entries())].filter(path => !needle || path.toLowerCase().includes(needle)).map(path => ({ path, here: here.size === 1 && here.has(path) }));
+  });
+  /** What was typed names a folder that does not exist yet: offered as "create and move here". */
+  protected readonly moverCreate = computed(() => {
+    const m = this.mover();
+    const path = m ? cleanFolderPath(m.text) : null;
+    return path && !['', ...folderPaths(this.entries())].some(f => f.toLowerCase() === path.toLowerCase()) ? path : null;
+  });
+  /** The last Move to Trash, to undo from the bottom bar. */
+  protected readonly undoable = signal<{ ids: string[]; label: string } | null>(null);
   private savedTop = 0;
   /** The other files of the folder on a part's page: a list, or a strip of drawings that pages left and right. */
   protected readonly siblingView = signal<'list' | 'strip'>(readFolderView());
@@ -289,7 +390,10 @@ export class CatalogDialog implements OnInit {
 
   protected readonly folders = computed(() => folderCounts(this.entries()));
   protected readonly shown = computed(() => sortCatalog(filterCatalog(this.entries(), this.query(), this.folder()), this.sortKey(), this.ascending()));
-  protected readonly detailEntry = computed(() => this.entries().find(e => e.path === this.detail()) ?? null);
+  /** The open part; the same object for the same file, so a reload of the list does not draw its big picture again. */
+  protected readonly detailEntry = computed(() => this.entries().find(e => e.path === this.detail()) ?? null,
+    { equal: (a, b) => a?.path === b?.path && a?.modified === b?.modified && a?.size === b?.size });
+  private keepNote = false; // a note about an action stays when the action itself moved the page to another path
   protected readonly detailIndex = computed(() => this.shown().findIndex(e => e.path === this.detail()));
   protected readonly siblings = computed(() => { const path = this.detail(); return path ? siblingsOf(this.entries(), path) : []; });
   protected readonly previous = computed(() => this.shown()[this.detailIndex() - 1] ?? null);
@@ -304,7 +408,8 @@ export class CatalogDialog implements OnInit {
   });
 
   constructor() {
-    closeOnEscape(() => (this.detail() ? this.closeDetail() : this.close.emit()));
+    closeOnEscape(() => (this.renaming() ? this.renaming.set(null) : this.mover() ? this.mover.set(null) : this.confirm() ? this.confirm.set(null) : this.detail() ? this.closeDetail() : this.picked().size ? this.picked.set(this.none) : this.close.emit()));
+    effect(() => { if (!this.manage.enabled()) this.picked.set(this.none); }); // Manage off: nothing stays ticked
     effect(() => { // draw what is in view: the strip of a part's page when it is shown, else the cards
       if (this.detail() && this.siblingView() === 'strip') this.thumbs.want(this.stripWanted());
       else this.thumbs.want(this.cards().map(card => card.entry));
@@ -334,9 +439,9 @@ export class CatalogDialog implements OnInit {
       observer.observe(element);
       onCleanup(() => observer.disconnect());
     });
+    effect(() => { this.detail(); untracked(() => { if (this.keepNote) this.keepNote = false; else this.actionNote.set(''); }); }); // a note is about the page it was made on
     effect(onCleanup => { // the page of a part: its big drawing and where it is used
       const entry = this.detailEntry();
-      this.actionNote.set('');
       this.usedIn.set(null);
       if (!entry) { this.setBig(null); return; }
       let current = true;
@@ -392,6 +497,13 @@ export class CatalogDialog implements OnInit {
   }
 
   protected onKey(event: KeyboardEvent) {
+    if (this.manage.enabled() && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') { event.preventDefault(); this.pickAll(); return; }
+    if (this.manage.enabled() && event.metaKey && event.key === 'Backspace') {
+      event.preventDefault();
+      const target = this.picked().size ? this.pickedPaths() : this.selected() ? [this.selected()!] : [];
+      void this.requestTrash(target);
+      return;
+    }
     if (event.key === 'Enter' && this.selected()) { event.preventDefault(); this.openDetail(this.selected()!); return; }
     const list = this.shown();
     if (!list.length || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
@@ -404,6 +516,189 @@ export class CatalogDialog implements OnInit {
     const element = this.scroller().nativeElement, rowTop = Math.floor(next / columns) * rowHeight;
     if (rowTop < element.scrollTop) element.scrollTop = rowTop;
     else if (rowTop + rowHeight > element.scrollTop + element.clientHeight) element.scrollTop = rowTop + rowHeight - element.clientHeight;
+  }
+
+  protected isPicked(path: string) { return this.picked().has(path); }
+
+  /** A click on a card: its page opens; with ⌘ (or Ctrl) it ticks the part instead (Manage on). */
+  protected onCardClick(event: MouseEvent, entry: CatalogEntry) {
+    if (this.manage.enabled() && (event.metaKey || event.ctrlKey)) { this.pick(event, entry); return; }
+    this.openDetail(entry.path);
+  }
+
+  /** The tick box of a card: one part in or out; with Shift every part from the last one ticked to this one. */
+  protected pick(event: MouseEvent, entry: CatalogEntry) {
+    event.stopPropagation();
+    const next = new Set(this.picked());
+    if (event.shiftKey && this.pickAnchor) for (const path of rangeBetween(this.shown().map(e => e.path), this.pickAnchor, entry.path)) next.add(path);
+    else { if (next.has(entry.path)) next.delete(entry.path); else next.add(entry.path); this.pickAnchor = entry.path; }
+    this.picked.set(next);
+  }
+
+  protected pickAll() { this.picked.set(new Set(this.shown().map(e => e.path))); }
+
+  /** Asks what would happen (a dry run: which documents use these files), then waits for a yes. */
+  protected async requestTrash(paths: string[]) {
+    if (!this.manage.enabled() || !paths.length) return;
+    this.actionNote.set('');
+    try {
+      const dry = await firstValueFrom(this.lib.trashBatch(paths, true));
+      const documents = Object.keys(dry.documents ?? {});
+      this.confirm.set({ paths, documents, parts: Object.values(dry.documents ?? {}).reduce((sum, n) => sum + n, 0) });
+    } catch {
+      this.actionNote.set('Could not check which documents use these files. Is the API running?');
+    }
+  }
+
+  protected async trashNow(paths: string[]) {
+    if (!this.manage.enabled()) return;
+    this.busy.set(true);
+    try {
+      const result = await firstValueFrom(this.lib.trashBatch(paths));
+      const gone = result.results.map(r => r.path);
+      const open = this.detail();
+      const next = open && gone.includes(open) ? (this.following() ?? this.previous())?.path ?? null : open;
+      this.entries.update(list => withoutPaths(list, gone));
+      this.picked.update(set => new Set([...set].filter(path => !gone.includes(path))));
+      if (open && next !== open) { if (next) this.detail.set(next); else this.closeDetail(); }
+      const ids = result.results.map(r => r.id).filter((id): id is string => !!id);
+      const failed = result.failed.length;
+      this.undoable.set(ids.length ? { ids, label: `Moved ${ids.length === 1 ? '1 part' : ids.length + ' parts'} to the Trash${failed ? `; ${failed} could not be moved` : ''}.` } : null);
+      if (!ids.length && failed) this.actionNote.set(`Could not move ${failed} to the Trash: ${result.failed[0].error}`);
+      this.confirm.set(null);
+      void this.lib.refreshTrash();
+      this.changed.emit();
+    } catch {
+      this.confirm.set(null);
+      this.actionNote.set('Could not move them to the Trash.');
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected openRename(entry: CatalogEntry) {
+    this.renaming.set({ path: entry.path, name: displayName(entry.name), error: '' });
+    this.focusField();
+  }
+
+  protected renameText(name: string) { this.renaming.update(r => r && { ...r, name, error: '' }); }
+
+  protected async renameNow() {
+    const r = this.renaming();
+    if (!r || !this.manage.enabled() || this.busy()) return;
+    this.busy.set(true);
+    try {
+      const result = await firstValueFrom(this.lib.rename(r.path, r.name));
+      this.renaming.set(null);
+      this.undoable.set(null);
+      this.actionNote.set(`Renamed to ${result.to.split('/').pop()}${this.documentNote(result.documents)}.`);
+      await this.reload();
+      if (this.detail() === r.path) { this.keepNote = true; this.detail.set(result.to); }
+      this.changed.emit();
+    } catch (error) {
+      this.renaming.update(now => now && { ...now, error: this.reason(error, 'Could not rename it.') });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async duplicate(entry: CatalogEntry) {
+    if (!this.manage.enabled() || this.busy()) return;
+    this.busy.set(true);
+    try {
+      const result = await firstValueFrom(this.lib.duplicate(entry.path));
+      await this.reload();
+      this.keepNote = true;
+      this.detail.set(result.path); // the copy opens
+      this.actionNote.set(`Duplicated: this is the copy of ${displayName(entry.name)}.`);
+      this.changed.emit();
+    } catch (error) {
+      this.actionNote.set(this.reason(error, 'Could not duplicate it.'));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected openMover(paths: string[]) {
+    if (!this.manage.enabled() || !paths.length) return;
+    this.mover.set({ paths, text: '', error: '' });
+    this.focusField();
+  }
+
+  protected moverText(text: string) { this.mover.update(m => m && { ...m, text, error: '' }); }
+
+  /** Enter in the move box: the folder typed (new or old), else the first folder in the list. */
+  protected moveFirst() {
+    const create = this.moverCreate();
+    if (create) { void this.moveTo(create, true); return; }
+    const first = this.moverFolders().find(f => !f.here);
+    if (first) void this.moveTo(first.path, false);
+  }
+
+  /** Moves the parts into `folder` ('' is the library root), after making the folder (and the ones above it) when it is new. */
+  protected async moveTo(folder: string, create: boolean) {
+    const m = this.mover();
+    if (!m || !this.manage.enabled() || this.busy()) return;
+    this.busy.set(true);
+    try {
+      if (create) {
+        let parent = '';
+        for (const part of folder.split('/')) {
+          try { await firstValueFrom(this.lib.newFolder(parent, part)); } catch (error) { if ((error as { status?: number }).status !== 409) throw error; } // 409: it is there already
+          parent = parent ? `${parent}/${part}` : part;
+        }
+      }
+      const result = await firstValueFrom(this.lib.move(m.paths, folder));
+      const moved = new Map(result.results.map(r => [r.from, r.to]));
+      const open = this.detail();
+      this.mover.set(null);
+      this.picked.set(this.none);
+      this.undoable.set(null);
+      const changed = result.results.reduce((sum, r) => sum + Object.values(r.documents).reduce((a, n) => a + n, 0), 0);
+      const failed = result.failed.length;
+      this.actionNote.set(`Moved ${moved.size} part${moved.size === 1 ? '' : 's'} to ${folder || 'the library root'}${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}${failed ? `; ${failed} could not be moved: ${result.failed[0].error}` : ''}.`);
+      await this.reload();
+      if (open && moved.has(open)) { this.keepNote = true; this.detail.set(moved.get(open)!); }
+      this.changed.emit();
+    } catch (error) {
+      this.mover.update(now => now && { ...now, error: this.reason(error, 'Could not move them.') });
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  private documentNote(documents: Record<string, number>) {
+    const parts = Object.values(documents).reduce((sum, n) => sum + n, 0);
+    return parts ? ` (${parts} part${parts === 1 ? '' : 's'} in documents updated)` : '';
+  }
+
+  private reason(error: unknown, fallback: string) {
+    const detail = (error as { error?: { detail?: unknown } }).error?.detail;
+    return typeof detail === 'string' ? detail.charAt(0).toUpperCase() + detail.slice(1) + '.' : fallback;
+  }
+
+  private focusField() {
+    setTimeout(() => { const field = this.host.nativeElement.querySelector('.confirm .field') as HTMLInputElement | null; field?.focus(); field?.select(); });
+  }
+
+  /** Puts the parts of the last Move to Trash back (the oldest first, as they went in) and reads the library again. */
+  protected async undoTrash() {
+    const last = this.undoable();
+    if (!last) return;
+    this.undoable.set(null);
+    for (const id of [...last.ids].reverse()) { try { await firstValueFrom(this.lib.putBack(id, 'rename')); } catch { /* it stays in the Trash */ } }
+    await this.reload();
+    void this.lib.refreshTrash();
+    this.changed.emit();
+  }
+
+  /** Reads the library again (after a change) and keeps the drawings that are still current. */
+  private async reload() {
+    try {
+      const found = await firstValueFrom(this.lib.catalog());
+      this.thumbs.seed(found);
+      this.entries.set(found);
+    } catch { /* the list stays as it was */ }
   }
 
   protected setSiblingView(view: 'list' | 'strip') {
