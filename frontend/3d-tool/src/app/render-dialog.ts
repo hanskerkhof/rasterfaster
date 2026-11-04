@@ -99,6 +99,7 @@ import { ColorPalette } from './color-palette';
           </button>
         }
         @if (url()) {
+          <button type="button" [disabled]="busy()" title="320 px, 4 samples: the same picture, rough and in a second or two (the gallery's thumbnail of a queued render is made like this)" (click)="quick(true, true)">Quick draft render</button>
           <button type="button" [disabled]="busy()" [title]="'A small turntable video to see the motion: ' + quickVideoText() + '. It is not queued; use Render turntable for the real one'" (click)="quickVideo()">Quick video</button>
           <button type="button" [disabled]="busy()" [title]="'An even rougher turntable video, to test the motion fast: ' + quickVideoText(true)" (click)="quickVideo(true)">Quick draft video</button>
           <select class="focus shape" [value]="render.aspect()" title="The shape of the picture: the size menu gives its width, the height follows the shape" (change)="chooseAspect($any($event.target).value)">
@@ -491,10 +492,11 @@ export class RenderDialog implements OnInit, OnDestroy {
     this.error.set('');
   }
 
-  protected async quick(force = false) {
+  protected async quick(force = false, draft = false) {
     this.isVideo.set(false);
     const quickUrl = new URL(this.url(), location.origin);
     this.render.dofParams(quickUrl);
+    if (draft) { quickUrl.searchParams.set('width', '320'); quickUrl.searchParams.set('samples', '4'); }
     const key = quickUrl.href + '\n' + JSON.stringify(this.store.doc().items); // clean (nothing changed since the last picture) or dirty (render again)
     const last = this.render.lastQuick;
     if (!force && last?.key === key) {
@@ -505,14 +507,14 @@ export class RenderDialog implements OnInit, OnDestroy {
     }
     this.quickReady.set(false);
     this.savedToLibrary.set(false);
-    this.busyText.set('Rendering a preview with Blender (800 px, a few seconds)…');
+    this.busyText.set(draft ? 'Rendering a draft with Blender (320 px, a second or two)…' : 'Rendering a preview with Blender (800 px, a few seconds)…');
     this.busy.set(true);
     this.error.set('');
     try {
       const response = await fetch(quickUrl, { cache: 'no-store', signal: this.beginQuick(quickUrl) });
       if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? `HTTP ${response.status}`);
       const blob = await response.blob();
-      const detail = `800 px · 24 samples${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`;
+      const detail = `${draft ? '320 px · 4 samples · draft' : '800 px · 24 samples'}${this.render.crop() ? ' · cropped' : ''}${this.render.depthOfField() ? ' · depth of field' : ''}`;
       this.render.lastQuick = { key, blob, detail, settings: response.headers.get('X-Render-Settings') ?? '' };
       this.show(blob, detail);
       this.quickReady.set(true);

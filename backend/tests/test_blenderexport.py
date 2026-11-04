@@ -268,7 +268,7 @@ def test_render_state_reaches_the_page_over_the_websocket_and_renders_queue_up(t
         if progress:
             progress(0.5)
         time.sleep(0.4)
-        return b"\x89PNG-hd" if width != 480 else b"\x89PNG-preview"
+        return b"\x89PNG-hd" if width != 320 else b"\x89PNG-preview"
 
     monkeypatch.setattr(blenderexport, "build_render", fake)
     with client.websocket_connect("/api/ws") as socket:
@@ -283,8 +283,10 @@ def test_render_state_reaches_the_page_over_the_websocket_and_renders_queue_up(t
             messages.append(socket.receive_json())
         done_first = next(i for i, m in enumerate(messages) if m["id"] == first["id"] and m["state"] == "done")
         running_second = next(i for i, m in enumerate(messages) if m["id"] == second.json()["id"] and m["state"] == "running")
-        assert done_first < running_second and [w for w in order if w != 480] == [1000, 2000]  # one at a time, in the order they came
-        assert order[:2] == [480, 1000]  # each picture first makes a small preliminary one
+        assert done_first < running_second and [w for w in order if w != 320] == [1000, 2000]  # one at a time, in the order they came
+        assert order.index(320) < order.index(1000)  # each picture first makes a small preliminary one (a waiting render's is made at once, beside the running one)
+        assert order.count(320) == 2
+        assert client.get(f"/api/render-jobs/{second.json()['id']}/preview.png").content == b"\x89PNG-preview"
         assert client.get(f"/api/render-jobs/{first['id']}/preview.png").content == b"\x89PNG-preview"
         assert next(m for m in messages if m["id"] == first["id"] and m["state"] == "done")["preview"] is True
     with client.websocket_connect("/api/ws") as late:  # a page opened afterwards still hears that a render is ready

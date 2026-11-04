@@ -68,7 +68,7 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
               @else if (job.preview) { <img [src]="'/api/render-jobs/' + job.id + '/preview.png'" [alt]="job.name" /> }
               <span class="over"><span class="spinner big"></span></span>
               <span class="kind">@if (job.kind === 'turntable') { <svg class="vicon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-label="Video"><rect x="2.5" y="5" width="14" height="14" rx="2.5"/><path d="m16.5 10 5-3v10l-5-3"/></svg> } {{ job.kind === 'turntable' ? videoSizeName(job.width) : 'HD' }}</span>
-              @if (job.preview) { <span class="draft">preliminary draft</span> }
+              @if (job.preview) { <span class="draft">draft</span> }
               <span class="eta">{{ job.state === 'running' ? (etaText() || 'working…') : 'queued · ' + job.position }}</span>
             </div>
             <div class="caption"><span class="name">{{ job.name }}</span></div>
@@ -333,7 +333,7 @@ export class ImagesPanel {
     const r = this.render.state();
     const jobs: { id: string; name: string; state: 'running' | 'queued'; kind: 'picture' | 'turntable'; preview: boolean; media: 'png' | 'mp4'; position: number; aspect: number; width: number }[] = [];
     if (r && r.state === 'running' && r.documentId === docId) jobs.push({ id: r.id, name: r.name, state: 'running', kind: r.kind ?? 'picture', preview: !!r.preview, media: r.previewMedia ?? 'png', position: 0, aspect: r.aspect ?? 16 / 9, width: r.width });
-    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: false, media: 'png', position: i + 1, aspect: q.aspect ?? 16 / 9, width: q.width }); });
+    (r?.queue ?? []).forEach((q, i) => { if (q.documentId === docId) jobs.push({ id: q.id, name: q.name, state: 'queued', kind: q.kind, preview: !!q.preview, media: q.previewMedia ?? 'png', position: i + 1, aspect: q.aspect ?? 16 / 9, width: q.width }); });
     return jobs;
   });
 

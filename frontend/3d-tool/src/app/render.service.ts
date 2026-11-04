@@ -163,6 +163,9 @@ export const reflectionNames = ['Studio dark', 'Softbox', 'Daylight', 'Neutral g
 /** A render that waits in the queue. */
 export interface QueuedRender {
   id: string;
+  /** Its draft picture (or video) is made: /api/render-jobs/{id}/preview.png|mp4. */
+  preview?: boolean;
+  previewMedia?: 'png' | 'mp4';
   name: string;
   kind: 'picture' | 'turntable';
   width: number;

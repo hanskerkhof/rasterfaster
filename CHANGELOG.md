@@ -7,6 +7,15 @@ Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d
 ### Added
 - **Fusion add-in**: a **Save As Mesh** command in the Add-Ins panel (own icon) that starts Fusion's built-in Save As Mesh (`FusionSaveAsSTLCommand`) for the selected body or component. Fusion's API cannot set keyboard shortcuts, so the shortcut (⇧⌥⌘S) is assigned once to this command in Fusion, the same way as for Save Local Copy.
 
+## 2026-11-04 - Drafts for waiting renders, Quick draft render (0.11.31)
+
+### Added
+- **FE** (`render-dialog.ts`): a **Quick draft render** button (320 px, 4 samples: a second or two).
+- **BE** (`main.py`), **FE** (`images-panel.ts`, `render.service.ts`): a render that is queued gets its draft picture (or draft video) at once, beside the render that runs, so the gallery has a thumbnail while it waits; the draft is a quick draft render (320 px, 4 samples, it was 480 px and 8). The queue tells the page which drafts are ready.
+
+### Changed
+- **FE** (`images-panel.ts`): the badge on a draft thumbnail reads **draft**.
+
 ## 2026-11-03 - Cancel a quick render, mirrors in X-Ray (0.11.30)
 
 ### Added

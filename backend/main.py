@@ -956,6 +956,8 @@ class RenderJob:
         self.png: bytes | None = None
         self.preview: bytes | None = None  # a small preliminary picture (a short quick video for a turntable), made just before a full-size render starts (the gallery shows it while the render runs)
         self.previewMedia = "png"  # "png" or "mp4"
+        self.previewStarted = False  # a waiting render gets its preview at once (see make_preview), so the gallery has something to show while it waits
+        self.previewDone = threading.Event()
         self.error = ""
         self.process: object | None = None
         self.marks: dict[str, list[float | None]] = {}  # per step: when it began and ended (seconds since the job began)
@@ -1035,7 +1037,7 @@ class RenderJob:
                 "documentId": self.documentId, "imageId": self.imageId, "version": self.version, "preview": self.preview is not None, "previewMedia": self.previewMedia, "aspect": round(self.aspect, 4), **self.frame_info(),
                 "kind": "turntable" if self.turntable else "picture", "frames": self.turntable[0] if self.turntable else 1, "motion": self.turntable[1] if self.turntable else None,
                 "queue": [{"id": q.id, "name": q.name, "kind": "turntable" if q.turntable else "picture", "width": q.width, "samples": q.samples, "frames": q.turntable[0] if q.turntable else 1,
-                           "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}", "documentId": q.documentId, "aspect": round(q.aspect, 4)} for q, _ in renderQueue],
+                           "motion": q.turntable[1] if q.turntable else None, "size": f"{q.width} x {round(q.width / q.aspect)}", "documentId": q.documentId, "aspect": round(q.aspect, 4), "preview": q.preview is not None, "previewMedia": q.previewMedia} for q, _ in renderQueue],
                 "waiting": len(renderQueue), "position": next((i + 1 for i, (queued, _) in enumerate(renderQueue) if queued is self), 0), "queueMax": renderQueueMax}
 
 
@@ -1120,6 +1122,43 @@ async def events(websocket: WebSocket) -> None:
         notifier.connections.discard(websocket)
 
 
+previewLock = threading.Lock()  # one preview at a time: a long queue does not start a Blender for every waiting render
+
+
+def make_preview(job: RenderJob, blender: str, glb: bytes, sun: dict | None, dof: str, crop: bool) -> None:
+    """A small preliminary picture (for a turntable: a quick draft video of one turn): the gallery shows it, with a spinner, while the real render waits or runs.
+    It is made when a render is queued; the render that gets to run first waits for it if it is still being made."""
+    if not job.documentId:
+        return
+    with renderLock:
+        mine = not job.previewStarted
+        job.previewStarted = True
+    if not mine:
+        job.previewDone.wait(timeout=900)
+        return
+    try:
+        if job.state in ("cancelled", "error", "done"):
+            return
+        with previewLock:
+            if job.state in ("cancelled", "error", "done"):
+                return
+            if job.turntable:
+                frames, motion, fps = job.turntable
+                seconds = max(1, min(round(frames / fps), 5))
+                job.preview = blenderexport.build_render(glb, blender, True, sun, 320, 2, None, None, timeout=900, dof=dof, crop=crop, turntable=(seconds * 12, motion, 12),
+                                                         track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)
+                job.previewMedia = "mp4"
+            else:
+                job.preview = blenderexport.build_render(glb, blender, True, sun, 320, 4, None, None, timeout=300, dof=dof, crop=crop)  # the quick draft render of the dialog
+        shown = latest_render() if job.state == "queued" else job  # a waiting render's draft is told in the queue of the one that runs
+        if shown:
+            notifier.notify({"type": "render", **shown.view()})
+    except Exception:  # noqa: BLE001 - the preview is a bonus: the render goes on without it
+        job.preview = None
+    finally:
+        job.previewDone.set()
+
+
 def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, dof: str = "0", crop: bool = False) -> None:
     def started(process: object) -> None:
         job.process = process
@@ -1142,19 +1181,7 @@ def run_render_job(job: RenderJob, blender: str, glb: bytes, sun: dict | None, d
         notifier.notify({"type": "render", **job.view()})
 
     try:
-        if job.documentId and job.state == "running":  # a small preliminary picture first (for a turntable: a quick draft video of one turn): the gallery shows it, with a spinner, while the real one renders
-            try:
-                if job.turntable:
-                    frames, motion, fps = job.turntable
-                    seconds = max(1, min(round(frames / fps), 5))
-                    job.preview = blenderexport.build_render(glb, blender, True, sun, 320, 2, None, started, timeout=900, dof=dof, crop=crop, turntable=(seconds * 12, motion, 12),
-                                                             track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)
-                    job.previewMedia = "mp4"
-                else:
-                    job.preview = blenderexport.build_render(glb, blender, True, sun, 480, 8, None, started, timeout=300, dof=dof, crop=crop)
-                notifier.notify({"type": "render", **job.view()})
-            except Exception:  # noqa: BLE001 - the preview is a bonus: the render goes on without it
-                job.preview = None
+        make_preview(job, blender, glb, sun, dof, crop)  # (a render that waited has had it made already)
         job.png = blenderexport.build_render(glb, blender, True, sun, job.width, job.samples, progress, started, timeout=4 * 3600 if job.turntable else 1800, dof=dof, crop=crop, phase=phase,
                                              turntable=job.turntable, track=job.track, track_pivot=job.track_pivot, look_at=job.look_at, direction=job.direction)  # (job.png holds the MP4 of a turntable)
         job.state, job.progress = ("done", 1.0) if job.state == "running" else (job.state, job.progress)
@@ -1207,6 +1234,8 @@ def start_render_job(documentId: str, colours: bool = True, view: str | None = N
         renderQueue.append((job, (blender, glb, sun, depthOfField, cropped)))
     notifier.notify({"type": "render", **job.view()})
     start_next_render()
+    if job.state == "queued":  # it has to wait: its preview is made now, beside the render that runs
+        threading.Thread(target=make_preview, args=(job, blender, glb, sun, depthOfField, cropped), daemon=True).start()
     return job.view()
 
 
