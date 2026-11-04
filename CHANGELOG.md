@@ -2,6 +2,22 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: a breadcrumb trail on a part's page (0.11.62)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): the folder panel of a part's page has a breadcrumb trail (`LIBRARY › MOUNTS › 1 RELAIS MODULE`) instead of the plain folder name. Click a crumb to show that folder (its folders and files, as a list or a strip) without leaving the page; the folder shown is highlighted, and the crumbs below it stay (dimmed) so you can go back down. Click a folder in the panel to go below; going into another branch replaces the trail. A click on a file opens its page, and the trail starts again from that file's folder. The panel lists the files of the folder shown including the open part (marked) and the folders in it with their number of parts.
+
+## 2026-11-05 - Catalog: a doubles tool, old and unused filters, folder actions (0.11.60, 0.11.61)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `ops.py`, `tests/test_api.py`): `POST /api/catalog/duplicates/scan` looks for identical files in the background (the same size first, then a SHA-1 of the content; hashes are remembered by path, size and modified time in `.catalog-cache/hashes.json`, so the next check only reads what changed; empty files are left out) and `GET /api/catalog/duplicates` gives the state and the groups. `GET /api/catalog/used` lists the library paths that documents (and their versions) use.
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`, `library.service.ts`): a **CLEAN UP** row in the catalog. **_OLD** and **UNUSED** are filters (old-looking names such as `_old`, `backup`, `copy`, `(1)`; parts no document or version uses). **CHECK FOR DOUBLES** is a button you press: it runs the check, shows its progress, and then the **DOUBLES** chip shows the groups of identical files as a list. Every copy has its folder, date and size and its own **Open**, **Rename…**, **Move…** and **Move to Trash**; nothing is marked, preferred or decided for you. **Check again** whenever you like; the result follows your renames, moves and trashes without a new check (and says OUT OF DATE after a Duplicate). Find, folder and the filters narrow the groups. On a part's page an **IDENTICAL** row lists the files that are the same, and **Keep this, trash the others** is there when you choose it.
+- **FE**: **folder actions**. With Manage on and a folder chosen in the FOLDER chips, **Rename…**, **Move…** and **Move to Trash** act on that folder (the usual question first, which names the documents); a part's page has the same for its own folder under `THIS FOLDER`. Moving a folder into itself is not offered, and the page, the group list and the folder filter follow the new path.
+
+### Changed
+- **FE** (0.11.61): the question before trashing a folder says `1 part` for a single part, not `1 parts`.
+- **FE**: the question before a Move to Trash names the documents once (it listed a document's saved versions one by one).
+
 ## 2026-11-05 - Catalog: the facts column of a part's page can be resized (0.11.58, 0.11.59)
 
 ### Added

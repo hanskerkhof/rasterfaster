@@ -428,3 +428,60 @@ def test_unsafe_thumbnail_is_refused(client, svg):
 def test_thumbnail_keeps_the_version_it_was_drawn_with(client, tmp_path):
     client.put("/api/catalog/thumb", params={"path": "a2.stl"}, json={**thumbBody, "modified": (tmp_path / "a2.stl").stat().st_mtime, "version": 2})
     assert {e["path"]: e for e in client.get("/api/catalog").json()}["a2.stl"]["thumbVersion"] == 2
+
+
+def _scan(client):
+    import time
+    assert client.post("/api/catalog/duplicates/scan").status_code == 200
+    for _ in range(100):
+        state = client.get("/api/catalog/duplicates").json()
+        if state["state"] != "running":
+            return state
+        time.sleep(0.05)
+    raise AssertionError("the scan did not finish")
+
+
+def _distinct(tmp_path):
+    """The fixture's three files are all the same 'solid': give them contents of their own."""
+    (tmp_path / "a2.stl").write_bytes(b"solid a2 !")
+    (tmp_path / "a10.stl").write_bytes(b"solid a10 !!")
+    (tmp_path / "BOXES" / "b.stl").write_bytes(b"solid b !!!")
+
+
+def test_duplicate_scan_groups_identical_files(client, tmp_path):
+    _distinct(tmp_path)
+    (tmp_path / "A").mkdir()
+    (tmp_path / "A" / "same.stl").write_bytes(b"solid same content")
+    (tmp_path / "BOXES" / "same copy.stl").write_bytes(b"solid same content")
+    (tmp_path / "a11.stl").write_bytes(b"solid same content")
+    (tmp_path / "A" / "other.stl").write_bytes(b"solid other content!")  # a different size
+    (tmp_path / "A" / "alike.stl").write_bytes(b"solid same contenT")  # the same size, other content
+    (tmp_path / "empty1.stl").write_bytes(b"")
+    (tmp_path / "empty2.stl").write_bytes(b"")
+    state = _scan(client)
+    assert state["state"] == "done"
+    assert [g["paths"] for g in state["groups"]] == [["a11.stl", "A/same.stl", "BOXES/same copy.stl"]]
+    assert state["groups"][0]["size"] == len(b"solid same content")
+    assert state["total"] == 4  # a11, same, same copy and alike share a size; empty files and 'other' are not read
+
+
+def test_duplicate_scan_remembers_hashes_and_notices_changes(client, tmp_path, monkeypatch):
+    from rf_library import duplicates
+    _distinct(tmp_path)
+    (tmp_path / "x1.stl").write_bytes(b"solid one")
+    (tmp_path / "x2.stl").write_bytes(b"solid one")
+    reads = []
+    real = duplicates.sha1_of
+    monkeypatch.setattr(duplicates, "sha1_of", lambda file: (reads.append(file.name), real(file))[1])
+    assert len(_scan(client)["groups"]) == 1
+    first = len(reads)
+    assert first >= 2
+    assert len(_scan(client)["groups"]) == 1 and len(reads) == first  # nothing was read again
+    (tmp_path / "x2.stl").write_bytes(b"solid two")  # changed: read again, no longer the same
+    assert _scan(client)["groups"] == [] and len(reads) > first
+
+
+def test_used_paths_come_from_documents_and_versions(client):
+    doc = client.post("/api/documents", json={"name": "d", "items": [{"id": "1", "path": "BOXES/b.stl", "name": "b", "color": 1, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}]}).json()
+    client.post(f"/api/documents/{doc['id']}/versions")
+    assert client.get("/api/catalog/used").json() == {"paths": ["BOXES/b.stl"]}

@@ -113,3 +113,67 @@ export function cleanFolderPath(text: string): string | null {
   if (parts.some(part => part === '.' || part === '..' || part.startsWith('.'))) return null;
   return parts.join('/');
 }
+
+/** A group of identical files (`/api/catalog/duplicates`): their library paths and the size they all have. */
+export interface DuplicateGroup {
+  paths: string[];
+  size: number;
+}
+
+/** Looks like a leftover: a folder or file name with old, backup, bak or copy as a word of its own (`_old`, `x copy`, `Model.bak`), or a number in brackets (`(1)`). */
+export function isOldPath(path: string): boolean {
+  const word = /(^|[\s_.\-([])(old|oud|backup|bak|copy|kopie|archive)($|[\s_.\-)\]])/i;
+  return path.split('/').some(part => word.test(part.replace(/\.stl$/i, '')) || /\(\d+\)/.test(part));
+}
+
+/** The groups as lists of the catalog's entries, each by path (no copy is preferred over another: that is for the user to decide). A path that is no longer in the catalog is left out; a group with fewer than two copies is no group. */
+export function groupCopies(entries: readonly CatalogEntry[], groups: readonly DuplicateGroup[]): CatalogEntry[][] {
+  const byPath = new Map(entries.map(entry => [entry.path, entry]));
+  return groups
+    .map(group => group.paths.map(path => byPath.get(path)).filter((entry): entry is CatalogEntry => !!entry).sort((x, y) => naturalCompare(x.path, y.path)))
+    .filter(copies => copies.length > 1);
+}
+
+/** Where a path went after the renames and moves `moves` (`from` / `to` of a file, or of a folder: everything below it follows). */
+export function remapPath(path: string, moves: readonly { from: string; to: string; kind?: string }[]): string {
+  for (const move of moves) {
+    if (path === move.from) return move.to;
+    if (path.startsWith(move.from + '/')) return move.to + path.slice(move.from.length);
+  }
+  return path;
+}
+
+/** The documents in a dry run's `{document file: parts}` (a working copy `id.json` or a version `id.versions/v3.json`): one per document, with their parts. */
+export function documentsOf(files: Record<string, number>): { ids: string[]; parts: number } {
+  const ids = new Set(Object.keys(files).map(file => file.replace(/\.versions\/.*$/, '').replace(/\.json$/, '')));
+  return { ids: [...ids].sort(naturalCompare), parts: Object.values(files).reduce((sum, n) => sum + n, 0) };
+}
+
+/** The path of a folder as crumbs, the library first: `a/b` -> LIBRARY, a, a/b. */
+export function crumbsOf(folder: string): { name: string; path: string }[] {
+  const parts = folder.split('/').filter(Boolean);
+  return [{ name: 'LIBRARY', path: '' }, ...parts.map((name, i) => ({ name, path: parts.slice(0, i + 1).join('/') }))];
+}
+
+/** The folders directly in `folder` ('' is the library) that have parts in them or below them, with how many parts that is. */
+export function childFolders(entries: readonly CatalogEntry[], folder: string): { name: string; path: string; count: number }[] {
+  const prefix = folder ? folder + '/' : '';
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    if (!entry.path.startsWith(prefix)) continue;
+    const rest = entry.path.slice(prefix.length);
+    const cut = rest.indexOf('/');
+    if (cut > 0) counts.set(rest.slice(0, cut), (counts.get(rest.slice(0, cut)) ?? 0) + 1);
+  }
+  return [...counts].map(([name, count]) => ({ name, path: prefix + name, count })).sort((a, b) => naturalCompare(a.name, b.name));
+}
+
+/** The parts directly in `folder` (not in the folders below it), by name. */
+export function filesIn(entries: readonly CatalogEntry[], folder: string): CatalogEntry[] {
+  return sortCatalog(entries.filter(entry => parentFolder(entry.path) === folder), 'name', true);
+}
+
+/** Whether `folder` is `ancestor` itself or lies below it (whole folder names; '' is the library: everything). */
+export function isWithin(folder: string, ancestor: string): boolean {
+  return !ancestor || folder === ancestor || folder.startsWith(ancestor + '/');
+}

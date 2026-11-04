@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
-from . import ops, searchterms
+from . import duplicates, ops, searchterms
 
 
 @dataclass
@@ -115,6 +115,11 @@ def create_router(config: LibraryConfig) -> APIRouter:
 
     cacheLock = threading.Lock()
     cacheIndexes: dict[Path, dict[str, dict]] = {}  # per cache folder: library path -> {modified, size, dims, volume} of the drawings it holds
+
+    scans: dict[Path, dict] = {}  # per library: the state of the scan for identical files
+
+    def scan_state() -> dict:
+        return scans.setdefault(config.library_root(), {"state": "idle", "scanned": 0, "total": 0, "groups": [], "error": ""})
 
     def cache_dir() -> Path:
         return config.documents_root() / cacheFolderName
@@ -370,6 +375,39 @@ def create_router(config: LibraryConfig) -> APIRouter:
             sidecar.write_text(json.dumps(record), encoding="utf-8")
             os.replace(sidecar, directory / f"{key}.json")
             index[path] = record
+
+    @router.post("/api/catalog/duplicates/scan")
+    def start_duplicate_scan() -> dict:
+        """Starts looking for identical files in the background (size first, then a content hash; hashes are remembered). Does nothing while a scan runs."""
+        state = scan_state()
+        root, cacheFile = config.library_root(), cache_dir() / "hashes.json"
+        with cacheLock:
+            if state["state"] == "running":
+                return {key: state[key] for key in ("state", "scanned", "total")}
+            state.update(state="running", scanned=0, total=0, groups=[], error="")
+
+        def work() -> None:
+            def progress(done: int, total: int) -> None:
+                state["scanned"], state["total"] = done, total
+            try:
+                groups = duplicates.scan(root, cacheFile, progress)
+                state.update(state="done", groups=groups)
+            except Exception as error:  # noqa: BLE001 - the page shows it instead of waiting for ever
+                state.update(state="error", error=str(error))
+        threading.Thread(target=work, name="duplicate-scan", daemon=True).start()
+        return {"state": "running", "scanned": 0, "total": 0}
+
+    @router.get("/api/catalog/duplicates")
+    def get_duplicates() -> dict:
+        """The state of the scan and, when it is done, the groups of identical files: {paths, size}."""
+        state = scan_state()
+        return {"state": state["state"], "scanned": state["scanned"], "total": state["total"], "error": state["error"],
+                "groups": state["groups"] if state["state"] == "done" else []}
+
+    @router.get("/api/catalog/used")
+    def get_used_paths() -> dict:
+        """Every library path that a document (or one of its versions) uses."""
+        return {"paths": ops.used_paths(config.documents_root())}
 
     @router.get("/api/search", response_model=list[LibraryEntry])
     def search(q: str, mode: Literal["any", "all"] = "any") -> list[LibraryEntry]:

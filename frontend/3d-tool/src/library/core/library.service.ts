@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
-import type { CatalogEntry } from '../catalog/catalog.logic';
+import type { CatalogEntry, DuplicateGroup } from '../catalog/catalog.logic';
 import { RF_LIBRARY_CONFIG } from './library.config';
 import { firstValueFrom } from 'rxjs';
 
@@ -90,6 +90,21 @@ export class LibraryService {
   /** Every STL of the library, for the catalog. */
   catalog() {
     return this.http.get<CatalogEntry[]>(`${this.api}/catalog`);
+  }
+
+  /** Starts looking for identical files in the background (the API remembers what it has read). */
+  startDuplicateScan() {
+    return this.http.post<{ state: string }>(`${this.api}/catalog/duplicates/scan`, {});
+  }
+
+  /** The state of that scan and, when it is done, the groups of identical files. */
+  duplicates() {
+    return this.http.get<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string; groups: DuplicateGroup[] }>(`${this.api}/catalog/duplicates`);
+  }
+
+  /** Every library path that a document (or one of its versions) uses. */
+  usedPaths() {
+    return this.http.get<{ paths: string[] }>(`${this.api}/catalog/used`);
   }
 
   list(path: string) {

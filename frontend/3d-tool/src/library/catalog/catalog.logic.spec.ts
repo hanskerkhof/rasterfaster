@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -82,5 +82,52 @@ describe('catalog logic', () => {
     expect(cleanFolderPath('')).toBe('');
     expect(cleanFolderPath('a/../b')).toBeNull();
     expect(cleanFolderPath('.hidden')).toBeNull();
+  });
+
+  it('recognizes old-looking paths', () => {
+    for (const old of ['_V-TWIN_OLD/models/x.stl', 'A/backup/x.stl', 'A/part copy.stl', 'A/part_old.stl', 'A/Model.bak.stl', '2x3 BP EXTENDER (1) (1).stl', 'A/oud/x.stl']) expect(isOldPath(old)).toBe(true);
+    for (const fine of ['A/BOLT_S8.stl', 'Gold/x.stl', 'A/copyright.stl', 'A/boldly.stl', 'A/Holder v2.stl', '1.4.BOLTS & NUTS/x.stl']) expect(isOldPath(fine)).toBe(false);
+  });
+
+  it('lists the copies of identical files by path, without preferring one', () => {
+    const files = [entry('B/p.stl', 9), entry('A/p.stl', 5), entry('_old/p.stl', 20), entry('C/q.stl', 1), entry('D/q.stl', 2), entry('E/solo.stl', 1)];
+    const groups = [{ paths: ['B/p.stl', 'A/p.stl', '_old/p.stl'], size: 1 }, { paths: ['C/q.stl', 'D/q.stl'], size: 2 }, { paths: ['E/solo.stl', 'gone.stl'], size: 3 }];
+    expect(groupCopies(files, groups).map(g => g.map(e => e.path))).toEqual([['_old/p.stl', 'A/p.stl', 'B/p.stl'], ['C/q.stl', 'D/q.stl']]); // a group left with one copy is dropped
+  });
+
+  it('follows renames and moves of files and folders', () => {
+    const moves = [{ from: 'A/x.stl', to: 'B/x.stl' }, { from: 'old', to: 'archive/old', kind: 'directory' }];
+    expect(remapPath('A/x.stl', moves)).toBe('B/x.stl');
+    expect(remapPath('old/deep/y.stl', moves)).toBe('archive/old/deep/y.stl');
+    expect(remapPath('older/y.stl', moves)).toBe('older/y.stl'); // only whole folder names
+    expect(remapPath('C/z.stl', moves)).toBe('C/z.stl');
+  });
+
+  it('names the documents of a dry run once', () => {
+    expect(documentsOf({ 'kiosk-1.json': 2, 'kiosk-1.versions/v3.json': 1, 'kiosk-1.versions/v4.json': 1, 'dada-2.json': 1 })).toEqual({ ids: ['dada-2', 'kiosk-1'], parts: 5 });
+    expect(documentsOf({})).toEqual({ ids: [], parts: 0 });
+  });
+
+  it('makes crumbs of a folder path', () => {
+    expect(crumbsOf('')).toEqual([{ name: 'LIBRARY', path: '' }]);
+    expect(crumbsOf('A/b c/d')).toEqual([{ name: 'LIBRARY', path: '' }, { name: 'A', path: 'A' }, { name: 'b c', path: 'A/b c' }, { name: 'd', path: 'A/b c/d' }]);
+  });
+
+  it('lists the folders and files of one folder', () => {
+    const files = [entry('A/x.stl'), entry('A/B/y.stl'), entry('A/B/z.stl'), entry('A/B/C/w.stl'), entry('A/D/v.stl'), entry('AB/u.stl'), entry('root.stl')];
+    expect(childFolders(files, '')).toEqual([{ name: 'A', path: 'A', count: 5 }, { name: 'AB', path: 'AB', count: 1 }]);
+    expect(childFolders(files, 'A')).toEqual([{ name: 'B', path: 'A/B', count: 3 }, { name: 'D', path: 'A/D', count: 1 }]);
+    expect(childFolders(files, 'A/D')).toEqual([]);
+    expect(filesIn(files, 'A').map(e => e.path)).toEqual(['A/x.stl']);
+    expect(filesIn(files, '').map(e => e.path)).toEqual(['root.stl']);
+    expect(filesIn(files, 'A/B').map(e => e.path)).toEqual(['A/B/y.stl', 'A/B/z.stl']);
+  });
+
+  it('knows whether a folder is within another', () => {
+    expect(isWithin('A/B', 'A')).toBe(true);
+    expect(isWithin('A', 'A')).toBe(true);
+    expect(isWithin('AB', 'A')).toBe(false);
+    expect(isWithin('A', 'A/B')).toBe(false);
+    expect(isWithin('anything', '')).toBe(true);
   });
 });

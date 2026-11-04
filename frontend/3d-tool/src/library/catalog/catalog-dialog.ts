@@ -9,7 +9,7 @@ import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin } from './catalog.logic';
 
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
@@ -77,19 +77,66 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
           }
         </div>
       </div>
+      @if (manage.enabled() && folder()) {
+        <div class="row folderbar"><span class="label">FOLDER</span>
+          <div class="chips"><span class="fname" [title]="folder()!">“{{ folder() }}”</span>
+            <button type="button" class="mg" (click)="openRenameFolder(folder()!)">RENAME…</button>
+            <button type="button" class="mg" (click)="openMover([folder()!])">MOVE…</button>
+            <button type="button" class="danger" (click)="requestTrash([folder()!])">MOVE TO TRASH</button>
+          </div>
+        </div>
+      }
+      <div class="row"><span class="label">CLEAN UP</span>
+        <div class="chips">
+          <button type="button" [class.on]="cleanFilters().has('old')" title="Names with old, backup, bak or copy in them, or (1)" (click)="toggleClean('old')">_OLD<sup>{{ oldCount() }}</sup></button>
+          <button type="button" [class.on]="cleanFilters().has('unused')" title="Parts that no document uses (the saved versions of documents count as using them)" (click)="toggleClean('unused')">UNUSED@if (used()) {<sup>{{ unusedCount() }}</sup>}</button>
+          <span class="bar-sep">|</span>
+          @if (scan().state === 'running') {
+            <span class="busy">CHECKING FOR DOUBLES… {{ scan().scanned }} / {{ scan().total }}</span>
+          } @else {
+            <button type="button" class="tool" title="Looks for files that are exactly the same (same size first, then the content). Nothing is changed; you decide what to do with the result." (click)="checkDoubles()">{{ groups() ? 'CHECK AGAIN' : 'CHECK FOR DOUBLES' }}</button>
+            @if (groups()) { <button type="button" [class.on]="viewDoubles()" title="Show the groups of identical files" (click)="viewDoubles.set(!viewDoubles())">DOUBLES<sup>{{ groups()!.length }}</sup></button> }
+            @if (doublesStale()) { <span class="warn" title="Parts were copied since the check">OUT OF DATE</span> }
+          }
+          @if (scan().state === 'error') { <span class="warn">Could not look for doubles: {{ scan().error }}</span> }
+        </div>
+      </div>
       <div class="row"><span class="label">FIND</span>
         <input #find type="text" placeholder="name, folder …  “phrase”  -exclude   [ / ]" spellcheck="false" autocomplete="off" [value]="query()" (input)="query.set(find.value)" />
       </div>
-      <div class="status"><span>SHOWING <b>{{ shown().length }}</b> / {{ entries().length }}</span><span>QUERY: {{ query().trim() ? query().trim().toUpperCase() : 'ALL' }}{{ folder() !== null ? ' · ' + (folder() || 'ROOT').toUpperCase() : '' }}</span></div>
+      <div class="status"><span>@if (viewDoubles() && groups()) { SHOWING <b>{{ doubleGroups().length }}</b> / {{ groups()!.length }} GROUPS OF IDENTICAL FILES } @else { SHOWING <b>{{ shown().length }}</b> / {{ entries().length }} }</span><span>QUERY: {{ query().trim() ? query().trim().toUpperCase() : 'ALL' }}{{ folder() !== null ? ' · ' + (folder() || 'ROOT').toUpperCase() : '' }}</span></div>
 
       @if (loading()) {
         <p class="empty">Reading the library…</p>
       } @else if (failed()) {
         <p class="empty">Could not read the library. Is the API running?</p>
-      } @else if (!shown().length) {
+      } @else if (!shown().length && !(viewDoubles() && groups())) {
         <p class="empty">No parts match.</p>
       }
-      <div #scroller class="scroller" tabindex="0" (scroll)="top.set(scroller.scrollTop)" (keydown)="onKey($event)">
+      <div class="groupsview" [hidden]="!(viewDoubles() && groups())">
+        @for (g of doubleGroups(); track $index; let n = $index) {
+          <div class="group">
+            <div class="ghead"><span>GROUP {{ pad(n + 1) }}</span><span>{{ g.length }} IDENTICAL FILES · {{ kb(g[0].size) }} EACH</span></div>
+            @for (c of g; track c.path) {
+              <div class="copy">
+                <button type="button" class="where" [title]="c.path" (click)="openIdentical(c.path)"><span class="dir">{{ folderOf(c) }}</span><span class="file">{{ fileTitle(c) }}</span></button>
+                <span class="when">{{ c.modified * 1000 | date: 'yyyy-MM-dd HH:mm' }}</span>
+                <span class="cacts">
+                  <button type="button" class="ghost" (click)="openIdentical(c.path)">OPEN</button>
+                  @if (manage.enabled()) {
+                    <button type="button" class="mg" (click)="openRename(c)">RENAME…</button>
+                    <button type="button" class="mg" (click)="openMover([c.path])">MOVE…</button>
+                    <button type="button" class="danger" (click)="requestTrash([c.path])">MOVE TO TRASH</button>
+                  }
+                </span>
+              </div>
+            }
+          </div>
+        } @empty {
+          <p class="empty">No identical files{{ query().trim() || folder() !== null || cleanFilters().size ? ' that match the filters' : '' }}.</p>
+        }
+      </div>
+      <div #scroller class="scroller" [hidden]="viewDoubles() && !!groups()" tabindex="0" (scroll)="top.set(scroller.scrollTop)" (keydown)="onKey($event)">
         <div class="space" [style.height.px]="window().rows * rowHeight">
           <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', ' + columnWidth() + 'px)'">
             @for (card of cards(); track card.entry.path) {
@@ -146,24 +193,38 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
               <div class="shead">
-                <span>IN THIS FOLDER · {{ folderOf(d) }}</span>
+                <span class="crumbs" role="navigation" aria-label="Folders">
+                  @for (c of crumbs(); track c.path; let last = $last) {
+                    <button type="button" class="crumb" [class.on]="c.path === browse()" [class.ahead]="isAhead(c.path)" [title]="c.path || 'The library'" (click)="goFolder(c.path)">{{ c.name }}</button>@if (!last) { <span class="sepc">›</span> }
+                  }
+                </span>
                 <span class="right">
-                  <span>{{ siblings().length ? siblings().length + (siblings().length === 1 ? ' OTHER FILE' : ' OTHER FILES') : 'NO OTHER FILES' }}</span>
+                  <span>{{ browseFolders().length ? browseFolders().length + (browseFolders().length === 1 ? ' FOLDER · ' : ' FOLDERS · ') : '' }}{{ browseFiles().length ? browseFiles().length + (browseFiles().length === 1 ? ' FILE' : ' FILES') : 'NO FILES' }}</span>
                   <span class="chips"><button type="button" [class.on]="siblingView() === 'list'" (click)="setSiblingView('list')">LIST</button><button type="button" [class.on]="siblingView() === 'strip'" (click)="setSiblingView('strip')">STRIP</button></span>
                 </span>
               </div>
               @if (siblingView() === 'list') {
                 <div class="listbox">
-                  @for (s of siblings(); track s.path) {
-                    <button type="button" class="sib" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ kb(s.size) }}</span></button>
+                  @for (f of browseFolders(); track f.path) {
+                    <button type="button" class="sib dirrow" [title]="f.path" (click)="goFolder(f.path)"><span class="n">▸ {{ f.name }}</span><span class="k">{{ f.count }} {{ f.count === 1 ? 'PART' : 'PARTS' }}</span></button>
+                  }
+                  @for (s of browseFiles(); track s.path) {
+                    <button type="button" class="sib" [class.current]="s.path === detail()" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ kb(s.size) }}</span></button>
                   }
                 </div>
-              } @else if (siblings().length) {
+              } @else if (browseFiles().length || browseFolders().length) {
                 <div class="stripbox">
                   @if (stripBack()) { <button type="button" class="arrow l" aria-label="Previous files" (click)="page(-1)">‹</button> }
                   <div #strip class="strip" (scroll)="measureStrip()">
-                    @for (s of siblings(); track s.path) {
-                      <button type="button" class="tile" [title]="s.path" (click)="detail.set(s.path)">
+                    @for (f of browseFolders(); track f.path) {
+                      <button type="button" class="tile dirtile" [title]="f.path" (click)="goFolder(f.path)">
+                        <span class="art"><span class="folder-glyph">▸</span></span>
+                        <span class="name">{{ f.name }}</span>
+                        <span class="meta">{{ f.count }} {{ f.count === 1 ? 'PART' : 'PARTS' }}</span>
+                      </button>
+                    }
+                    @for (s of browseFiles(); track s.path) {
+                      <button type="button" class="tile" [class.current]="s.path === detail()" [title]="s.path" (click)="detail.set(s.path)">
                         <span class="art">
                           @switch (thumbs.state(s)) {
                             @case ('drawn') { <img [src]="thumbs.url(s)" alt="" draggable="false" /> }
@@ -197,6 +258,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 <div><dt>FILE SIZE</dt><dd>{{ kb(d.size) }}</dd></div>
                 <div><dt>MODIFIED</dt><dd>{{ d.modified * 1000 | date: 'yyyy-MM-dd HH:mm' }}</dd></div>
                 <div><dt>USED IN</dt><dd>{{ usedIn() === null ? '…' : usedIn() === 0 ? 'no document' : usedIn() + (usedIn() === 1 ? ' document' : ' documents') }}</dd></div>
+                @if (identical().length) {
+                  <div><dt>IDENTICAL</dt><dd class="same">@for (other of identical().slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (identical().length > 6) { <span>+ {{ identical().length - 6 }} more</span> }</dd></div>
+                }
                 <div><dt>PATH</dt><dd class="path">{{ d.path }}</dd></div>
               </dl>
               <div class="actions">
@@ -212,7 +276,16 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <button type="button" class="mg" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
                     <button type="button" class="mg" (click)="openMover([d.path])">MOVE…</button>
                     <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
+                    @if (identical().length) { <button type="button" class="danger" (click)="requestTrash(identical(), 'This file stays; the files identical to it go.')" title="Keep this file and move the identical ones to the Trash">KEEP THIS, TRASH THE {{ identical().length === 1 ? 'OTHER' : identical().length + ' OTHERS' }}</button> }
                   </div>
+                  @if (folderPathOf(d)) {
+                    <div class="mlabel thisfolder"><span>THIS FOLDER</span><span [title]="folderPathOf(d)">{{ folderPathOf(d) }}</span></div>
+                    <div class="actions">
+                      <button type="button" class="mg" (click)="openRenameFolder(folderPathOf(d))">RENAME FOLDER…</button>
+                      <button type="button" class="mg" (click)="openMover([folderPathOf(d)])">MOVE FOLDER…</button>
+                      <button type="button" class="danger" (click)="requestTrash([folderPathOf(d)])">TRASH FOLDER…</button>
+                    </div>
+                  }
                 </div>
               }
               @if (actionNote()) { <p class="empty">{{ actionNote() }}</p> }
@@ -227,10 +300,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
       @if (renaming(); as r) {
         <div class="shade"></div>
         <div class="confirm" role="dialog" aria-label="Rename">
-          <h4>RENAME</h4>
+          <h4>RENAME {{ r.folder ? 'FOLDER' : 'PART' }}</h4>
           <p class="n">{{ r.path }}</p>
           <input class="field" type="text" spellcheck="false" autocomplete="off" [value]="r.name" (input)="renameText($any($event.target).value)" (keydown.enter)="renameNow()" />
-          <p class="hint">The .stl is added when it is left out. Documents that use the file follow the new name.</p>
+          <p class="hint">{{ r.folder ? 'Documents that use parts in the folder follow the new name.' : 'The .stl is added when it is left out. Documents that use the file follow the new name.' }}</p>
           @if (r.error) { <p class="warn">{{ r.error }}</p> }
           <div class="actions"><button type="button" class="add" [disabled]="busy()" (click)="renameNow()">RENAME</button><button type="button" class="ghost" (click)="renaming.set(null)">CANCEL [ESC]</button></div>
         </div>
@@ -238,7 +311,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
       @if (mover(); as m) {
         <div class="shade"></div>
         <div class="confirm mover" role="dialog" aria-label="Move">
-          <h4>MOVE {{ m.paths.length === 1 ? '1 PART' : m.paths.length + ' PARTS' }} TO …</h4>
+          <h4>MOVE {{ m.paths.length === 1 ? (isFolder(m.paths[0]) ? '1 FOLDER' : '1 PART') : m.paths.length + ' ITEMS' }} TO …</h4>
           <input class="field" type="text" spellcheck="false" autocomplete="off" placeholder="a folder, or a new one: new/folder" [value]="m.text" (input)="moverText($any($event.target).value)" (keydown.enter)="moveFirst()" />
           <div class="folders-list">
             @if (moverCreate(); as create) { <button type="button" class="pick create" (click)="moveTo(create, true)">CREATE “{{ create }}” AND MOVE HERE</button> }
@@ -253,8 +326,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
       @if (confirm(); as c) {
         <div class="shade"></div>
         <div class="confirm" role="alertdialog" aria-label="Move to Trash">
-          <h4>MOVE {{ c.paths.length === 1 ? '1 PART' : c.paths.length + ' PARTS' }} TO THE TRASH?</h4>
+          <h4>MOVE {{ c.paths.length === 1 ? (isFolder(c.paths[0]) ? '1 FOLDER' : '1 PART') : c.paths.length + ' ITEMS' }} TO THE TRASH?</h4>
           @if (c.paths.length === 1) { <p class="n">{{ c.paths[0] }}</p> }
+          @if (c.paths.length === 1 && isFolder(c.paths[0])) { <p>The folder and the {{ partsUnder(c.paths[0]) }} part{{ partsUnder(c.paths[0]) === 1 ? '' : 's' }} in it.</p> }
+          @if (c.note) { <p>{{ c.note }}</p> }
           @if (c.documents.length) {
             <p class="warn">{{ c.parts }} part{{ c.parts === 1 ? '' : 's' }} in {{ c.documents.length }} document{{ c.documents.length === 1 ? '' : 's' }} use{{ c.parts === 1 ? 's' : '' }} {{ c.paths.length === 1 ? 'it' : 'these' }} ({{ c.documents.join(', ') }}): they will show a ⚠ until you Put Back.</p>
           } @else {
@@ -274,7 +349,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     button { font: inherit; color: inherit; cursor: pointer; background: transparent; border: 0; padding: 2px 6px; letter-spacing: inherit; }
     .close { color: #888; } .close:hover { color: #fff; }
     .row { display: flex; align-items: baseline; gap: 12px; padding: 6px 0; border-bottom: 1px solid #2c2d31; }
-    .label { flex: none; width: 56px; color: #888; }
+    .label { flex: none; width: 64px; color: #888; }
     .chips { display: flex; flex-wrap: wrap; gap: 2px 6px; min-width: 0; } .folders { max-height: 66px; overflow: auto; }
     .chips button { color: #aaa; } .chips button:hover { color: #fff; } .chips button.on { background: #e6e6e6; color: #111; }
     sup { margin-left: 3px; font-size: 8px; opacity: .6; }
@@ -288,6 +363,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
     .siblings { flex: none; height: 260px; display: flex; flex-direction: column; border: 1px solid #2c2d31; overflow: hidden; } /* the same height as a list and as a strip: nothing jumps when you switch */
     .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .shead > span:first-child { min-width: 0; } .crumbs { flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .crumbs::-webkit-scrollbar { display: none; }
+    .crumb { padding: 0 5px; color: #aaa; } .crumb:hover { color: #fff; } .crumb.on { background: #e6e6e6; color: #111; } .crumb.ahead { color: #666; } .crumb.ahead:hover { color: #fff; } .sepc { color: #555; }
+    .sib.dirrow .n { color: #9db7f0; } .sib.current { background: #26324a; color: #fff; } .tile.current { background: #26324a; } .tile.dirtile .art { color: #9db7f0; } .folder-glyph { font-size: 40px; }
     .shead .right { display: flex; align-items: baseline; gap: 14px; } .shead .chips button { color: #888; } .shead .chips button.on { background: #e6e6e6; color: #111; }
     .stripbox { position: relative; flex: 1 1 auto; min-height: 0; } .strip { height: 100%; display: flex; overflow-x: auto; scrollbar-width: none; } .strip::-webkit-scrollbar { display: none; }
     .tile { flex: none; box-sizing: border-box; width: ${tileWidth}px; display: flex; flex-direction: column; padding: 8px 12px; text-align: left; border: 0; box-shadow: inset -1px 0 #2c2d31; background: transparent; overflow: hidden; }
@@ -317,6 +395,16 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .mlabel { display: flex; justify-content: space-between; color: #c9a64e; font-size: 10px; letter-spacing: .1em; } .mlabel span:last-child { color: #7d6a3a; }
     .manage .actions { margin-top: 8px; }
     .mg { padding: 3px 10px; border: 1px solid #6b5a2a; color: #e8c470; } .mg:hover:not(:disabled) { background: #3a3320; color: #ffe27a; border-color: #c9a64e; } .mg:disabled { opacity: .4; }
+    .warn { color: #e8c470; } .busy { color: #9db7f0; } .bar-sep { color: #444; }
+    .tool { border: 1px solid #3a4a6a; padding: 0 8px; color: #9db7f0; } .tool:hover { background: #26324a; color: #fff; }
+    .folderbar .fname { color: #e6e6e6; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .thisfolder { margin-top: 10px; } .thisfolder span:last-child { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .groupsview { flex: 1; min-height: 0; overflow: auto; border: 1px solid #2c2d31; } .groupsview[hidden] { display: none; }
+    .group { border-bottom: 1px solid #2c2d31; } .ghead { display: flex; justify-content: space-between; padding: 6px 12px; background: #1a1b1f; color: #888; }
+    .copy { display: flex; align-items: center; gap: 12px; padding: 4px 12px; } .copy:hover { background: #1e2024; }
+    .where { flex: 1; min-width: 0; display: flex; flex-direction: column; text-align: left; padding: 2px 0; } .where .dir { color: #777; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .where .file { color: #e6e6e6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .when { flex: none; color: #777; } .cacts { flex: none; display: flex; gap: 6px; }
+    .link { padding: 0; color: #9db7f0; text-align: left; word-break: break-all; font-size: 10px; } .link:hover { color: #fff; text-decoration: underline; } .same { display: flex; flex-direction: column; gap: 2px; }
     .confirm .field { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 6px 8px; background: #111; border: 1px solid #3a3b40; color: #e6e6e6; } .confirm .field:focus { border-color: #2f6fed; }
     .confirm .hint { font-size: 10px; color: #777; } .folders-list { max-height: 240px; overflow: auto; margin-top: 6px; border: 1px solid #2c2d31; }
     .pick { display: block; width: 100%; box-sizing: border-box; padding: 4px 10px; text-align: left; color: #ccc; word-break: break-all; } .pick:hover:not(:disabled) { background: #26324a; color: #fff; } .pick:disabled { opacity: .35; cursor: default; } .pick.create { color: #9ad29a; }
@@ -373,14 +461,25 @@ export class CatalogDialog implements OnInit {
   private pickAnchor: string | null = null;
   protected readonly pickedPaths = computed(() => this.shown().filter(e => this.picked().has(e.path)).map(e => e.path));
   /** The Move to Trash waiting for a yes: what it is, and which documents use those files (from a dry run). */
-  protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number } | null>(null);
+  protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number; note: string } | null>(null);
   protected readonly busy = signal(false);
+  /** Clean-up filters (they combine): old-looking names, identical files, parts no document uses. */
+  protected readonly cleanFilters = signal<ReadonlySet<'old' | 'unused'>>(new Set());
+  /** The result of the doubles check is shown (a list of groups) instead of the cards. */
+  protected readonly viewDoubles = signal(false);
+  /** Parts were copied since the check: its groups may be missing a new copy. */
+  protected readonly doublesStale = signal(false);
+  /** The groups of identical files (null until the scan has run) and how the scan is doing. */
+  protected readonly groups = signal<DuplicateGroup[] | null>(null);
+  protected readonly scan = signal<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }>({ state: 'idle', scanned: 0, total: 0, error: '' });
+  protected readonly used = signal<ReadonlySet<string> | null>(null);
+  private destroyed = false;
   /** The width of the facts column of a part's page (px), dragged with the bar between it and the drawing; remembered. */
   protected readonly specWidth = signal(readSpecWidth());
   protected readonly resizing = signal(false);
   protected readonly defaultWidth = defaultSpecWidth;
   private gripStart: { x: number; width: number } | null = null;
-  protected readonly renaming = signal<{ path: string; name: string; error: string } | null>(null);
+  protected readonly renaming = signal<{ path: string; name: string; error: string; folder: boolean } | null>(null);
   protected readonly mover = signal<{ paths: string[]; text: string; error: string } | null>(null);
   /** The folders a move can go to: those matching what was typed, and whether the parts are all there already. */
   protected readonly moverFolders = computed(() => {
@@ -388,7 +487,8 @@ export class CatalogDialog implements OnInit {
     if (!m) return [];
     const needle = m.text.trim().toLowerCase();
     const here = new Set(m.paths.map(parentFolder));
-    return ['', ...folderPaths(this.entries())].filter(path => !needle || path.toLowerCase().includes(needle)).map(path => ({ path, here: here.size === 1 && here.has(path) }));
+    const inside = (path: string) => m.paths.some(moved => path === moved || path.startsWith(moved + '/')); // a folder cannot go into itself
+    return ['', ...folderPaths(this.entries())].filter(path => !inside(path) && (!needle || path.toLowerCase().includes(needle))).map(path => ({ path, here: here.size === 1 && here.has(path) }));
   });
   /** What was typed names a folder that does not exist yet: offered as "create and move here". */
   protected readonly moverCreate = computed(() => {
@@ -409,7 +509,8 @@ export class CatalogDialog implements OnInit {
   /** The tiles in view and one page more, in the order to draw them. */
   private readonly stripWanted = computed(() => {
     const first = Math.floor(this.stripLeft() / tileWidth), perPage = Math.max(1, Math.ceil(this.stripSize().width / tileWidth));
-    return this.siblings().slice(first, first + 2 * perPage + 1);
+    const fromFile = Math.max(0, first - this.browseFolders().length); // the folder tiles come first and have no drawing
+    return this.browseFiles().slice(fromFile, fromFile + 2 * perPage + 1);
   });
   /** The part named in the address when the dialog opened (a reload or a link); the address is left alone until the catalog has loaded and it was looked up. */
   private pendingPart: string | null = location.hash.startsWith('#part=') ? decodeURIComponent(location.hash.slice(6)) : null;
@@ -419,13 +520,44 @@ export class CatalogDialog implements OnInit {
   private readonly find = viewChild.required<ElementRef<HTMLInputElement>>('find');
 
   protected readonly folders = computed(() => folderCounts(this.entries()));
-  protected readonly shown = computed(() => sortCatalog(filterCatalog(this.entries(), this.query(), this.folder()), this.sortKey(), this.ascending()));
+  protected readonly oldCount = computed(() => this.entries().filter(entry => isOldPath(entry.path)).length);
+  protected readonly unusedCount = computed(() => { const used = this.used(); return used ? this.entries().filter(entry => !used.has(entry.path)).length : 0; });
+  /** Does the part pass what is typed in Find, the folder and the clean-up filters? */
+  private passes(entry: CatalogEntry): boolean {
+    if (!filterCatalog([entry], this.query(), this.folder()).length) return false;
+    const filters = this.cleanFilters();
+    if (filters.has('old') && !isOldPath(entry.path)) return false;
+    const used = this.used();
+    return !(filters.has('unused') && used && used.has(entry.path));
+  }
+  protected readonly shown = computed(() => {
+    let list = filterCatalog(this.entries(), this.query(), this.folder());
+    const filters = this.cleanFilters();
+    if (filters.has('old')) list = list.filter(entry => isOldPath(entry.path));
+    if (filters.has('unused') && this.used()) { const used = this.used()!; list = list.filter(entry => !used.has(entry.path)); }
+    return sortCatalog(list, this.sortKey(), this.ascending());
+  });
+  /** The groups of identical files as lists of entries (by path). */
+  private readonly groupsOfCopies = computed(() => { const groups = this.groups(); return groups ? groupCopies(this.entries(), groups) : []; });
+  /** The groups to show: those with at least one copy that passes the filters (all their copies are listed). */
+  protected readonly doubleGroups = computed(() => this.groupsOfCopies().filter(copies => copies.some(copy => this.passes(copy))));
+  /** The files identical to the one on the open page (when the doubles are known). */
+  protected readonly identical = computed(() => {
+    const path = this.detail();
+    const group = path ? this.groupsOfCopies().find(copies => copies.some(copy => copy.path === path)) : null;
+    return group ? group.filter(copy => copy.path !== path).map(copy => copy.path) : [];
+  });
   /** The open part; the same object for the same file, so a reload of the list does not draw its big picture again. */
   protected readonly detailEntry = computed(() => this.entries().find(e => e.path === this.detail()) ?? null,
     { equal: (a, b) => a?.path === b?.path && a?.modified === b?.modified && a?.size === b?.size });
   private keepNote = false; // a note about an action stays when the action itself moved the page to another path
   protected readonly detailIndex = computed(() => this.shown().findIndex(e => e.path === this.detail()));
-  protected readonly siblings = computed(() => { const path = this.detail(); return path ? siblingsOf(this.entries(), path) : []; });
+  /** The folder shown in the folder panel of a part's page, and the trail of crumbs: the whole path of the part's folder when the page opened, kept while you go up it, extended or replaced when you go below it or into another folder. */
+  protected readonly browse = signal('');
+  protected readonly trail = signal('');
+  protected readonly crumbs = computed(() => crumbsOf(this.trail()));
+  protected readonly browseFolders = computed(() => (this.detail() ? childFolders(this.entries(), this.browse()) : []));
+  protected readonly browseFiles = computed(() => (this.detail() ? filesIn(this.entries(), this.browse()) : []));
   protected readonly previous = computed(() => this.shown()[this.detailIndex() - 1] ?? null);
   protected readonly following = computed(() => (this.detailIndex() < 0 ? null : this.shown()[this.detailIndex() + 1] ?? null));
   protected readonly selectedEntry = computed(() => this.shown().find(e => e.path === this.selected()) ?? null);
@@ -445,7 +577,7 @@ export class CatalogDialog implements OnInit {
       else this.thumbs.want(this.cards().map(card => card.entry));
     });
     effect(onCleanup => { // measure the strip when it appears, changes its files or its width; a new folder starts at its first file
-      this.siblings(); this.siblingView();
+      this.browseFiles(); this.browseFolders(); this.siblingView();
       const element = this.stripRef()?.nativeElement;
       if (!element) return;
       element.scrollLeft = 0;
@@ -468,6 +600,10 @@ export class CatalogDialog implements OnInit {
       const observer = new ResizeObserver(() => this.size.set({ width: element.clientWidth, height: element.clientHeight }));
       observer.observe(element);
       onCleanup(() => observer.disconnect());
+    });
+    effect(() => { // a page opens on its own folder, with the whole path as the trail
+      const path = this.detail();
+      untracked(() => { const folder = path ? parentFolder(path) : ''; this.browse.set(folder); this.trail.set(folder); });
     });
     effect(() => { this.detail(); untracked(() => { if (this.keepNote) this.keepNote = false; else this.actionNote.set(''); }); }); // a note is about the page it was made on
     effect(onCleanup => { // the page of a part: its big drawing and where it is used
@@ -492,6 +628,7 @@ export class CatalogDialog implements OnInit {
       try { history.replaceState(null, '', path ? `#part=${encodeURIComponent(path)}` : location.pathname + location.search); } catch { /* not allowed here */ }
     });
     inject(DestroyRef).onDestroy(() => {
+      this.destroyed = true;
       this.setBig(null);
       try { if (location.hash.startsWith('#part=')) history.replaceState(null, '', location.pathname + location.search); } catch { /* not allowed here */ }
     });
@@ -568,13 +705,13 @@ export class CatalogDialog implements OnInit {
   protected pickAll() { this.picked.set(new Set(this.shown().map(e => e.path))); }
 
   /** Asks what would happen (a dry run: which documents use these files), then waits for a yes. */
-  protected async requestTrash(paths: string[]) {
+  protected async requestTrash(paths: string[], note = '') {
     if (!this.manage.enabled() || !paths.length) return;
     this.actionNote.set('');
     try {
       const dry = await firstValueFrom(this.lib.trashBatch(paths, true));
-      const documents = Object.keys(dry.documents ?? {});
-      this.confirm.set({ paths, documents, parts: Object.values(dry.documents ?? {}).reduce((sum, n) => sum + n, 0) });
+      const used = documentsOf(dry.documents ?? {});
+      this.confirm.set({ paths, documents: used.ids, parts: used.parts, note });
     } catch {
       this.actionNote.set('Could not check which documents use these files. Is the API running?');
     }
@@ -587,13 +724,18 @@ export class CatalogDialog implements OnInit {
       const result = await firstValueFrom(this.lib.trashBatch(paths));
       const gone = result.results.map(r => r.path);
       const open = this.detail();
-      const next = open && gone.includes(open) ? (this.following() ?? this.previous())?.path ?? null : open;
+      const openGone = !!open && gone.some(path => open === path || open.startsWith(path + '/'));
+      const next = openGone ? (gone.some(path => open!.startsWith(path + '/')) ? null : (this.following() ?? this.previous())?.path ?? null) : open;
+      const before = this.entries().length;
       this.entries.update(list => withoutPaths(list, gone));
-      this.picked.update(set => new Set([...set].filter(path => !gone.includes(path))));
-      if (open && next !== open) { if (next) this.detail.set(next); else this.closeDetail(); }
+      const parts = before - this.entries().length;
+      if (this.folder() !== null && gone.includes(this.folder()!)) this.folder.set(null);
+      this.picked.update(set => new Set([...set].filter(path => !gone.some(g => path === g || path.startsWith(g + '/')))));
+      this.groups.update(groups => groups && groups.map(group => ({ ...group, paths: group.paths.filter(path => !gone.some(g => path === g || path.startsWith(g + '/'))) })).filter(group => group.paths.length > 1));
+      if (open && openGone) { if (next) this.detail.set(next); else this.closeDetail(); }
       const ids = result.results.map(r => r.id).filter((id): id is string => !!id);
       const failed = result.failed.length;
-      this.undoable.set(ids.length ? { ids, label: `Moved ${ids.length === 1 ? '1 part' : ids.length + ' parts'} to the Trash${failed ? `; ${failed} could not be moved` : ''}.` } : null);
+      this.undoable.set(ids.length ? { ids, label: `Moved ${ids.length === 1 && !paths.some(p => this.isFolder(p)) ? '1 part' : paths.some(p => this.isFolder(p)) ? `${ids.length === 1 ? '1 item' : ids.length + ' items'} (${parts} part${parts === 1 ? '' : 's'})` : ids.length + ' parts'} to the Trash${failed ? `; ${failed} could not be moved` : ''}.` } : null);
       if (!ids.length && failed) this.actionNote.set(`Could not move ${failed} to the Trash: ${result.failed[0].error}`);
       this.confirm.set(null);
       void this.lib.refreshTrash();
@@ -606,10 +748,68 @@ export class CatalogDialog implements OnInit {
     }
   }
 
+  protected toggleClean(key: 'old' | 'unused') {
+    const next = new Set(this.cleanFilters());
+    if (next.has(key)) next.delete(key); else next.add(key);
+    this.cleanFilters.set(next);
+    if (next.has(key) && key === 'unused' && !this.used()) void this.loadUsed();
+  }
+
+  /** The "Check for doubles" button: starts the check (again) and shows its result when it is done. Nothing is changed by it. */
+  protected async checkDoubles() {
+    if (this.scan().state === 'running') return;
+    this.doublesStale.set(false);
+    await this.startScan();
+    if (this.groups()) this.viewDoubles.set(true);
+  }
+
+  /** Looks for identical files on the API (in the background) and waits for the answer. */
+  private async startScan() {
+    this.scan.set({ state: 'running', scanned: 0, total: 0, error: '' });
+    try {
+      await firstValueFrom(this.lib.startDuplicateScan());
+      for (;;) {
+        const answer = await firstValueFrom(this.lib.duplicates());
+        if (this.destroyed) return;
+        this.scan.set({ state: answer.state, scanned: answer.scanned, total: answer.total, error: answer.error });
+        if (answer.state === 'done') { this.groups.set(answer.groups); return; }
+        if (answer.state !== 'running') return;
+        await new Promise(resolve => setTimeout(resolve, 700));
+      }
+    } catch {
+      this.scan.set({ state: 'error', scanned: 0, total: 0, error: 'is the API running?' });
+    }
+  }
+
+  private async loadUsed() {
+    try { this.used.set(new Set((await firstValueFrom(this.lib.usedPaths())).paths)); } catch { /* the filter stays empty */ }
+  }
+
+  /** After a rename or move: the groups, the folder filter and the page follow the new paths, so the result of the check stays right without a new check. */
+  private follow(moves: { from: string; to: string; kind?: string }[]) {
+    this.groups.update(groups => groups && groups.map(group => ({ ...group, paths: group.paths.map(path => remapPath(path, moves)) })));
+    const folder = this.folder();
+    if (folder) { const to = remapPath(folder, moves); if (to !== folder) this.folder.set(to.includes('/') ? null : to); }
+    if (this.used()) void this.loadUsed(); // documents follow renamed files
+  }
+
+  protected openIdentical(path: string) { this.detail.set(path); this.selected.set(path); }
+
   protected openRename(entry: CatalogEntry) {
-    this.renaming.set({ path: entry.path, name: displayName(entry.name), error: '' });
+    this.renaming.set({ path: entry.path, name: displayName(entry.name), error: '', folder: false });
     this.focusField();
   }
+
+  protected openRenameFolder(path: string) {
+    if (!this.manage.enabled()) return;
+    this.renaming.set({ path, name: path.split('/').pop()!, error: '', folder: true });
+    this.focusField();
+  }
+
+  protected isFolder(path: string) { return !path.toLowerCase().endsWith('.stl'); }
+  /** The folder of a part, as a library path ('' for a part at the root). */
+  protected folderPathOf(entry: CatalogEntry) { return parentFolder(entry.path); }
+  protected partsUnder(folder: string) { return this.entries().filter(entry => entry.path.startsWith(folder + '/')).length; }
 
   protected renameText(name: string) { this.renaming.update(r => r && { ...r, name, error: '' }); }
 
@@ -621,9 +821,12 @@ export class CatalogDialog implements OnInit {
       const result = await firstValueFrom(this.lib.rename(r.path, r.name));
       this.renaming.set(null);
       this.undoable.set(null);
-      this.actionNote.set(`Renamed to ${result.to.split('/').pop()}${this.documentNote(result.documents)}.`);
+      this.actionNote.set(`Renamed ${r.folder ? 'folder ' : ''}to ${result.to.split('/').pop()}${this.documentNote(result.documents)}.`);
+      const moves = [{ from: r.path, to: result.to, kind: r.folder ? 'directory' : 'file' }];
       await this.reload();
-      if (this.detail() === r.path) { this.keepNote = true; this.detail.set(result.to); }
+      this.follow(moves);
+      const open = this.detail();
+      if (open && remapPath(open, moves) !== open) { this.keepNote = true; this.detail.set(remapPath(open, moves)); }
       this.changed.emit();
     } catch (error) {
       this.renaming.update(now => now && { ...now, error: this.reason(error, 'Could not rename it.') });
@@ -638,6 +841,8 @@ export class CatalogDialog implements OnInit {
     try {
       const result = await firstValueFrom(this.lib.duplicate(entry.path));
       await this.reload();
+      if (this.groups()) this.doublesStale.set(true); // the copy is identical to its original
+      if (this.used()) void this.loadUsed();
       this.keepNote = true;
       this.detail.set(result.path); // the copy opens
       this.actionNote.set(`Duplicated: this is the copy of ${displayName(entry.name)}.`);
@@ -679,6 +884,7 @@ export class CatalogDialog implements OnInit {
         }
       }
       const result = await firstValueFrom(this.lib.move(m.paths, folder));
+      const moves = result.results.map(r => ({ from: r.from, to: r.to, kind: r.kind }));
       const moved = new Map(result.results.map(r => [r.from, r.to]));
       const open = this.detail();
       this.mover.set(null);
@@ -686,9 +892,10 @@ export class CatalogDialog implements OnInit {
       this.undoable.set(null);
       const changed = result.results.reduce((sum, r) => sum + Object.values(r.documents).reduce((a, n) => a + n, 0), 0);
       const failed = result.failed.length;
-      this.actionNote.set(`Moved ${moved.size} part${moved.size === 1 ? '' : 's'} to ${folder || 'the library root'}${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}${failed ? `; ${failed} could not be moved: ${result.failed[0].error}` : ''}.`);
+      this.actionNote.set(`Moved ${moved.size} item${moved.size === 1 ? '' : 's'} to ${folder || 'the library root'}${changed ? ` (${changed} part${changed === 1 ? '' : 's'} in documents updated)` : ''}${failed ? `; ${failed} could not be moved: ${result.failed[0].error}` : ''}.`);
       await this.reload();
-      if (open && moved.has(open)) { this.keepNote = true; this.detail.set(moved.get(open)!); }
+      this.follow(moves);
+      if (open && remapPath(open, moves) !== open) { this.keepNote = true; this.detail.set(remapPath(open, moves)); }
       this.changed.emit();
     } catch (error) {
       this.mover.update(now => now && { ...now, error: this.reason(error, 'Could not move them.') });
@@ -718,6 +925,7 @@ export class CatalogDialog implements OnInit {
     this.undoable.set(null);
     for (const id of [...last.ids].reverse()) { try { await firstValueFrom(this.lib.putBack(id, 'rename')); } catch { /* it stays in the Trash */ } }
     await this.reload();
+    if (this.groups()) this.doublesStale.set(true); // copies may be back
     void this.lib.refreshTrash();
     this.changed.emit();
   }
@@ -806,6 +1014,15 @@ export class CatalogDialog implements OnInit {
   }
   /** The place of the open part in the list ('—' when the filter has left it out, which a part picked from its folder can be). */
   protected number() { return this.detailIndex() < 0 ? '—' : this.pad(this.detailIndex() + 1); }
+  /** Shows another folder in the folder panel without leaving the page. Going up the trail keeps the crumbs below it; going elsewhere changes the trail. */
+  protected goFolder(path: string) {
+    this.browse.set(path);
+    if (!isWithin(this.trail(), path)) this.trail.set(path);
+  }
+
+  /** A crumb below the folder shown: still on the trail, to go back down to. */
+  protected isAhead(path: string) { return path !== this.browse() && isWithin(path, this.browse()); }
+
   protected folderOf(entry: CatalogEntry) { return parentFolder(entry.path) || 'LIBRARY ROOT'; }
   protected tooLarge(entry: CatalogEntry) { return isTooLarge(entry.size); }
   protected fileTitle(entry: CatalogEntry) { return displayName(entry.name); }
