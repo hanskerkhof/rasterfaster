@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-04 - Fusion add-in: Save As Mesh command for a keyboard shortcut (0.11.31)
+
+### Added
+- **Fusion add-in**: a **Save As Mesh** command in the Add-Ins panel (own icon) that starts Fusion's built-in Save As Mesh (`FusionSaveAsSTLCommand`) for the selected body or component. Fusion's API cannot set keyboard shortcuts, so the shortcut (⇧⌥⌘S) is assigned once to this command in Fusion, the same way as for Save Local Copy.
+
 ## 2026-11-03 - Cancel a quick render, mirrors in X-Ray (0.11.30)
 
 ### Added

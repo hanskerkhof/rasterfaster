@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Draws the three command icons into AddInRasterfasterLocalF3D/resources/<command>/ (16x16, 32x32 and @2x/64x64 PNGs, the names Fusion looks for).
+"""Draws the four command icons into AddInRasterfasterLocalF3D/resources/<command>/ (16x16, 32x32 and @2x/64x64 PNGs, the names Fusion looks for).
 Run it again after changing a drawing: python3 make_icons.py   (needs Pillow)"""
 from pathlib import Path
 
@@ -44,7 +44,19 @@ def folder_icon(draw):
     draw.rounded_rectangle([40, 230, 470, 440], radius=36, fill=folderDark, outline=dark, width=18)
 
 
-for name, drawing in (("save", save), ("open", open_), ("folder", folder_icon)):
+def mesh(draw):  # a triangulated block with a blue arrow down onto a tray: a body goes onto the disk as a mesh
+    top, left, right, back, front = (250, 60), (80, 190), (420, 190), (250, 190), (250, 320)
+    draw.polygon([top, left, back], fill=(150, 190, 245), outline=dark)
+    draw.polygon([top, back, right], fill=(110, 160, 235), outline=dark)
+    draw.polygon([left, back, front], fill=(90, 140, 225), outline=dark)
+    draw.polygon([back, right, front], fill=(60, 110, 205), outline=dark)
+    for a, b in ((top, left), (top, right), (left, front), (right, front), (top, back), (back, front), (left, right)):
+        draw.line([a, b], fill=dark, width=12)
+    arrow(draw, 250, 330, 410, True, blue, width=36, head=70)
+    draw.line([(110, 455), (390, 455)], fill=blue, width=36)
+
+
+for name, drawing in (("save", save), ("open", open_), ("folder", folder_icon), ("mesh", mesh)):
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     drawing(ImageDraw.Draw(image))
     target = out / name

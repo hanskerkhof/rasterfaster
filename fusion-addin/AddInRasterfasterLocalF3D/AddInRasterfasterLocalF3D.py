@@ -1,11 +1,12 @@
 """Local .f3d files instead of the Fusion cloud (for the Personal Use limit of 10 active documents).
 
-Three commands in the Utilities tab > Add-Ins panel:
+Four commands in the Utilities tab > Add-Ins panel:
   Save Local Copy   exports the open design as <name>.f3d into the local folder (written to a hidden temporary file first and then moved
                     over the old copy, so a failed export never damages the file that is there). With "Add version" ticked the file is
                     called <name>_v<N>.f3d, where N is the version number Fusion gives the document (the v5 in its tab)
   Open Local File   opens a local .f3d as a new, unsaved document (it is never put in the cloud unless you save it there; when you close it,
                     choose "Don't save")
+  Save As Mesh      starts Fusion's own Save As Mesh for the selected body or component (a command of ours, to give a keyboard shortcut)
   Local Folder      chooses the folder (default ~/Documents/FUSION360, remembered in localf3d.json next to this file)
 When a document is closed (or Fusion is quit) that has changes without an up-to-date local copy, the add-in asks whether to save one first
 (it cannot keep the document open: Fusion lets an add-in cancel only a save, not a close); the Save Local Copy dialog has a checkbox to turn that off.
@@ -23,6 +24,9 @@ import adsk.core
 import adsk.fusion
 
 SAVE_ID, OPEN_ID, FOLDER_ID = 'rasterfaster_localf3d_save', 'rasterfaster_localf3d_open', 'rasterfaster_localf3d_folder'
+MESH_ID = 'rasterfaster_localf3d_savemesh'  # a command of our own that starts Fusion's Save As Mesh, so that it can get a keyboard shortcut next to the others
+MESH_COMMAND = 'FusionSaveAsSTLCommand'  # the id of Fusion's own Save As Mesh command (found in ui.commandDefinitions)
+MESH_EVENT = 'rasterfaster_localf3d_savemesh_event'
 PANEL_ID = 'SolidScriptsAddinsPanel'
 OPEN_DIALOG_EVENT = 'rasterfaster_localf3d_open_dialog'  # starts the Save dialog a moment after a close was cancelled
 CLOSE_COMMAND = 'CloseDocumentCommand'  # the id of the command Fusion runs to close a document (found with the command log)
@@ -613,6 +617,35 @@ def on_close_command(args):
         args.isCanceled = True
 
 
+def on_mesh_created(args):
+    args.command.execute.add(keep(Handler(on_mesh_execute)))
+
+
+def on_mesh_execute(args):
+    """Fusion's own command is started from a custom event, a moment after our own command has ended: a command cannot be started from inside another one."""
+    def fire():
+        time.sleep(0.1)
+        app.fireCustomEvent(MESH_EVENT, '')
+
+    threading.Thread(target=fire, daemon=True).start()
+
+
+def start_save_as_mesh(args):
+    definition = ui.commandDefinitions.itemById(MESH_COMMAND)
+    if not definition:
+        ui.messageBox('Fusion has no command ' + MESH_COMMAND + ' (Save As Mesh).')
+        return
+    definition.execute()
+
+
+class MeshEventHandler(adsk.core.CustomEventHandler):
+    def __init__(self):
+        super().__init__()
+
+    def notify(self, args):
+        guarded(start_save_as_mesh, args)
+
+
 def open_save_dialog(args):
     ui.commandDefinitions.itemById(SAVE_ID).execute()
 
@@ -679,6 +712,11 @@ def run(context):
         except Exception:
             pass
         app.registerCustomEvent(OPEN_DIALOG_EVENT).add(keep(DialogEventHandler()))
+        try:
+            app.unregisterCustomEvent(MESH_EVENT)
+        except Exception:
+            pass
+        app.registerCustomEvent(MESH_EVENT).add(keep(MeshEventHandler()))
         global closing_handler
         closing_handler = ClosingHandler()
         app.documentClosing.add(closing_handler)
@@ -688,6 +726,7 @@ def run(context):
         add_command(SAVE_ID, 'Save Local Copy', 'Export the open design as a local .f3d file (no Fusion cloud)', 'save', on_save_created)
         add_command(OPEN_ID, 'Open Local File', 'Open a local .f3d file as a new, unsaved document', 'open', on_open_created)
         add_command(FOLDER_ID, 'Local Folder', 'Choose the folder for the local .f3d files', 'folder', on_folder_created)
+        add_command(MESH_ID, 'Save As Mesh', 'Open Fusion\'s Save As Mesh dialog for the selected body or component (give it a keyboard shortcut)', 'mesh', on_mesh_created)
     except Exception:
         if ui:
             ui.messageBox('Local .f3d failed to start:\n' + traceback.format_exc())
@@ -697,6 +736,7 @@ def stop(context):
     try:
         app.unregisterCustomEvent(EXPORT_EVENT)
         app.unregisterCustomEvent(OPEN_DIALOG_EVENT)
+        app.unregisterCustomEvent(MESH_EVENT)
     except Exception:
         pass
     try:
@@ -709,7 +749,7 @@ def stop(context):
         pass
     try:
         panel = ui.allToolbarPanels.itemById(PANEL_ID)
-        for command_id in (SAVE_ID, OPEN_ID, FOLDER_ID):
+        for command_id in (SAVE_ID, OPEN_ID, FOLDER_ID, MESH_ID):
             control = panel.controls.itemById(command_id)
             if control:
                 control.deleteMe()

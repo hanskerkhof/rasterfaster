@@ -2,12 +2,13 @@
 
 A Fusion 360 add-in for working with **local `.f3d` files instead of the Fusion cloud**. The free Personal Use plan allows only 10 active cloud documents; with this add-in you can keep as many small designs as you like as files on your Mac (for example in iCloud Drive) and open them one at a time.
 
-It adds three commands to the **Add-Ins** panel of the **Utilities** tab:
+It adds four commands to the **Add-Ins** panel of the **Utilities** tab:
 
 | Command | What it does |
 |---|---|
 | **Save Local Copy** | Exports the open design as an `.f3d` file into your local folder. Optionally adds Fusion's own version number of the document (`RF14_v3.f3d`). |
 | **Open Local File** | Opens a local `.f3d` as a new, unsaved document. |
+| **Save As Mesh** | Opens Fusion's own Save As Mesh dialog for the body or component you selected in the browser. It is a command of the add-in only so that it can have a keyboard shortcut (below). |
 | **Local Folder** | Chooses the folder for the local files (default `~/Documents/FUSION360`). |
 
 The add-in's version is the Rasterfaster app's version (`npm run bump:version -- X.Y.Z` in `frontend/3d-tool` updates the manifest too); Fusion shows it in the Version column of Scripts and Add-Ins, and the Save Local Copy dialog shows it on its last line. Tested with Fusion 2704.1.53 on macOS. Mac only (the manifest says `mac`).
@@ -80,7 +81,7 @@ Click **Local Folder** and pick a folder. The choice is stored in `localf3d.json
 
 ## Tips
 
-- **Shortcuts:** assign keyboard shortcuts to the commands in Fusion: right-click a command in the toolbar, or use the Fusion preferences.
+- **Shortcuts:** assign keyboard shortcuts to the commands in Fusion: right-click a command in the toolbar, or use the Fusion preferences. The API cannot set a shortcut: Fusion keeps it per command id (`rasterfaster_localf3d_savemesh` for Save As Mesh), so it is assigned once and stays through add-in restarts. For Save As Mesh: right-click **Save As Mesh** in the Add-Ins panel > Change keyboard shortcut > press ⇧⌥⌘S.
 - **iCloud:** choose *Keep Downloaded* on the folder, so that a file is not offloaded and must be downloaded again (a gigabyte) before Fusion can open it. Wait until a new file has finished uploading before you open it on another Mac.
 - **Disk space:** each version is a complete file. Delete the old versions you no longer need.
 - **Searching:** `scripts/f3dsearch.py` (see the main README) finds component names inside all the `.f3d` files in a folder without opening Fusion: run `backend/.venv1/bin/python scripts/f3dsearch.py index ~/Documents/FUSION360`, then `search WORD`.
