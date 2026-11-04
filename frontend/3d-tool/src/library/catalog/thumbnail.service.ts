@@ -5,7 +5,7 @@ import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { firstValueFrom } from 'rxjs';
 import { RF_LIBRARY_CONFIG } from '../core/library.config';
 import { LibraryService } from '../core/library.service';
-import { buildSilhouetteGeometry, creaseDegrees } from '../preview/silhouette';
+import { buildSilhouetteGeometry, creaseDegrees, drawingFlatDegrees } from '../preview/silhouette';
 import { buildViewSvg } from '../preview/svg-view';
 import { CatalogEntry } from './catalog.logic';
 import { isLarge, isTooLarge, meshVolume, themeSvg, thumbnailDirection, thumbnailScale, thumbnailVersion } from './thumbnail.logic';
@@ -34,6 +34,8 @@ export class ThumbnailService {
   readonly drawn = signal<ReadonlyMap<string, DrawnInfo>>(new Map());
   /** Parts whose drawing failed (an unreadable file): not tried again until the catalog is opened again. */
   readonly failed = signal<ReadonlySet<string>>(new Set());
+  /** What the big drawings of the detail page measured (a part opened before its thumbnail was drawn has no size yet). */
+  readonly measured = signal<ReadonlyMap<string, { dims: number[]; volume: number }>>(new Map());
   /** How many cards in view are still waiting for their drawing. */
   readonly waiting = signal(0);
 
@@ -118,7 +120,9 @@ export class ThumbnailService {
     while (this.running) await new Promise(resolve => setTimeout(resolve, 50)); // the renderer is used by one drawing at a time
     this.running = true;
     try {
-      return (await this.build(entry, width)).svg;
+      const { svg, dims, volume } = await this.build(entry, width);
+      this.measured.update(map => new Map(map).set(entry.path, { dims, volume }));
+      return svg;
     } catch {
       return null;
     } finally {
@@ -138,7 +142,7 @@ export class ThumbnailService {
       geometry.translate(...geometry.boundingBox!.getCenter(new THREE.Vector3()).negate().toArray());
       geometry.computeBoundingSphere();
       edges = new THREE.EdgesGeometry(geometry, creaseDegrees);
-      silhouette = buildSilhouetteGeometry(geometry);
+      silhouette = buildSilhouetteGeometry(geometry, creaseDegrees, drawingFlatDegrees);
       const radius = Math.max(geometry.boundingSphere!.radius, 1e-3), distance = radius * 4;
       const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, distance - radius * 1.5, distance + radius * 1.5);
       camera.up.set(0, 0, 1);

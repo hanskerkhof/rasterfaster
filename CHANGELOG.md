@@ -2,6 +2,30 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Open in Catalog (0.11.51, 0.11.52)
+
+### Added
+- **FE** (`src/library/tree/tree-panel.ts`, `app.ts`, `app.html`): the context menu of a file in the file list has **Open in Catalog**: the parts archive opens on that file's page.
+
+### Fixed
+- **FE** (`thumbnail.service.ts`, `catalog-dialog.ts`; 0.11.52): a part's page showed `…` for SIZE and VOLUME until its thumbnail had been drawn; the big drawing measures the part too, and the page uses that.
+
+## 2026-11-05 - Hidden-line drawings of curved parts (0.11.49, 0.11.50)
+
+### Fixed
+- **FE** (`src/library/preview/svg-view.ts`, `thumbnail.logic.ts`): the thumbnails and the large view of the parts archive (and the SVG view of a document) drew the contour lines of curved parts (cones, cylinders, bolts) as dashes and dots. The contour of a smooth surface lies at its middle depth, while the wall one pixel inside it is nearer to the camera by millimetres, so the line was judged hidden depending on the pixel it fell in. Contour lines are now tested against the farthest surface within one pixel around them. The drawing version is 6: cached drawings are redrawn.
+- **FE** (`silhouette.ts`, `thumbnail.service.ts`; 0.11.50): the contour of a finely faceted cone or cylinder broke off where neighbouring facets bend less than 0.5° (such edges counted as flat triangulation). The thumbnails use 0.05° (`drawingFlatDegrees`); the 3D view keeps 0.5°. The drawing version is 7.
+
+## 2026-11-04 - Parts archive: a strip of drawings for the folder's files (0.11.45 to 0.11.48)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`): on a part's page, the other files of the folder can be shown as a **LIST** (as before) or a **STRIP** (switch in the heading, remembered as `rasterfaster.catalogFolderView`): a row of tiles with the drawing, name and size, scrolled sideways. The **‹** and **›** arrows at its ends move one page (as many whole tiles as fit) with a smooth scroll, like a row of films; an arrow shows only when there is more in that direction. The drawings of the tiles in view and the next page are made first.
+
+### Fixed
+- **FE** (`catalog-dialog.ts`; 0.11.48): the size line of a strip tile sits directly under its name, and the list and the strip of the folder's files have the same fixed height (260 px; the list scrolls inside it), so nothing jumps when you switch between them.
+- **FE** (`catalog-dialog.ts`; 0.11.47): the tiles of the strip are 228 px high, not 248: the name has room for two lines (shortened with … after that) and the size line follows it, instead of three lines of empty space.
+- **FE** (`catalog-dialog.ts`; 0.11.46): in the strip view the panel's own modifier class collided with the strip's class and laid the whole panel out as a row.
+
 ## 2026-11-04 - Parts archive: the files of the folder on a part's page (0.11.44)
 
 ### Added

@@ -316,6 +316,12 @@ export class App {
     try { open ? sessionStorage.setItem(catalogOpenKey, '1') : sessionStorage.removeItem(catalogOpenKey); } catch { /* storage unavailable */ }
   }
   /** A part chosen in the catalog: added to the document; the catalog stays open so several parts can be added. */
+  /** "Open in Catalog" in the file list's menu: the catalog opens on that file's page (it reads the part from the address, `#part=`). */
+  protected openCatalogAt(path: string) {
+    try { history.replaceState(null, '', `#part=${encodeURIComponent(path)}`); } catch { /* not allowed here */ }
+    this.setCatalogOpen(true);
+  }
+
   /** Find in browser, from a part's page in the catalog: the catalog closes and the file list shows the file. */
   protected findFromCatalog(path: string) {
     this.setCatalogOpen(false);

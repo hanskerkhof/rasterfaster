@@ -13,7 +13,7 @@ export function isTooLarge(size: number): boolean {
 }
 
 /** Bump when the look of a drawing changes: drawings of an older version in the cache are drawn again. */
-export const thumbnailVersion = 5;
+export const thumbnailVersion = 7;
 /** A drawing is made at a fixed size for the screen: this many drawing units per CSS pixel (2: sharp on a retina screen, smoothly reduced on a normal one). */
 export const thumbnailScale = 2;
 /** Line width in drawing units: one CSS pixel. */

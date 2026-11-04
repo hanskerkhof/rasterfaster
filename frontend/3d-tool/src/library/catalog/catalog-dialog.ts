@@ -9,9 +9,15 @@ import { formatDims, isTooLarge } from './thumbnail.logic';
 import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows } from './catalog.logic';
 
 const sortStorageKey = 'rasterfaster.catalogSort';
+const folderViewKey = 'rasterfaster.catalogFolderView';
+const tileWidth = 232; // a tile of the strip (px): its drawing is 208 wide, so it sits on whole pixels
 const cardWidth = 226;
 const cardMinWidth = 150; // the narrowest a card gets (px); the columns share the width
 const rowHeight = 264; // a card with its gap (px): the grid draws only the rows in view
+
+function readFolderView(): 'list' | 'strip' {
+  try { return localStorage.getItem(folderViewKey) === 'strip' ? 'strip' : 'list'; } catch { return 'list'; }
+}
 
 function readSort(): { key: CatalogSortKey; ascending: boolean } {
   try {
@@ -111,10 +117,42 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
               }
               <span class="cap l">FIG. {{ number() }}</span><span class="cap r">LINE DRAWING · HIDDEN LINES REMOVED</span>
             </div>
-            <div class="siblings">
-              <div class="shead"><span>IN THIS FOLDER · {{ folderOf(d) }}</span><span>{{ siblings().length ? siblings().length + (siblings().length === 1 ? ' OTHER FILE' : ' OTHER FILES') : 'NO OTHER FILES' }}</span></div>
-              @for (s of siblings(); track s.path) {
-                <button type="button" class="sib" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ kb(s.size) }}</span></button>
+            <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
+              <div class="shead">
+                <span>IN THIS FOLDER · {{ folderOf(d) }}</span>
+                <span class="right">
+                  <span>{{ siblings().length ? siblings().length + (siblings().length === 1 ? ' OTHER FILE' : ' OTHER FILES') : 'NO OTHER FILES' }}</span>
+                  <span class="chips"><button type="button" [class.on]="siblingView() === 'list'" (click)="setSiblingView('list')">LIST</button><button type="button" [class.on]="siblingView() === 'strip'" (click)="setSiblingView('strip')">STRIP</button></span>
+                </span>
+              </div>
+              @if (siblingView() === 'list') {
+                <div class="listbox">
+                  @for (s of siblings(); track s.path) {
+                    <button type="button" class="sib" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ kb(s.size) }}</span></button>
+                  }
+                </div>
+              } @else if (siblings().length) {
+                <div class="stripbox">
+                  @if (stripBack()) { <button type="button" class="arrow l" aria-label="Previous files" (click)="page(-1)">‹</button> }
+                  <div #strip class="strip" (scroll)="measureStrip()">
+                    @for (s of siblings(); track s.path) {
+                      <button type="button" class="tile" [title]="s.path" (click)="detail.set(s.path)">
+                        <span class="art">
+                          @switch (thumbs.state(s)) {
+                            @case ('drawn') { <img [src]="thumbs.url(s)" alt="" draggable="false" /> }
+                            @case ('large') { <span class="note">LARGE FILE · {{ kb(s.size) }}</span> }
+                            @case ('toolarge') { <span class="note">TOO LARGE · {{ kb(s.size) }}</span> }
+                            @case ('failed') { <span class="note">NO DRAWING</span> }
+                            @default { <span class="note pending">PENDING</span> }
+                          }
+                        </span>
+                        <span class="name">{{ fileTitle(s) }}</span>
+                        <span class="meta">{{ meta(s) }}</span>
+                      </button>
+                    }
+                  </div>
+                  @if (stripForward()) { <button type="button" class="arrow r" aria-label="Next files" (click)="page(1)">›</button> }
+                </div>
               }
             </div>
             </div>
@@ -168,8 +206,15 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .dhead { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2c2d31; color: #888; }
     .dbody { flex: 1; min-height: 0; display: flex; gap: 28px; padding: 16px 0; overflow: auto; }
     .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
-    .siblings { flex: none; max-height: 192px; overflow: auto; border: 1px solid #2c2d31; }
-    .shead { position: sticky; top: 0; display: flex; justify-content: space-between; padding: 6px 10px; background: #16171a; border-bottom: 1px solid #2c2d31; color: #888; }
+    .siblings { flex: none; height: 260px; display: flex; flex-direction: column; border: 1px solid #2c2d31; overflow: hidden; } /* the same height as a list and as a strip: nothing jumps when you switch */
+    .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
+    .shead .right { display: flex; align-items: baseline; gap: 14px; } .shead .chips button { color: #888; } .shead .chips button.on { background: #e6e6e6; color: #111; }
+    .stripbox { position: relative; flex: 1 1 auto; min-height: 0; } .strip { height: 100%; display: flex; overflow-x: auto; scrollbar-width: none; } .strip::-webkit-scrollbar { display: none; }
+    .tile { flex: none; box-sizing: border-box; width: ${tileWidth}px; display: flex; flex-direction: column; padding: 8px 12px; text-align: left; border: 0; box-shadow: inset -1px 0 #2c2d31; background: transparent; overflow: hidden; }
+    .tile:hover { background: #1e2024; } .tile .art { margin-bottom: 4px; } .tile .name { flex: none; max-height: 32px; color: #e6e6e6; font-size: 12px; overflow: hidden; word-break: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; } /* two lines, like the cards: the sizes line up across the tiles */ .tile .meta { flex: none; margin-top: 2px; color: #777; }
+    .arrow { position: absolute; top: 0; bottom: 0; width: 44px; display: flex; align-items: center; justify-content: center; font-size: 30px; color: #fff; background: rgba(22,23,26,.82); border: 0; z-index: 1; } .arrow:hover { background: rgba(38,50,74,.95); }
+    .arrow.l { left: 0; } .arrow.r { right: 0; }
+    .shead { flex: none; display: flex; justify-content: space-between; padding: 6px 10px; background: #16171a; border-bottom: 1px solid #2c2d31; color: #888; }
     .sib { display: flex; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 3px 10px; text-align: left; color: #bbb; } .sib:hover { background: #1e2024; color: #fff; }
     .sib .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sib .k { flex: none; color: #666; }
     .fig { position: relative; flex: 1 1 auto; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
@@ -223,6 +268,18 @@ export class CatalogDialog implements OnInit {
   protected readonly usedIn = signal<number | null>(null);
   protected readonly actionNote = signal('');
   private savedTop = 0;
+  /** The other files of the folder on a part's page: a list, or a strip of drawings that pages left and right. */
+  protected readonly siblingView = signal<'list' | 'strip'>(readFolderView());
+  private readonly stripRef = viewChild<ElementRef<HTMLElement>>('strip');
+  private readonly stripLeft = signal(0);
+  private readonly stripSize = signal({ width: 0, total: 0 });
+  protected readonly stripBack = computed(() => this.stripLeft() > 0);
+  protected readonly stripForward = computed(() => this.stripLeft() + this.stripSize().width < this.stripSize().total - 1);
+  /** The tiles in view and one page more, in the order to draw them. */
+  private readonly stripWanted = computed(() => {
+    const first = Math.floor(this.stripLeft() / tileWidth), perPage = Math.max(1, Math.ceil(this.stripSize().width / tileWidth));
+    return this.siblings().slice(first, first + 2 * perPage + 1);
+  });
   /** The part named in the address when the dialog opened (a reload or a link); the address is left alone until the catalog has loaded and it was looked up. */
   private pendingPart: string | null = location.hash.startsWith('#part=') ? decodeURIComponent(location.hash.slice(6)) : null;
   private readonly size = signal({ width: 800, height: 500 });
@@ -248,7 +305,20 @@ export class CatalogDialog implements OnInit {
 
   constructor() {
     closeOnEscape(() => (this.detail() ? this.closeDetail() : this.close.emit()));
-    effect(() => this.thumbs.want(this.cards().map(card => card.entry))); // draw what is in view
+    effect(() => { // draw what is in view: the strip of a part's page when it is shown, else the cards
+      if (this.detail() && this.siblingView() === 'strip') this.thumbs.want(this.stripWanted());
+      else this.thumbs.want(this.cards().map(card => card.entry));
+    });
+    effect(onCleanup => { // measure the strip when it appears, changes its files or its width; a new folder starts at its first file
+      this.siblings(); this.siblingView();
+      const element = this.stripRef()?.nativeElement;
+      if (!element) return;
+      element.scrollLeft = 0;
+      const observer = new ResizeObserver(() => this.measureStrip());
+      observer.observe(element);
+      const timer = setTimeout(() => this.measureStrip());
+      onCleanup(() => { observer.disconnect(); clearTimeout(timer); });
+    });
     effect(() => { // a new result list starts at the top
       this.shown();
       this.scroller().nativeElement.scrollTop = 0;
@@ -336,6 +406,27 @@ export class CatalogDialog implements OnInit {
     else if (rowTop + rowHeight > element.scrollTop + element.clientHeight) element.scrollTop = rowTop + rowHeight - element.clientHeight;
   }
 
+  protected setSiblingView(view: 'list' | 'strip') {
+    this.siblingView.set(view);
+    try { localStorage.setItem(folderViewKey, view); } catch { /* storage unavailable */ }
+  }
+
+  protected measureStrip() {
+    const element = this.stripRef()?.nativeElement;
+    if (!element) return;
+    this.stripLeft.set(element.scrollLeft);
+    this.stripSize.set({ width: element.clientWidth, total: element.scrollWidth });
+  }
+
+  /** One page left or right (as many whole tiles as fit), scrolled smoothly, like a row of films. */
+  protected page(direction: -1 | 1) {
+    const element = this.stripRef()?.nativeElement;
+    if (!element) return;
+    const perPage = Math.max(1, Math.floor(element.clientWidth / tileWidth));
+    const target = (Math.round(element.scrollLeft / tileWidth) + direction * perPage) * tileWidth;
+    element.scrollTo({ left: Math.max(0, Math.min(element.scrollWidth - element.clientWidth, target)), behavior: 'smooth' });
+  }
+
   protected openDetail(path: string) {
     this.savedTop = this.top();
     this.selected.set(path);
@@ -367,8 +458,8 @@ export class CatalogDialog implements OnInit {
   protected folderOf(entry: CatalogEntry) { return parentFolder(entry.path) || 'LIBRARY ROOT'; }
   protected tooLarge(entry: CatalogEntry) { return isTooLarge(entry.size); }
   protected fileTitle(entry: CatalogEntry) { return displayName(entry.name); }
-  protected dimsOf(entry: CatalogEntry) { return formatDims(this.thumbs.drawn().get(entry.path)?.dims ?? entry.dims); }
-  protected volumeOf(entry: CatalogEntry) { const v = this.thumbs.drawn().get(entry.path)?.volume ?? entry.volume; return v == null ? '…' : `${(v / 1000).toFixed(v >= 100000 ? 0 : 1)} cm³`; }
+  protected dimsOf(entry: CatalogEntry) { return formatDims(this.thumbs.drawn().get(entry.path)?.dims ?? this.thumbs.measured().get(entry.path)?.dims ?? entry.dims); }
+  protected volumeOf(entry: CatalogEntry) { const v = this.thumbs.drawn().get(entry.path)?.volume ?? this.thumbs.measured().get(entry.path)?.volume ?? entry.volume; return v == null ? '…' : `${(v / 1000).toFixed(v >= 100000 ? 0 : 1)} cm³`; }
   protected short(name: string) { const n = displayName(name); return n.length > 40 ? n.slice(0, 39) + '…' : n; }
   protected draw(event: Event, entry: CatalogEntry) { event.stopPropagation(); this.thumbs.drawNow(entry); }
   protected meta(entry: CatalogEntry) {

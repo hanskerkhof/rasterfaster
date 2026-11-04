@@ -88,6 +88,7 @@ interface Row {
         @if (m.paths.length) {
           <div class="sep"></div>
           <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="revealInFinder(m.paths[0])">Reveal in Finder</button>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || m.files.length !== 1" (click)="openInCatalogFromMenu(m.files[0])">Open in Catalog</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, true)">{{ m.paths.length > 1 ? 'Copy Paths' : 'Copy Path' }}</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, false)">{{ m.paths.length > 1 ? 'Copy Relative Paths' : 'Copy Relative Path' }}</button>
           <div class="sep"></div>
@@ -176,6 +177,8 @@ export class TreePanel {
   readonly openTrash = output<void>();
   /** The notice's "Relink…" button: the parts (document item ids) that were looked up get another file. */
   readonly relink = output<string[]>();
+  /** "Open in Catalog": show this file on its page in the parts archive. */
+  readonly openInCatalog = output<string>();
   /** Ids of the document parts the notice is about (for its Relink button); null when the notice has none. */
   protected readonly noticeRelink = signal<string[] | null>(null);
 
@@ -782,6 +785,11 @@ export class TreePanel {
       const detail = (error as { error?: { detail?: unknown } }).error?.detail;
       this.note(typeof detail === 'string' ? `Could not duplicate it: ${detail}` : 'Could not duplicate it');
     }
+  }
+
+  protected openInCatalogFromMenu(path: string) {
+    this.menu.set(null);
+    this.openInCatalog.emit(path);
   }
 
   protected async revealInFinder(path: string) {
