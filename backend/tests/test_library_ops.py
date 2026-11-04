@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-import library_ops
+from rf_library import ops as library_ops
 import main
 
 

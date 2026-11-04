@@ -1,13 +1,14 @@
 {
   "name": "3d-tool",
-  "version": "0.11.31",
+  "version": "0.11.40",
   "scripts": {
     "bump:version": "node scripts/bump-version.mjs",
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check:boundaries": "node scripts/check-boundaries.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

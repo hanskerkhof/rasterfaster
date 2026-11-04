@@ -2,6 +2,46 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-04 - Parts archive: a page for every part (0.11.39, 0.11.40)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `thumbnail.service.ts`, `app.ts`, `app.html`): a click (or Enter) on a card opens the part's page inside the catalog: a large drawing (made on the spot, 560 px, not cached), the facts about the file (file, folder, size in mm, volume, file size, modified, how many documents use it, path) and **Add to document**, **Find in browser** (the catalog closes and the file list shows the file) and **Reveal in Finder**. **← / →** (and the buttons at the bottom) go to the previous and next part of the current list; Esc goes back to the list where you were. The address is `#part=<path>`, so a reload (or a copied link) comes back to the part. On a card, **+ ADD** (on hover) adds the part straight away.
+- **FE** (`thumbnail.logic.ts`): parts over 100 MB are never drawn (the card says `TOO LARGE`); between 20 and 100 MB they still wait for **Draw anyway**.
+
+### Fixed
+- **FE** (`catalog-dialog.ts`; 0.11.40): the address `#part=…` was cleared on startup, before the catalog had loaded, so a reload did not come back to the part.
+
+### Changed
+- **FE**: a double-click on a card no longer adds the part (a click opens its page).
+
+## 2026-11-04 - Parts archive: thumbnails, and it stays open on reload (0.11.34 to 0.11.38)
+
+### Added
+- **BE** (`backend/rf_library/router.py`, `tests/test_api.py`): the thumbnail cache. `PUT` and `GET /api/catalog/thumb?path=` store and serve one SVG drawing per part in the hidden folder `RASTERFASTER_APP/.catalog-cache/` (with a small .json beside it: the file's modified time, its width/depth/height and volume); `GET /api/catalog` says per part whether a current drawing exists (`drawn`, `dims`, `volume`; a changed file needs a new one). An SVG with scripts or event handlers is refused, and the served drawing carries a sandbox CSP.
+- **FE** (`src/library/catalog/thumbnail.service.ts`, `thumbnail.logic.ts`): the cards of the parts archive show an isometric hidden-lines drawing (white lines on dark), drawn in the browser, one part at a time, only for the cards in view (the newest scroll position first), then kept in the cache for the next visit. A card shows `PENDING` until its drawing is ready; the card's size line shows the part's real size in mm (`80 × 60 × 4 mm`). Parts over 20 MB are not drawn by themselves: the card says `LARGE FILE` and has **Draw anyway**.
+
+### Fixed
+- **FE** (`thumbnail.service.ts`; 0.11.38): the drawing's frame is fitted to the part's box as the camera sees it, not to its bounding sphere, so flat parts fill the picture; the picture is 200 px wide.
+- **FE** (`thumbnail.logic.ts`, `thumbnail.service.ts`, `catalog-dialog.ts`), **BE** (`router.py`; 0.11.37): the thumbnails had jagged lines because a 640-unit drawing was scaled down to the card. They are now made for the screen: a fixed size in CSS pixels (2 drawing units per pixel, lines exactly one pixel wide), shown unscaled. Drawings carry a version; those of the first look are drawn again.
+- **FE** (`thumbnail.logic.ts`), **BE** (`router.py`; 0.11.36): the drawing of a very dense part (a 22 MB STL) was refused as too big. Coordinates are now rounded to one decimal and the limit is 6 MB.
+
+### Changed
+- **FE** (`src/library/preview/svg-view.ts`): moved from the app into the library (the drawing code is shared), exported from `@rasterfaster/library`.
+- **FE** (`app.ts`, `app.html`; 0.11.35): the Catalog stays open when the page is reloaded (kept per browser tab in session storage).
+
+## 2026-11-04 - Parts archive: a catalog of the whole library (0.11.33)
+
+### Added
+- **BE** (`backend/rf_library/router.py`, `tests/test_api.py`): `GET /api/catalog` lists every .stl of the library (name, path, top-level folder, modified, size) in natural path order.
+- **FE** (`src/library/catalog/`, `app.html`, `app.ts`, `app.scss`): a **Catalog** button next to the Trash opens the **parts archive**, a near full-screen dialog with a numbered card per part (`NO.001`, folder code, name, size and date). Filter by folder (chips with counts), **Find** by name or folder (same syntax as the file list: "phrase", -exclude; `/` focuses it), sort by name, date or size (remembered, `rasterfaster.catalogSort`). Only the cards in view are drawn, so all ~6,500 parts scroll smoothly. Click selects, arrow keys move, double-click, Enter or **Add to document** adds the part. Pictures, the detail page and library management follow in later versions (`docs/library-catalog-plan.md`).
+
+## 2026-11-04 - Library code separated from the app (0.11.32)
+
+### Changed
+- **BE** (`backend/rf_library/`: `router.py`, `ops.py`, `searchterms.py`; `main.py`, `rasterfaster.spec`): the library API (list, search, file, rename, move, duplicate, new folder, Trash, reveal) is its own package, mounted by `main.py` with the paths passed in; `library_ops.py` and `searchterms.py` moved into it. Same routes and behaviour.
+- **FE** (`src/library/`, `tsconfig.json`, `scripts/check-boundaries.mjs`): the library files (library service, file tree, delete and Trash dialogs, Quick Look, renderer, silhouette, filter terms, Esc helper) moved to `src/library/` behind `public-api.ts`, imported as `@rasterfaster/library`; the API base comes from `RF_LIBRARY_CONFIG` (default `/api`). `npm run check:boundaries` keeps the dependency one way. No change in the app's behaviour.
+- Plan for the parts catalog: `docs/library-catalog-plan.md`.
+
 ## 2026-11-04 - Fusion add-in: Save As Mesh command for a keyboard shortcut (0.11.31)
 
 ### Added

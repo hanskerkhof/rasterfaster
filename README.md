@@ -12,11 +12,15 @@ cd frontend/3d-tool && npm start      # http://localhost:4200
 
 Tests: `cd backend && .venv1/bin/python -m pytest`
 
+Library code is kept apart from the document code so it can be published on its own (plan: `docs/library-catalog-plan.md`): the API is the `backend/rf_library` package (router, `ops.py`, `searchterms.py`; `main.py` mounts it), the UI is `frontend/3d-tool/src/library/`, imported as `@rasterfaster/library` (its `public-api.ts`; the API base is `RF_LIBRARY_CONFIG`). The library never imports from `src/app`, and the app never deep-imports the library: `npm run check:boundaries` checks both.
+
 Pick up backend code changes without killing the process (re-execs in place, same PID):
 
 ```bash
 curl -sS -X POST http://127.0.0.1:8100/api/runtime/restart -H 'Content-Type: application/json' -d '{"reason":"code change"}'
 ```
+
+**Catalog** (button next to the Trash, bottom left of the file list): the parts archive, a near full-screen dialog with a card for every STL of the library. Folder chips, **Find** (same syntax as the file list; `/` focuses it), sort by name, date or size; arrow keys move, Enter or double-click adds the part to the document, Esc closes. `GET /api/catalog` lists the files.
 
 Tree keyboard (Finder-style): ↑/↓ move, → expand / step into folder, ← collapse / go to parent, Home/End.
 
@@ -172,7 +176,7 @@ The app polls `GET /api/health` every 5 s (and when the browser reports a networ
 
 ## Renaming library files and directories (file management, phase 1)
 
-Right-click a row in the file list → **Rename…**, press **Enter** (or F2) on a focused row, or click a row that is already selected, wait a moment and the name becomes editable (a slow second click, like in the Finder; a double-click still adds a file to the document, and a folder's arrow still opens and closes it): the row becomes a text field (a file without its `.stl`, which is added again); Enter again without typing or Esc cancels, Enter after typing saves; a name that is empty, starts with a dot, contains `/ \ :` or already exists is refused with the reason shown under the field. The API is `POST /api/library/rename` (`{path, newName}`, `?dryRun=true` only reports what would happen), implemented in `backend/library_ops.py`.
+Right-click a row in the file list → **Rename…**, press **Enter** (or F2) on a focused row, or click a row that is already selected, wait a moment and the name becomes editable (a slow second click, like in the Finder; a double-click still adds a file to the document, and a folder's arrow still opens and closes it): the row becomes a text field (a file without its `.stl`, which is added again); Enter again without typing or Esc cancels, Enter after typing saves; a name that is empty, starts with a dot, contains `/ \ :` or already exists is refused with the reason shown under the field. The API is `POST /api/library/rename` (`{path, newName}`, `?dryRun=true` only reports what would happen), implemented in `backend/rf_library/ops.py`.
 
 - **Backup of the original, the first time only:** the first time a *file* is renamed, a copy of the original goes to the backup folder with the same hierarchy: renaming `<library>/1.4.BOLTS & NUTS/old name.stl` keeps `3D_BACKUP/RASTERFASTER/1.4.BOLTS & NUTS/old name.stl` (the folder is named like the library folder). If the copy fails, nothing is renamed. Renaming the same file again (A, B, C) is not backed up again: a registry follows the file (`<backup folder>/.rasterfaster/registry.json`). A backup never overwrites another one (`name (2).stl`).
 - **Directories:** renaming a directory copies nothing; it is only logged.

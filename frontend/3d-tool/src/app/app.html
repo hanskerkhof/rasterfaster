@@ -63,6 +63,7 @@
     }
   </div>
   <div class="trash-bar">
+    <button type="button" class="trash-button" title="The parts archive: browse every part of the library" (click)="setCatalogOpen(true)">▦ Catalog</button>
     <button type="button" class="trash-button" title="The Trash: put files back or delete them for good" (click)="trashOpen.set(true)">🗑 Trash@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
   </div>
   </div>
@@ -171,6 +172,7 @@
       </div>
     }
     @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }
+    @if (catalogOpen()) { <app-catalog-dialog (close)="setCatalogOpen(false)" (add)="addFromCatalog($event)" (findInBrowser)="findFromCatalog($event)" /> }
     @if (trashOpen()) { <app-trash-dialog (close)="trashOpen.set(false)" (changed)="onTrashChanged()" /> }
     @if (store.conflict()) {
       <div class="conflict" role="alert">

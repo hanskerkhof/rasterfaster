@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
-import { LibraryService, TrashItem } from './library.service';
+import { LibraryService, TrashItem } from '../core/library.service';
 import { TrashDialog } from './trash-dialog';
 
 const item = (id: string, over: Partial<TrashItem> = {}): TrashItem => ({ id, name: `${id}.stl`, originalPath: `a/${id}.stl`, kind: 'file', deletedAt: 1, size: 10, missing: false, ...over });

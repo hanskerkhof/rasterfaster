@@ -376,3 +376,55 @@ def test_a_file_of_your_own_goes_into_the_gallery(client):
     assert video.status_code == 201 and video.json()["kind"] == "file" and video.json()["media"] == "mp4" and (video.json()["width"], video.json()["height"]) == (960, 540)
     assert client.get(f"{base}/{video.json()['id']}.mp4").status_code == 200
     assert [n["name"] for n in client.get(base).json()] == ["clip", "my picture"]
+
+
+def test_catalog_lists_every_stl_with_its_top_folder(client, tmp_path):
+    (tmp_path / "BOXES" / "deep").mkdir()
+    (tmp_path / "BOXES" / "deep" / "c.STL").write_bytes(b"solid 1")
+    (tmp_path / ".hidden").mkdir()
+    (tmp_path / ".hidden" / "h.stl").write_bytes(b"x")
+    (tmp_path / ".dot.stl").write_bytes(b"x")
+    found = client.get("/api/catalog").json()
+    assert [(e["path"], e["folder"]) for e in found] == [("a2.stl", ""), ("a10.stl", ""), ("BOXES/b.stl", "BOXES"), ("BOXES/deep/c.STL", "BOXES")]  # natural, case-insensitive
+    assert found[3]["name"] == "c.STL" and found[3]["size"] == 7 and found[3]["modified"] > 0
+
+
+thumbBody = {"modified": 0, "svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0L1 1"/></svg>', "dims": [1.0, 2.0, 3.0], "volume": 6.0}
+
+
+def test_thumbnail_is_stored_served_and_listed_in_the_catalog(client, tmp_path):
+    stamp = (tmp_path / "a2.stl").stat().st_mtime
+    assert client.get("/api/catalog/thumb", params={"path": "a2.stl"}).status_code == 404
+    assert client.put("/api/catalog/thumb", params={"path": "a2.stl"}, json={**thumbBody, "modified": stamp}).status_code == 204
+    served = client.get("/api/catalog/thumb", params={"path": "a2.stl", "v": "1"})
+    assert served.status_code == 200 and served.headers["content-type"].startswith("image/svg+xml") and "<path" in served.text
+    assert "sandbox" in served.headers["content-security-policy"]
+    drawn = {e["path"]: e for e in client.get("/api/catalog").json()}
+    assert drawn["a2.stl"]["thumbVersion"] == 1  # a drawing made without a version is the first look
+    assert drawn["a2.stl"]["drawn"] and drawn["a2.stl"]["dims"] == [1.0, 2.0, 3.0] and drawn["a2.stl"]["volume"] == 6.0
+    assert not drawn["a10.stl"]["drawn"] and drawn["a10.stl"]["dims"] is None
+    assert (main.documentsRoot / ".catalog-cache").is_dir()  # hidden, next to the documents
+    assert client.get("/api/documents").json() == []  # and it is not a document
+
+
+def test_changed_file_needs_a_new_thumbnail(client, tmp_path):
+    client.put("/api/catalog/thumb", params={"path": "a2.stl"}, json={**thumbBody, "modified": (tmp_path / "a2.stl").stat().st_mtime})
+    import os
+    os.utime(tmp_path / "a2.stl", (1, 1))
+    assert not {e["path"]: e for e in client.get("/api/catalog").json()}["a2.stl"]["drawn"]
+
+
+@pytest.mark.parametrize("path,status", [("../x.stl", 403), ("missing.stl", 404), ("BOXES/notes.txt", 404)])
+def test_thumbnail_paths_are_checked(client, path, status):
+    assert client.put("/api/catalog/thumb", params={"path": path}, json=thumbBody).status_code == status
+    assert client.get("/api/catalog/thumb", params={"path": path}).status_code in (403, 404)
+
+
+@pytest.mark.parametrize("svg", ['<svg><script>alert(1)</script></svg>', '<svg onload="x()"/>', "<html></html>", '<svg><a href="javascript:x"/></svg>'])
+def test_unsafe_thumbnail_is_refused(client, svg):
+    assert client.put("/api/catalog/thumb", params={"path": "a2.stl"}, json={**thumbBody, "svg": svg}).status_code == 400
+
+
+def test_thumbnail_keeps_the_version_it_was_drawn_with(client, tmp_path):
+    client.put("/api/catalog/thumb", params={"path": "a2.stl"}, json={**thumbBody, "modified": (tmp_path / "a2.stl").stat().st_mtime, "version": 2})
+    assert {e["path"]: e for e in client.get("/api/catalog").json()}["a2.stl"]["thumbVersion"] == 2

@@ -1,10 +1,10 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { highlightParts } from './filter-terms';
-import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from './library.service';
+import { highlightParts } from '../util/filter-terms';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from '../core/library.service';
 import { DeleteDialog } from './delete-dialog';
-import { QuickLook } from './quick-look';
+import { QuickLook } from '../preview/quick-look';
 import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
 
 interface Row {

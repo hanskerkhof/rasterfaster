@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { Subscription } from 'rxjs';
-import { LibraryService } from './library.service';
+import { LibraryService } from '../core/library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
 

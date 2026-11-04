@@ -2,7 +2,7 @@ import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, inject, output } from '@angular/core';
 import { BomRow, bomToCsv, buildBom } from './bom';
 import { DocumentStore } from './document.store';
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '@rasterfaster/library';
 
 @Component({
   selector: 'app-bom-dialog',

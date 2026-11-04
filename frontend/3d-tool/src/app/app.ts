@@ -2,7 +2,7 @@ import { Component, DestroyRef, HostListener, computed, effect, inject, signal, 
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { SwUpdate, VersionReadyEvent } from '@angular/service-worker';
 import { filter, firstValueFrom } from 'rxjs';
-import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult } from './library.service';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, SortKey, TrashBatchResult, TrashDialog, TreePanel, CatalogDialog } from '@rasterfaster/library';
 import { DocumentPanel } from './document-panel';
 import { ViewsPanel } from './views-panel';
 import { ImagesPanel } from './images-panel';
@@ -10,8 +10,6 @@ import { ObjectMenu } from './object-menu';
 import { ReleaseFocus } from './release-focus';
 import { DocItem, DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
-import { TreePanel } from './tree-panel';
-import { TrashDialog } from './trash-dialog';
 import { RenderDialog } from './render-dialog';
 import { RenderService, aspects, fxIds, fxNames } from './render.service';
 import { ApiStatus } from './api-status';
@@ -49,9 +47,15 @@ function readFilterMode(): 'any' | 'all' {
   try { return localStorage.getItem(filterModeStorageKey) === 'all' ? 'all' : 'any'; } catch { return 'any'; }
 }
 
+const catalogOpenKey = 'rasterfaster.catalogOpen';
+
+function readCatalogOpen(): boolean {
+  try { return sessionStorage.getItem(catalogOpenKey) === '1' || location.hash.startsWith('#part='); } catch { return false; }
+}
+
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
+  imports: [TreePanel, TrashDialog, CatalogDialog, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
@@ -305,6 +309,24 @@ export class App {
   }
 
   protected readonly trashOpen = signal(false);
+  /** The catalog stays open when the page is reloaded (kept per browser tab). */
+  protected readonly catalogOpen = signal(readCatalogOpen());
+  protected setCatalogOpen(open: boolean) {
+    this.catalogOpen.set(open);
+    try { open ? sessionStorage.setItem(catalogOpenKey, '1') : sessionStorage.removeItem(catalogOpenKey); } catch { /* storage unavailable */ }
+  }
+  /** A part chosen in the catalog: added to the document; the catalog stays open so several parts can be added. */
+  /** Find in browser, from a part's page in the catalog: the catalog closes and the file list shows the file. */
+  protected findFromCatalog(path: string) {
+    this.setCatalogOpen(false);
+    if (this.panelHidden()) this.togglePanel();
+    const show = () => { this.findRequest.set({ paths: [path], seq: Date.now() }); this.open(path); };
+    if (this.filterText().trim()) { this.onFilter(''); setTimeout(show, 200); } else show();
+  }
+
+  protected addFromCatalog(path: string) {
+    this.addToDocument(path);
+  }
   /** The last Move to Trash, offered for undo for a few seconds (the Finder's "Undo Move to Trash"). */
   protected readonly undoTrash = signal<{ ids: string[]; label: string } | null>(null);
   private undoTimer?: ReturnType<typeof setTimeout>;

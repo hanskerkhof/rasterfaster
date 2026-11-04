@@ -45,7 +45,7 @@ def resolve_paths(env: Mapping[str, str], repoDir: Path, home: Path, frozen: boo
     """`repoDir` is the repository root (the folder holding backend/, frontend/ and documents/); `bundleDir` the PyInstaller data folder."""
     defaultLibrary = home / "Documents" / "3D" / "RASTERFASTER"
     configuredBackup = read_config(home).get("backupRoot")
-    backup = env.get("RF_BACKUP") or configuredBackup or str(home / "Documents" / "3D_BACKUP")  # originals of renamed files, see library_ops.py
+    backup = env.get("RF_BACKUP") or configuredBackup or str(home / "Documents" / "3D_BACKUP")  # originals of renamed files, see rf_library/ops.py
     if frozen:
         configured = read_config(home).get("libraryRoot")
         library = env.get("RF_ROOT") or configured or str(defaultLibrary)

@@ -8,12 +8,9 @@ import { ColorPalette } from './color-palette';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { RenderService, aspectRatio, beamNames, turnDirections, turntableLengths } from './render.service';
 import { AppMode, DocLight, DocSavedView, DocView, DocumentStore, Vec3, workArea } from './document.store';
-import { LibraryService } from './library.service';
-import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
-import { setSilhouetteEdges, silhouetteEdges } from './silhouette';
+import { buildImageSvg, buildParts, buildViewSvg, clearParts, LibraryService, previewStyle, setSilhouetteEdges, silhouetteEdges, ViewMode } from '@rasterfaster/library';
 import { ReleaseFocus, ViewFocus } from './release-focus';
 import { ViewCube } from './view-cube';
-import { buildImageSvg, buildViewSvg } from './svg-view';
 import { ZGridMode, defaultZGridMode, nextZLevel, zGridModes } from './z-levels';
 
 const gridCellMm = 20; // RASTERFASTER base grid pitch
@@ -64,7 +61,7 @@ function foldDegrees(d: number) {
   return folded === -180 ? 180 : folded;
 }
 
-export type { ViewMode } from './model-render';
+export type { ViewMode } from '@rasterfaster/library';
 
 function readZGridMode(): ZGridMode {
   try {
