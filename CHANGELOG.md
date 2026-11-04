@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: the facts column of a part's page can be resized (0.11.58, 0.11.59)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`): on a part's page a bar between the drawing and the facts column can be dragged (double-click for the default 380 px; no keyboard keys: ← → browse the parts, 0.11.59); the width is remembered (`rasterfaster.catalogSpecWidth`). The column keeps at least 260 px and the drawing at least 320 px.
+
 ## 2026-11-05 - Parts archive is now Parts catalog (0.11.57)
 
 ### Changed

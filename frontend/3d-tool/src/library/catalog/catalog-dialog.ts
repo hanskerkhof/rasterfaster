@@ -13,10 +13,22 @@ import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, f
 
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
+const specWidthKey = 'rasterfaster.catalogSpecWidth';
+const defaultSpecWidth = 380;
+const minSpecWidth = 260;
+const minFigureWidth = 320;
 const tileWidth = 232; // a tile of the strip (px): its drawing is 208 wide, so it sits on whole pixels
 const cardWidth = 226;
 const cardMinWidth = 150; // the narrowest a card gets (px); the columns share the width
 const rowHeight = 264; // a card with its gap (px): the grid draws only the rows in view
+
+function readSpecWidth(): number {
+  try {
+    const stored = Number(localStorage.getItem(specWidthKey));
+    if (Number.isFinite(stored) && stored >= minSpecWidth) return Math.round(stored);
+  } catch { /* storage unavailable */ }
+  return defaultSpecWidth;
+}
 
 function readFolderView(): 'list' | 'strip' {
   try { return localStorage.getItem(folderViewKey) === 'strip' ? 'strip' : 'list'; } catch { return 'list'; }
@@ -171,7 +183,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
               }
             </div>
             </div>
-            <div class="spec">
+            <div class="grip" [class.active]="resizing()" role="separator" aria-orientation="vertical" [attr.aria-valuenow]="specWidth()"
+                 title="Drag to resize · double-click for the default width"
+                 (pointerdown)="onGripDown($event)" (pointermove)="onGripMove($event)" (pointerup)="onGripUp($event)" (pointercancel)="onGripUp($event)" (dblclick)="setSpecWidth(defaultWidth)"></div>
+            <div class="spec" [style.width.px]="specWidth()">
               <div class="where">{{ d.folder || 'LIBRARY ROOT' }}</div>
               <h3>{{ fileTitle(d) }}</h3>
               <dl>
@@ -269,7 +284,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .list { display: flex; flex-direction: column; flex: 1; min-height: 0; } .list[hidden] { display: none; }
     .detail { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .dhead { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2c2d31; color: #888; }
-    .dbody { flex: 1; min-height: 0; display: flex; gap: 28px; padding: 16px 0; overflow: auto; }
+    .dbody { flex: 1; min-height: 0; display: flex; gap: 0; padding: 16px 0; overflow: auto; }
     .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
     .siblings { flex: none; height: 260px; display: flex; flex-direction: column; border: 1px solid #2c2d31; overflow: hidden; } /* the same height as a list and as a strip: nothing jumps when you switch */
     .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
@@ -284,7 +299,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .sib .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sib .k { flex: none; color: #666; }
     .fig { position: relative; flex: 1 1 auto; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
     .fig img { flex: none; } .cap { position: absolute; bottom: 8px; color: #555; font-size: 10px; } .cap.l { left: 10px; } .cap.r { right: 10px; }
-    .spec { flex: 0 1 380px; min-width: 260px; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
+    .spec { flex: none; min-width: 0; }
+    .grip { position: relative; flex: none; width: 28px; cursor: col-resize; touch-action: none; } .grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: transparent; transition: background .12s; } .grip:hover::after, .grip.active::after { background: #2f6fed; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
     dl { margin: 0; } dl > div { display: flex; gap: 16px; padding: 6px 0; border-top: 1px solid #2c2d31; } dl > div:last-child { border-bottom: 1px solid #2c2d31; }
     dt { flex: none; width: 84px; color: #888; } dd { margin: 0; min-width: 0; color: #e6e6e6; word-break: break-word; } .path { font-size: 10px; color: #aaa; }
     .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; } .ghost { border: 1px solid #444; padding: 3px 10px; color: #ccc; } .ghost:hover { border-color: #888; color: #fff; }
@@ -359,6 +375,11 @@ export class CatalogDialog implements OnInit {
   /** The Move to Trash waiting for a yes: what it is, and which documents use those files (from a dry run). */
   protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number } | null>(null);
   protected readonly busy = signal(false);
+  /** The width of the facts column of a part's page (px), dragged with the bar between it and the drawing; remembered. */
+  protected readonly specWidth = signal(readSpecWidth());
+  protected readonly resizing = signal(false);
+  protected readonly defaultWidth = defaultSpecWidth;
+  private gripStart: { x: number; width: number } | null = null;
   protected readonly renaming = signal<{ path: string; name: string; error: string } | null>(null);
   protected readonly mover = signal<{ paths: string[]; text: string; error: string } | null>(null);
   /** The folders a move can go to: those matching what was typed, and whether the parts are all there already. */
@@ -708,6 +729,32 @@ export class CatalogDialog implements OnInit {
       this.thumbs.seed(found);
       this.entries.set(found);
     } catch { /* the list stays as it was */ }
+  }
+
+  protected setSpecWidth(width: number, save = true) {
+    const room = (this.host.nativeElement.querySelector('.dbody') as HTMLElement | null)?.clientWidth ?? 1200;
+    const next = Math.round(Math.max(minSpecWidth, Math.min(width, room - minFigureWidth - 28)));
+    this.specWidth.set(next);
+    if (save) { try { localStorage.setItem(specWidthKey, String(next)); } catch { /* storage unavailable */ } }
+  }
+
+  protected onGripDown(event: PointerEvent) {
+    event.preventDefault();
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    this.gripStart = { x: event.clientX, width: this.specWidth() };
+    this.resizing.set(true);
+  }
+
+  protected onGripMove(event: PointerEvent) {
+    if (this.gripStart) this.setSpecWidth(this.gripStart.width - (event.clientX - this.gripStart.x), false); // the bar moves left: the column grows
+  }
+
+  protected onGripUp(event: PointerEvent) {
+    if (!this.gripStart) return;
+    this.gripStart = null;
+    this.resizing.set(false);
+    try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* already released */ }
+    this.setSpecWidth(this.specWidth()); // keep it
   }
 
   protected setSiblingView(view: 'list' | 'strip') {
