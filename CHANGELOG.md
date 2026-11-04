@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-04 - Parts archive: thumbnails on whole pixels (0.11.42, 0.11.43)
+
+### Changed
+- **FE** (`catalog-dialog.ts`, `thumbnail.logic.ts`): the cards of the catalog use whole, even pixel widths and fixed line heights, and the drawings have an even size in CSS pixels, so a drawing is centred on a whole pixel and its 1-pixel lines are not smeared over two rows (a half-pixel position made thin lines look jagged). The drawing version is 5 (0.11.43; 4 had briefly been used by a build with thicker lines that was taken back): cached drawings are redrawn.
+
 ## 2026-11-04 - Parts archive: a page for every part (0.11.39, 0.11.40)
 
 ### Added

@@ -11,6 +11,7 @@ describe('thumbnail logic', () => {
     expect(themed).toContain('d="M0.1 0.9L11.5 1.0"'); // one decimal
     expect(themed).not.toMatch(/#fff|#000|<rect|<title|width="120"|1\.4/);
     expect(themed.endsWith('</svg>')).toBe(true);
+    expect(themeSvg('<svg viewBox="0 0 125 61" width="1" height="1"></svg>')).toBe('<svg viewBox="0 0 125 61" width="62" height="30"></svg>'); // even sizes (62.5 and 30.5 round to whole even pixels)
   });
 
   it('measures the volume of a closed mesh', () => {

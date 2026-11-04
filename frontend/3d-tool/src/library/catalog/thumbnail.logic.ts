@@ -13,7 +13,7 @@ export function isTooLarge(size: number): boolean {
 }
 
 /** Bump when the look of a drawing changes: drawings of an older version in the cache are drawn again. */
-export const thumbnailVersion = 3;
+export const thumbnailVersion = 5;
 /** A drawing is made at a fixed size for the screen: this many drawing units per CSS pixel (2: sharp on a retina screen, smoothly reduced on a normal one). */
 export const thumbnailScale = 2;
 /** Line width in drawing units: one CSS pixel. */
@@ -28,7 +28,8 @@ export const thumbnailDirection: [number, number, number] = [1, -1, 0.9];
  */
 export function themeSvg(svg: string): string {
   const box = /viewBox="(-?\d+) (-?\d+) (\d+) (\d+)"/.exec(svg);
-  const size = box ? ` width="${Math.round(Number(box[3]) / thumbnailScale)}" height="${Math.round(Number(box[4]) / thumbnailScale)}"` : '';
+  const even = (units: number) => 2 * Math.round(units / thumbnailScale / 2); // an even number of CSS pixels: centred in an even box it sits on a whole pixel
+  const size = box ? ` width="${even(Number(box[3]))}" height="${even(Number(box[4]))}"` : '';
   return svg
     .replace(/<\?xml[^>]*\?>\s*/, '')
     .replace(/<rect [^>]*fill="#fff"\/>\s*/, '')

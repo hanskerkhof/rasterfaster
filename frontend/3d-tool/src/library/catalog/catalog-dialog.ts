@@ -9,7 +9,8 @@ import { formatDims, isTooLarge } from './thumbnail.logic';
 import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, sortCatalog, visibleRows } from './catalog.logic';
 
 const sortStorageKey = 'rasterfaster.catalogSort';
-const cardWidth = 226; // the narrowest a card gets (px); the columns share the width
+const cardWidth = 226;
+const cardMinWidth = 150; // the narrowest a card gets (px); the columns share the width
 const rowHeight = 264; // a card with its gap (px): the grid draws only the rows in view
 
 function readSort(): { key: CatalogSortKey; ascending: boolean } {
@@ -68,7 +69,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
       }
       <div #scroller class="scroller" tabindex="0" (scroll)="top.set(scroller.scrollTop)" (keydown)="onKey($event)">
         <div class="space" [style.height.px]="window().rows * rowHeight">
-          <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', minmax(0, 1fr))'">
+          <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', ' + columnWidth() + 'px)'">
             @for (card of cards(); track card.entry.path) {
               <button type="button" class="card" [class.selected]="card.entry.path === selected()" (click)="openDetail(card.entry.path)" [title]="card.entry.path">
                 <span class="top"><span>NO.{{ pad(card.number) }}</span><span>{{ code(card.entry.folder) }}</span></span>
@@ -139,7 +140,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     </section>
   `,
   styles: `
-    :host { color: #d8d8d8; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; letter-spacing: .02em; }
+    :host { color: #d8d8d8; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; line-height: 16px; letter-spacing: .02em; } /* whole-pixel lines: every height in the dialog is a whole number of pixels */
     .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 10; }
     .dialog { position: fixed; z-index: 11; inset: 16px; display: flex; flex-direction: column; padding: 14px 18px; background: #16171a; border: 1px solid #2c2d31; border-radius: 6px; box-shadow: 0 16px 50px rgba(0,0,0,.6); min-height: 0; }
     header { display: flex; align-items: baseline; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid #2c2d31; }
@@ -168,9 +169,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .card .plus { position: absolute; right: 8px; bottom: 8px; display: none; padding: 1px 6px; background: #e6e6e6; color: #111; } .card { position: relative; } .card:hover .plus { display: block; } .plus:hover { background: #fff; }
     .scroller { flex: 1; min-height: 0; overflow: auto; border: 1px solid #2c2d31; outline: 0; }
     .space { position: relative; } .grid { position: absolute; left: 0; right: 0; top: 0; display: grid; }
-    .card { height: ${rowHeight}px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 10px; border: 0; border-right: 1px solid #2c2d31; border-bottom: 1px solid #2c2d31; background: transparent; overflow: hidden; }
+    .card { height: ${rowHeight}px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px 11px 8px 10px; border: 0; border-right: 1px solid #2c2d31; border-bottom: 1px solid #2c2d31; background: transparent; overflow: hidden; }
     .card:hover { background: #1e2024; } .card.selected { background: #26324a; outline: 1px solid #2f6fed; outline-offset: -1px; }
-    .top { display: flex; justify-content: space-between; color: #777; }
+    .top { flex: none; height: 16px; display: flex; justify-content: space-between; color: #777; }
     .art { flex: none; height: 156px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; }
     .art img { flex: none; image-rendering: auto; } /* shown as drawn: a fixed size in CSS pixels, not scaled */
     .note { color: #555; font-size: 10px; letter-spacing: .1em; } .note.pending { border: 1px dashed #333; padding: 28px 22px; }
@@ -224,6 +225,8 @@ export class CatalogDialog implements OnInit {
   protected readonly following = computed(() => (this.detailIndex() < 0 ? null : this.shown()[this.detailIndex() + 1] ?? null));
   protected readonly selectedEntry = computed(() => this.shown().find(e => e.path === this.selected()) ?? null);
   protected readonly window = computed(() => visibleRows(this.shown().length, this.size().width, this.top(), this.size().height, cardWidth, rowHeight));
+  /** Whole, even pixels per column (the rest of the width stays empty at the right): the drawings then sit on whole pixels and their thin lines stay sharp. */
+  protected readonly columnWidth = computed(() => Math.max(cardMinWidth, 2 * Math.floor(this.size().width / this.window().columns / 2)));
   protected readonly cards = computed(() => {
     const { columns, first, last } = this.window();
     return this.shown().slice(first * columns, last * columns).map((entry, i) => ({ entry, number: first * columns + i + 1 }));
