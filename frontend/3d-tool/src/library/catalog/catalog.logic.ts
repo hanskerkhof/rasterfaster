@@ -78,3 +78,15 @@ export function visibleRows(total: number, width: number, top: number, height: n
   const last = Math.min(rows, Math.ceil((top + height) / rowHeight) + buffer);
   return { columns, rows, first, last };
 }
+
+/** The folder a library path is in (`a/b/c.stl` -> `a/b`, '' at the root). */
+export function parentFolder(path: string): string {
+  const cut = path.lastIndexOf('/');
+  return cut < 0 ? '' : path.slice(0, cut);
+}
+
+/** The other files in the same folder as `path` (not in the folders below it), by name; the part itself is left out. */
+export function siblingsOf(entries: readonly CatalogEntry[], path: string): CatalogEntry[] {
+  const folder = parentFolder(path);
+  return sortCatalog(entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder), 'name', true);
+}

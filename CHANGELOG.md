@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-04 - Parts archive: the files of the folder on a part's page (0.11.44)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): below the drawing, a part's page lists the other files in the same folder (not those in folders below it), by name with their file size; a click opens that file's page. The list ignores the catalog's filters, and a part opened that way that the filter has left out shows `—` for its number.
+
 ## 2026-11-04 - Parts archive: thumbnails on whole pixels (0.11.42, 0.11.43)
 
 ### Changed

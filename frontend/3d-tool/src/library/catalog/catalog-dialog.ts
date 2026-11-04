@@ -6,7 +6,7 @@ import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows } from './catalog.logic';
 
 const sortStorageKey = 'rasterfaster.catalogSort';
 const cardWidth = 226;
@@ -100,15 +100,23 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
 
       @if (detailEntry(); as d) {
         <section class="detail" aria-label="Part">
-          <div class="dhead"><span>NO.{{ pad(detailIndex() + 1) }} / {{ shown().length }} · {{ code(d.folder) }}</span><button type="button" class="close" (click)="closeDetail()">BACK [ESC]</button></div>
+          <div class="dhead"><span>NO.{{ number() }} / {{ shown().length }} · {{ code(d.folder) }}</span><button type="button" class="close" (click)="closeDetail()">BACK [ESC]</button></div>
           <div class="dbody">
+            <div class="left">
             <div class="fig">
               @switch (bigState()) {
                 @case ('ready') { <img [src]="bigUrl()!" alt="" draggable="false" /> }
                 @case ('loading') { <span class="note">DRAWING…</span> }
                 @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
               }
-              <span class="cap l">FIG. {{ pad(detailIndex() + 1) }}</span><span class="cap r">LINE DRAWING · HIDDEN LINES REMOVED</span>
+              <span class="cap l">FIG. {{ number() }}</span><span class="cap r">LINE DRAWING · HIDDEN LINES REMOVED</span>
+            </div>
+            <div class="siblings">
+              <div class="shead"><span>IN THIS FOLDER · {{ folderOf(d) }}</span><span>{{ siblings().length ? siblings().length + (siblings().length === 1 ? ' OTHER FILE' : ' OTHER FILES') : 'NO OTHER FILES' }}</span></div>
+              @for (s of siblings(); track s.path) {
+                <button type="button" class="sib" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ kb(s.size) }}</span></button>
+              }
+            </div>
             </div>
             <div class="spec">
               <div class="where">{{ d.folder || 'LIBRARY ROOT' }}</div>
@@ -159,7 +167,12 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .detail { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .dhead { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2c2d31; color: #888; }
     .dbody { flex: 1; min-height: 0; display: flex; gap: 28px; padding: 16px 0; overflow: auto; }
-    .fig { position: relative; flex: 1 1 60%; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
+    .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+    .siblings { flex: none; max-height: 192px; overflow: auto; border: 1px solid #2c2d31; }
+    .shead { position: sticky; top: 0; display: flex; justify-content: space-between; padding: 6px 10px; background: #16171a; border-bottom: 1px solid #2c2d31; color: #888; }
+    .sib { display: flex; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 3px 10px; text-align: left; color: #bbb; } .sib:hover { background: #1e2024; color: #fff; }
+    .sib .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sib .k { flex: none; color: #666; }
+    .fig { position: relative; flex: 1 1 auto; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
     .fig img { flex: none; } .cap { position: absolute; bottom: 8px; color: #555; font-size: 10px; } .cap.l { left: 10px; } .cap.r { right: 10px; }
     .spec { flex: 0 1 380px; min-width: 260px; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
     dl { margin: 0; } dl > div { display: flex; gap: 16px; padding: 6px 0; border-top: 1px solid #2c2d31; } dl > div:last-child { border-bottom: 1px solid #2c2d31; }
@@ -221,6 +234,7 @@ export class CatalogDialog implements OnInit {
   protected readonly shown = computed(() => sortCatalog(filterCatalog(this.entries(), this.query(), this.folder()), this.sortKey(), this.ascending()));
   protected readonly detailEntry = computed(() => this.entries().find(e => e.path === this.detail()) ?? null);
   protected readonly detailIndex = computed(() => this.shown().findIndex(e => e.path === this.detail()));
+  protected readonly siblings = computed(() => { const path = this.detail(); return path ? siblingsOf(this.entries(), path) : []; });
   protected readonly previous = computed(() => this.shown()[this.detailIndex() - 1] ?? null);
   protected readonly following = computed(() => (this.detailIndex() < 0 ? null : this.shown()[this.detailIndex() + 1] ?? null));
   protected readonly selectedEntry = computed(() => this.shown().find(e => e.path === this.selected()) ?? null);
@@ -348,6 +362,9 @@ export class CatalogDialog implements OnInit {
   protected finder(entry: CatalogEntry) {
     this.lib.reveal(entry.path).subscribe({ next: () => this.actionNote.set('Shown in the Finder.'), error: () => this.actionNote.set('Could not show it in the Finder (it only works on the Mac that runs the API).') });
   }
+  /** The place of the open part in the list ('—' when the filter has left it out, which a part picked from its folder can be). */
+  protected number() { return this.detailIndex() < 0 ? '—' : this.pad(this.detailIndex() + 1); }
+  protected folderOf(entry: CatalogEntry) { return parentFolder(entry.path) || 'LIBRARY ROOT'; }
   protected tooLarge(entry: CatalogEntry) { return isTooLarge(entry.size); }
   protected fileTitle(entry: CatalogEntry) { return displayName(entry.name); }
   protected dimsOf(entry: CatalogEntry) { return formatDims(this.thumbs.drawn().get(entry.path)?.dims ?? entry.dims); }

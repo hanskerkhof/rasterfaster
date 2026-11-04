@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -52,5 +52,15 @@ describe('catalog logic', () => {
     expect(visibleRows(100, 1000, 1000, 400, 200, 100)).toEqual({ columns: 5, rows: 20, first: 8, last: 16 });
     expect(visibleRows(3, 100, 0, 400, 200, 100).columns).toBe(1); // narrower than a card: one column
     expect(visibleRows(0, 1000, 0, 400, 200, 100).rows).toBe(0);
+  });
+
+  it('finds the folder of a path and the other files in it', () => {
+    expect(parentFolder('a/b/c.stl')).toBe('a/b');
+    expect(parentFolder('c.stl')).toBe('');
+    const files = [entry('A/x2.stl'), entry('A/x10.stl'), entry('A/sub/y.stl'), entry('B/x2.stl'), entry('loose.stl')];
+    expect(siblingsOf(files, 'A/x2.stl').map(e => e.path)).toEqual(['A/x10.stl']); // not itself, not a subfolder, not another folder
+    expect(siblingsOf(files, 'loose.stl')).toEqual([]);
+    expect(siblingsOf(files, 'A/sub/y.stl')).toEqual([]);
+    expect(siblingsOf([entry('A/b.stl'), entry('A/a.stl'), entry('A/c.stl')], 'A/b.stl').map(e => e.name)).toEqual(['a.stl', 'c.stl']);
   });
 });
