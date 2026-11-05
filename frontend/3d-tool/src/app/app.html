@@ -67,6 +67,7 @@
   </div>
   <div class="trash-bar">
     <button type="button" class="trash-button" title="The parts catalog: browse every part of the library (key C)" (click)="setCatalogOpen(true)">▦ Catalog <kbd>C</kbd></button>
+    <button type="button" class="trash-button" title="Read the library from disk again: use it after changing files outside the app" [disabled]="rereading()" (click)="rereadLibrary()">{{ rereading() ? '⟳ Reading…' : '⟳ Reload' }}</button>
     <button type="button" class="trash-button" title="The Trash: put files back or delete them for good (key T)" (click)="trashOpen.set(true)">🗑 Trash <kbd>T</kbd>@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
   </div>
   </div>

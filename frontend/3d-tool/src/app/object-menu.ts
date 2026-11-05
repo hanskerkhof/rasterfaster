@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DocumentStore, Finish } from './document.store';
 import { ColorPalette } from './color-palette';
-import { closeOnEscape } from '@rasterfaster/library';
+import { LibraryService, closeOnEscape } from '@rasterfaster/library';
 import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */
@@ -104,6 +104,14 @@ import { baseThicknessMm } from './z-levels';
           <span class="icon">⌕</span>Find in browser
           <span class="hint">show {{ items().length > 1 ? 'the files' : 'the file' }} in the file list</span>
         </button>
+        <button type="button" role="menuitem" [disabled]="!libraryPath()" (click)="revealInFinder()">
+          <span class="icon">⌕</span>Reveal in Finder
+          <span class="hint">{{ libraryPath() ? 'show the file in the Finder' : 'one part from the library' }}</span>
+        </button>
+        <button type="button" role="menuitem" [disabled]="!libraryPath()" (click)="openInCatalog()">
+          <span class="icon">▦</span>Open in catalog
+          <span class="hint">{{ libraryPath() ? 'the page of this part' : 'one part from the library' }}</span>
+        </button>
         <button type="button" role="menuitem" (click)="showInAssembly()">
           <span class="icon">⌖</span>Show in assembly
           <span class="hint">select and zoom to {{ items().length > 1 ? 'these parts' : 'this part' }}</span>
@@ -143,6 +151,7 @@ import { baseThicknessMm } from './z-levels';
 })
 export class ObjectMenu {
   protected readonly store = inject(DocumentStore);
+  private readonly lib = inject(LibraryService);
 
   private readonly items = computed(() => {
     const ids = new Set(this.store.contextMenu()?.ids ?? []);
@@ -319,6 +328,24 @@ export class ObjectMenu {
 
   protected ungroup() {
     this.store.ungroupSelected();
+    this.close();
+  }
+
+  /** The library file of the menu's part when it is exactly one (not several, not the geometry of an imported 3MF). */
+  protected readonly libraryPath = computed(() => {
+    const items = this.items();
+    return items.length === 1 && !items[0].path.startsWith('embedded:') ? items[0].path : null;
+  });
+
+  protected revealInFinder() {
+    const path = this.libraryPath();
+    if (path) this.lib.reveal(path).subscribe({ error: () => this.store.announce('Reveal in Finder only works on the Mac that runs the API', 5000) });
+    this.close();
+  }
+
+  protected openInCatalog() {
+    const path = this.libraryPath();
+    if (path) this.store.catalogRequest.set({ path, seq: (this.store.catalogRequest()?.seq ?? 0) + 1 });
     this.close();
   }
 

@@ -12,6 +12,7 @@ import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
+import { CatalogMenu, MenuItem } from './catalog-menu';
 import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf, alternativesOf, altLabel, companionCounts, partNumber, companionLabel } from './catalog.logic';
 
 type CheckMode = 'exact' | 'shape';
@@ -66,7 +67,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
  */
 @Component({
   selector: 'app-catalog-dialog',
-  imports: [DatePipe, ManageToggle, QuickLook],
+  imports: [DatePipe, ManageToggle, QuickLook, CatalogMenu],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <section class="dialog" role="dialog" aria-label="Parts catalog">
@@ -74,6 +75,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
         <h2>PARTS CATALOG</h2>
         <span class="stats">{{ entries().length }} parts · {{ folders().length }} folders</span>
         <app-manage-toggle />
+        <button type="button" class="close" title="Read the library from disk again (the catalog and the file list)" [disabled]="refreshing()" (click)="refresh()">{{ refreshing() ? 'READING…' : '⟳ RELOAD' }}</button>
         <button type="button" class="close" (click)="close.emit()">CLOSE [ESC]</button>
       </header>
 
@@ -159,7 +161,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
         <div class="space" [style.height.px]="window().rows * rowHeight">
           <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', ' + columnWidth() + 'px)'">
             @for (card of cards(); track card.entry.path) {
-              <button type="button" class="card" [class.selected]="card.entry.path === selected()" [class.picked]="isPicked(card.entry.path)" (click)="onCardClick($event, card.entry)" [title]="card.entry.path">
+              <button type="button" class="card" [class.selected]="card.entry.path === selected()" [class.picked]="isPicked(card.entry.path)" (click)="onCardClick($event, card.entry)" (contextmenu)="openMenu($event, card.entry)" [title]="card.entry.path">
                 <span class="top"><span class="l">@if (manage.enabled()) { <span class="check" role="checkbox" [attr.aria-checked]="isPicked(card.entry.path)" [class.on]="isPicked(card.entry.path)" title="Select (Shift: a range)" (click)="pick($event, card.entry)">{{ isPicked(card.entry.path) ? '✓' : '' }}</span> }NO.{{ pad(card.number) }}</span><span>{{ code(card.entry.folder) }}</span></span>
                 <span class="art">
                   @if (companionCount().get(card.entry.path); as n) { <span class="partsbadge" [title]="partsTitle(n)">{{ n }} PARTS</span> }
@@ -175,7 +177,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @for (part of parts(card.entry.name); track $index) { @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} } }
                 </span>
                 <span class="meta">{{ meta(card.entry) }}</span>
-                <span class="plus" role="button" tabindex="-1" title="Add to the document" (click)="addCard($event, card.entry)">+ ADD</span>
+                <span class="plus" role="button" tabindex="-1" [title]="companionCount().get(card.entry.path) ? 'Add the ' + companionCount().get(card.entry.path) + ' parts that belong together to the document' : 'Add to the document'" (click)="addCard($event, card.entry)">+ ADD@if (companionCount().get(card.entry.path); as n) { {{ n }} }</span>
               </button>
             }
           </div>
@@ -215,7 +217,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
                 }
               }
-              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }@for (alt of alternatives(); track alt.path; let first = $first) { <button type="button" class="alt" [class.first]="first" [class.on]="alt.path === detail()" [title]="'Alternative: ' + alt.name + ' (the base model and its ALT I, ALT II ... are alternatives of each other: use one of them)'" (click)="openIdentical(alt.path)">{{ altLabel(alt.name) }}</button> }</span>
+              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, they are numbered parts P1, P2, P3 of one set, or they share an ID code such as ID3), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }@for (alt of alternatives(); track alt.path; let first = $first) { <button type="button" class="alt" [class.first]="first" [class.on]="alt.path === detail()" [title]="'Alternative: ' + alt.name + ' (the base model and its ALT I, ALT II ... are alternatives of each other: use one of them)'" (click)="openIdentical(alt.path)">{{ altLabel(alt.name) }}</button> }</span>
               <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figShown() === 'together' ? companions().length + 1 + ' PARTS AT THEIR OWN PLACES · DRAG TO ORBIT' : figShown() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
@@ -244,7 +246,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <button type="button" class="sib dirrow" [title]="f.path" (click)="goFolder(f.path)"><span class="n">▸ {{ f.name }}</span><span class="k">{{ f.count }} {{ f.count === 1 ? 'PART' : 'PARTS' }}</span></button>
                   }
                   @for (s of browseFiles(); track s.path) {
-                    <button type="button" class="sib" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ kb(s.size) }}</span></button>
+                    <button type="button" class="sib" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)" (contextmenu)="openMenu($event, s)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ kb(s.size) }}</span></button>
                   }
                 </div>
               } @else if (browseFiles().length || browseFolders().length) {
@@ -259,7 +261,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                       </button>
                     }
                     @for (s of browseFiles(); track s.path) {
-                      <button type="button" class="tile" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)">
+                      <button type="button" class="tile" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)" (contextmenu)="openMenu($event, s)">
                         <span class="art">
                           @if (companionCount().get(s.path); as n) { <span class="partsbadge" [title]="partsTitle(n)">{{ n }} PARTS</span> }
                           @switch (thumbs.state(s)) {
@@ -408,6 +410,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
           <div class="actions"><button type="button" class="ghost" (click)="mover.set(null)">CANCEL [ESC]</button></div>
         </div>
       }
+      @if (menu(); as m) { <app-catalog-menu [x]="m.x" [y]="m.y" [heading]="menuHeading()" [items]="menuItems()" (chosen)="onMenuPick($event)" (closed)="menu.set(null)" /> }
       @if (confirm(); as c) {
         <div class="shade"></div>
         <div class="confirm" role="alertdialog" aria-label="Move to Trash">
@@ -696,7 +699,7 @@ export class CatalogDialog implements OnInit {
   });
   /** How many parts the set of each part that belongs together with others has (for the badge on its thumbnail). */
   protected readonly companionCount = computed(() => companionCounts(this.entries()));
-  protected partsTitle(n: number) { return `One of ${n} parts that belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set). Open it and choose TOGETHER to see them in one scene.`; }
+  protected partsTitle(n: number) { return `One of ${n} parts that belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, they are numbered parts P1, P2, P3 of one set, or they share an ID code such as ID3). Open it and choose TOGETHER to see them in one scene.`; }
   protected readonly browseFolders = computed(() => (this.pageOpen() ? childFolders(this.entries(), this.browse()) : []));
   protected readonly browseFiles = computed(() => (this.pageOpen() ? filesIn(this.entries(), this.browse()) : []));
   /** The files of the open part's own folder in the order the folder panel shows them (by name): what the arrow keys, ← and → and the buttons at the bottom walk through. */
@@ -784,6 +787,7 @@ export class CatalogDialog implements OnInit {
     });
     const slash = (event: KeyboardEvent) => {
       const typing = document.activeElement instanceof HTMLInputElement;
+      if (this.menu()) return; // the menu has the keys
       if (event.key === '/' && !typing && !this.detail()) { event.preventDefault(); this.find().nativeElement.focus(); }
       else if (this.detail() && !typing && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); this.step(event.key === 'ArrowLeft' ? -1 : 1); }
     };
@@ -798,6 +802,7 @@ export class CatalogDialog implements OnInit {
       if ((event.key !== 'Backspace' && event.key !== 'Delete') || event.altKey || event.ctrlKey) return;
       const field = document.activeElement;
       if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || (field as HTMLElement | null)?.isContentEditable) return; // typing a name
+      if (this.menu()) { event.preventDefault(); event.stopImmediatePropagation(); return; }
       event.stopImmediatePropagation(); // not on to the app behind the catalog, where it would remove a part from the open document
       if (this.confirm() || this.renaming() || this.mover() || this.busy()) { event.preventDefault(); return; }
       const entry = this.detailEntry();
@@ -878,7 +883,7 @@ export class CatalogDialog implements OnInit {
   /** TOGETHER is shown: the part and the parts shown with it go to the Trash as one batch (one Put Back brings them all back). */
   protected trashTogether(entry: CatalogEntry) {
     const paths = [entry.path, ...this.companions().map(c => c.path)];
-    void this.requestTrash(paths, 'These parts belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set).');
+    void this.requestTrash(paths, 'These parts belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, they are numbered parts P1, P2, P3 of one set, or they share an ID code such as ID3).');
   }
 
   protected async requestTrash(paths: string[], note = '') {
@@ -1178,6 +1183,17 @@ export class CatalogDialog implements OnInit {
     this.changed.emit();
   }
 
+  protected readonly refreshing = signal(false);
+  /** RELOAD in the header: the library is read from disk again (files changed outside the app), here and in the file list behind. */
+  protected async refresh() {
+    this.refreshing.set(true);
+    try {
+      await this.reload();
+      this.actionNote.set(`Library read again: ${this.entries().length} parts`);
+      this.changed.emit();
+    } finally { this.refreshing.set(false); }
+  }
+
   /** Reads the library again (after a change) and keeps the drawings that are still current. */
   private async reload() {
     try {
@@ -1297,7 +1313,103 @@ export class CatalogDialog implements OnInit {
   protected findOpen(path: string) {
     if (this.figShown() === 'together') this.findInBrowserMany.emit([path, ...this.companions().map(c => c.path)]); else this.findInBrowser.emit(path);
   }
-  protected addCard(event: Event, entry: CatalogEntry) { event.stopPropagation(); this.add.emit(entry.path); }
+  // --- the context menu of a part (right-click on a card, a tile or a row) ----------------------------------------------------------
+
+  /** The open menu: where, for which part, and for which parts (the ticked ones when it is on one of them, else just that part). */
+  protected readonly menu = signal<{ x: number; y: number; entry: CatalogEntry; paths: string[] } | null>(null);
+
+  protected openMenu(event: MouseEvent, entry: CatalogEntry) {
+    event.preventDefault();
+    event.stopPropagation();
+    const paths = this.picked().has(entry.path) ? [...this.picked()] : [entry.path];
+    this.menu.set({ x: event.clientX, y: event.clientY, entry, paths });
+  }
+
+  protected readonly menuHeading = computed(() => {
+    const m = this.menu();
+    return !m ? '' : m.paths.length > 1 ? `${m.paths.length} PARTS` : displayName(m.entry.name);
+  });
+
+  protected readonly menuItems = computed<MenuItem[]>(() => {
+    const m = this.menu();
+    if (!m) return [];
+    const many = m.paths.length > 1, n = m.paths.length, e = m.entry, manage = this.manage.enabled();
+    const together = many ? [] : companionsOf(this.entries(), e.path);
+    const alternatives = many ? [] : alternativesOf(this.entries(), e.path).filter(a => a.path !== e.path);
+    const items: MenuItem[] = [
+      { id: 'open', icon: '▦', label: 'Open page', hint: 'its page, with the 3D view', disabled: many },
+      { id: 'add', icon: '＋', label: many ? `Add ${n} Parts to Document` : 'Add to Document', hint: 'into the open document' },
+      ...(together.length ? [{ id: 'addTogether', icon: '＋', label: `Add ${together.length + 1} Parts Together`, hint: 'with the parts that belong together' }] : []),
+      { sep: true },
+      { id: 'find', icon: '⌕', label: many ? 'Find in browser' : 'Find in browser', hint: `show ${many ? 'the files' : 'the file'} in the file list` },
+      { id: 'reveal', icon: '⌖', label: 'Reveal in Finder', hint: many ? 'select one part' : 'show the file in the Finder', disabled: many },
+      { icon: '⧉', label: 'Copy', hint: many ? `${n} parts` : '', children: [
+        { id: 'copyPath', icon: '⧉', label: many ? 'Paths' : 'Path', hint: 'the whole path' },
+        { id: 'copyRelative', icon: '⧉', label: many ? 'Relative paths' : 'Relative path', hint: 'from the library' },
+        { id: 'copyName', icon: '⧉', label: many ? 'File names' : 'File name', hint: 'without the folder' },
+      ] },
+    ];
+    if (together.length || alternatives.length) {
+      items.push({ sep: true });
+      if (together.length) items.push({ id: 'together', icon: '◫', label: 'Show together', hint: `${together.length + 1} parts that belong together` });
+      if (alternatives.length) items.push({ icon: '⇄', label: 'Alternatives', hint: `${alternatives.length} other${alternatives.length === 1 ? '' : 's'}`, children: alternatives.map(a => ({ id: 'alt:' + a.path, icon: '▦', label: altLabel(a.name), hint: displayName(a.name) })) });
+    }
+    items.push({ sep: true }, { id: 'check', icon: '⊞', label: 'Check this part', hint: many ? 'select one part' : 'for doubles and the same shape', disabled: many });
+    if (manage) {
+      items.push({ sep: true },
+        { id: 'rename', icon: '✎', label: 'Rename…', hint: many ? 'select one part' : '', disabled: many },
+        { id: 'duplicate', icon: '⧉', label: 'Duplicate', hint: many ? 'select one part' : 'next to the original', disabled: many },
+        { id: 'move', icon: '⇥', label: many ? `Move ${n} Parts to…` : 'Move to…', hint: 'another folder' },
+        { sep: true },
+        { id: 'trash', icon: '⌫', label: many ? `Move ${n} Parts to Trash` : 'Move to Trash', hint: '⌫' });
+    }
+    return items;
+  });
+
+  protected async onMenuPick(id: string) {
+    const m = this.menu();
+    this.menu.set(null);
+    if (!m) return;
+    const e = m.entry, paths = m.paths;
+    if (id.startsWith('alt:')) { this.openDetail(id.slice(4)); return; }
+    switch (id) {
+      case 'open': this.openDetail(e.path); break;
+      case 'add': if (paths.length === 1) this.add.emit(paths[0]); else this.addMany.emit(paths); break;
+      case 'addTogether': this.addMany.emit(this.togetherWith(e)); break;
+      case 'find': if (paths.length === 1) this.findInBrowser.emit(paths[0]); else this.findInBrowserMany.emit(paths); break;
+      case 'reveal': this.finder(e); break;
+      case 'copyPath': case 'copyRelative': case 'copyName': await this.copyText(paths, id); break;
+      case 'together': this.openDetail(e.path); this.setFigView('together'); break;
+      case 'check': this.openDetail(e.path); void this.checkPart(e); break;
+      case 'rename': this.openRename(e); break;
+      case 'duplicate': void this.duplicate(e); break;
+      case 'move': this.openMover(paths); break;
+      case 'trash': void this.requestTrash(paths); break;
+    }
+  }
+
+  /** Copies the paths (whole, relative to the library) or the file names of these parts, one per line. */
+  private async copyText(paths: string[], kind: 'copyPath' | 'copyRelative' | 'copyName') {
+    try {
+      const root = kind === 'copyPath' ? await this.lib.rootPath() : '';
+      const text = paths.map(path => kind === 'copyPath' ? `${root}/${path}` : kind === 'copyName' ? path.split('/').pop()! : path).join('\n');
+      await navigator.clipboard.writeText(text);
+      this.actionNote.set(paths.length > 1 ? `${paths.length} ${kind === 'copyName' ? 'file names' : 'paths'} copied` : kind === 'copyName' ? 'File name copied' : 'Path copied');
+    } catch {
+      this.actionNote.set('Could not copy');
+    }
+  }
+
+  /** + ADD on a card: the part, or all the parts that belong together with it (the button says how many). */
+  protected addCard(event: Event, entry: CatalogEntry) {
+    event.stopPropagation();
+    const paths = this.togetherWith(entry);
+    if (paths.length > 1) this.addMany.emit(paths); else this.add.emit(entry.path);
+  }
+  /** The part and the parts that belong together with it (the part first), or just the part. */
+  private togetherWith(entry: CatalogEntry): string[] {
+    return [entry.path, ...companionsOf(this.entries(), entry.path).map(c => c.path)];
+  }
   protected finder(entry: CatalogEntry) {
     this.lib.reveal(entry.path).subscribe({ next: () => this.actionNote.set('Shown in the Finder.'), error: () => this.actionNote.set('Could not show it in the Finder (it only works on the Mac that runs the API).') });
   }

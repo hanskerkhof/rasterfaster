@@ -161,6 +161,10 @@ export class App {
       untracked(() => this.scheduleMissingCheck(key ? key.split('\n') : []));
     });
     effect(() => {
+      const request = this.store.catalogRequest();
+      if (request) untracked(() => this.openCatalogAt(request.path));
+    });
+    effect(() => {
       const request = this.store.browserRequest();
       if (!request) return;
       untracked(() => {
@@ -408,6 +412,18 @@ export class App {
   }
 
   /** Something was put back from the Trash dialog: the list has to look again. */
+  protected readonly rereading = signal(false);
+  /** Reload: the library is read from disk again (the file list and the trash count; the catalog does the same on its own button), for files changed outside the app. */
+  protected async rereadLibrary() {
+    this.rereading.set(true);
+    try {
+      await Promise.all([this.onTrashChanged(), this.lib.refreshTrash()]);
+      this.showToast('Library read again from disk', 'ok');
+    } catch {
+      this.showToast('Could not read the library', 'err');
+    } finally { this.rereading.set(false); }
+  }
+
   protected async onTrashChanged() {
     this.libraryTick.update(n => n + 1); // Put Back, Delete Immediately, Empty Trash: the missing files change
     await this.treePanel()?.reload();

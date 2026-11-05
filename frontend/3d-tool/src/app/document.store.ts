@@ -897,6 +897,9 @@ export class DocumentStore {
   /** In relink mode: also relink every other part of the document that uses the same file. */
   readonly relinkAll = signal(true);
 
+  /** "Open in catalog" from the object menu: the app opens the catalog on this part's page. */
+  readonly catalogRequest = signal<{ path: string; seq: number } | null>(null);
+
   findInBrowser(ids: readonly string[]) {
     const wanted = new Set(ids);
     const chosen = this.doc().items.filter(i => wanted.has(i.id));

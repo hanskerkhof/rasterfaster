@@ -2,6 +2,32 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - ID codes without a digit: IDstrz (0.12.14)
+
+### Fixed
+- **FE** (`catalog.logic.ts`): `RF16_STROZZI v4 P1 IDstrz` and `RF16_STROZZI_BOTTOM 12deg v1 IDstrz` were not taken as one set, because a code needed a digit. A capital `ID` straight followed by three or more lower-case letters is a code too (`IDstrz`); words such as `IDLER` (6 files in the library) and `Idle` are still not.
+
+## 2026-11-05 - Context menu on the thumbnails; + ADD N for parts that belong together (0.12.13)
+
+### Added
+- **FE** (`catalog-menu.ts`, `catalog-dialog.ts`): a **context menu** on the catalog's cards, and on the tiles and rows of a part's page (right-click), in the style of the app's object menu (font, icons, grey hints, separators, flyouts, Esc closes only the menu). Rows: Open page, Add to Document, **Add N Parts Together** (for parts that belong together), Find in browser, Reveal in Finder, **Copy ▸** (path, relative path, file name), **Alternatives ▸** (ALT I, II ...), Show together, Check this part, and with Manage on Rename…, Duplicate, Move to…, Move to Trash. On a ticked card the menu acts on all ticked parts (Add, Find in browser, Copy, Move, Trash).
+- **FE**: the **+ ADD** button that shows on a card on hover reads **+ ADD N** for a part that belongs together with others, and adds all N of them to the document.
+
+## 2026-11-05 - Reload: read the library from disk again (0.12.12)
+
+### Added
+- **FE** (`app.ts`, `app.html`, `catalog-dialog.ts`): a **⟳ Reload** button next to Catalog and Trash re-reads the library from disk (every open folder of the file list, the search, the missing-file check and the Trash count) and says so in a toast; the catalog has **⟳ RELOAD** in its header that re-reads its parts (drawings that are still current are kept) and the file list behind it. For files changed outside the app, instead of a browser reload.
+
+## 2026-11-05 - Parts with the same ID code belong together (0.12.11)
+
+### Added
+- **FE** (`catalog.logic.ts`, `catalog.logic.spec.ts`, `catalog-dialog.ts`): a third filename convention for TOGETHER: parts of one folder that carry the same ID code are companions, whatever the rest of their names say (`RF3.1 SPEAKER ENCLOSURE ID3 P3`, `RF3.1 INTERCOM GRILL MOUNT ID3 P2`, `RF3.1 8w MOUNT with SCREWS ID3 P1`). `idKey` reads `ID3`, `id1`, `iD1`, `ID_Qwx6`, `IdQ45wd`: `ID`, an optional `_` or `-`, then letters and digits with at least one digit, as a separate word (so `IDLER` and `ID-CARD` are not codes); the case does not matter. They get the TOGETHER view, the `N PARTS` badge, ADD TO DOCUMENT (N) and Move to Trash for the group; the legend uses their part numbers (P1, P2, P3).
+
+## 2026-11-05 - Object menu: Reveal in Finder and Open in catalog (0.12.10)
+
+### Added
+- **FE** (`object-menu.ts`, `document.store.ts`, `app.ts`): the right-click menu of a part in the 3D view has **Reveal in Finder** and **Open in catalog** below Find in browser (for one part of the library; not for several parts or the geometry of an imported 3MF).
+
 ## 2026-11-05 - Paste puts the copies where the originals are (0.12.9)
 
 ### Changed

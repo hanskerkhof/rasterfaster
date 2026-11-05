@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, altLevel, altKey, altLabel, alternativesOf, partNumber, setKey, companionLabel, companionCounts, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, idKey, altLevel, altKey, altLabel, alternativesOf, partNumber, setKey, companionLabel, companionCounts, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -230,5 +230,28 @@ describe('catalog logic', () => {
     expect(companionsOf(files, 'M/3.43 USB-C FEMALE BACK ALT I.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE FRONT.stl']); // no FRONT ALT I: the base
     expect(companionsOf(files, 'M/3.43 USB-C FEMALE FRONT.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE BACK.stl']);
     expect(companionCounts(files).get('M/3.43 USB-C FEMALE BACK ALT I.stl')).toBe(2); // two slots, not five files
+  });
+
+  it('reads the ID code in all the ways it is written', () => {
+    expect(['x ID3.stl', 'x id1.stl', 'x iD1.stl', 'x ID_Qwx6.stl', 'x IdQ45wd.stl', 'x ID-7 P1.stl'].map(idKey)).toEqual(['3', '1', '1', 'qwx6', 'q45wd', '7']);
+    expect(idKey('x IDstrz.stl')).toBe('strz'); // capital ID and lower-case letters: a code without a digit
+    expect(idKey('RF16_STROZZI v4 P1 IDstrz')).toBe(idKey('RF16_STROZZI_BOTTOM 12deg v1 IDstrz'));
+    expect(idKey('IDLER bar.stl')).toBeNull(); // upper case letters, no digit: a word
+    expect(idKey('Idle wheel.stl')).toBeNull();
+    expect(idKey('x idstrz.stl')).toBeNull();
+    expect(idKey('ID-CARD holder.stl')).toBeNull();
+    expect(idKey('MID3 clip.stl')).toBeNull(); // not a separate word
+    expect(idKey('x ID.stl')).toBeNull();
+  });
+
+  it('puts the parts with the same ID code together, whatever the rest of the names say', () => {
+    const names = ['RF3.1 SPEAKER ENCLOSURE ID3 P3.stl', 'RF3.1 INTERCOM GRILL MOUNT ID3 P2.stl', 'RF3.1 8w MOUNT with SCREWS ID3 P1.stl', 'RF3.1 OTHER ID4 P1.stl', 'RF3.1 PLAIN.stl'];
+    const files = names.map(name => ({ path: 'M/' + name, name } as CatalogEntry));
+    files.push({ path: 'N/x ID3.stl', name: 'x ID3.stl' } as CatalogEntry); // another folder: not together
+    expect(companionsOf(files, 'M/' + names[0]).map(e => e.name)).toEqual([names[2], names[1]]); // by part number
+    expect(companionsOf(files, 'M/' + names[2]).map(e => e.name)).toEqual([names[1], names[0]]);
+    expect(companionsOf(files, 'M/' + names[3])).toEqual([]);
+    expect(companionCounts(files).get('M/' + names[1])).toBe(3);
+    expect(companionCounts(files).has('M/' + names[4])).toBe(false);
   });
 });

@@ -277,6 +277,21 @@ export function setKey(name: string): string | null {
   return stem.replace(partNumberPattern, ' ').replace(pairPattern, ' ').toLowerCase().replace(/[\s_]+/g, ' ').trim();
 }
 
+/**
+ * The third way for parts to belong together: the same ID code in the name, whatever the rest of the name says. Two ways to write it:
+ * `ID`, an optional `_` or `-` and a code of letters and digits with at least one digit (`ID3`, `id1`, `iD1`, `ID_Qwx6`, `IdQ45wd`); or a capital `ID` straight
+ * followed by a code of three or more lower-case letters (`IDstrz`). So `IDLER`, `Idle` and `ID-CARD` are not codes.
+ */
+const idDigitPattern = /(?<![A-Za-z0-9])ID[_-]?(?=[A-Za-z]*\d)([A-Za-z0-9]+)(?![A-Za-z0-9])/i;
+const idLettersPattern = /(?<![A-Za-z0-9])ID[_-]?([a-z]{3,})(?![A-Za-z0-9])/;
+
+/** The ID code of a name in lower case (`RF3.1 8w MOUNT ID3 P1.stl` -> `3`, `RF16 v4 IDstrz` -> `strz`), or null when it has none. */
+export function idKey(name: string): string | null {
+  const stem = stemOf(name);
+  const match = idDigitPattern.exec(stem) ?? idLettersPattern.exec(stem);
+  return match ? match[1].toLowerCase() : null;
+}
+
 /** A short name for the legend of the together view: the part number and the position words of the name (`P1 BOTTOM`), or null when it has neither. */
 export function companionLabel(name: string): string | null {
   const stem = stemOf(name);
@@ -290,12 +305,12 @@ export function companionLabel(name: string): string | null {
 export function companionsOf(entries: readonly CatalogEntry[], path: string): CatalogEntry[] {
   const self = entries.find(entry => entry.path === path);
   if (!self) return [];
-  const pairKey = companionKey(self.name), numbered = setKey(self.name);
-  if (pairKey === null && numbered === null) return [];
+  const pairKey = companionKey(self.name), numbered = setKey(self.name), id = idKey(self.name);
+  if (pairKey === null && numbered === null && id === null) return [];
   const folder = parentFolder(path);
   const slot = altKey(self.name), level = altLevel(self.name);
   const candidates = entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder && altKey(entry.name) !== slot
-    && ((pairKey !== null && companionKey(entry.name) === pairKey) || (numbered !== null && setKey(entry.name) === numbered)));
+    && ((pairKey !== null && companionKey(entry.name) === pairKey) || (numbered !== null && setKey(entry.name) === numbered) || (id !== null && idKey(entry.name) === id)));
   // a companion that has alternatives counts once: the one with the same ALT as this part, else the base, else the first alternative
   const bySlot = new Map<string, CatalogEntry>();
   const rank = (entry: CatalogEntry) => (altLevel(entry.name) === level ? 0 : altLevel(entry.name) === 0 ? 1 : 2 + altLevel(entry.name));
@@ -308,19 +323,20 @@ export function companionsOf(entries: readonly CatalogEntry[], path: string): Ca
  * number as `companionsOf(...).length + 1`, for all parts at once (the cards of the catalog and the tiles of a part's page show it as a badge).
  */
 export function companionCounts(entries: readonly CatalogEntry[]): Map<string, number> {
-  const byPair = new Map<string, string[]>(), bySet = new Map<string, string[]>();
+  const byPair = new Map<string, string[]>(), bySet = new Map<string, string[]>(), byId = new Map<string, string[]>();
   const add = (map: Map<string, string[]>, key: string, path: string) => { const list = map.get(key); if (list) list.push(path); else map.set(key, [path]); };
   for (const entry of entries) {
     const folder = parentFolder(entry.path);
-    const pair = companionKey(entry.name), numbered = setKey(entry.name);
+    const pair = companionKey(entry.name), numbered = setKey(entry.name), id = idKey(entry.name);
     if (pair !== null) add(byPair, `${folder}\0${pair}`, entry.path);
     if (numbered !== null) add(bySet, `${folder}\0${numbered}`, entry.path);
+    if (id !== null) add(byId, `${folder}\0${id}`, entry.path);
   }
   const counts = new Map<string, number>();
   for (const entry of entries) {
     const folder = parentFolder(entry.path);
-    const pair = companionKey(entry.name), numbered = setKey(entry.name);
-    const members = new Set([...(pair !== null ? byPair.get(`${folder}\0${pair}`) ?? [] : []), ...(numbered !== null ? bySet.get(`${folder}\0${numbered}`) ?? [] : [])]);
+    const pair = companionKey(entry.name), numbered = setKey(entry.name), id = idKey(entry.name);
+    const members = new Set([...(pair !== null ? byPair.get(`${folder}\0${pair}`) ?? [] : []), ...(numbered !== null ? bySet.get(`${folder}\0${numbered}`) ?? [] : []), ...(id !== null ? byId.get(`${folder}\0${id}`) ?? [] : [])]);
     const slots = new Set([...members].map(path => altKey(path.split('/').pop()!)));
     if (slots.size > 1) counts.set(entry.path, slots.size);
   }
