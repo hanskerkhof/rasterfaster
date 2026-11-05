@@ -304,8 +304,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             </div>
           </div>
           <div class="dnav">
-            <button type="button" [disabled]="!previous()" (click)="step(-1)">{{ previous() ? '← ' + pad(detailIndex()) + ' ' + short(previous()!.name) : '' }}</button>
-            <button type="button" [disabled]="!following()" (click)="step(1)">{{ following() ? pad(detailIndex() + 2) + ' ' + short(following()!.name) + ' →' : '' }}</button>
+            <button type="button" [disabled]="!previous()" (click)="step(-1)">{{ previous() ? '← ' + numberOf(previous()!) + ' ' + short(previous()!.name) : '' }}</button>
+            <button type="button" [disabled]="!following()" (click)="step(1)">{{ following() ? numberOf(following()!) + ' ' + short(following()!.name) + ' →' : '' }}</button>
           </div>
         </section>
       }
@@ -593,8 +593,11 @@ export class CatalogDialog implements OnInit {
   private readonly pageOpen = computed(() => !!this.detail()); // the lists below must not be made again for every other part that is opened: the strip would jump
   protected readonly browseFolders = computed(() => (this.pageOpen() ? childFolders(this.entries(), this.browse()) : []));
   protected readonly browseFiles = computed(() => (this.pageOpen() ? filesIn(this.entries(), this.browse()) : []));
-  protected readonly previous = computed(() => this.shown()[this.detailIndex() - 1] ?? null);
-  protected readonly following = computed(() => (this.detailIndex() < 0 ? null : this.shown()[this.detailIndex() + 1] ?? null));
+  /** The files of the open part's own folder in the order the folder panel shows them (by name): what the arrow keys, ← and → and the buttons at the bottom walk through. */
+  private readonly ownFolderFiles = computed(() => { const path = this.detail(); return path ? filesIn(this.entries(), parentFolder(path)) : []; });
+  private readonly ownIndex = computed(() => this.ownFolderFiles().findIndex(file => file.path === this.detail()));
+  protected readonly previous = computed(() => (this.ownIndex() > 0 ? this.ownFolderFiles()[this.ownIndex() - 1] : null));
+  protected readonly following = computed(() => (this.ownIndex() < 0 ? null : this.ownFolderFiles()[this.ownIndex() + 1] ?? null));
   protected readonly selectedEntry = computed(() => this.shown().find(e => e.path === this.selected()) ?? null);
   protected readonly window = computed(() => visibleRows(this.shown().length, this.size().width, this.top(), this.size().height, cardWidth, rowHeight));
   /** Whole, even pixels per column (the rest of the width stays empty at the right): the drawings then sit on whole pixels and their thin lines stay sharp. */
@@ -773,7 +776,7 @@ export class CatalogDialog implements OnInit {
       const open = this.detail();
       const openGone = !!open && gone.some(path => open === path || open.startsWith(path + '/'));
       // after the open part is trashed: the next thumbnail or row of the folder panel, else the one before it, else the next part of the whole list
-      const inFolder = this.browseFiles().map(file => file.path);
+      const inFolder = this.ownFolderFiles().map(file => file.path);
       const at = inFolder.indexOf(open ?? '');
       const folderNext = at < 0 ? undefined : [...inFolder.slice(at + 1), ...inFolder.slice(0, at).reverse()].find(path => !gone.some(g => path === g || path.startsWith(g + '/')));
       const next = openGone ? (gone.some(path => open!.startsWith(path + '/')) ? null : folderNext ?? (this.following() ?? this.previous())?.path ?? null) : open;
@@ -1102,6 +1105,8 @@ export class CatalogDialog implements OnInit {
     this.lib.reveal(entry.path).subscribe({ next: () => this.actionNote.set('Shown in the Finder.'), error: () => this.actionNote.set('Could not show it in the Finder (it only works on the Mac that runs the API).') });
   }
   /** The place of the open part in the list ('—' when the filter has left it out, which a part picked from its folder can be). */
+  /** The catalog number of a part (its place in the list of all parts), '—' when the filters have left it out. */
+  protected numberOf(entry: CatalogEntry) { const i = this.shown().findIndex(e => e.path === entry.path); return i < 0 ? '—' : this.pad(i + 1); }
   protected number() { return this.detailIndex() < 0 ? '—' : this.pad(this.detailIndex() + 1); }
   private lastRevealed = '';
   /** Scrolls the strip (or the list) of the folder panel so that the open part is in view, one tile of context before it; leaves it alone when it is already there. */

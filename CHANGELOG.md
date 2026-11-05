@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: the arrow keys follow the folder panel's order (0.11.68)
+
+### Fixed
+- **FE** (`catalog-dialog.ts`): on a part's page ← and → (and the previous / next buttons at the bottom) went through the catalog's overall list, sorted across all folders and by the chosen sort, so in a folder they jumped around and did not follow the thumbnails or the list. They now walk through the files of the part's own folder in the order the folder panel shows (by name), stop at the first and the last, and show the catalog number of the neighbour in the buttons.
+
 ## 2026-11-05 - Catalog: after a Move to Trash the page goes to the next thumbnail (0.11.67)
 
 ### Changed
