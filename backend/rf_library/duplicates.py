@@ -1,4 +1,4 @@
-"""Identical files in the library (and files with the same shape): first by size (two files of different sizes cannot be the same, and reading is the expensive part), then by
+"""Identical files in the library (and files with the same shape, however they are triangulated): first by size (two files of different sizes cannot be the same, and reading is the expensive part), then by
 the SHA-1 of the content of the files that share a size. A hash is remembered by path, size and modified time, so a second scan only reads
 what changed. Empty files are left out (they are all "the same" and say nothing)."""
 import hashlib
@@ -59,30 +59,51 @@ def read_triangles(file: Path) -> np.ndarray:
 
 
 def shape_features(file: Path) -> list[float]:
-    """Measurements of the shape that do not depend on where the part sits, on the header, on the normals or on the order of the triangles: the
-    number of triangles, the size of the box round it, its volume and surface area, and where its centre lies in that box. The same part
-    exported again, or at another place of an assembly, gives the same numbers (to the noise of the file's single-precision floats)."""
+    """Measurements of the shape that do not depend on where the part sits, on the header, on the normals, on the order of the triangles or on
+    how the surface is divided into triangles: the size of the box round it, its volume, its surface area and its centre of mass relative to
+    that box. The same part exported again (or with another triangulation, or at another place of an assembly) gives the same numbers."""
     triangles = read_triangles(file)
     if len(triangles) == 0:
         raise ValueError("no triangles")
-    corners = triangles.reshape(-1, 3)
-    low = corners.min(axis=0)
+    low = triangles.reshape(-1, 3).min(axis=0)
     moved = triangles - low  # the part moved to the origin: its place is gone
     size = moved.reshape(-1, 3).max(axis=0)
     a, b, c = moved[:, 0], moved[:, 1], moved[:, 2]
-    volume = abs(float(np.einsum("ij,ij->i", a, np.cross(b, c)).sum())) / 6.0
+    signed = np.einsum("ij,ij->i", a, np.cross(b, c)) / 6.0  # the volume of the tetrahedron of each triangle with the origin
+    volume = float(signed.sum())
     area = float(np.linalg.norm(np.cross(b - a, c - a), axis=1).sum()) / 2.0
-    centre = moved.reshape(-1, 3).mean(axis=0)
-    return [float(len(triangles)), *map(float, size), volume, area, *map(float, centre)]
+    if abs(volume) > 1e-9:
+        centre = ((a + b + c) / 4.0 * signed[:, None]).sum(axis=0) / volume  # the centre of mass of the solid
+    else:
+        centre = moved.reshape(-1, 3).mean(axis=0)  # an open surface has no volume: the middle of its corners
+    return [*map(float, size), abs(volume), area, *map(float, centre)]
+
+
+boxTolerance = 0.05  # mm, for the box and the centre of mass
+volumeTolerance = 1e-3  # relative
+areaTolerance = 1.5e-3  # relative
 
 
 def same_shape(first: list[float], second: list[float]) -> bool:
-    """Do two sets of measurements describe the same shape? (the same triangle count; sizes and centres within 0.01 mm; volume and area within 0.01 %)"""
-    if first[0] != second[0]:
+    """Do two sets of measurements describe the same shape? (the box and the centre of mass within 0.05 mm, the volume within 0.1 %, the surface within 0.15 %)"""
+    if any(abs(x - y) > boxTolerance for x, y in list(zip(first[0:3], second[0:3])) + list(zip(first[5:8], second[5:8]))):
         return False
-    if any(abs(x - y) > 0.01 for x, y in zip(first[1:4], second[1:4])) or any(abs(x - y) > 0.01 for x, y in zip(first[6:9], second[6:9])):
-        return False
-    return all(abs(x - y) <= 1e-4 * max(abs(x), abs(y), 1.0) for x, y in zip(first[4:6], second[4:6]))
+    return abs(first[3] - second[3]) <= volumeTolerance * max(first[3], second[3], 1.0) and abs(first[4] - second[4]) <= areaTolerance * max(first[4], second[4], 1.0)
+
+
+def walk_stl(root: Path):
+    """(library path, size, modified) of every .stl of the library (dot files and folders left out)."""
+    for directory, dirNames, fileNames in os.walk(root):
+        dirNames[:] = [name for name in dirNames if not name.startswith(".")]
+        for name in fileNames:
+            if name.startswith(".") or not name.lower().endswith(".stl"):
+                continue
+            file = Path(directory) / name
+            try:
+                stat = file.stat()
+            except OSError:
+                continue
+            yield file.relative_to(root).as_posix(), stat.st_size, stat.st_mtime
 
 
 def candidates(root: Path) -> list[tuple[str, int, float]]:
@@ -107,11 +128,12 @@ def scan(root: Path, cacheFile: Path, progress: Callable[[int, int], None] | Non
     """Groups of identical files: [{"paths": [...], "size": bytes}], each group sorted by path, the groups by their first path.
     `mode` "exact": the same bytes. `mode` "shape": the same shape (see `shape_features`: a re-exported or moved copy of a part counts); only
     files of the same size are compared, and files over `maxShapeBytes` are left out."""
-    found = candidates(root)
     if mode == "shape":
-        found = [item for item in found if item[1] <= maxShapeBytes]
+        found = [item for item in walk_stl(root) if 0 < item[1] <= maxShapeBytes]  # any size: another triangulation of a part is another size
+    else:
+        found = candidates(root)
     cache = read_cache(cacheFile)
-    key = "features" if mode == "shape" else "sha1"
+    key = "measures" if mode == "shape" else "sha1"
     measured: dict[str, object] = {}
     changed = False
     for done, (path, size, modified) in enumerate(found, start=1):
@@ -132,25 +154,24 @@ def scan(root: Path, cacheFile: Path, progress: Callable[[int, int], None] | Non
     sizes = {path: size for path, size, _ in found}
     groups: list[dict] = []
     if mode == "shape":
-        bySize: dict[int, list[str]] = {}
-        for path in measured:
-            bySize.setdefault(sizes[path], []).append(path)
-        for size, paths in bySize.items():
-            parent = {path: path for path in paths}  # files that are the same shape as one another, joined (union-find)
+        order = sorted(measured, key=lambda path: measured[path][3])  # by volume: files of the same shape lie next to one another
+        parent = {path: path for path in order}  # files that are the same shape as one another, joined (union-find)
 
-            def root_of(path: str) -> str:
-                while parent[path] != path:
-                    parent[path] = parent[parent[path]]
-                    path = parent[path]
-                return path
-            for i, first in enumerate(paths):
-                for second in paths[i + 1:]:
-                    if same_shape(measured[first], measured[second]):  # type: ignore[arg-type]
-                        parent[root_of(second)] = root_of(first)
-            joined: dict[str, list[str]] = {}
-            for path in paths:
-                joined.setdefault(root_of(path), []).append(path)
-            groups += [{"paths": sorted(group, key=natural_key), "size": size} for group in joined.values() if len(group) > 1]
+        def root_of(path: str) -> str:
+            while parent[path] != path:
+                parent[path] = parent[parent[path]]
+                path = parent[path]
+            return path
+        for i, first in enumerate(order):
+            for second in order[i + 1:]:
+                if measured[second][3] - measured[first][3] > volumeTolerance * max(measured[second][3], 1.0):  # type: ignore[index]
+                    break
+                if same_shape(measured[first], measured[second]):  # type: ignore[arg-type]
+                    parent[root_of(second)] = root_of(first)
+        joined: dict[str, list[str]] = {}
+        for path in order:
+            joined.setdefault(root_of(path), []).append(path)
+        groups = [{"paths": sorted(group, key=natural_key), "size": max(sizes[path] for path in group)} for group in joined.values() if len(group) > 1]
     else:
         byHash: dict[tuple[int, str], list[str]] = {}
         for path, value in measured.items():
@@ -160,13 +181,20 @@ def scan(root: Path, cacheFile: Path, progress: Callable[[int, int], None] | Non
     return groups
 
 
+sizeWindow = 0.30  # a part exported again may be 30 % bigger or smaller as a file
+maxShapeCandidates = 600
+
+
 def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> dict:
-    """What in the library is the same as one part: files with exactly its content, and files with its shape (not counting the identical ones).
-    Only the files of the same size are looked at, so this is quick; what is read is remembered in the same caches as the scans use."""
+    """What in the library is the same as one part: files with exactly its content (the files of its size are read), and files with its shape
+    (another triangulation, another place, another header: the files of about its size, within 30 %, are measured). Quick: what is read is remembered
+    in the same caches as the scans use."""
     target = root / relative
     stat = target.stat()
     size = stat.st_size
-    others = [item for item in candidates_of_size(root, size) if item[0] != relative]
+    everything = [item for item in walk_stl(root) if item[0] != relative]
+    exactCandidates = [item for item in everything if item[1] == size]
+    shapeCandidates = sorted((item for item in everything if abs(item[1] - size) <= sizeWindow * size and item[1] <= maxShapeBytes), key=lambda item: abs(item[1] - size))[:maxShapeCandidates]
     exact, shape = read_cache(exactCache), read_cache(shapeCache)
     changed = {"exact": False, "shape": False}
 
@@ -180,38 +208,34 @@ def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> di
 
     mine = value(exact, "exact", "sha1", relative, size, stat.st_mtime, sha1_of)
     try:
-        myShape = value(shape, "shape", "features", relative, size, stat.st_mtime, shape_features) if 0 < size <= maxShapeBytes else None
+        myShape = value(shape, "shape", "measures", relative, size, stat.st_mtime, shape_features) if 0 < size <= maxShapeBytes else None
     except (ValueError, struct.error):
         myShape = None  # not a readable STL: it can still have exact copies
     identical: list[str] = []
-    sameShape: list[str] = []
-    for path, fileSize, modified in others:
+    for path, fileSize, modified in exactCandidates:
         try:
             if value(exact, "exact", "sha1", path, fileSize, modified, sha1_of) == mine:
                 identical.append(path)
-            elif myShape is not None and same_shape(myShape, value(shape, "shape", "features", path, fileSize, modified, shape_features)):
-                sameShape.append(path)
-        except (OSError, ValueError, struct.error):
+        except OSError:
             continue
+    sameShape: list[str] = []
+    if myShape is not None:
+        known = {path: (fileSize, modified) for path, fileSize, modified in everything}
+        near = {path for path, _, _ in shapeCandidates}
+        for path, fileSize, modified in shapeCandidates:
+            if path in identical:
+                continue
+            try:
+                if same_shape(myShape, value(shape, "shape", "measures", path, fileSize, modified, shape_features)):
+                    sameShape.append(path)
+            except (OSError, ValueError, struct.error):
+                continue
+        for path, record in list(shape.items()):  # what a library-wide check has measured already is compared whatever its size: no reading needed
+            if path in near or path in identical or path == relative or path not in known or "measures" not in record:
+                continue
+            if record.get("size") == known[path][0] and abs(record.get("modified", 0) - known[path][1]) <= 1e-3 and same_shape(myShape, record["measures"]):
+                sameShape.append(path)
     for kind, cache, file in (("exact", exact, exactCache), ("shape", shape, shapeCache)):
         if changed[kind]:
             write_cache(file, {path: record for path, record in cache.items() if (root / path).is_file()})
-    return {"identical": sorted(identical, key=natural_key), "sameShape": sorted(sameShape, key=natural_key), "compared": len(others)}
-
-
-def candidates_of_size(root: Path, size: int) -> list[tuple[str, int, float]]:
-    """(library path, size, modified) of the .stl files that have exactly this size."""
-    found: list[tuple[str, int, float]] = []
-    for directory, dirNames, fileNames in os.walk(root):
-        dirNames[:] = [name for name in dirNames if not name.startswith(".")]
-        for name in fileNames:
-            if name.startswith(".") or not name.lower().endswith(".stl"):
-                continue
-            file = Path(directory) / name
-            try:
-                stat = file.stat()
-            except OSError:
-                continue
-            if stat.st_size == size:
-                found.append((file.relative_to(root).as_posix(), stat.st_size, stat.st_mtime))
-    return found
+    return {"identical": sorted(identical, key=natural_key), "sameShape": sorted(sameShape, key=natural_key), "compared": len(set(path for path, _, _ in exactCandidates) | set(path for path, _, _ in shapeCandidates))}

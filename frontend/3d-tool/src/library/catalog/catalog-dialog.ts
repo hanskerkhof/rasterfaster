@@ -3,6 +3,7 @@ import { Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, ou
 import { firstValueFrom } from 'rxjs';
 import { LibraryService } from '../core/library.service';
 import { ManageService } from '../core/manage.service';
+import { RF_PART_FINDERS, RfFinderResult } from '../core/part-finder';
 import { ManageToggle } from '../core/manage-toggle';
 import { rangeBetween } from '../tree/tree-selection';
 import { closeOnEscape } from '../util/escape-close';
@@ -122,11 +123,11 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
       <div class="groupsview" [hidden]="!activeGroups()">
         @for (g of doubleGroups(); track $index; let n = $index) {
           <div class="group">
-            <div class="ghead"><span>GROUP {{ pad(n + 1) }}</span><span>{{ g.length }} {{ activeMode().files }} · {{ kb(g[0].size) }} EACH</span></div>
+            <div class="ghead"><span>GROUP {{ pad(n + 1) }}</span><span>{{ g.length }} {{ activeMode().files }}{{ viewDoubles() === 'exact' ? ' · ' + kb(g[0].size) + ' EACH' : '' }}</span></div>
             @for (c of g; track c.path) {
               <div class="copy">
                 <button type="button" class="where" [title]="c.path" (click)="openIdentical(c.path)"><span class="dir">{{ folderOf(c) }}</span><span class="file">{{ fileTitle(c) }}</span></button>
-                <span class="when">{{ c.modified * 1000 | date: 'yyyy-MM-dd HH:mm' }}</span>
+                <span class="when">{{ kb(c.size) }} · {{ c.modified * 1000 | date: 'yyyy-MM-dd HH:mm' }}</span>
                 <span class="cacts">
                   <button type="button" class="ghost" (click)="openIdentical(c.path)">OPEN</button>
                   @if (manage.enabled()) {
@@ -202,6 +203,14 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 <span class="crumbs" role="navigation" aria-label="Folders">
                   @for (c of crumbs(); track c.path; let last = $last) {
                     <button type="button" class="crumb" [class.on]="c.path === browse()" [class.ahead]="isAhead(c.path)" [title]="c.path || 'The library'" (click)="goFolder(c.path)">{{ c.name }}</button>@if (!last) { <span class="sepc">›</span> }
+                    @if (c.path === browse() && crumbFolders().length) {
+                      <span class="subs">
+                        @if (last) { <span class="sepc">›</span> }
+                        @for (f of crumbFolders().slice(0, 8); track f.path) { <button type="button" class="crumb sub" [title]="f.path + ' · ' + f.count + (f.count === 1 ? ' part' : ' parts')" (click)="goFolder(f.path)">▸ {{ f.name }}</button> }
+                        @if (crumbFolders().length > 8) { <span class="sepc" title="The others are in the list below">+{{ crumbFolders().length - 8 }}</span> }
+                        @if (!last) { <span class="sepc">|</span> }
+                      </span>
+                    }
                   }
                 </span>
                 <span class="right">
@@ -270,11 +279,39 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @if (partChecks()[d.path]; as r) { <span class="result">{{ r.identical.length + r.sameShape.length ? (r.identical.length ? r.identical.length + ' IDENTICAL' : '') + (r.identical.length && r.sameShape.length ? ' · ' : '') + (r.sameShape.length ? r.sameShape.length + ' SAME SHAPE' : '') : 'NONE FOUND' }}</span> }
                   @if (partError() && partChecking() !== d.path) { <span class="warn">{{ partError() }}</span> }
                 </dd></div>
+                @for (finder of finders; track finder.id) {
+                  <div><dt>{{ finder.id.toUpperCase() }}</dt><dd class="check-row">
+                    @if (finderBusy() === finderKey(finder.id, d.path)) { <span class="busy">{{ finderProgress() || 'SEARCHING…' }}</span> }
+                    @else { <button type="button" class="tool" (click)="runFinder(finder.id, d)">{{ finderResults()[finderKey(finder.id, d.path)] ? 'SEARCH AGAIN' : finder.label }}</button> }
+                    @if (finderResults()[finderKey(finder.id, d.path)]; as r) { <span class="result">{{ r.found ? r.hits.length + (r.more ? '+' : '') + ' FOUND' : 'NOT FOUND' }}</span> }
+                    @if (finderError()[finderKey(finder.id, d.path)]; as e) { <span class="warn">{{ e }}</span> }
+                  </dd></div>
+                }
                 @for (row of sameRows(); track row.label) {
                   <div><dt>{{ row.label }}</dt><dd class="same">@for (other of row.paths.slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (row.paths.length > 6) { <span>+ {{ row.paths.length - 6 }} more</span> }</dd></div>
                 }
                 <div><dt>PATH</dt><dd class="path">{{ d.path }}</dd></div>
               </dl>
+              @for (finder of finders; track finder.id) {
+                @if (finderResults()[finderKey(finder.id, d.path)]; as r) {
+                  <div class="finds">
+                    <div class="fhead"><span>{{ finder.id.toUpperCase() }}</span><span>{{ r.summary }}</span></div>
+                    @for (hit of r.hits; track hit.path ?? hit.title) {
+                      <div class="hit" [class.exact]="hit.exact">
+                        <div class="hline"><b>{{ hit.title }}</b>@if (hit.exact) { <small class="tag">EXACT NAME</small> }@if (finder.reveal && hit.path) { <button type="button" class="link" title="Show the file in the Finder" (click)="revealHit(finder.id, hit.path)">REVEAL</button> }</div>
+                        <div class="hsub" [title]="hit.subtitle">{{ hit.subtitle }}</div>
+                        @for (m of hit.matches; track m.name) {
+                          <div class="hmatch"><span [class.exactname]="m.exact">{{ m.name }}</span>@if (m.places.length) { <small>in {{ m.places.join(' · ') }}</small> }</div>
+                        }
+                        @if (hit.moreMatches) { <div class="hsub">+ {{ hit.moreMatches }} more names</div> }
+                        @if (hit.note) { <div class="hsub">{{ hit.note }}</div> }
+                      </div>
+                    } @empty { <div class="hsub">Nothing found.</div> }
+                    @if (r.more) { <div class="hsub">+ {{ r.more }} more designs</div> }
+                    @if (r.hint) { <div class="hint-line"><span class="warn">{{ r.hint }}</span>@if (r.refresh) { <button type="button" class="tool" [disabled]="finderBusy() !== null" (click)="refreshFinder(finder.id, d)">{{ r.refreshLabel }}</button> }</div> }
+                  </div>
+                }
+              }
               <div class="actions">
                 <button type="button" class="add" (click)="add.emit(d.path)">ADD TO DOCUMENT</button>
                 <button type="button" class="ghost" (click)="findInBrowser.emit(d.path)">FIND IN BROWSER</button>
@@ -376,6 +413,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .siblings { flex: none; height: 260px; display: flex; flex-direction: column; border: 1px solid #2c2d31; overflow: hidden; } /* the same height as a list and as a strip: nothing jumps when you switch */
     .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .shead > span:first-child { min-width: 0; } .crumbs { flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .crumbs::-webkit-scrollbar { display: none; }
+    .subs { display: inline-flex; align-items: center; } .crumb.sub { color: #9db7f0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; } .crumb.sub:hover { color: #fff; }
     .crumb { padding: 0 5px; color: #aaa; } .crumb:hover { color: #fff; } .crumb.on { background: #e6e6e6; color: #111; } .crumb.ahead { color: #666; } .crumb.ahead:hover { color: #fff; } .sepc { color: #555; }
     .sib.dirrow .n { color: #9db7f0; } .sib.current { background: #26324a; color: #fff; } .tile.current { background: #26324a; outline: 2px solid #2f6fed; outline-offset: -2px; } .tile.current .name { color: #fff; } .tile.current .meta { color: #9db7f0; } .tile.dirtile .art { color: #9db7f0; } .folder-glyph { font-size: 40px; }
     .shead .right { display: flex; align-items: baseline; gap: 14px; } .shead .chips button { color: #888; } .shead .chips button.on { background: #e6e6e6; color: #111; }
@@ -407,6 +445,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .mlabel { display: flex; justify-content: space-between; color: #c9a64e; font-size: 10px; letter-spacing: .1em; } .mlabel span:last-child { color: #7d6a3a; }
     .manage .actions { margin-top: 8px; }
     .mg { padding: 3px 10px; border: 1px solid #6b5a2a; color: #e8c470; } .mg:hover:not(:disabled) { background: #3a3320; color: #ffe27a; border-color: #c9a64e; } .mg:disabled { opacity: .4; }
+    .finds { margin-top: 12px; border: 1px solid #2c2d31; } .fhead { display: flex; justify-content: space-between; gap: 12px; padding: 5px 10px; background: #1a1b1f; color: #888; } .fhead span:last-child { color: #e8c470; text-align: right; }
+    .hit { padding: 6px 10px; border-top: 1px solid #2c2d31; } .hit.exact { background: rgba(154,210,154,.05); } .hline { display: flex; align-items: baseline; gap: 10px; } .hline b { font-weight: 400; color: #e6e6e6; word-break: break-all; } .tag { color: #9ad29a; font-size: 9px; letter-spacing: .08em; }
+    .hsub { color: #777; font-size: 10px; word-break: break-all; } .hmatch { padding-left: 10px; color: #bbb; } .hmatch small { color: #777; margin-left: 8px; } .exactname { color: #9ad29a; }
+    .hint-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid #2c2d31; }
     .check-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .check-row .result { color: #e8c470; }
     .warn { color: #e8c470; } .busy { color: #9db7f0; } .bar-sep { color: #444; }
     .tool { border: 1px solid #3a4a6a; padding: 0 8px; color: #9db7f0; } .tool:hover { background: #26324a; color: #fff; }
@@ -476,6 +518,12 @@ export class CatalogDialog implements OnInit {
   /** The Move to Trash waiting for a yes: what it is, and which documents use those files (from a dry run). */
   protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number; note: string } | null>(null);
   protected readonly busy = signal(false);
+  /** Ways to look for the part somewhere else (the host app provides them: FIND IN FUSION). */
+  protected readonly finders = inject(RF_PART_FINDERS);
+  protected readonly finderResults = signal<Record<string, RfFinderResult>>({});
+  protected readonly finderError = signal<Record<string, string>>({});
+  protected readonly finderBusy = signal<string | null>(null);
+  protected readonly finderProgress = signal('');
   /** What "Check this part" found for the parts checked on their page (by path): identical files and files with the same shape. */
   protected readonly partChecks = signal<Record<string, { identical: string[]; sameShape: string[] }>>({});
   protected readonly partChecking = signal<string | null>(null);
@@ -489,7 +537,7 @@ export class CatalogDialog implements OnInit {
     { key: 'exact', check: 'CHECK FOR DOUBLES', again: 'CHECK DOUBLES AGAIN', chip: 'DOUBLES', busy: 'CHECKING FOR DOUBLES', what: 'IDENTICAL FILES', files: 'IDENTICAL FILES',
       title: 'Looks for files that are exactly the same (same size first, then the content). Nothing is changed; you decide what to do with the result.' },
     { key: 'shape', check: 'CHECK FOR SAME SHAPE', again: 'CHECK SAME SHAPE AGAIN', chip: 'SAME SHAPE', busy: 'CHECKING THE SHAPES', what: 'FILES WITH THE SAME SHAPE', files: 'FILES WITH THE SAME SHAPE',
-      title: 'Looks for files with the same shape: a part exported again, or the same part at another place of an assembly (same file size, any position, header or triangle order). Nothing is changed.' },
+      title: 'Looks for files with the same shape: a part exported again, triangulated differently, or at another place of an assembly (any file size, position, header or triangle order; the box, volume, surface and centre of mass agree). Nothing is changed.' },
   ];
   protected readonly groupsBy = signal<Record<CheckMode, DuplicateGroup[] | null>>({ exact: null, shape: null });
   protected readonly scanBy = signal<Record<CheckMode, ScanState>>({ exact: { ...idleScan }, shape: { ...idleScan } });
@@ -591,6 +639,12 @@ export class CatalogDialog implements OnInit {
   protected readonly trail = signal('');
   protected readonly crumbs = computed(() => crumbsOf(this.trail()));
   private readonly pageOpen = computed(() => !!this.detail()); // the lists below must not be made again for every other part that is opened: the strip would jump
+  /** The folders in the folder shown, for the breadcrumb (the one the trail goes on into is already a crumb). */
+  protected readonly crumbFolders = computed(() => {
+    const crumbs = this.crumbs(), at = crumbs.findIndex(c => c.path === this.browse());
+    const next = at >= 0 ? crumbs[at + 1]?.path : undefined;
+    return this.browseFolders().filter(folder => folder.path !== next);
+  });
   protected readonly browseFolders = computed(() => (this.pageOpen() ? childFolders(this.entries(), this.browse()) : []));
   protected readonly browseFiles = computed(() => (this.pageOpen() ? filesIn(this.entries(), this.browse()) : []));
   /** The files of the open part's own folder in the order the folder panel shows them (by name): what the arrow keys, ← and → and the buttons at the bottom walk through. */
@@ -819,6 +873,35 @@ export class CatalogDialog implements OnInit {
   }
 
   /** "Check this part": looks for files identical to this part, and for files with its shape, among the files of its size (quick: no scan of the library). */
+  protected finderKey(id: string, path: string) { return `${id}|${path}`; }
+
+  /** A finder's button: looks for the part (what is read is remembered by the host) and shows where it was found. */
+  protected async runFinder(id: string, entry: CatalogEntry, again?: (progress: (text: string) => void) => Promise<RfFinderResult>) {
+    const finder = this.finders.find(f => f.id === id);
+    const key = this.finderKey(id, entry.path);
+    if (!finder || this.finderBusy()) return;
+    this.finderBusy.set(key);
+    this.finderProgress.set('');
+    this.finderError.update(all => ({ ...all, [key]: '' }));
+    try {
+      const result = await (again ? again(text => this.finderProgress.set(text)) : finder.find(entry.path, text => this.finderProgress.set(text)));
+      this.finderResults.update(all => ({ ...all, [key]: result }));
+    } catch (error) {
+      this.finderError.update(all => ({ ...all, [key]: (error as { error?: { detail?: string }; message?: string }).error?.detail ?? (error as Error).message ?? 'The search failed.' }));
+    } finally {
+      this.finderBusy.set(null);
+    }
+  }
+
+  protected refreshFinder(id: string, entry: CatalogEntry) {
+    const refresh = this.finderResults()[this.finderKey(id, entry.path)]?.refresh;
+    if (refresh) void this.runFinder(id, entry, refresh);
+  }
+
+  protected revealHit(id: string, path: string) {
+    void this.finders.find(f => f.id === id)?.reveal?.(path).catch(() => this.actionNote.set('Could not show it in the Finder.'));
+  }
+
   protected async checkPart(entry: CatalogEntry) {
     if (this.partChecking()) return;
     this.partChecking.set(entry.path);
@@ -878,6 +961,7 @@ export class CatalogDialog implements OnInit {
     const remap = (groups: DuplicateGroup[] | null) => groups && groups.map(group => ({ ...group, paths: group.paths.map(path => remapPath(path, moves)) }));
     this.groupsBy.update(by => ({ exact: remap(by.exact), shape: remap(by.shape) }));
     this.mapPartChecks(path => remapPath(path, moves));
+    this.finderResults.set({}); // the names of the parts changed
     const folder = this.folder();
     if (folder) { const to = remapPath(folder, moves); if (to !== folder) this.folder.set(to.includes('/') ? null : to); }
     if (this.used()) void this.loadUsed(); // documents follow renamed files

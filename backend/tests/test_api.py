@@ -513,11 +513,13 @@ def test_same_shape_finds_re_exports_that_exact_misses(client, tmp_path):
     (tmp_path / "part (1).stl").write_bytes(_binary_stl([t3, t1, t2], b"exported again"))  # the triangles in another order, another header
     (tmp_path / "part (2).stl").write_bytes(_binary_stl([(c, b, a) for a, b, c in (t1, t2, t3)], b"third"))  # the corners of each triangle the other way round
     (tmp_path / "part (3).stl").write_bytes(_binary_stl([[(x + 80, y, z) for x, y, z in t] for t in (t1, t2, t3)], b"moved"))  # the same part at another place
+    mid = ((10 + 0) / 2, (0 + 10) / 2, 0)  # the first triangle cut in two: another triangulation of the same surface (another triangle count and file size)
+    (tmp_path / "part split.stl").write_bytes(_binary_stl([(t1[0], t1[1], mid), (t1[0], mid, t1[2]), t2, t3], b"retriangulated"))
     (tmp_path / "other.stl").write_bytes(_binary_stl([t1, t2, ((10, 0, 0), (0, 10, 0), (0, 0, 11))]))  # one corner moved: another shape, the same size
     assert _scan_mode(client, "exact")["groups"] == []  # not a single byte-identical pair
     state = _scan_mode(client, "shape")
-    assert [g["paths"] for g in state["groups"]] == [["part (1).stl", "part (2).stl", "part (3).stl", "part.stl"]]  # (3) is the same part, moved 80 mm
-    assert state["total"] == 5  # the five files of the same size are read; the fixture's smaller files are not
+    assert [g["paths"] for g in state["groups"]] == [["part (1).stl", "part (2).stl", "part (3).stl", "part split.stl", "part.stl"]]  # (3) is the same part moved 80 mm, "split" is triangulated differently
+    assert state["total"] == 9  # every file is measured, whatever its size (the three tiny ones of the fixture are no STL and are left out of the groups)
 
 
 def test_shape_features_ignore_place_format_and_noise_but_not_shape(tmp_path):
@@ -544,11 +546,26 @@ def test_matches_of_one_part(client, tmp_path):
     (tmp_path / "reordered.stl").write_bytes(_binary_stl([t3, t1, t2], b"C"))
     (tmp_path / "other.stl").write_bytes(_binary_stl([t1, t2, ((10, 0, 0), (0, 10, 0), (0, 0, 11))], b"A"))
     found = client.get("/api/catalog/matches", params={"path": "part.stl"}).json()
+    (tmp_path / "split.stl").write_bytes(_binary_stl([(t1[0], t1[1], (5, 5, 0)), (t1[0], (5, 5, 0), t1[2]), t2, t3], b"D"))  # another triangulation: 50 bytes more
+    found = client.get("/api/catalog/matches", params={"path": "part.stl"}).json()
     assert found["identical"] == ["exact copy.stl"]
-    assert found["sameShape"] == ["moved.stl", "reordered.stl"]  # not "other.stl": one corner differs
-    assert found["compared"] == 4
-    again = client.get("/api/catalog/matches", params={"path": "moved.stl"}).json()  # from the remembered measurements
-    assert again["identical"] == [] and again["sameShape"] == ["part.stl", "exact copy.stl", "reordered.stl"] or set(again["sameShape"]) == {"part.stl", "exact copy.stl", "reordered.stl"}
-    assert client.get("/api/catalog/matches", params={"path": "a2.stl"}).json() == {"identical": [], "sameShape": [], "compared": 0}
+    assert found["sameShape"] == ["moved.stl", "reordered.stl", "split.stl"]  # not "other.stl": one corner differs
+    again = client.get("/api/catalog/matches", params={"path": "split.stl"}).json()  # from the remembered measurements, though its file size is another
+    assert again["identical"] == [] and set(again["sameShape"]) == {"part.stl", "exact copy.stl", "moved.stl", "reordered.stl"}
+    assert client.get("/api/catalog/matches", params={"path": "a2.stl"}).json()["sameShape"] == []
     assert client.get("/api/catalog/matches", params={"path": "missing.stl"}).status_code == 404
     assert client.get("/api/catalog/matches", params={"path": "../x.stl"}).status_code == 403
+
+
+def test_matches_use_what_a_library_check_has_measured(client, tmp_path):
+    _distinct(tmp_path)
+    t1, t2, t3 = ((0, 0, 0), (10, 0, 0), (0, 10, 0)), ((0, 0, 0), (0, 10, 0), (0, 0, 10)), ((10, 0, 0), (0, 10, 0), (0, 0, 10))
+    (tmp_path / "part.stl").write_bytes(_binary_stl([t1, t2, t3]))
+    pieces = []
+    for a, b, c in (t1, t2, t3):  # every triangle cut in two: the file is twice as big, far outside the size window of one part
+        m = tuple((y + z) / 2 for y, z in zip(b, c))
+        pieces += [(a, b, m), (a, m, c)]
+    (tmp_path / "fine.stl").write_bytes(_binary_stl(pieces))
+    assert client.get("/api/catalog/matches", params={"path": "part.stl"}).json()["sameShape"] == []  # not measured, not near in size
+    assert [g["paths"] for g in _scan_mode(client, "shape")["groups"]] == [["fine.stl", "part.stl"]]
+    assert client.get("/api/catalog/matches", params={"path": "part.stl"}).json()["sameShape"] == ["fine.stl"]  # now it is known

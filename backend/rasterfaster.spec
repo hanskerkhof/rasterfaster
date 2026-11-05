@@ -11,9 +11,9 @@ version = json.load(open(os.path.join(here, "..", "frontend", "3d-tool", "packag
 
 analysis = Analysis(
     ["app.py"],
-    pathex=[here],
+    pathex=[here, os.path.join(here, "..", "scripts")],
     datas=[(frontend, "frontend")] + ([(seed, "seed_documents")] if os.path.isdir(seed) else []),
-    hiddenimports=collect_submodules("uvicorn") + collect_submodules("websockets") + ["AppKit", "Quartz", "PyObjCTools.AppHelper"] + ["blenderexport", "export3mf", "svgexport", "appconfig", "rf_library", "rf_library.router", "rf_library.ops", "rf_library.searchterms"],
+    hiddenimports=collect_submodules("uvicorn") + collect_submodules("websockets") + ["AppKit", "Quartz", "PyObjCTools.AppHelper"] + ["blenderexport", "export3mf", "svgexport", "appconfig", "rf_library", "rf_library.router", "rf_library.ops", "rf_library.searchterms", "fusionfind", "f3dsearch", "zstandard"],
     excludes=["pytest", "tkinter"],
 )
 pyz = PYZ(analysis.pure)

@@ -4,3 +4,4 @@ pytest==9.0.2
 httpx==0.28.1
 websockets==15.0.1  # uvicorn needs a WebSocket library for /api/ws (the render-ready messages)
 numpy==2.3.2
+zstandard==0.24.0  # scripts/f3dsearch.py (the Fusion file search of /api/fusion/*) reads the compressed parts of .f3d files

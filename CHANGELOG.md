@@ -2,6 +2,24 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: the subfolders in the breadcrumb (0.11.72)
+
+### Added
+- **FE** (`catalog-dialog.ts`): the breadcrumb trail on a part's page also shows the subfolders of the folder shown, as blue `▸ name` chips right after the highlighted crumb (the folder the trail goes on into is already a crumb; up to eight, then `+N`; the rest are in the list or strip below). A click goes into that folder.
+
+## 2026-11-05 - Catalog: FIND IN FUSION (0.11.71)
+
+### Added
+- **BE** (`backend/fusionfind.py`, `main.py`, `requirements.txt`, `rasterfaster.spec`, `tests/test_fusionfind.py`): the search of `scripts/f3dsearch.py` as an API. `GET /api/fusion/find?path=` says in which Fusion designs the part is a component or body: the name an STL exported from Fusion carries (`<design>_RF11 - work v199_<component>`) is turned into what to look for (the deepest component first, `(1)` and `copy` left off) and searched in the index (the newest version of each design with a match; where in the design it sits when the hierarchy file exists; exact names first). `GET /api/fusion/status` (the folder, designs indexed, files new or changed since), `POST /api/fusion/index` (reads the new and changed files in the background: the Fusion cache, the folders given to `f3dsearch.py index` and the Fusion folder, `RF_FUSION`, default `~/Documents/FUSION360`) and `POST /api/fusion/reveal`. `zstandard` is now in `requirements.txt` and the packaged app.
+- **FE** (`src/library/core/part-finder.ts`, `src/app/fusion-finder.ts`, `app.config.ts`, `catalog-dialog.ts`): a **FIND IN FUSION** button on a part's page (the library offers a plug-in point, `RF_PART_FINDERS`; the app provides the Fusion one). It searches at once with the index as it is and lists the design files that have the part: the file, its folder, the names that matched with where they sit in the design, `EXACT NAME` for a component of exactly that name, **Reveal** in the Finder. When Fusion files are new or changed since the last index it says so, with a button to read them (with progress) and search again; with an empty index it reads them first.
+
+## 2026-11-05 - Same shape: other triangulations and other file sizes (0.11.69, 0.11.70)
+
+### Fixed
+- **BE** (0.11.70): **Check this part** also compares with every file that a library-wide same-shape check has measured, whatever its file size, so a part with twice the triangles is found once that check has run.
+- **BE** (`backend/rf_library/duplicates.py`, `tests/test_api.py`): two parts that were exported with a different triangulation (8,688 and 8,810 triangles, 424 and 430 KB: `work-SWITCHING POWER SUPPLY`) were not found by the same-shape check, which only compared files of the same size and counted triangles. The shape is now measured with what does not depend on the triangulation: the box (0.05 mm), the volume (0.1 %), the surface area (0.15 %) and the centre of mass (0.05 mm). The library-wide check measures every file up to 60 MB whatever its size (15 s for 6,400 files the first time, 0.2 s after: the measurements are remembered, now under `measures` in `shape-hashes.json`, so the earlier ones are made again); **Check this part** measures the files whose size is within 30 % of the part's (about a second). The exact check still compares files of the same size by their content.
+- **FE** (`catalog-dialog.ts`): the copies of a same-shape group have different sizes, so the heading no longer says `EACH` for them and every row shows its own file size.
+
 ## 2026-11-05 - Catalog: the arrow keys follow the folder panel's order (0.11.68)
 
 ### Fixed

@@ -4,6 +4,7 @@
  */
 export * from './core/library.config';
 export * from './core/library.service';
+export * from './core/part-finder';
 export * from './core/manage.service';
 export * from './core/manage-toggle';
 export * from './tree/tree-panel';

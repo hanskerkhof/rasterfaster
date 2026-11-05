@@ -39,6 +39,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
 from rf_library import LibraryConfig, create_router
+import fusionfind
 
 _paths = appconfig.resolve_paths(os.environ, Path(__file__).resolve().parent.parent, Path.home(), appconfig.is_frozen(), appconfig.bundle_dir())
 libraryRoot = _paths["libraryRoot"]
@@ -273,6 +274,7 @@ def get_document(documentId: str) -> DocumentOut:
 
 
 documentWriteLock = threading.Lock()
+app.include_router(fusionfind.create_router())  # find a part in the Fusion 360 files (scripts/f3dsearch.py)
 app.include_router(create_router(LibraryConfig(
     library_root=lambda: libraryRoot, backup_root=lambda: backupRoot, documents_root=lambda: documentsRoot, write_lock=documentWriteLock,
     resolve_part=lambda path: resolve_part(path), is_embedded=lambda path: bool(embeddedPattern.match(path)))))  # the library API (rf_library): paths are read at every request
