@@ -326,14 +326,42 @@ export class App {
 
   /** Find in browser, from a part's page in the catalog: the catalog closes and the file list shows the file. */
   protected findFromCatalog(path: string) {
+    this.findManyFromCatalog([path]);
+  }
+  /** The same for several files (the parts shown together): all of them are selected in the file list. */
+  protected findManyFromCatalog(paths: string[]) {
     this.setCatalogOpen(false);
     if (this.panelHidden()) this.togglePanel();
-    const show = () => { this.findRequest.set({ paths: [path], seq: Date.now() }); this.open(path); };
+    const show = () => { this.findRequest.set({ paths, seq: Date.now() }); if (paths.length === 1) this.open(paths[0]); };
     if (this.filterText().trim()) { this.onFilter(''); setTimeout(show, 200); } else show();
   }
 
   protected addFromCatalog(path: string) {
-    this.addToDocument(path);
+    void this.addFromCatalogMany([path]);
+  }
+  /** A small message over everything (the catalog covers the rest of the app): what was added to the document, or why it failed. */
+  protected readonly toast = signal<{ text: string; kind: 'ok' | 'err' } | null>(null);
+  private toastTimer?: ReturnType<typeof setTimeout>;
+  private showToast(text: string, kind: 'ok' | 'err') {
+    this.toast.set({ text, kind });
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toast.set(null), kind === 'ok' ? 3000 : 6000);
+  }
+  /** Parts chosen in the catalog go into the document, and a toast says that they are in (or that it failed). */
+  protected async addFromCatalogMany(paths: string[]) {
+    if (!paths.length) return;
+    if (this.store.relinkRequest()) { this.addToDocument(paths[0]); return; } // relink mode: the part chosen is for the parts to relink
+    const last = paths[paths.length - 1];
+    this.selected.set(last);
+    this.writeLastStl(last);
+    this.treePanel()?.closeQuickLook();
+    const name = (path: string) => path.split('/').pop()!.replace(/\.stl$/i, '');
+    try {
+      if (paths.length === 1) await this.viewer().addObject(paths[0]); else await this.viewer().addObjects(paths);
+      this.showToast(paths.length === 1 ? `Added to the document: ${name(paths[0])}` : `Added ${paths.length} parts to the document: ${paths.map(name).join(', ')}`, 'ok');
+    } catch (e) {
+      this.showToast(`Could not add ${paths.length === 1 ? name(paths[0]) : paths.length + ' parts'}: ${(e as Error)?.message ?? e}`, 'err');
+    }
   }
   /** The last Move to Trash, offered for undo for a few seconds (the Finder's "Undo Move to Trash"). */
   protected readonly undoTrash = signal<{ ids: string[]; label: string } | null>(null);
@@ -514,6 +542,11 @@ export class App {
     if (digit && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey && this.modes[+digit[1] - 1] && (this.store.appMode() === 'design' || this.modes[+digit[1] - 1].id === 'shaded')) {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);
+    }
+    if (event.code === 'KeyC' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat && !this.catalogOpen() // C: the parts catalog
+      && !(event.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable], dialog, [role="dialog"]')) {
+      event.preventDefault();
+      this.setCatalogOpen(true);
     }
     if (event.code === 'KeyM' && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) { // ⌥M: the step of Option moves, 1 mm / 0.1 mm
       event.preventDefault();

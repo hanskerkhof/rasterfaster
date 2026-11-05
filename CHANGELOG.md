@@ -2,6 +2,23 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - A toast after ADD TO DOCUMENT, FIND IN BROWSER for parts shown together, FIND remembered (0.12.7)
+
+### Added
+- **FE** (`catalog-dialog.ts`): the **FIND** text of the catalog is kept in local storage (`rasterfaster.catalogFind`): opening the catalog again, or reloading the page, brings back the same search.
+- **FE** (`catalog-dialog.ts`, `app.ts`, `app.html`): in TOGETHER mode **FIND IN BROWSER (N)** closes the catalog and selects the open part and all its companions in the file list (the single-part behaviour is unchanged).
+- **FE** (`app.ts`, `app.html`, `app.scss`): adding parts from the catalog shows a toast over the dialog: `Added to the document: <name>` (or `Added N parts ...` with their names) once they are in, green and gone after 3 s; if the add fails, `Could not add ...` with the reason, red, for 6 s (the old error line sits behind the dialog).
+
+## 2026-11-05 - ADD TO DOCUMENT adds all the parts shown together (0.12.5)
+
+### Changed
+- **FE** (`catalog-dialog.ts`, `app.html`): on a part's page in TOGETHER mode **ADD TO DOCUMENT (N)** adds all N parts of the scene to the document in one step (`addMany`, as the file list's multi-add); in the other modes, and for a part without companions, it adds the open part as before. The button names the number of parts.
+
+## 2026-11-05 - Key C opens the catalog (0.12.4)
+
+### Added
+- **FE** (`app.ts`, `app.html`, `app.scss`): press **C** to open the parts catalog (not while typing in a field, with a dialog open, or with ⌘ / ⌃ / ⌥ / ⇧ held); the Catalog button shows the key.
+
 ## 2026-11-05 - Catalog: alternatives ALT I, ALT II ... can be toggled (0.12.3)
 
 ### Added

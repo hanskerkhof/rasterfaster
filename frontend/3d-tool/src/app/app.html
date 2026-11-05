@@ -66,7 +66,7 @@
     }
   </div>
   <div class="trash-bar">
-    <button type="button" class="trash-button" title="The parts catalog: browse every part of the library" (click)="setCatalogOpen(true)">▦ Catalog</button>
+    <button type="button" class="trash-button" title="The parts catalog: browse every part of the library (key C)" (click)="setCatalogOpen(true)">▦ Catalog <kbd>C</kbd></button>
     <button type="button" class="trash-button" title="The Trash: put files back or delete them for good" (click)="trashOpen.set(true)">🗑 Trash@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
   </div>
   </div>
@@ -175,7 +175,7 @@
       </div>
     }
     @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }
-    @if (catalogOpen()) { <app-catalog-dialog (close)="setCatalogOpen(false)" (add)="addFromCatalog($event)" (findInBrowser)="findFromCatalog($event)" (changed)="onTrashChanged()" /> }
+    @if (catalogOpen()) { <app-catalog-dialog (close)="setCatalogOpen(false)" (add)="addFromCatalog($event)" (addMany)="addFromCatalogMany($event)" (findInBrowser)="findFromCatalog($event)" (findInBrowserMany)="findManyFromCatalog($event)" (changed)="onTrashChanged()" /> }
     @if (trashOpen()) { <app-trash-dialog (close)="trashOpen.set(false)" (changed)="onTrashChanged()" /> }
     @if (store.conflict()) {
       <div class="conflict" role="alert">
@@ -184,6 +184,7 @@
         <button type="button" (click)="store.keepMyVersion()">Keep mine (overwrite)</button>
       </div>
     }
+    @if (toast(); as t) { <div class="toast" [class.err]="t.kind === 'err'" role="status" aria-live="polite">{{ t.kind === 'ok' ? '✓' : '⚠' }} {{ t.text }}</div> }
     @if (store.notice(); as notice) { <div class="notice" role="status">{{ notice }}</div> }
     @if (api.offline()) {
       <div class="offline" role="alert">

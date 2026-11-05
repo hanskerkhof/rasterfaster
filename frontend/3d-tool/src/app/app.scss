@@ -92,6 +92,7 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .trash-button { padding: 3px 10px; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; font: inherit; font-size: 12px; opacity: .75; cursor: pointer; }
 .trash-button:hover { background: rgba(255,255,255,.08); opacity: 1; }
 .trash-button .count { margin-left: 6px; padding: 0 6px; font-size: 10px; background: #31353f; border-radius: 8px; }
+.trash-button kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .55; }
 .notice.undo { bottom: 48px; }
 .notice.render-progress { bottom: 84px; width: min(900px, 94vw); box-sizing: border-box; padding: 8px 12px; } /* a fixed width: the toast does not grow and shrink with its numbers */
 .notice.render-progress .bar { height: 4px; margin-bottom: 7px; background: #14161a; border-radius: 2px; overflow: hidden; }
@@ -145,3 +146,6 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress .line .v.pct { min-width: 5ch; } .notice.render-progress .line .v.clock { min-width: 7ch; }
 .notice.render-progress .line .v.frames { min-width: 15ch; text-align: left; } .notice.render-progress .line .v.eta { min-width: 21ch; text-align: left; }
 .notice.render-progress .line button { flex: none; }
+
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 40; max-width: min(90vw, 640px); padding: 8px 14px; background: rgba(28,60,40,.97); border: 1px solid #4ea36b; border-radius: 8px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.5); pointer-events: none; }
+.toast.err { background: rgba(70,28,28,.97); border-color: #d06a6a; color: #ffb3b3; }

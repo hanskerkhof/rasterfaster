@@ -20,6 +20,7 @@ const idleScan: ScanState = { state: 'idle', scanned: 0, total: 0, error: '' };
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
 const figViewKey = 'rasterfaster.catalogFigView';
+const queryKey = 'rasterfaster.catalogFind';
 const specWidthKey = 'rasterfaster.catalogSpecWidth';
 const defaultSpecWidth = 380;
 const minSpecWidth = 260;
@@ -35,6 +36,10 @@ function readSpecWidth(): number {
     if (Number.isFinite(stored) && stored >= minSpecWidth) return Math.round(stored);
   } catch { /* storage unavailable */ }
   return defaultSpecWidth;
+}
+
+function readQuery(): string {
+  try { return localStorage.getItem(queryKey) ?? ''; } catch { return ''; }
 }
 
 function readFigView(): 'drawing' | '3d' | 'together' {
@@ -338,8 +343,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 }
               }
               <div class="actions">
-                <button type="button" class="add" (click)="add.emit(d.path)">ADD TO DOCUMENT</button>
-                <button type="button" class="ghost" (click)="findInBrowser.emit(d.path)">FIND IN BROWSER</button>
+                <button type="button" class="add" [title]="togetherPaths().length > 1 ? 'Add the ' + togetherPaths().length + ' parts shown together to the document' : 'Add this part to the document'" (click)="addOpen(d.path)">ADD TO DOCUMENT@if (togetherPaths().length > 1) { ({{ togetherPaths().length }}) }</button>
+                <button type="button" class="ghost" [title]="figShown() === 'together' ? 'Show the ' + (companions().length + 1) + ' parts shown together in the file list, all selected' : 'Show this part in the file list'" (click)="findOpen(d.path)">FIND IN BROWSER@if (figShown() === 'together') { ({{ companions().length + 1 }}) }</button>
                 <button type="button" class="ghost" (click)="finder(d)">REVEAL IN FINDER</button>
               </div>
               @if (manage.enabled()) {
@@ -526,6 +531,10 @@ export class CatalogDialog implements OnInit {
   readonly close = output<void>();
   /** The part to add to the document (its library path). */
   readonly add = output<string>();
+  /** Several parts at once (the parts shown together). */
+  readonly addMany = output<string[]>();
+  /** Several parts to show and select in the file list at once (the parts shown together). */
+  readonly findInBrowserMany = output<string[]>();
   /** Show this part in the file list of the app (the dialog closes). */
   readonly findInBrowser = output<string>();
   /** Parts were moved to the Trash or put back: the app refreshes the file list. */
@@ -537,7 +546,8 @@ export class CatalogDialog implements OnInit {
   protected readonly entries = signal<CatalogEntry[]>([]);
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
-  protected readonly query = signal('');
+  /** FIND is remembered (this browser): the catalog opens again with the same words, also after a reload. */
+  protected readonly query = signal(readQuery());
   protected readonly folder = signal<string | null>(null);
   protected readonly sortKey = signal<CatalogSortKey>(this.stored.key);
   protected readonly ascending = signal(this.stored.ascending);
@@ -704,6 +714,7 @@ export class CatalogDialog implements OnInit {
   });
 
   constructor() {
+    effect(() => { const text = this.query(); try { if (text) localStorage.setItem(queryKey, text); else localStorage.removeItem(queryKey); } catch { /* storage unavailable */ } });
     closeOnEscape(() => (this.renaming() ? this.renaming.set(null) : this.mover() ? this.mover.set(null) : this.confirm() ? this.confirm.set(null) : this.detail() ? this.closeDetail() : this.picked().size ? this.picked.set(this.none) : this.close.emit()));
     effect(() => { if (!this.manage.enabled()) this.picked.set(this.none); }); // Manage off: nothing stays ticked
     effect(() => { // draw what is in view: the strip of a part's page when it is shown, else the cards
@@ -1277,6 +1288,15 @@ export class CatalogDialog implements OnInit {
     this.bigUrl.set(url);
   }
 
+  /** ADD TO DOCUMENT on a part's page: with TOGETHER shown, all the parts of the scene go in (one step), else the open part. */
+  protected addOpen(path: string) {
+    const together = this.togetherPaths();
+    if (together.length > 1) this.addMany.emit(together); else this.add.emit(path);
+  }
+  /** FIND IN BROWSER on a part's page: with TOGETHER shown, the part and all its companions are selected in the file list, else the open part. */
+  protected findOpen(path: string) {
+    if (this.figShown() === 'together') this.findInBrowserMany.emit([path, ...this.companions().map(c => c.path)]); else this.findInBrowser.emit(path);
+  }
   protected addCard(event: Event, entry: CatalogEntry) { event.stopPropagation(); this.add.emit(entry.path); }
   protected finder(entry: CatalogEntry) {
     this.lib.reveal(entry.path).subscribe({ next: () => this.actionNote.set('Shown in the Finder.'), error: () => this.actionNote.set('Could not show it in the Finder (it only works on the Mac that runs the API).') });
