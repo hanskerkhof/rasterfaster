@@ -485,3 +485,70 @@ def test_used_paths_come_from_documents_and_versions(client):
     doc = client.post("/api/documents", json={"name": "d", "items": [{"id": "1", "path": "BOXES/b.stl", "name": "b", "color": 1, "position": [0, 0, 0], "rotation": [0, 0, 0, 1]}]}).json()
     client.post(f"/api/documents/{doc['id']}/versions")
     assert client.get("/api/catalog/used").json() == {"paths": ["BOXES/b.stl"]}
+
+
+def _binary_stl(triangles, header: bytes = b"") -> bytes:
+    import struct
+    out = header.ljust(80, b" ")[:80] + struct.pack("<I", len(triangles))
+    for t in triangles:
+        out += struct.pack("<3f", 0, 0, 1) + b"".join(struct.pack("<3f", *corner) for corner in t) + b"\0\0"
+    return out
+
+
+def _scan_mode(client, mode):
+    import time
+    assert client.post("/api/catalog/duplicates/scan", params={"mode": mode}).status_code == 200
+    for _ in range(100):
+        state = client.get("/api/catalog/duplicates", params={"mode": mode}).json()
+        if state["state"] != "running":
+            return state
+        time.sleep(0.05)
+    raise AssertionError("the scan did not finish")
+
+
+def test_same_shape_finds_re_exports_that_exact_misses(client, tmp_path):
+    _distinct(tmp_path)
+    t1, t2, t3 = ((0, 0, 0), (10, 0, 0), (0, 10, 0)), ((0, 0, 0), (0, 10, 0), (0, 0, 10)), ((10, 0, 0), (0, 10, 0), (0, 0, 10))
+    (tmp_path / "part.stl").write_bytes(_binary_stl([t1, t2, t3], b"exported by A"))
+    (tmp_path / "part (1).stl").write_bytes(_binary_stl([t3, t1, t2], b"exported again"))  # the triangles in another order, another header
+    (tmp_path / "part (2).stl").write_bytes(_binary_stl([(c, b, a) for a, b, c in (t1, t2, t3)], b"third"))  # the corners of each triangle the other way round
+    (tmp_path / "part (3).stl").write_bytes(_binary_stl([[(x + 80, y, z) for x, y, z in t] for t in (t1, t2, t3)], b"moved"))  # the same part at another place
+    (tmp_path / "other.stl").write_bytes(_binary_stl([t1, t2, ((10, 0, 0), (0, 10, 0), (0, 0, 11))]))  # one corner moved: another shape, the same size
+    assert _scan_mode(client, "exact")["groups"] == []  # not a single byte-identical pair
+    state = _scan_mode(client, "shape")
+    assert [g["paths"] for g in state["groups"]] == [["part (1).stl", "part (2).stl", "part (3).stl", "part.stl"]]  # (3) is the same part, moved 80 mm
+    assert state["total"] == 5  # the five files of the same size are read; the fixture's smaller files are not
+
+
+def test_shape_features_ignore_place_format_and_noise_but_not_shape(tmp_path):
+    from rf_library import duplicates
+    tri = ((0, 0, 0), (5, 0, 0), (0, 5, 0))
+    ascii_text = "solid x\n" + "facet normal 0 0 1\nouter loop\n" + "".join(f"vertex {a} {b} {c}\n" for a, b, c in tri) + "endloop\nendfacet\nendsolid x\n"
+    (tmp_path / "a.stl").write_text(ascii_text)
+    (tmp_path / "b.stl").write_text(ascii_text.replace("vertex 5 0 0", "vertex 5.0000001 0 0"))  # noise
+    (tmp_path / "c.stl").write_bytes(_binary_stl([tri]))  # binary instead of ASCII
+    (tmp_path / "d.stl").write_bytes(_binary_stl([[(x + 40, y - 3, z + 7) for x, y, z in tri]]))  # moved
+    (tmp_path / "e.stl").write_bytes(_binary_stl([((0, 0, 0), (5, 0, 0), (0, 6, 0))]))  # another shape
+    features = {name: duplicates.shape_features(tmp_path / f"{name}.stl") for name in "abcde"}
+    for name in "bcd":
+        assert duplicates.same_shape(features["a"], features[name]), name
+    assert not duplicates.same_shape(features["a"], features["e"])
+
+
+def test_matches_of_one_part(client, tmp_path):
+    _distinct(tmp_path)
+    t1, t2, t3 = ((0, 0, 0), (10, 0, 0), (0, 10, 0)), ((0, 0, 0), (0, 10, 0), (0, 0, 10)), ((10, 0, 0), (0, 10, 0), (0, 0, 10))
+    (tmp_path / "part.stl").write_bytes(_binary_stl([t1, t2, t3], b"A"))
+    (tmp_path / "exact copy.stl").write_bytes(_binary_stl([t1, t2, t3], b"A"))
+    (tmp_path / "moved.stl").write_bytes(_binary_stl([[(x + 80, y, z) for x, y, z in t] for t in (t1, t2, t3)], b"B"))
+    (tmp_path / "reordered.stl").write_bytes(_binary_stl([t3, t1, t2], b"C"))
+    (tmp_path / "other.stl").write_bytes(_binary_stl([t1, t2, ((10, 0, 0), (0, 10, 0), (0, 0, 11))], b"A"))
+    found = client.get("/api/catalog/matches", params={"path": "part.stl"}).json()
+    assert found["identical"] == ["exact copy.stl"]
+    assert found["sameShape"] == ["moved.stl", "reordered.stl"]  # not "other.stl": one corner differs
+    assert found["compared"] == 4
+    again = client.get("/api/catalog/matches", params={"path": "moved.stl"}).json()  # from the remembered measurements
+    assert again["identical"] == [] and again["sameShape"] == ["part.stl", "exact copy.stl", "reordered.stl"] or set(again["sameShape"]) == {"part.stl", "exact copy.stl", "reordered.stl"}
+    assert client.get("/api/catalog/matches", params={"path": "a2.stl"}).json() == {"identical": [], "sameShape": [], "compared": 0}
+    assert client.get("/api/catalog/matches", params={"path": "missing.stl"}).status_code == 404
+    assert client.get("/api/catalog/matches", params={"path": "../x.stl"}).status_code == 403

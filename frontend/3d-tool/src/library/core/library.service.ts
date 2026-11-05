@@ -92,14 +92,19 @@ export class LibraryService {
     return this.http.get<CatalogEntry[]>(`${this.api}/catalog`);
   }
 
-  /** Starts looking for identical files in the background (the API remembers what it has read). */
-  startDuplicateScan() {
-    return this.http.post<{ state: string }>(`${this.api}/catalog/duplicates/scan`, {});
+  /** Starts looking for identical files (`exact`) or for files with the same shape (`shape`: re-exports, or the same part at another place) in the background; the API remembers what it has read. */
+  startDuplicateScan(mode: 'exact' | 'shape' = 'exact') {
+    return this.http.post<{ state: string }>(`${this.api}/catalog/duplicates/scan`, {}, { params: { mode } });
   }
 
   /** The state of that scan and, when it is done, the groups of identical files. */
-  duplicates() {
-    return this.http.get<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string; groups: DuplicateGroup[] }>(`${this.api}/catalog/duplicates`);
+  duplicates(mode: 'exact' | 'shape' = 'exact') {
+    return this.http.get<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string; groups: DuplicateGroup[] }>(`${this.api}/catalog/duplicates`, { params: { mode } });
+  }
+
+  /** What is the same as one part: files with exactly its content (`identical`) and files with its shape (`sameShape`), from the files of the same size. */
+  matches(path: string) {
+    return this.http.get<{ identical: string[]; sameShape: string[]; compared: number }>(`${this.api}/catalog/matches`, { params: { path } });
   }
 
   /** Every library path that a document (or one of its versions) uses. */

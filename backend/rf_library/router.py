@@ -116,10 +116,10 @@ def create_router(config: LibraryConfig) -> APIRouter:
     cacheLock = threading.Lock()
     cacheIndexes: dict[Path, dict[str, dict]] = {}  # per cache folder: library path -> {modified, size, dims, volume} of the drawings it holds
 
-    scans: dict[Path, dict] = {}  # per library: the state of the scan for identical files
+    scans: dict[tuple[Path, str], dict] = {}  # per library and kind of check ("exact" or "shape"): the state of the scan
 
-    def scan_state() -> dict:
-        return scans.setdefault(config.library_root(), {"state": "idle", "scanned": 0, "total": 0, "groups": [], "error": ""})
+    def scan_state(mode: str) -> dict:
+        return scans.setdefault((config.library_root(), mode), {"state": "idle", "scanned": 0, "total": 0, "groups": [], "error": ""})
 
     def cache_dir() -> Path:
         return config.documents_root() / cacheFolderName
@@ -377,10 +377,11 @@ def create_router(config: LibraryConfig) -> APIRouter:
             index[path] = record
 
     @router.post("/api/catalog/duplicates/scan")
-    def start_duplicate_scan() -> dict:
-        """Starts looking for identical files in the background (size first, then a content hash; hashes are remembered). Does nothing while a scan runs."""
-        state = scan_state()
-        root, cacheFile = config.library_root(), cache_dir() / "hashes.json"
+    def start_duplicate_scan(mode: Literal["exact", "shape"] = "exact") -> dict:
+        """Starts looking for identical files in the background (`mode` exact: size first, then a hash of the content) or for files with the same
+        shape (re-exports of a part: the same triangles whatever the header and their order). Hashes are remembered. Does nothing while a scan runs."""
+        state = scan_state(mode)
+        root, cacheFile = config.library_root(), cache_dir() / ("hashes.json" if mode == "exact" else "shape-hashes.json")
         with cacheLock:
             if state["state"] == "running":
                 return {key: state[key] for key in ("state", "scanned", "total")}
@@ -390,7 +391,7 @@ def create_router(config: LibraryConfig) -> APIRouter:
             def progress(done: int, total: int) -> None:
                 state["scanned"], state["total"] = done, total
             try:
-                groups = duplicates.scan(root, cacheFile, progress)
+                groups = duplicates.scan(root, cacheFile, progress, mode)
                 state.update(state="done", groups=groups)
             except Exception as error:  # noqa: BLE001 - the page shows it instead of waiting for ever
                 state.update(state="error", error=str(error))
@@ -398,11 +399,22 @@ def create_router(config: LibraryConfig) -> APIRouter:
         return {"state": "running", "scanned": 0, "total": 0}
 
     @router.get("/api/catalog/duplicates")
-    def get_duplicates() -> dict:
-        """The state of the scan and, when it is done, the groups of identical files: {paths, size}."""
-        state = scan_state()
+    def get_duplicates(mode: Literal["exact", "shape"] = "exact") -> dict:
+        """The state of the scan and, when it is done, the groups of identical files (or of files with the same shape): {paths, size}."""
+        state = scan_state(mode)
         return {"state": state["state"], "scanned": state["scanned"], "total": state["total"], "error": state["error"],
                 "groups": state["groups"] if state["state"] == "done" else []}
+
+    @router.get("/api/catalog/matches")
+    def get_matches(path: str) -> dict:
+        """What is the same as one part: `identical` (exactly its content) and `sameShape` (its shape: a re-export, or the same part moved), from the files of the same size."""
+        file = resolve_inside_root(path)
+        if file.suffix.lower() != ".stl" or not file.is_file():
+            raise HTTPException(status_code=404, detail="not an STL of the library")
+        try:
+            return duplicates.matches(config.library_root(), file.relative_to(config.library_root()).as_posix(), cache_dir() / "hashes.json", cache_dir() / "shape-hashes.json")
+        except (OSError, ValueError) as error:
+            raise HTTPException(status_code=400, detail=f"could not read it: {error}")
 
     @router.get("/api/catalog/used")
     def get_used_paths() -> dict:

@@ -11,6 +11,9 @@ import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
 import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin } from './catalog.logic';
 
+type CheckMode = 'exact' | 'shape';
+interface ScanState { state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }
+const idleScan: ScanState = { state: 'idle', scanned: 0, total: 0, error: '' };
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
 const specWidthKey = 'rasterfaster.catalogSpecWidth';
@@ -91,32 +94,35 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
           <button type="button" [class.on]="cleanFilters().has('old')" title="Names with old, backup, bak or copy in them, or (1)" (click)="toggleClean('old')">_OLD<sup>{{ oldCount() }}</sup></button>
           <button type="button" [class.on]="cleanFilters().has('unused')" title="Parts that no document uses (the saved versions of documents count as using them)" (click)="toggleClean('unused')">UNUSED@if (used()) {<sup>{{ unusedCount() }}</sup>}</button>
           <span class="bar-sep">|</span>
-          @if (scan().state === 'running') {
-            <span class="busy">CHECKING FOR DOUBLES… {{ scan().scanned }} / {{ scan().total }}</span>
-          } @else {
-            <button type="button" class="tool" title="Looks for files that are exactly the same (same size first, then the content). Nothing is changed; you decide what to do with the result." (click)="checkDoubles()">{{ groups() ? 'CHECK AGAIN' : 'CHECK FOR DOUBLES' }}</button>
-            @if (groups()) { <button type="button" [class.on]="viewDoubles()" title="Show the groups of identical files" (click)="viewDoubles.set(!viewDoubles())">DOUBLES<sup>{{ groups()!.length }}</sup></button> }
-            @if (doublesStale()) { <span class="warn" title="Parts were copied since the check">OUT OF DATE</span> }
+          @for (m of checkModes; track m.key; let first = $first) {
+            @if (!first) { <span class="bar-sep">|</span> }
+            @if (scanBy()[m.key].state === 'running') {
+              <span class="busy">{{ m.busy }}… {{ scanBy()[m.key].scanned }} / {{ scanBy()[m.key].total }}</span>
+            } @else {
+              <button type="button" class="tool" [title]="m.title" (click)="check(m.key)">{{ groupsBy()[m.key] ? m.again : m.check }}</button>
+              @if (groupsBy()[m.key]) { <button type="button" [class.on]="viewDoubles() === m.key" [title]="'Show the groups of ' + m.what" (click)="viewDoubles.set(viewDoubles() === m.key ? null : m.key)">{{ m.chip }}<sup>{{ groupsBy()[m.key]!.length }}</sup></button> }
+              @if (staleBy()[m.key]) { <span class="warn" title="Parts were copied or put back since the check">OUT OF DATE</span> }
+            }
+            @if (scanBy()[m.key].state === 'error') { <span class="warn">Could not check: {{ scanBy()[m.key].error }}</span> }
           }
-          @if (scan().state === 'error') { <span class="warn">Could not look for doubles: {{ scan().error }}</span> }
         </div>
       </div>
       <div class="row"><span class="label">FIND</span>
         <input #find type="text" placeholder="name, folder …  “phrase”  -exclude   [ / ]" spellcheck="false" autocomplete="off" [value]="query()" (input)="query.set(find.value)" />
       </div>
-      <div class="status"><span>@if (viewDoubles() && groups()) { SHOWING <b>{{ doubleGroups().length }}</b> / {{ groups()!.length }} GROUPS OF IDENTICAL FILES } @else { SHOWING <b>{{ shown().length }}</b> / {{ entries().length }} }</span><span>QUERY: {{ query().trim() ? query().trim().toUpperCase() : 'ALL' }}{{ folder() !== null ? ' · ' + (folder() || 'ROOT').toUpperCase() : '' }}</span></div>
+      <div class="status"><span>@if (activeGroups()) { SHOWING <b>{{ doubleGroups().length }}</b> / {{ activeGroups()!.length }} GROUPS OF {{ activeMode().what }} } @else { SHOWING <b>{{ shown().length }}</b> / {{ entries().length }} }</span><span>QUERY: {{ query().trim() ? query().trim().toUpperCase() : 'ALL' }}{{ folder() !== null ? ' · ' + (folder() || 'ROOT').toUpperCase() : '' }}</span></div>
 
       @if (loading()) {
         <p class="empty">Reading the library…</p>
       } @else if (failed()) {
         <p class="empty">Could not read the library. Is the API running?</p>
-      } @else if (!shown().length && !(viewDoubles() && groups())) {
+      } @else if (!shown().length && !activeGroups()) {
         <p class="empty">No parts match.</p>
       }
-      <div class="groupsview" [hidden]="!(viewDoubles() && groups())">
+      <div class="groupsview" [hidden]="!activeGroups()">
         @for (g of doubleGroups(); track $index; let n = $index) {
           <div class="group">
-            <div class="ghead"><span>GROUP {{ pad(n + 1) }}</span><span>{{ g.length }} IDENTICAL FILES · {{ kb(g[0].size) }} EACH</span></div>
+            <div class="ghead"><span>GROUP {{ pad(n + 1) }}</span><span>{{ g.length }} {{ activeMode().files }} · {{ kb(g[0].size) }} EACH</span></div>
             @for (c of g; track c.path) {
               <div class="copy">
                 <button type="button" class="where" [title]="c.path" (click)="openIdentical(c.path)"><span class="dir">{{ folderOf(c) }}</span><span class="file">{{ fileTitle(c) }}</span></button>
@@ -133,10 +139,10 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             }
           </div>
         } @empty {
-          <p class="empty">No identical files{{ query().trim() || folder() !== null || cleanFilters().size ? ' that match the filters' : '' }}.</p>
+          <p class="empty">No {{ activeMode().files.toLowerCase() }}{{ query().trim() || folder() !== null || cleanFilters().size ? ' that match the filters' : '' }}.</p>
         }
       </div>
-      <div #scroller class="scroller" [hidden]="viewDoubles() && !!groups()" tabindex="0" (scroll)="top.set(scroller.scrollTop)" (keydown)="onKey($event)">
+      <div #scroller class="scroller" [hidden]="!!activeGroups()" tabindex="0" (scroll)="top.set(scroller.scrollTop)" (keydown)="onKey($event)">
         <div class="space" [style.height.px]="window().rows * rowHeight">
           <div class="grid" [style.transform]="'translateY(' + window().first * rowHeight + 'px)'" [style.grid-template-columns]="'repeat(' + window().columns + ', ' + columnWidth() + 'px)'">
             @for (card of cards(); track card.entry.path) {
@@ -258,8 +264,14 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 <div><dt>FILE SIZE</dt><dd>{{ kb(d.size) }}</dd></div>
                 <div><dt>MODIFIED</dt><dd>{{ d.modified * 1000 | date: 'yyyy-MM-dd HH:mm' }}</dd></div>
                 <div><dt>USED IN</dt><dd>{{ usedIn() === null ? '…' : usedIn() === 0 ? 'no document' : usedIn() + (usedIn() === 1 ? ' document' : ' documents') }}</dd></div>
-                @if (identical().length) {
-                  <div><dt>IDENTICAL</dt><dd class="same">@for (other of identical().slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (identical().length > 6) { <span>+ {{ identical().length - 6 }} more</span> }</dd></div>
+                <div><dt>DOUBLES</dt><dd class="check-row">
+                  @if (partChecking() === d.path) { <span class="busy">CHECKING…</span> }
+                  @else { <button type="button" class="tool" title="Looks for files that are exactly the same as this part, and for files with its shape (a re-export, or the same part at another place). Only files of the same size are read." (click)="checkPart(d)">{{ partChecks()[d.path] ? 'CHECK AGAIN' : 'CHECK THIS PART' }}</button> }
+                  @if (partChecks()[d.path]; as r) { <span class="result">{{ r.identical.length + r.sameShape.length ? (r.identical.length ? r.identical.length + ' IDENTICAL' : '') + (r.identical.length && r.sameShape.length ? ' · ' : '') + (r.sameShape.length ? r.sameShape.length + ' SAME SHAPE' : '') : 'NONE FOUND' }}</span> }
+                  @if (partError() && partChecking() !== d.path) { <span class="warn">{{ partError() }}</span> }
+                </dd></div>
+                @for (row of sameRows(); track row.label) {
+                  <div><dt>{{ row.label }}</dt><dd class="same">@for (other of row.paths.slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (row.paths.length > 6) { <span>+ {{ row.paths.length - 6 }} more</span> }</dd></div>
                 }
                 <div><dt>PATH</dt><dd class="path">{{ d.path }}</dd></div>
               </dl>
@@ -276,7 +288,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <button type="button" class="mg" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
                     <button type="button" class="mg" (click)="openMover([d.path])">MOVE…</button>
                     <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
-                    @if (identical().length) { <button type="button" class="danger" (click)="requestTrash(identical(), 'This file stays; the files identical to it go.')" title="Keep this file and move the identical ones to the Trash">KEEP THIS, TRASH THE {{ identical().length === 1 ? 'OTHER' : identical().length + ' OTHERS' }}</button> }
+                    @for (row of sameRows(); track row.label) { <button type="button" class="danger" (click)="requestTrash(row.paths, 'This file stays; the files ' + row.what + ' go.')" [title]="'Keep this file and move the files ' + row.what + ' to the Trash'">KEEP THIS, TRASH THE {{ row.paths.length === 1 ? 'OTHER' : row.paths.length + ' OTHERS' }}{{ row.label === 'SAME SHAPE' ? ' (SAME SHAPE)' : '' }}</button> }
                   </div>
                   @if (folderPathOf(d)) {
                     <div class="mlabel thisfolder"><span>THIS FOLDER</span><span [title]="folderPathOf(d)">{{ folderPathOf(d) }}</span></div>
@@ -335,7 +347,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
           } @else {
             <p>No document uses {{ c.paths.length === 1 ? 'it' : 'them' }}. Put Back in the Trash undoes this.</p>
           }
-          <div class="actions"><button type="button" class="danger" [disabled]="busy()" (click)="trashNow(c.paths)">MOVE TO TRASH</button><button type="button" class="ghost" (click)="confirm.set(null)">CANCEL [ESC]</button></div>
+          <div class="actions"><button type="button" class="danger" [disabled]="busy()" (click)="trashNow(c.paths)">MOVE TO TRASH [ENTER]</button><button type="button" class="ghost" (click)="confirm.set(null)">CANCEL [ESC]</button></div>
         </div>
       }
     </section>
@@ -395,6 +407,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .mlabel { display: flex; justify-content: space-between; color: #c9a64e; font-size: 10px; letter-spacing: .1em; } .mlabel span:last-child { color: #7d6a3a; }
     .manage .actions { margin-top: 8px; }
     .mg { padding: 3px 10px; border: 1px solid #6b5a2a; color: #e8c470; } .mg:hover:not(:disabled) { background: #3a3320; color: #ffe27a; border-color: #c9a64e; } .mg:disabled { opacity: .4; }
+    .check-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .check-row .result { color: #e8c470; }
     .warn { color: #e8c470; } .busy { color: #9db7f0; } .bar-sep { color: #444; }
     .tool { border: 1px solid #3a4a6a; padding: 0 8px; color: #9db7f0; } .tool:hover { background: #26324a; color: #fff; }
     .folderbar .fname { color: #e6e6e6; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -463,15 +476,27 @@ export class CatalogDialog implements OnInit {
   /** The Move to Trash waiting for a yes: what it is, and which documents use those files (from a dry run). */
   protected readonly confirm = signal<{ paths: string[]; documents: string[]; parts: number; note: string } | null>(null);
   protected readonly busy = signal(false);
+  /** What "Check this part" found for the parts checked on their page (by path): identical files and files with the same shape. */
+  protected readonly partChecks = signal<Record<string, { identical: string[]; sameShape: string[] }>>({});
+  protected readonly partChecking = signal<string | null>(null);
+  protected readonly partError = signal('');
   /** Clean-up filters (they combine): old-looking names, identical files, parts no document uses. */
   protected readonly cleanFilters = signal<ReadonlySet<'old' | 'unused'>>(new Set());
   /** The result of the doubles check is shown (a list of groups) instead of the cards. */
-  protected readonly viewDoubles = signal(false);
-  /** Parts were copied since the check: its groups may be missing a new copy. */
-  protected readonly doublesStale = signal(false);
-  /** The groups of identical files (null until the scan has run) and how the scan is doing. */
-  protected readonly groups = signal<DuplicateGroup[] | null>(null);
-  protected readonly scan = signal<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }>({ state: 'idle', scanned: 0, total: 0, error: '' });
+  protected readonly viewDoubles = signal<CheckMode | null>(null);
+  /** The two checks: files that are exactly the same, and files with the same shape (a re-export, or the same part at another place). Each has its groups (null until it has run), its progress and whether it is out of date. */
+  protected readonly checkModes: { key: CheckMode; check: string; again: string; chip: string; busy: string; title: string; what: string; files: string }[] = [
+    { key: 'exact', check: 'CHECK FOR DOUBLES', again: 'CHECK DOUBLES AGAIN', chip: 'DOUBLES', busy: 'CHECKING FOR DOUBLES', what: 'IDENTICAL FILES', files: 'IDENTICAL FILES',
+      title: 'Looks for files that are exactly the same (same size first, then the content). Nothing is changed; you decide what to do with the result.' },
+    { key: 'shape', check: 'CHECK FOR SAME SHAPE', again: 'CHECK SAME SHAPE AGAIN', chip: 'SAME SHAPE', busy: 'CHECKING THE SHAPES', what: 'FILES WITH THE SAME SHAPE', files: 'FILES WITH THE SAME SHAPE',
+      title: 'Looks for files with the same shape: a part exported again, or the same part at another place of an assembly (same file size, any position, header or triangle order). Nothing is changed.' },
+  ];
+  protected readonly groupsBy = signal<Record<CheckMode, DuplicateGroup[] | null>>({ exact: null, shape: null });
+  protected readonly scanBy = signal<Record<CheckMode, ScanState>>({ exact: { ...idleScan }, shape: { ...idleScan } });
+  protected readonly staleBy = signal<Record<CheckMode, boolean>>({ exact: false, shape: false });
+  /** The groups the list shows (null: the cards are shown), and which check they are from. */
+  protected readonly activeGroups = computed(() => { const mode = this.viewDoubles(); return mode ? this.groupsBy()[mode] : null; });
+  protected readonly activeMode = computed(() => this.checkModes.find(m => m.key === (this.viewDoubles() ?? 'exact'))!);
   protected readonly used = signal<ReadonlySet<string> | null>(null);
   private destroyed = false;
   /** The width of the facts column of a part's page (px), dragged with the bar between it and the drawing; remembered. */
@@ -538,14 +563,23 @@ export class CatalogDialog implements OnInit {
     return sortCatalog(list, this.sortKey(), this.ascending());
   });
   /** The groups of identical files as lists of entries (by path). */
-  private readonly groupsOfCopies = computed(() => { const groups = this.groups(); return groups ? groupCopies(this.entries(), groups) : []; });
+  private readonly groupsOfCopies = computed(() => { const groups = this.activeGroups(); return groups ? groupCopies(this.entries(), groups) : []; });
   /** The groups to show: those with at least one copy that passes the filters (all their copies are listed). */
   protected readonly doubleGroups = computed(() => this.groupsOfCopies().filter(copies => copies.some(copy => this.passes(copy))));
-  /** The files identical to the one on the open page (when the doubles are known). */
-  protected readonly identical = computed(() => {
+  /** What is the same as the part on the open page, from the checks that have run: identical files, and files with the same shape (the identical ones left out of those). */
+  protected readonly sameRows = computed(() => {
     const path = this.detail();
-    const group = path ? this.groupsOfCopies().find(copies => copies.some(copy => copy.path === path)) : null;
-    return group ? group.filter(copy => copy.path !== path).map(copy => copy.path) : [];
+    if (!path) return [];
+    const fromChecks = (mode: CheckMode) => {
+      const groups = this.groupsBy()[mode];
+      const group = groups ? groupCopies(this.entries(), groups).find(copies => copies.some(copy => copy.path === path)) : null;
+      return group ? group.filter(copy => copy.path !== path).map(copy => copy.path) : [];
+    };
+    const mine = this.partChecks()[path];
+    const exists = (other: string) => this.entries().some(entry => entry.path === other);
+    const exact = [...new Set([...fromChecks('exact'), ...(mine?.identical ?? []).filter(exists)])].sort();
+    const shape = [...new Set([...fromChecks('shape'), ...(mine?.sameShape ?? []).filter(exists)])].filter(other => !exact.includes(other)).sort();
+    return [...(exact.length ? [{ label: 'IDENTICAL', what: 'identical to it', paths: exact }] : []), ...(shape.length ? [{ label: 'SAME SHAPE', what: 'with the same shape', paths: shape }] : [])];
   });
   /** The open part; the same object for the same file, so a reload of the list does not draw its big picture again. */
   protected readonly detailEntry = computed(() => this.entries().find(e => e.path === this.detail()) ?? null,
@@ -642,8 +676,16 @@ export class CatalogDialog implements OnInit {
       if (event.key === '/' && !typing && !this.detail()) { event.preventDefault(); this.find().nativeElement.focus(); }
       else if (this.detail() && !typing && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !event.metaKey && !event.ctrlKey && !event.altKey) { event.preventDefault(); this.step(event.key === 'ArrowLeft' ? -1 : 1); }
     };
+    const confirmEnter = (event: KeyboardEvent) => { // Enter says yes to the question before a Move to Trash
+      const c = this.confirm();
+      if (event.key !== 'Enter' || !c || this.busy() || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void this.trashNow(c.paths);
+    };
+    document.addEventListener('keydown', confirmEnter, true);
     document.addEventListener('keydown', slash);
-    inject(DestroyRef).onDestroy(() => document.removeEventListener('keydown', slash));
+    inject(DestroyRef).onDestroy(() => { document.removeEventListener('keydown', slash); document.removeEventListener('keydown', confirmEnter, true); });
   }
 
   async ngOnInit() {
@@ -736,7 +778,8 @@ export class CatalogDialog implements OnInit {
       const parts = before - this.entries().length;
       if (this.folder() !== null && gone.includes(this.folder()!)) this.folder.set(null);
       this.picked.update(set => new Set([...set].filter(path => !gone.some(g => path === g || path.startsWith(g + '/')))));
-      this.groups.update(groups => groups && groups.map(group => ({ ...group, paths: group.paths.filter(path => !gone.some(g => path === g || path.startsWith(g + '/'))) })).filter(group => group.paths.length > 1));
+      this.groupsBy.update(by => ({ exact: this.withoutGone(by.exact, gone), shape: this.withoutGone(by.shape, gone) }));
+      this.mapPartChecks(path => (gone.some(g => path === g || path.startsWith(g + '/')) ? null : path));
       if (open && openGone) { if (next) this.detail.set(next); else this.closeDetail(); }
       const ids = result.results.map(r => r.id).filter((id): id is string => !!id);
       const failed = result.failed.length;
@@ -760,30 +803,63 @@ export class CatalogDialog implements OnInit {
     if (next.has(key) && key === 'unused' && !this.used()) void this.loadUsed();
   }
 
-  /** The "Check for doubles" button: starts the check (again) and shows its result when it is done. Nothing is changed by it. */
-  protected async checkDoubles() {
-    if (this.scan().state === 'running') return;
-    this.doublesStale.set(false);
-    await this.startScan();
-    if (this.groups()) this.viewDoubles.set(true);
+  /** A "Check for ..." button: starts that check (again) and shows its result when it is done. Nothing is changed by it. */
+  protected async check(mode: CheckMode) {
+    if (this.scanBy()[mode].state === 'running') return;
+    this.staleBy.update(by => ({ ...by, [mode]: false }));
+    await this.startScan(mode);
+    if (this.groupsBy()[mode]) this.viewDoubles.set(mode);
   }
 
-  /** Looks for identical files on the API (in the background) and waits for the answer. */
-  private async startScan() {
-    this.scan.set({ state: 'running', scanned: 0, total: 0, error: '' });
+  /** "Check this part": looks for files identical to this part, and for files with its shape, among the files of its size (quick: no scan of the library). */
+  protected async checkPart(entry: CatalogEntry) {
+    if (this.partChecking()) return;
+    this.partChecking.set(entry.path);
+    this.partError.set('');
     try {
-      await firstValueFrom(this.lib.startDuplicateScan());
+      const found = await firstValueFrom(this.lib.matches(entry.path));
+      this.partChecks.update(all => ({ ...all, [entry.path]: { identical: found.identical, sameShape: found.sameShape } }));
+    } catch (error) {
+      this.partError.set(this.reason(error, 'Could not check it.'));
+    } finally {
+      this.partChecking.set(null);
+    }
+  }
+
+  /** The results of "Check this part" after paths changed: `change` gives a path's new path, or null when it is gone. */
+  private mapPartChecks(change: (path: string) => string | null) {
+    this.partChecks.update(all => {
+      const next: Record<string, { identical: string[]; sameShape: string[] }> = {};
+      for (const [path, result] of Object.entries(all)) {
+        const key = change(path);
+        if (key !== null) next[key] = { identical: result.identical.map(change).filter((p): p is string => p !== null), sameShape: result.sameShape.map(change).filter((p): p is string => p !== null) };
+      }
+      return next;
+    });
+  }
+
+  private setScan(mode: CheckMode, state: ScanState) { this.scanBy.update(by => ({ ...by, [mode]: state })); }
+
+  /** Starts a check on the API (it runs in the background there) and waits for the answer. */
+  private async startScan(mode: CheckMode) {
+    this.setScan(mode, { state: 'running', scanned: 0, total: 0, error: '' });
+    try {
+      await firstValueFrom(this.lib.startDuplicateScan(mode));
       for (;;) {
-        const answer = await firstValueFrom(this.lib.duplicates());
+        const answer = await firstValueFrom(this.lib.duplicates(mode));
         if (this.destroyed) return;
-        this.scan.set({ state: answer.state, scanned: answer.scanned, total: answer.total, error: answer.error });
-        if (answer.state === 'done') { this.groups.set(answer.groups); return; }
+        this.setScan(mode, { state: answer.state, scanned: answer.scanned, total: answer.total, error: answer.error });
+        if (answer.state === 'done') { this.groupsBy.update(by => ({ ...by, [mode]: answer.groups })); return; }
         if (answer.state !== 'running') return;
         await new Promise(resolve => setTimeout(resolve, 700));
       }
     } catch {
-      this.scan.set({ state: 'error', scanned: 0, total: 0, error: 'is the API running?' });
+      this.setScan(mode, { state: 'error', scanned: 0, total: 0, error: 'is the API running?' });
     }
+  }
+
+  private withoutGone(groups: DuplicateGroup[] | null, gone: string[]): DuplicateGroup[] | null {
+    return groups && groups.map(group => ({ ...group, paths: group.paths.filter(path => !gone.some(g => path === g || path.startsWith(g + '/'))) })).filter(group => group.paths.length > 1);
   }
 
   private async loadUsed() {
@@ -792,7 +868,9 @@ export class CatalogDialog implements OnInit {
 
   /** After a rename or move: the groups, the folder filter and the page follow the new paths, so the result of the check stays right without a new check. */
   private follow(moves: { from: string; to: string; kind?: string }[]) {
-    this.groups.update(groups => groups && groups.map(group => ({ ...group, paths: group.paths.map(path => remapPath(path, moves)) })));
+    const remap = (groups: DuplicateGroup[] | null) => groups && groups.map(group => ({ ...group, paths: group.paths.map(path => remapPath(path, moves)) }));
+    this.groupsBy.update(by => ({ exact: remap(by.exact), shape: remap(by.shape) }));
+    this.mapPartChecks(path => remapPath(path, moves));
     const folder = this.folder();
     if (folder) { const to = remapPath(folder, moves); if (to !== folder) this.folder.set(to.includes('/') ? null : to); }
     if (this.used()) void this.loadUsed(); // documents follow renamed files
@@ -846,7 +924,8 @@ export class CatalogDialog implements OnInit {
     try {
       const result = await firstValueFrom(this.lib.duplicate(entry.path));
       await this.reload();
-      if (this.groups()) this.doublesStale.set(true); // the copy is identical to its original
+      this.staleBy.update(by => ({ exact: by.exact || !!this.groupsBy().exact, shape: by.shape || !!this.groupsBy().shape })); // the copy is identical to its original
+      this.partChecks.set({});
       if (this.used()) void this.loadUsed();
       this.keepNote = true;
       this.detail.set(result.path); // the copy opens
@@ -930,7 +1009,8 @@ export class CatalogDialog implements OnInit {
     this.undoable.set(null);
     for (const id of [...last.ids].reverse()) { try { await firstValueFrom(this.lib.putBack(id, 'rename')); } catch { /* it stays in the Trash */ } }
     await this.reload();
-    if (this.groups()) this.doublesStale.set(true); // copies may be back
+    this.staleBy.update(by => ({ exact: by.exact || !!this.groupsBy().exact, shape: by.shape || !!this.groupsBy().shape })); // copies may be back
+    this.partChecks.set({});
     void this.lib.refreshTrash();
     this.changed.emit();
   }

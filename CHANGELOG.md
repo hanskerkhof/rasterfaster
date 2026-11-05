@@ -2,6 +2,23 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: Check this part on a part's page (0.11.66)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `tests/test_api.py`): `GET /api/catalog/matches?path=` tells what in the library is the same as one part: `identical` (exactly its content) and `sameShape` (its shape: a re-export, or the same part at another place). Only the files of the same size are read, so it is quick and needs no scan of the library; what is read is remembered in the same caches as the checks.
+- **FE** (`catalog-dialog.ts`, `library.service.ts`): a **DOUBLES** row on a part's page with a **Check this part** button (and **Check again**); it says `NONE FOUND` or how many identical and same-shape files there are, and they appear in the `IDENTICAL` and `SAME SHAPE` rows below (together with what the two library-wide checks have found), each with its link and **Keep this, trash the others**. The result follows renames, moves and trashes.
+
+## 2026-11-05 - Catalog: Enter confirms a Move to Trash (0.11.65)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): in the question before a Move to Trash, **Enter** says yes (the button reads `MOVE TO TRASH [ENTER]`; Esc still cancels).
+
+## 2026-11-05 - Catalog: Check for same shape (0.11.64)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `tests/test_api.py`): a second check, `mode=shape` on `POST /api/catalog/duplicates/scan` and `GET /api/catalog/duplicates`: files with the same shape, which the exact check cannot see: a part exported again (another header, another order of the triangles, ASCII or binary) or the same part at another place of an assembly. Each file is measured (number of triangles, the size of its box, volume, surface area, where its centre lies in the box: nothing that depends on position or order) and files of the same size whose measurements agree (0.01 mm, 0.01 %) are grouped. Files over 60 MB are left out; measurements are remembered in `.catalog-cache/shape-hashes.json`.
+- **FE** (`catalog-dialog.ts`, `library.service.ts`): **Check for same shape** next to Check for doubles, with its own **SAME SHAPE** chip and group list (the same per-copy Open, Rename…, Move…, Move to Trash; nothing preselected). On a part's page a **SAME SHAPE** row lists such files, and **Keep this, trash the others (same shape)** is there when you choose it. A part moved 80 mm sideways in an assembly layout (the numbered `CORNER LEFT 3h (1)` copies of `11.25.RENOO_TIMER`) is the typical find.
+
 ## 2026-11-05 - Catalog: the open part stays in view in the strip (0.11.63)
 
 ### Fixed
