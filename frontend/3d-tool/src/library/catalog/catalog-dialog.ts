@@ -780,9 +780,21 @@ export class CatalogDialog implements OnInit {
       event.stopImmediatePropagation();
       void this.trashNow(c.paths);
     };
+    const trashKey = (event: KeyboardEvent) => { // Backspace (or Delete, or ⌘⌫) on a part's page: the question before a Move to Trash, as its button does
+      if ((event.key !== 'Backspace' && event.key !== 'Delete') || event.altKey || event.ctrlKey) return;
+      const field = document.activeElement;
+      if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || (field as HTMLElement | null)?.isContentEditable) return; // typing a name
+      event.stopImmediatePropagation(); // not on to the app behind the catalog, where it would remove a part from the open document
+      if (this.confirm() || this.renaming() || this.mover() || this.busy()) { event.preventDefault(); return; }
+      const entry = this.detailEntry();
+      if (!entry || !this.manage.enabled()) return;
+      event.preventDefault();
+      if (this.figShown() === 'together') this.trashTogether(entry); else void this.requestTrash([entry.path]);
+    };
+    document.addEventListener('keydown', trashKey, true);
     document.addEventListener('keydown', confirmEnter, true);
     document.addEventListener('keydown', slash);
-    inject(DestroyRef).onDestroy(() => { document.removeEventListener('keydown', slash); document.removeEventListener('keydown', confirmEnter, true); });
+    inject(DestroyRef).onDestroy(() => { document.removeEventListener('keydown', slash); document.removeEventListener('keydown', confirmEnter, true); document.removeEventListener('keydown', trashKey, true); });
   }
 
   async ngOnInit() {

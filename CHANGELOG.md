@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: Backspace on a part's page asks to move it to the Trash (0.11.83)
+
+### Added
+- **FE** (`catalog-dialog.ts`): on a part's page **Backspace** (or Delete) opens the question before a Move to Trash for the open part, as the button does (with TOGETHER shown, for the whole group); Enter says yes, Esc no. It does nothing while a name is being typed or another question is open, and only with Manage on. The key no longer reaches the app behind the catalog while it is open (Delete there removes a part from the open document).
+
 ## 2026-11-05 - Catalog: an N PARTS badge on the thumbnails of parts that belong together (0.11.82)
 
 ### Added
