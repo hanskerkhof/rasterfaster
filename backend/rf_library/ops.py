@@ -338,6 +338,16 @@ def documents_using(documentsRoot: Path, relative: str, isDirectory: bool) -> di
     return found
 
 
+def used_paths(documentsRoot: Path) -> list[str]:
+    """Every library path that a document (a working copy or any saved version) uses, once, sorted."""
+    found: set[str] = set()
+    for file in document_files(documentsRoot):
+        data = read_json(file, None)
+        if isinstance(data, dict) and isinstance(data.get("items"), list):
+            found.update(item["path"] for item in data["items"] if isinstance(item, dict) and isinstance(item.get("path"), str))
+    return sorted(found)
+
+
 def read_trash_index(backupRoot: Path) -> list[dict]:
     return read_json(state_dir(backupRoot) / "trash.json", [])
 

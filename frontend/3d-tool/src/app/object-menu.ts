@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { DocumentStore, Finish } from './document.store';
 import { ColorPalette } from './color-palette';
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '@rasterfaster/library';
 import { baseThicknessMm } from './z-levels';
 
 /** Right-click menu for document objects. Shown at the pointer; acts on the items the store names. */

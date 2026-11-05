@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import main
-import searchterms
+from rf_library import searchterms
 
 EXAMPLES = [
     "BOLT FEET S2.stl",

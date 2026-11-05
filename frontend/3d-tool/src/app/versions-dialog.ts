@@ -3,7 +3,7 @@ import { Component, OnInit, inject, output, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 
 /** The versions of the open document (v1, v2, ...): look at an older one (read-only) or promote it to the newest, like Fusion 360. */
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '@rasterfaster/library';
 @Component({
   selector: 'app-versions-dialog',
   imports: [DatePipe],

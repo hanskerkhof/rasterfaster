@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '@rasterfaster/library';
 import { ImagesService } from './images.service';
 import { Aspect, RenderService, focusCentre, fxIds, fxNames, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, videoWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';

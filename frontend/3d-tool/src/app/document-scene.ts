@@ -2,9 +2,7 @@ import * as THREE from 'three';
 import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { DocItem, DocumentStore, PartStats, Quat, Vec3, cellCenteredPosition, clampToWorkArea, snapStepMm, workArea } from './document.store';
-import { ViewMode, buildParts, clearParts } from './model-render';
-import { ViewPart, buildWireGeometry } from './svg-view';
-import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
+import { ViewPart, buildWireGeometry, buildParts, buildSilhouetteGeometry, clearParts, creaseDegrees, silhouetteEdges, ViewMode } from '@rasterfaster/library';
 import { ZGridMode, nearestZLevel, nextZLevel } from './z-levels';
 
 const selectedColor = 0xf0a040;

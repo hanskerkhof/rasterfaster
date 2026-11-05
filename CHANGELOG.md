@@ -2,6 +2,226 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: Backspace on a part's page asks to move it to the Trash (0.11.83)
+
+### Added
+- **FE** (`catalog-dialog.ts`): on a part's page **Backspace** (or Delete) opens the question before a Move to Trash for the open part, as the button does (with TOGETHER shown, for the whole group); Enter says yes, Esc no. It does nothing while a name is being typed or another question is open, and only with Manage on. The key no longer reaches the app behind the catalog while it is open (Delete there removes a part from the open document).
+
+## 2026-11-05 - Catalog: an N PARTS badge on the thumbnails of parts that belong together (0.11.82)
+
+### Added
+- **FE** (`catalog.logic.ts`, `catalog-dialog.ts`): the thumbnails of parts that belong together (LEFT / RIGHT, TOP / BOTTOM ... pairs, and numbered P1, P2, P3 sets) have a badge in the upper right corner of the picture saying how many parts the set has (`3 PARTS`), on the cards of the catalog and on the tiles of the strip on a part's page; the tooltip says why and how to see them together.
+
+## 2026-11-05 - Catalog: numbered parts P1, P2, P3 belong together (0.11.81)
+
+### Added
+- **FE** (`catalog.logic.ts`, `preview/quick-look.ts`, `catalog-dialog.ts`, README): a second filename convention for parts that belong together: numbered parts **P1, P2, P3 ...** of one set. Names in one folder that are the same once the part number and the position words (LEFT, TOP ...) are taken out, wherever they sit and whatever the separators or double spaces (`3.21 P1 USBA BOTTOM ALT III EIGHT`, `3.21 USBA TOP_P2_ALT III  EIGHT`, `3.21 P3 USBA FRONT ALT III EIGHT`), are one set and can be viewed TOGETHER like the LEFT / RIGHT pairs. A part number is `P` and digits between separators (`Screw-Terminal-P5.08` is a pitch and does not count). The legend names the parts by number and position (`P1 BOTTOM`, `P2 TOP`, `P3 FRONT`), and the colours follow the part numbers, so each part keeps its colour whichever of them is open.
+
+## 2026-11-05 - Catalog: the doubles results under DOUBLES (0.11.80)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): on a part's page the `IDENTICAL` and `SAME SHAPE` rows now sit directly under the `DOUBLES` row that made them, above `TOGETHER` and `FUSION` (they were below the Fusion row).
+
+## 2026-11-05 - Catalog: Move to Trash takes the TOGETHER parts too (0.11.79)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): while a part is viewed TOGETHER, the trash button of its page reads **MOVE ALL n TOGETHER TO TRASH** and moves the part and all the parts it belongs with in one batch (one Put Back brings them back); **ONLY THIS ONE TO TRASH** is there for the open part alone. The question before it lists the files (up to eight), says why they belong together, and names the documents that use any of them. In the plain and the 3D view the button is the same as before.
+
+## 2026-11-05 - Catalog: the parts of the TOGETHER view marked in the strip and the list (0.11.78)
+
+### Added
+- **FE** (`catalog-dialog.ts`): while a part is viewed TOGETHER with its companions, their thumbnails in the strip and their rows in the list are marked in the colour the part has in the 3D view (a coloured bar and frame on a tile, a coloured bar and tint on a row; the open one keeps its blue frame and gets the bar too), so the legend and the folder panel match.
+
+## 2026-11-05 - Catalog: parts that belong together (0.11.77)
+
+### Added
+- **FE** (`catalog.logic.ts`, `preview/together.ts`, `preview/quick-look.ts`, `catalog-dialog.ts`): a **filename convention** for parts that belong together: names in the same folder that are the same except for one of the word pairs **LEFT / RIGHT**, **TOP / BOTTOM**, **FRONT / BACK** or **UPPER / LOWER** (whole words, any case: `3.43 USB-C FEMALE FRONT` and `3.43 USB-C FEMALE BACK`, `CORNER LEFT 3h` and `CORNER RIGHT 3h`; with two pairs in a name the four of `TOP LEFT`, `TOP RIGHT`, `BOTTOM LEFT`, `BOTTOM RIGHT`). They stay separate parts. On the page of one of them the picture has a **TOGETHER n** button (and the facts a `TOGETHER` row with **View together** and links to the others): the 3D view then shows all of them in one scene, each in a colour of its own with a legend (`FRONT`, `BACK`, the open one in bold), at the places their own STL files give them (the origins are respected, as when parts are added to a document in the app; the scene as a whole is centred), with the same orbit, zoom and view modes. Parts over 100 MB are left out. The word pairs are one list, `pairWords` in `catalog.logic.ts`.
+
+## 2026-11-05 - Catalog: a 3D preview on a part's page (0.11.75, 0.11.76)
+
+### Added
+- **FE** (`src/library/preview/quick-look.ts`, `catalog-dialog.ts`): a **DRAWING | 3D** switch on the picture of a part's page (remembered, `rasterfaster.catalogFigView`). **3D** shows the part in the preview of the file list's Quick Look (isometric to start with; drag to orbit, scroll to zoom; Solid, Outline, Wireframe and the hidden-line modes), filling the picture; it follows ← → and the thumbnails, and takes the width of the resize bar. Parts over 100 MB are not previewed. Quick Look has an `embedded` mode for this (no frame, header or resize corner); the line drawing is not made while 3D is shown. (0.11.76: the mode buttons sit under the switch, not over it, and the size is not repeated over the caption.)
+
+## 2026-11-05 - FIND IN FUSION: a label for the cache and for your own files (0.11.74)
+
+### Added
+- **FE** (`part-finder.ts`, `fusion-finder.ts`, `catalog-dialog.ts`), **BE** (`fusionfind.py`): every hit has a label by its name: a blue **☁ CACHE** (the copy of a cloud design that Fusion keeps on this Mac) or a green **▤ LOCAL** (one of your own .f3d files in the local Fusion folder), with a tooltip saying what that means; the summary says how many of each (`7 Fusion designs: 4 local, 3 in the cache`), and within the exact names your own files are listed before the cache.
+
+## 2026-11-05 - Catalog: the resize bar runs the whole length of the facts (0.11.73)
+
+### Fixed
+- **FE** (`catalog-dialog.ts`): on a part's page the resize bar was only as tall as the window, so it stopped where a long facts column (a Fusion result, many doubles) went on below; the three columns now sit in one box that is as tall as the longest of them, and the drawing column stays no taller than the window.
+
+## 2026-11-05 - Catalog: the subfolders in the breadcrumb (0.11.72)
+
+### Added
+- **FE** (`catalog-dialog.ts`): the breadcrumb trail on a part's page also shows the subfolders of the folder shown, as blue `▸ name` chips right after the highlighted crumb (the folder the trail goes on into is already a crumb; up to eight, then `+N`; the rest are in the list or strip below). A click goes into that folder.
+
+## 2026-11-05 - Catalog: FIND IN FUSION (0.11.71)
+
+### Added
+- **BE** (`backend/fusionfind.py`, `main.py`, `requirements.txt`, `rasterfaster.spec`, `tests/test_fusionfind.py`): the search of `scripts/f3dsearch.py` as an API. `GET /api/fusion/find?path=` says in which Fusion designs the part is a component or body: the name an STL exported from Fusion carries (`<design>_RF11 - work v199_<component>`) is turned into what to look for (the deepest component first, `(1)` and `copy` left off) and searched in the index (the newest version of each design with a match; where in the design it sits when the hierarchy file exists; exact names first). `GET /api/fusion/status` (the folder, designs indexed, files new or changed since), `POST /api/fusion/index` (reads the new and changed files in the background: the Fusion cache, the folders given to `f3dsearch.py index` and the Fusion folder, `RF_FUSION`, default `~/Documents/FUSION360`) and `POST /api/fusion/reveal`. `zstandard` is now in `requirements.txt` and the packaged app.
+- **FE** (`src/library/core/part-finder.ts`, `src/app/fusion-finder.ts`, `app.config.ts`, `catalog-dialog.ts`): a **FIND IN FUSION** button on a part's page (the library offers a plug-in point, `RF_PART_FINDERS`; the app provides the Fusion one). It searches at once with the index as it is and lists the design files that have the part: the file, its folder, the names that matched with where they sit in the design, `EXACT NAME` for a component of exactly that name, **Reveal** in the Finder. When Fusion files are new or changed since the last index it says so, with a button to read them (with progress) and search again; with an empty index it reads them first.
+
+## 2026-11-05 - Same shape: other triangulations and other file sizes (0.11.69, 0.11.70)
+
+### Fixed
+- **BE** (0.11.70): **Check this part** also compares with every file that a library-wide same-shape check has measured, whatever its file size, so a part with twice the triangles is found once that check has run.
+- **BE** (`backend/rf_library/duplicates.py`, `tests/test_api.py`): two parts that were exported with a different triangulation (8,688 and 8,810 triangles, 424 and 430 KB: `work-SWITCHING POWER SUPPLY`) were not found by the same-shape check, which only compared files of the same size and counted triangles. The shape is now measured with what does not depend on the triangulation: the box (0.05 mm), the volume (0.1 %), the surface area (0.15 %) and the centre of mass (0.05 mm). The library-wide check measures every file up to 60 MB whatever its size (15 s for 6,400 files the first time, 0.2 s after: the measurements are remembered, now under `measures` in `shape-hashes.json`, so the earlier ones are made again); **Check this part** measures the files whose size is within 30 % of the part's (about a second). The exact check still compares files of the same size by their content.
+- **FE** (`catalog-dialog.ts`): the copies of a same-shape group have different sizes, so the heading no longer says `EACH` for them and every row shows its own file size.
+
+## 2026-11-05 - Catalog: the arrow keys follow the folder panel's order (0.11.68)
+
+### Fixed
+- **FE** (`catalog-dialog.ts`): on a part's page ← and → (and the previous / next buttons at the bottom) went through the catalog's overall list, sorted across all folders and by the chosen sort, so in a folder they jumped around and did not follow the thumbnails or the list. They now walk through the files of the part's own folder in the order the folder panel shows (by name), stop at the first and the last, and show the catalog number of the neighbour in the buttons.
+
+## 2026-11-05 - Catalog: after a Move to Trash the page goes to the next thumbnail (0.11.67)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): when the open part is moved to the Trash from its page, the page moves on to the next thumbnail (or row) of the folder panel, else the one before it, else the next part of the whole list (it always took the next of the whole list, which is often in another folder).
+
+## 2026-11-05 - Catalog: Check this part on a part's page (0.11.66)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `tests/test_api.py`): `GET /api/catalog/matches?path=` tells what in the library is the same as one part: `identical` (exactly its content) and `sameShape` (its shape: a re-export, or the same part at another place). Only the files of the same size are read, so it is quick and needs no scan of the library; what is read is remembered in the same caches as the checks.
+- **FE** (`catalog-dialog.ts`, `library.service.ts`): a **DOUBLES** row on a part's page with a **Check this part** button (and **Check again**); it says `NONE FOUND` or how many identical and same-shape files there are, and they appear in the `IDENTICAL` and `SAME SHAPE` rows below (together with what the two library-wide checks have found), each with its link and **Keep this, trash the others**. The result follows renames, moves and trashes.
+
+## 2026-11-05 - Catalog: Enter confirms a Move to Trash (0.11.65)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): in the question before a Move to Trash, **Enter** says yes (the button reads `MOVE TO TRASH [ENTER]`; Esc still cancels).
+
+## 2026-11-05 - Catalog: Check for same shape (0.11.64)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `tests/test_api.py`): a second check, `mode=shape` on `POST /api/catalog/duplicates/scan` and `GET /api/catalog/duplicates`: files with the same shape, which the exact check cannot see: a part exported again (another header, another order of the triangles, ASCII or binary) or the same part at another place of an assembly. Each file is measured (number of triangles, the size of its box, volume, surface area, where its centre lies in the box: nothing that depends on position or order) and files of the same size whose measurements agree (0.01 mm, 0.01 %) are grouped. Files over 60 MB are left out; measurements are remembered in `.catalog-cache/shape-hashes.json`.
+- **FE** (`catalog-dialog.ts`, `library.service.ts`): **Check for same shape** next to Check for doubles, with its own **SAME SHAPE** chip and group list (the same per-copy Open, Rename…, Move…, Move to Trash; nothing preselected). On a part's page a **SAME SHAPE** row lists such files, and **Keep this, trash the others (same shape)** is there when you choose it. A part moved 80 mm sideways in an assembly layout (the numbered `CORNER LEFT 3h (1)` copies of `11.25.RENOO_TIMER`) is the typical find.
+
+## 2026-11-05 - Catalog: the open part stays in view in the strip (0.11.63)
+
+### Fixed
+- **FE** (`src/library/catalog/catalog-dialog.ts`): in the strip of a part's page, clicking a tile made the strip jump back to its start, so the part you had just opened scrolled out of view. The strip now stays where it is when the part is already in view, scrolls it into view (with one tile of context before it) when it is not (previous / next, a click in the list of doubles), and starts at the beginning in another folder. The open tile is highlighted (blue frame, `OPEN` before its size); the list keeps the open row in view too.
+
+## 2026-11-05 - Catalog: a breadcrumb trail on a part's page (0.11.62)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): the folder panel of a part's page has a breadcrumb trail (`LIBRARY › MOUNTS › 1 RELAIS MODULE`) instead of the plain folder name. Click a crumb to show that folder (its folders and files, as a list or a strip) without leaving the page; the folder shown is highlighted, and the crumbs below it stay (dimmed) so you can go back down. Click a folder in the panel to go below; going into another branch replaces the trail. A click on a file opens its page, and the trail starts again from that file's folder. The panel lists the files of the folder shown including the open part (marked) and the folders in it with their number of parts.
+
+## 2026-11-05 - Catalog: a doubles tool, old and unused filters, folder actions (0.11.60, 0.11.61)
+
+### Added
+- **BE** (`backend/rf_library/duplicates.py`, `router.py`, `ops.py`, `tests/test_api.py`): `POST /api/catalog/duplicates/scan` looks for identical files in the background (the same size first, then a SHA-1 of the content; hashes are remembered by path, size and modified time in `.catalog-cache/hashes.json`, so the next check only reads what changed; empty files are left out) and `GET /api/catalog/duplicates` gives the state and the groups. `GET /api/catalog/used` lists the library paths that documents (and their versions) use.
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`, `library.service.ts`): a **CLEAN UP** row in the catalog. **_OLD** and **UNUSED** are filters (old-looking names such as `_old`, `backup`, `copy`, `(1)`; parts no document or version uses). **CHECK FOR DOUBLES** is a button you press: it runs the check, shows its progress, and then the **DOUBLES** chip shows the groups of identical files as a list. Every copy has its folder, date and size and its own **Open**, **Rename…**, **Move…** and **Move to Trash**; nothing is marked, preferred or decided for you. **Check again** whenever you like; the result follows your renames, moves and trashes without a new check (and says OUT OF DATE after a Duplicate). Find, folder and the filters narrow the groups. On a part's page an **IDENTICAL** row lists the files that are the same, and **Keep this, trash the others** is there when you choose it.
+- **FE**: **folder actions**. With Manage on and a folder chosen in the FOLDER chips, **Rename…**, **Move…** and **Move to Trash** act on that folder (the usual question first, which names the documents); a part's page has the same for its own folder under `THIS FOLDER`. Moving a folder into itself is not offered, and the page, the group list and the folder filter follow the new path.
+
+### Changed
+- **FE** (0.11.61): the question before trashing a folder says `1 part` for a single part, not `1 parts`.
+- **FE**: the question before a Move to Trash names the documents once (it listed a document's saved versions one by one).
+
+## 2026-11-05 - Catalog: the facts column of a part's page can be resized (0.11.58, 0.11.59)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`): on a part's page a bar between the drawing and the facts column can be dragged (double-click for the default 380 px; no keyboard keys: ← → browse the parts, 0.11.59); the width is remembered (`rasterfaster.catalogSpecWidth`). The column keeps at least 260 px and the drawing at least 320 px.
+
+## 2026-11-05 - Parts archive is now Parts catalog (0.11.57)
+
+### Changed
+- **FE** (`catalog-dialog.ts`, `app.html`, `tree-panel.ts`), README, `docs/library-catalog-plan.md`: the dialog is called **PARTS CATALOG** (heading, accessible label, the tooltip of the Catalog button and the comments); the word "archive" is no longer used for it. Earlier entries of this changelog keep the name they had.
+
+## 2026-11-05 - Catalog: the management buttons set apart (0.11.56)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): on a part's page the management buttons (Rename…, Duplicate, Move…, Move to Trash) are in their own dashed amber box labelled `MANAGE · CHANGES THE LIBRARY`, with amber buttons (Move to Trash stays red), apart from the three plain buttons (Add to document, Find in browser, Reveal in Finder).
+
+## 2026-11-05 - Catalog: rename, duplicate, move, new folder (0.11.55)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): with Manage on, a part's page has **Rename…** (the .stl is added when left out; documents that use the file follow), **Duplicate** (the copy opens) and **Move…**; the bar for ticked parts has **Move…**. Move opens a folder list with a box to filter it; typing a path that does not exist (`new/folder`) offers **Create … and move here** (Enter does it). All of it uses the existing library endpoints (backups, documents follow); the catalog and the file list read the library again afterwards, and a note says what happened (and how many parts in documents were updated). The drawing of a renamed or moved part is made again.
+
+## 2026-11-05 - Catalog: selection and Move to Trash (0.11.54)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`, `app.html`): with Manage on, the cards of the parts archive have a tick box (Shift ticks a range, ⌘-click on a card ticks it, ⌘A ticks everything shown); a bar at the bottom shows `N SELECTED` with **Select all shown**, **Clear** and **Move to Trash** (also ⌘⌫). A part's page has **Move to Trash** too. Before anything moves, a dry run asks which documents use the files and the confirmation names them; the same Trash as the file list is used (one batch, one Put Back), the catalog and the file list update, and the bottom bar offers **Undo**. The Manage switch is in the catalog's header as well; with Manage off the tick boxes and buttons are gone.
+
+## 2026-11-05 - Manage switch for the library (0.11.53)
+
+### Added
+- **FE** (`src/library/core/manage.service.ts`, `manage-toggle.ts`, `library.config.ts`, `app.html`, `app.ts`): the **Manage** switch in the header of the file panel (on by default, remembered as `rasterfaster.manage`). It belongs to the library only: with Manage off the file list is read-only (no Rename, Duplicate, New Folder, Move to Trash or Delete, no drag-and-drop moves, no top-level New Folder button; the shortcuts ⌘⌫, ⌥⌘⌫, Enter and F2 do nothing); browsing, Add to Document, Reveal in Finder, Copy Path, the Trash dialog and Open in Catalog stay. Documents, the parts list and exports are not affected. A host can make the library read-only for good with `provideRfLibrary({ readOnly: true })`: the switch is then off and not shown.
+
+## 2026-11-05 - Open in Catalog (0.11.51, 0.11.52)
+
+### Added
+- **FE** (`src/library/tree/tree-panel.ts`, `app.ts`, `app.html`): the context menu of a file in the file list has **Open in Catalog**: the parts archive opens on that file's page.
+
+### Fixed
+- **FE** (`thumbnail.service.ts`, `catalog-dialog.ts`; 0.11.52): a part's page showed `…` for SIZE and VOLUME until its thumbnail had been drawn; the big drawing measures the part too, and the page uses that.
+
+## 2026-11-05 - Hidden-line drawings of curved parts (0.11.49, 0.11.50)
+
+### Fixed
+- **FE** (`src/library/preview/svg-view.ts`, `thumbnail.logic.ts`): the thumbnails and the large view of the parts archive (and the SVG view of a document) drew the contour lines of curved parts (cones, cylinders, bolts) as dashes and dots. The contour of a smooth surface lies at its middle depth, while the wall one pixel inside it is nearer to the camera by millimetres, so the line was judged hidden depending on the pixel it fell in. Contour lines are now tested against the farthest surface within one pixel around them. The drawing version is 6: cached drawings are redrawn.
+- **FE** (`silhouette.ts`, `thumbnail.service.ts`; 0.11.50): the contour of a finely faceted cone or cylinder broke off where neighbouring facets bend less than 0.5° (such edges counted as flat triangulation). The thumbnails use 0.05° (`drawingFlatDegrees`); the 3D view keeps 0.5°. The drawing version is 7.
+
+## 2026-11-04 - Parts archive: a strip of drawings for the folder's files (0.11.45 to 0.11.48)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`): on a part's page, the other files of the folder can be shown as a **LIST** (as before) or a **STRIP** (switch in the heading, remembered as `rasterfaster.catalogFolderView`): a row of tiles with the drawing, name and size, scrolled sideways. The **‹** and **›** arrows at its ends move one page (as many whole tiles as fit) with a smooth scroll, like a row of films; an arrow shows only when there is more in that direction. The drawings of the tiles in view and the next page are made first.
+
+### Fixed
+- **FE** (`catalog-dialog.ts`; 0.11.48): the size line of a strip tile sits directly under its name, and the list and the strip of the folder's files have the same fixed height (260 px; the list scrolls inside it), so nothing jumps when you switch between them.
+- **FE** (`catalog-dialog.ts`; 0.11.47): the tiles of the strip are 228 px high, not 248: the name has room for two lines (shortened with … after that) and the size line follows it, instead of three lines of empty space.
+- **FE** (`catalog-dialog.ts`; 0.11.46): in the strip view the panel's own modifier class collided with the strip's class and laid the whole panel out as a row.
+
+## 2026-11-04 - Parts archive: the files of the folder on a part's page (0.11.44)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `catalog.logic.ts`): below the drawing, a part's page lists the other files in the same folder (not those in folders below it), by name with their file size; a click opens that file's page. The list ignores the catalog's filters, and a part opened that way that the filter has left out shows `—` for its number.
+
+## 2026-11-04 - Parts archive: thumbnails on whole pixels (0.11.42, 0.11.43)
+
+### Changed
+- **FE** (`catalog-dialog.ts`, `thumbnail.logic.ts`): the cards of the catalog use whole, even pixel widths and fixed line heights, and the drawings have an even size in CSS pixels, so a drawing is centred on a whole pixel and its 1-pixel lines are not smeared over two rows (a half-pixel position made thin lines look jagged). The drawing version is 5 (0.11.43; 4 had briefly been used by a build with thicker lines that was taken back): cached drawings are redrawn.
+
+## 2026-11-04 - Parts archive: a page for every part (0.11.39, 0.11.40)
+
+### Added
+- **FE** (`src/library/catalog/catalog-dialog.ts`, `thumbnail.service.ts`, `app.ts`, `app.html`): a click (or Enter) on a card opens the part's page inside the catalog: a large drawing (made on the spot, 560 px, not cached), the facts about the file (file, folder, size in mm, volume, file size, modified, how many documents use it, path) and **Add to document**, **Find in browser** (the catalog closes and the file list shows the file) and **Reveal in Finder**. **← / →** (and the buttons at the bottom) go to the previous and next part of the current list; Esc goes back to the list where you were. The address is `#part=<path>`, so a reload (or a copied link) comes back to the part. On a card, **+ ADD** (on hover) adds the part straight away.
+- **FE** (`thumbnail.logic.ts`): parts over 100 MB are never drawn (the card says `TOO LARGE`); between 20 and 100 MB they still wait for **Draw anyway**.
+
+### Fixed
+- **FE** (`catalog-dialog.ts`; 0.11.40): the address `#part=…` was cleared on startup, before the catalog had loaded, so a reload did not come back to the part.
+
+### Changed
+- **FE**: a double-click on a card no longer adds the part (a click opens its page).
+
+## 2026-11-04 - Parts archive: thumbnails, and it stays open on reload (0.11.34 to 0.11.38)
+
+### Added
+- **BE** (`backend/rf_library/router.py`, `tests/test_api.py`): the thumbnail cache. `PUT` and `GET /api/catalog/thumb?path=` store and serve one SVG drawing per part in the hidden folder `RASTERFASTER_APP/.catalog-cache/` (with a small .json beside it: the file's modified time, its width/depth/height and volume); `GET /api/catalog` says per part whether a current drawing exists (`drawn`, `dims`, `volume`; a changed file needs a new one). An SVG with scripts or event handlers is refused, and the served drawing carries a sandbox CSP.
+- **FE** (`src/library/catalog/thumbnail.service.ts`, `thumbnail.logic.ts`): the cards of the parts archive show an isometric hidden-lines drawing (white lines on dark), drawn in the browser, one part at a time, only for the cards in view (the newest scroll position first), then kept in the cache for the next visit. A card shows `PENDING` until its drawing is ready; the card's size line shows the part's real size in mm (`80 × 60 × 4 mm`). Parts over 20 MB are not drawn by themselves: the card says `LARGE FILE` and has **Draw anyway**.
+
+### Fixed
+- **FE** (`thumbnail.service.ts`; 0.11.38): the drawing's frame is fitted to the part's box as the camera sees it, not to its bounding sphere, so flat parts fill the picture; the picture is 200 px wide.
+- **FE** (`thumbnail.logic.ts`, `thumbnail.service.ts`, `catalog-dialog.ts`), **BE** (`router.py`; 0.11.37): the thumbnails had jagged lines because a 640-unit drawing was scaled down to the card. They are now made for the screen: a fixed size in CSS pixels (2 drawing units per pixel, lines exactly one pixel wide), shown unscaled. Drawings carry a version; those of the first look are drawn again.
+- **FE** (`thumbnail.logic.ts`), **BE** (`router.py`; 0.11.36): the drawing of a very dense part (a 22 MB STL) was refused as too big. Coordinates are now rounded to one decimal and the limit is 6 MB.
+
+### Changed
+- **FE** (`src/library/preview/svg-view.ts`): moved from the app into the library (the drawing code is shared), exported from `@rasterfaster/library`.
+- **FE** (`app.ts`, `app.html`; 0.11.35): the Catalog stays open when the page is reloaded (kept per browser tab in session storage).
+
+## 2026-11-04 - Parts archive: a catalog of the whole library (0.11.33)
+
+### Added
+- **BE** (`backend/rf_library/router.py`, `tests/test_api.py`): `GET /api/catalog` lists every .stl of the library (name, path, top-level folder, modified, size) in natural path order.
+- **FE** (`src/library/catalog/`, `app.html`, `app.ts`, `app.scss`): a **Catalog** button next to the Trash opens the **parts archive**, a near full-screen dialog with a numbered card per part (`NO.001`, folder code, name, size and date). Filter by folder (chips with counts), **Find** by name or folder (same syntax as the file list: "phrase", -exclude; `/` focuses it), sort by name, date or size (remembered, `rasterfaster.catalogSort`). Only the cards in view are drawn, so all ~6,500 parts scroll smoothly. Click selects, arrow keys move, double-click, Enter or **Add to document** adds the part. Pictures, the detail page and library management follow in later versions (`docs/library-catalog-plan.md`).
+
+## 2026-11-04 - Library code separated from the app (0.11.32)
+
+### Changed
+- **BE** (`backend/rf_library/`: `router.py`, `ops.py`, `searchterms.py`; `main.py`, `rasterfaster.spec`): the library API (list, search, file, rename, move, duplicate, new folder, Trash, reveal) is its own package, mounted by `main.py` with the paths passed in; `library_ops.py` and `searchterms.py` moved into it. Same routes and behaviour.
+- **FE** (`src/library/`, `tsconfig.json`, `scripts/check-boundaries.mjs`): the library files (library service, file tree, delete and Trash dialogs, Quick Look, renderer, silhouette, filter terms, Esc helper) moved to `src/library/` behind `public-api.ts`, imported as `@rasterfaster/library`; the API base comes from `RF_LIBRARY_CONFIG` (default `/api`). `npm run check:boundaries` keeps the dependency one way. No change in the app's behaviour.
+- Plan for the parts catalog: `docs/library-catalog-plan.md`.
+
 ## 2026-11-04 - Fusion add-in: Save As Mesh command for a keyboard shortcut (0.11.31)
 
 ### Added

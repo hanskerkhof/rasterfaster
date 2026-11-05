@@ -7,6 +7,7 @@
 .panel.hidden .panel-resize { pointer-events: none; }
 :host(.sliding) { transition: grid-template-columns 160ms cubic-bezier(.2, .8, .2, 1); }
 :host(.sliding) .panel { transition: border-width 160ms; }
+.manage { margin-left: auto; margin-right: 6px; }
 .panel-toggle { display: inline-flex; align-items: center; justify-content: center; padding: 3px 6px; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; cursor: pointer; opacity: .75; }
 .panel-toggle:hover { opacity: 1; background: #31353f; border-color: #000; }
 .panel-toggle.show { margin-right: 4px; }
@@ -87,7 +88,7 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
            background: #1f4f8f; color: #fff; border: 1px solid #000; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
 .viewing button { padding: 3px 10px; background: rgba(0,0,0,.3); color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
 
-.trash-bar { flex: none; padding: 4px 8px; border-top: 1px solid #000; }
+.trash-bar { flex: none; display: flex; gap: 4px; padding: 4px 8px; border-top: 1px solid #000; }
 .trash-button { padding: 3px 10px; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 4px; font: inherit; font-size: 12px; opacity: .75; cursor: pointer; }
 .trash-button:hover { background: rgba(255,255,255,.08); opacity: 1; }
 .trash-button .count { margin-left: 6px; padding: 0 6px; font-size: 10px; background: #31353f; border-radius: 8px; }

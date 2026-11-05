@@ -1,5 +1,5 @@
 import { Component, untracked, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal } from '@angular/core';
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '@rasterfaster/library';
 import { DocumentStore } from './document.store';
 import { ImageNote, ImagesService } from './images.service';
 import { RenderService, ambientNames, aspectRatio, reflectionNames, fxIds, fxNames, beamNames, hdWidths, strengthNames } from './render.service';

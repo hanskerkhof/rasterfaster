@@ -1,5 +1,5 @@
 import { Component, DestroyRef, inject, input, output } from '@angular/core';
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '../util/escape-close';
 
 /** "Delete Immediately": a small modal question. Enter confirms, Esc (or a click outside) cancels. */
 @Component({

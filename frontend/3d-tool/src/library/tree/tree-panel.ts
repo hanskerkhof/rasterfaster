@@ -1,10 +1,11 @@
 import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { highlightParts } from './filter-terms';
-import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from './library.service';
+import { highlightParts } from '../util/filter-terms';
+import { LibraryEntry, LibraryService, MoveBatchResult, RenameResult, TrashBatchResult } from '../core/library.service';
+import { ManageService } from '../core/manage.service';
 import { DeleteDialog } from './delete-dialog';
-import { QuickLook } from './quick-look';
+import { QuickLook } from '../preview/quick-look';
 import { actedOn, pruned, rangeBetween, toggled } from './tree-selection';
 
 interface Row {
@@ -44,7 +45,7 @@ interface Row {
          (dragover)="onDragOver($event, null)" (dragleave)="onDragLeave($event)" (drop)="onDrop($event, null)">
       @for (r of rows(); track r.entry.path) {
         <div class="row" [class.dir]="r.entry.type === 'dir'" [class.focus]="r.entry.path === focused()" [class.picked]="isPicked(r.entry.path)" [class.out]="isOutOfSelection(r.entry.path)" [class.drop]="dropTarget() === r.entry.path"
-             draggable="true" (dragstart)="onDragStart($event, r)" (dragend)="endDrag()" (dragover)="onDragOver($event, r)" (drop)="onDrop($event, r)"
+             [attr.draggable]="manage.enabled() ? 'true' : null" (dragstart)="onDragStart($event, r)" (dragend)="endDrag()" (dragover)="onDragOver($event, r)" (drop)="onDrop($event, r)"
              [class.sel]="r.entry.type === 'file' && r.entry.path === selected()"
              [style.padding-left.px]="6 + r.depth * 14" (click)="onClick(r, $event)" (dblclick)="onDoubleClick(r)" (contextmenu)="onContextMenu($event, r)">
           <span class="caret">{{ r.entry.type === 'dir' ? (r.open ? '▾' : '▸') : '' }}</span>
@@ -80,18 +81,25 @@ interface Row {
       <div class="menu" role="menu" [style.left.px]="m.x" [style.top.px]="m.y">
         @if (m.paths.length) {
           <button type="button" role="menuitem" [disabled]="!m.files.length" (click)="addFromMenu(m.files)">{{ m.files.length > 1 ? 'Add ' + m.files.length + ' Files to Document' : 'Add to Document' }}<span class="key">⌘↓</span></button>
-          <div class="sep"></div>
-          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="startRename(m.paths[0])">Rename…<span class="key">↵</span></button>
-          <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || !m.files.length" (click)="duplicateFile(m.paths[0])">Duplicate</button>
+          @if (manage.enabled()) {
+            <div class="sep"></div>
+            <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="startRename(m.paths[0])">Rename…<span class="key">↵</span></button>
+            <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || !m.files.length" (click)="duplicateFile(m.paths[0])">Duplicate</button>
+          }
         }
-        <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="newFolder(m.paths[0] ?? null)">New Folder</button>
+        @if (manage.enabled()) {
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="newFolder(m.paths[0] ?? null)">New Folder</button>
+        }
         @if (m.paths.length) {
           <div class="sep"></div>
           <button type="button" role="menuitem" [disabled]="m.paths.length > 1" (click)="revealInFinder(m.paths[0])">Reveal in Finder</button>
+          <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || m.files.length !== 1" (click)="openInCatalogFromMenu(m.files[0])">Open in Catalog</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, true)">{{ m.paths.length > 1 ? 'Copy Paths' : 'Copy Path' }}</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, false)">{{ m.paths.length > 1 ? 'Copy Relative Paths' : 'Copy Relative Path' }}</button>
-          <div class="sep"></div>
-          <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
+          @if (manage.enabled()) {
+            <div class="sep"></div>
+            <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
+          }
         }
       </div>
     }
@@ -146,6 +154,8 @@ interface Row {
 })
 export class TreePanel {
   private readonly lib = inject(LibraryService);
+  /** Manage off: the list is for browsing only (nothing is renamed, moved, duplicated or trashed from here). */
+  protected readonly manage = inject(ManageService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Nested search results; null = browse the library lazily. */
@@ -176,6 +186,8 @@ export class TreePanel {
   readonly openTrash = output<void>();
   /** The notice's "Relink…" button: the parts (document item ids) that were looked up get another file. */
   readonly relink = output<string[]>();
+  /** "Open in Catalog": show this file on its page in the parts catalog. */
+  readonly openInCatalog = output<string>();
   /** Ids of the document parts the notice is about (for its Relink button); null when the notice has none. */
   protected readonly noticeRelink = signal<string[] | null>(null);
 
@@ -498,7 +510,7 @@ export class TreePanel {
     const plain = !ev.metaKey && !ev.ctrlKey && !ev.shiftKey && !ev.altKey;
     const onArrow = (ev.target as HTMLElement).closest('.caret') !== null;
     const alone = this.selection().size <= 1;
-    const slowSecondClick = path === this.focused() && this.treeWasFocused && plain && alone && !onArrow && sinceLast > TreePanel.doubleClickMs && !this.renaming() && !this.menu();
+    const slowSecondClick = this.manage.enabled() && path === this.focused() && this.treeWasFocused && plain && alone && !onArrow && sinceLast > TreePanel.doubleClickMs && !this.renaming() && !this.menu();
     if (ev.shiftKey && !onArrow) { // Shift-click: everything from the anchor to here
       this.selection.set(new Set(rangeBetween(this.visiblePaths(), this.anchor ?? this.focused(), path)));
       this.focused.set(path);
@@ -614,6 +626,7 @@ export class TreePanel {
 
   /** Moves the rows to the Trash; when documents use them the user is asked first. */
   protected async requestTrash(paths: string[]) {
+    if (!this.manage.enabled()) return;
     this.menu.set(null);
     this.pendingTrash.set(null);
     const chosen = actedOn(this.visiblePaths(), new Set(paths));
@@ -632,6 +645,7 @@ export class TreePanel {
 
   /** ⌥⌘⌫: asks whether to delete these rows for good, saying what is in them and which documents use them. */
   protected async requestDelete(paths: string[]) {
+    if (!this.manage.enabled()) return;
     this.menu.set(null);
     this.pendingTrash.set(null);
     const chosen = actedOn(this.visiblePaths(), new Set(paths));
@@ -741,6 +755,7 @@ export class TreePanel {
 
   /** Makes a folder inside `path` (or next to it when it is a file; in the library root without a path) and opens it for naming. */
   protected async newFolder(path: string | null) {
+    if (!this.manage.enabled()) return;
     this.menu.set(null);
     const row = path === null ? null : this.rows().find(r => r.entry.path === path);
     const parent = path === null ? '' : row?.entry.type === 'dir' ? path : path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
@@ -771,6 +786,7 @@ export class TreePanel {
   }
 
   protected async duplicateFile(path: string) {
+    if (!this.manage.enabled()) return;
     this.menu.set(null);
     try {
       const made = await firstValueFrom(this.lib.duplicate(path));
@@ -782,6 +798,11 @@ export class TreePanel {
       const detail = (error as { error?: { detail?: unknown } }).error?.detail;
       this.note(typeof detail === 'string' ? `Could not duplicate it: ${detail}` : 'Could not duplicate it');
     }
+  }
+
+  protected openInCatalogFromMenu(path: string) {
+    this.menu.set(null);
+    this.openInCatalog.emit(path);
   }
 
   protected async revealInFinder(path: string) {
@@ -829,6 +850,7 @@ export class TreePanel {
   }
 
   private canDrop(folder: string): boolean {
+    if (!this.manage.enabled()) return false;
     if (!this.dragPaths.length) return false;
     return this.dragPaths.every(p => {
       const parent = p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
@@ -877,6 +899,7 @@ export class TreePanel {
 
   /** Turns the row into a text field with the name (a file without its .stl) selected. */
   protected async startRename(path: string) {
+    if (!this.manage.enabled()) return;
     this.menu.set(null);
     const row = this.rows().find(r => r.entry.path === path);
     if (!row) return;

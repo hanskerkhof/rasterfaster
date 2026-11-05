@@ -12,7 +12,8 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve"
+    "module": "preserve",
+    "paths": { "@rasterfaster/library": ["./src/library/public-api.ts"] }
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

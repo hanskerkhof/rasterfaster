@@ -1,11 +1,10 @@
-import { LibraryService } from './library.service';
+import { LibraryService, rangeEndingAt } from '@rasterfaster/library';
 import { cubeKeepOut } from './view-cube';
 import { ReleaseFocus } from './release-focus';
 import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { VersionsDialog } from './versions-dialog';
 import { RenderService } from './render.service';
-import { rangeEndingAt } from './tree-selection';
 import { ZipEntry, buildZip } from './zip';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 

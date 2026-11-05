@@ -31,8 +31,6 @@ import images
 import versions
 import export3mf
 import import3mf
-import library_ops
-import searchterms
 import svgexport
 from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.concurrency import run_in_threadpool
@@ -40,25 +38,19 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from pydantic import BaseModel, Field
+from rf_library import LibraryConfig, create_router
+import fusionfind
 
 _paths = appconfig.resolve_paths(os.environ, Path(__file__).resolve().parent.parent, Path.home(), appconfig.is_frozen(), appconfig.bundle_dir())
 libraryRoot = _paths["libraryRoot"]
 apiPort = int(os.environ.get("PORT", "8100"))
 frontendDist = _paths["frontendDist"]
 documentsRoot = _paths["documentsRoot"]
-backupRoot = _paths["backupRoot"]  # originals of renamed library files (library_ops.py)
+backupRoot = _paths["backupRoot"]  # originals of renamed library files (rf_library/ops.py)
 if appconfig.is_frozen() and not os.environ.get("RF_DOCS"):
     appconfig.seed_documents(documentsRoot, (appconfig.bundle_dir() or Path(".")) / "seed_documents")
 
 app = FastAPI(title="RASTERFASTER API")
-
-
-class LibraryEntry(BaseModel):
-    name: str
-    path: str
-    type: Literal["dir", "file"]
-    modified: float
-    match: bool = True
 
 
 def resolve_inside_root(relativePath: str) -> Path:
@@ -79,10 +71,6 @@ def resolve_part(path: str) -> Path:
     return resolve_inside_root(path)
 
 
-def natural_key(name: str) -> list:
-    return [int(part) if part.isdigit() else part.lower() for part in re.split(r"(\d+)", name)]
-
-
 @app.get("/api/health")
 def health():
     """Cheap liveness check; the frontend polls it to show an offline banner. `documents` is the newest modification time of any
@@ -94,248 +82,6 @@ def health():
         except OSError:
             pass
     return {"status": "ok", "documents": stamp}
-
-
-class RenameRequest(BaseModel):
-    path: str = Field(max_length=1024)
-    newName: str = Field(max_length=300)
-
-
-@app.post("/api/library/rename")
-def rename_library_entry(body: RenameRequest, dryRun: bool = False) -> dict:
-    """Renames a library file or directory (see library_ops.py): the first rename of a file keeps a copy of the original in the backup folder, the
-    documents that use it follow. `dryRun=true` only reports what would happen."""
-    with documentWriteLock:
-        try:
-            return library_ops.rename(libraryRoot, backupRoot, documentsRoot, body.path, body.newName, dryRun)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-class TrashRequest(BaseModel):
-    path: str = Field(max_length=1024)
-
-
-@app.post("/api/library/trash")
-def move_library_entry_to_trash(body: TrashRequest, dryRun: bool = False) -> dict:
-    """Moves a library file or directory to the Trash (like the Finder); `dryRun=true` reports the documents that use it."""
-    with documentWriteLock:
-        try:
-            return library_ops.move_to_trash(libraryRoot, backupRoot, documentsRoot, body.path, dryRun)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-class TrashBatchRequest(BaseModel):
-    paths: list[str] = Field(max_length=2000)
-
-
-@app.post("/api/library/trash-batch")
-def move_library_entries_to_trash(body: TrashBatchRequest, dryRun: bool = False) -> dict:
-    """Moves several library items to the Trash as one action (a folder and things inside it count as the folder). `dryRun=true` lists them
-    and the documents that use them."""
-    with documentWriteLock:
-        try:
-            return library_ops.trash_batch(libraryRoot, backupRoot, documentsRoot, body.paths, dryRun)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.post("/api/library/delete-batch")
-def delete_library_entries(body: TrashBatchRequest, dryRun: bool = False) -> dict:
-    """Deletes several library items for good, without the Trash (⌥⌘⌫ in the file list). `dryRun=true` lists them and the documents that use them."""
-    with documentWriteLock:
-        try:
-            return library_ops.delete_batch(libraryRoot, backupRoot, documentsRoot, body.paths, dryRun)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-class PathsRequest(BaseModel):
-    paths: list[str] = Field(max_length=5000)
-
-
-@app.post("/api/library/missing")
-def library_missing(body: PathsRequest) -> dict:
-    """Which of these library paths are not files in the library (moved to the Trash, renamed or deleted outside the app, or outside the library):
-    the parts list marks the document parts that use them."""
-    missing = []
-    for path in dict.fromkeys(body.paths):
-        try:
-            found = resolve_part(path).is_file() if embeddedPattern.match(path) else library_ops.inside_library(libraryRoot, path).is_file()
-        except library_ops.LibraryError:
-            found = False
-        if not found:
-            missing.append(path)
-    return {"missing": missing}
-
-
-@app.get("/api/library/root")
-def library_root() -> dict:
-    """Where the STL library is on this machine (the file list builds full paths for Copy Path from it)."""
-    return {"root": str(libraryRoot)}
-
-
-class MoveRequest(BaseModel):
-    paths: list[str] = Field(max_length=2000)
-    targetDir: str = Field(max_length=1024)
-
-
-@app.post("/api/library/move")
-def move_library_entries(body: MoveRequest, dryRun: bool = False) -> dict:
-    """Moves files and directories into one library directory (the first move of a file keeps a copy of the original in the backup folder, the
-    documents follow). `dryRun=true` only reports what would happen."""
-    with documentWriteLock:
-        try:
-            return library_ops.move_batch(libraryRoot, backupRoot, documentsRoot, body.paths, body.targetDir, dryRun)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-class NewFolderRequest(BaseModel):
-    parent: str = Field(max_length=1024)
-    name: str = Field(max_length=300)
-
-
-@app.post("/api/library/new-folder")
-def new_library_folder(body: NewFolderRequest) -> dict:
-    with documentWriteLock:
-        try:
-            return library_ops.make_folder(libraryRoot, backupRoot, body.parent, body.name)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.post("/api/library/remove-empty-folder")
-def remove_empty_library_folder(body: TrashRequest) -> dict:
-    """Removes an empty folder (Esc right after New Folder cancels the new folder)."""
-    with documentWriteLock:
-        try:
-            return library_ops.remove_empty_folder(libraryRoot, backupRoot, body.path)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.post("/api/library/duplicate")
-def duplicate_library_file(body: TrashRequest) -> dict:
-    with documentWriteLock:
-        try:
-            return library_ops.duplicate(libraryRoot, backupRoot, body.path)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.post("/api/library/reveal")
-def reveal_library_entry(body: TrashRequest) -> dict:
-    """Shows a library item in the Finder (`open -R`); only works on the Mac that runs the API."""
-    try:
-        target = library_ops.inside_library(libraryRoot, body.path)
-    except library_ops.LibraryError as error:
-        raise HTTPException(status_code=error.status, detail=str(error))
-    if sys.platform != "darwin":
-        raise HTTPException(status_code=501, detail="Reveal in Finder only works on macOS")
-    subprocess.run(["open", "-R", str(target)], check=False)
-    return {"path": body.path, "absolute": str(target)}
-
-
-@app.get("/api/library/trash")
-def list_library_trash() -> list[dict]:
-    return library_ops.list_trash(backupRoot)
-
-
-@app.post("/api/library/trash/{itemId}/put-back")
-def put_back_from_trash(itemId: str, onConflict: Literal["ask", "rename"] = "ask") -> dict:
-    with documentWriteLock:
-        try:
-            return library_ops.put_back(libraryRoot, backupRoot, itemId, onConflict)
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.delete("/api/library/trash/{itemId}")
-def delete_from_trash(itemId: str) -> dict:
-    """"Delete Immediately": removes one item from the Trash for good."""
-    with documentWriteLock:
-        try:
-            return {"removed": library_ops.delete_immediately(backupRoot, itemId)}
-        except library_ops.LibraryError as error:
-            raise HTTPException(status_code=error.status, detail=str(error))
-
-
-@app.delete("/api/library/trash")
-def empty_library_trash() -> dict:
-    """"Empty Trash": removes everything in the Trash for good."""
-    with documentWriteLock:
-        return {"removed": library_ops.delete_immediately(backupRoot, None)}
-
-
-@app.get("/api/list", response_model=list[LibraryEntry])
-def list_directory(path: str = "") -> list[LibraryEntry]:
-    directory = resolve_inside_root(path)
-    if not directory.is_dir():
-        raise HTTPException(status_code=404, detail="not a directory")
-    entries = [
-        LibraryEntry(
-            name=child.name,
-            path=child.relative_to(libraryRoot).as_posix(),
-            type="dir" if child.is_dir() else "file",
-            modified=child.stat().st_mtime,
-        )
-        for child in directory.iterdir()
-        if not child.name.startswith(".") and (child.is_dir() or child.suffix.lower() == ".stl")
-    ]
-    entries.sort(key=lambda entry: (entry.type != "dir", natural_key(entry.name)))
-    return entries
-
-
-maxSearchResults = 2000
-
-
-def make_entry(path: Path, match: bool) -> LibraryEntry:
-    return LibraryEntry(
-        name=path.name,
-        path=path.relative_to(libraryRoot).as_posix(),
-        type="dir" if path.is_dir() else "file",
-        modified=path.stat().st_mtime,
-        match=match,
-    )
-
-
-@app.get("/api/search", response_model=list[LibraryEntry])
-def search(q: str, mode: Literal["any", "all"] = "any") -> list[LibraryEntry]:
-    """Files and folders whose name contains the terms of `q` (see searchterms.py): any of them, or with `mode=all` every one."""
-    include, exclude = searchterms.parse_query(q)
-    if not include:
-        return []
-    found: dict[str, LibraryEntry] = {}
-    matchCount = 0
-    for directory, dirNames, fileNames in os.walk(libraryRoot):
-        dirNames[:] = [name for name in dirNames if not name.startswith(".")]
-        names = dirNames + [name for name in fileNames if name.lower().endswith(".stl") and not name.startswith(".")]
-        for name in names:
-            if not searchterms.name_matches(name, include, exclude, mode):
-                continue
-            path = Path(directory) / name
-            found[path.relative_to(libraryRoot).as_posix()] = make_entry(path, True)
-            for ancestor in path.parents:
-                if ancestor == libraryRoot:
-                    break
-                found.setdefault(ancestor.relative_to(libraryRoot).as_posix(), make_entry(ancestor, False))
-            matchCount += 1
-        if matchCount >= maxSearchResults:
-            break
-    return list(found.values())
-
-
-@app.get("/api/file")
-def get_file(path: str) -> FileResponse:
-    file = resolve_part(path)
-    if file.suffix.lower() != ".stl":
-        raise HTTPException(status_code=400, detail="only .stl")
-    if not file.is_file():
-        raise HTTPException(status_code=404, detail="not found")
-    # no-cache = always revalidate with the ETag, so a file overwritten on disk shows up at once instead of the browser's heuristic cached copy
-    return FileResponse(file, media_type="model/stl", headers={"Cache-Control": "no-cache"})
 
 
 class DocumentItemRender(BaseModel):
@@ -528,6 +274,10 @@ def get_document(documentId: str) -> DocumentOut:
 
 
 documentWriteLock = threading.Lock()
+app.include_router(fusionfind.create_router())  # find a part in the Fusion 360 files (scripts/f3dsearch.py)
+app.include_router(create_router(LibraryConfig(
+    library_root=lambda: libraryRoot, backup_root=lambda: backupRoot, documents_root=lambda: documentsRoot, write_lock=documentWriteLock,
+    resolve_part=lambda path: resolve_part(path), is_embedded=lambda path: bool(embeddedPattern.match(path)))))  # the library API (rf_library): paths are read at every request
 
 
 @app.put("/api/documents/{documentId}", response_model=DocumentOut)

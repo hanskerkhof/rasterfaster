@@ -1,10 +1,10 @@
 import { DatePipe } from '@angular/common';
 import { Component, OnInit, inject, output, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { LibraryService, TrashItem } from './library.service';
+import { LibraryService, TrashItem } from '../core/library.service';
 
 /** The Trash of the library, like the Finder's: Put Back, Delete Immediately and Empty Trash. */
-import { closeOnEscape } from './escape-close';
+import { closeOnEscape } from '../util/escape-close';
 @Component({
   selector: 'app-trash-dialog',
   imports: [DatePipe],

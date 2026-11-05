@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, effect, inject, signal } from '@angular/core';
+import type { CatalogEntry, DuplicateGroup } from '../catalog/catalog.logic';
+import { RF_LIBRARY_CONFIG } from './library.config';
 import { firstValueFrom } from 'rxjs';
 
 export interface LibraryEntry {
@@ -72,6 +74,7 @@ function readStoredSort(): { key: SortKey; ascending: boolean } {
 @Injectable({ providedIn: 'root' })
 export class LibraryService {
   private readonly http = inject(HttpClient);
+  private readonly api = inject(RF_LIBRARY_CONFIG).apiBase;
 
   private readonly storedSort = readStoredSort();
   readonly sortKey = signal<SortKey>(this.storedSort.key);
@@ -84,76 +87,101 @@ export class LibraryService {
     });
   }
 
+  /** Every STL of the library, for the catalog. */
+  catalog() {
+    return this.http.get<CatalogEntry[]>(`${this.api}/catalog`);
+  }
+
+  /** Starts looking for identical files (`exact`) or for files with the same shape (`shape`: re-exports, or the same part at another place) in the background; the API remembers what it has read. */
+  startDuplicateScan(mode: 'exact' | 'shape' = 'exact') {
+    return this.http.post<{ state: string }>(`${this.api}/catalog/duplicates/scan`, {}, { params: { mode } });
+  }
+
+  /** The state of that scan and, when it is done, the groups of identical files. */
+  duplicates(mode: 'exact' | 'shape' = 'exact') {
+    return this.http.get<{ state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string; groups: DuplicateGroup[] }>(`${this.api}/catalog/duplicates`, { params: { mode } });
+  }
+
+  /** What is the same as one part: files with exactly its content (`identical`) and files with its shape (`sameShape`), from the files of the same size. */
+  matches(path: string) {
+    return this.http.get<{ identical: string[]; sameShape: string[]; compared: number }>(`${this.api}/catalog/matches`, { params: { path } });
+  }
+
+  /** Every library path that a document (or one of its versions) uses. */
+  usedPaths() {
+    return this.http.get<{ paths: string[] }>(`${this.api}/catalog/used`);
+  }
+
   list(path: string) {
-    return this.http.get<LibraryEntry[]>('/api/list', { params: { path } });
+    return this.http.get<LibraryEntry[]>(`${this.api}/list`, { params: { path } });
   }
 
   /** Renames a library file or directory; the first rename of a file keeps a copy of the original in the backup folder. */
   rename(path: string, newName: string) {
-    return this.http.post<RenameResult>('/api/library/rename', { path, newName });
+    return this.http.post<RenameResult>(`${this.api}/library/rename`, { path, newName });
   }
 
   private rootCache?: Promise<string>;
 
   /** The full path of the library folder on the machine that runs the API (cached), for Copy Path. */
   rootPath(): Promise<string> {
-    this.rootCache ??= firstValueFrom(this.http.get<{ root: string }>('/api/library/root')).then(r => r.root, error => { this.rootCache = undefined; throw error; });
+    this.rootCache ??= firstValueFrom(this.http.get<{ root: string }>(`${this.api}/library/root`)).then(r => r.root, error => { this.rootCache = undefined; throw error; });
     return this.rootCache;
   }
 
   /** Moves files and directories into the library directory `targetDir` ('' is the library root); the documents follow. */
   move(paths: string[], targetDir: string) {
-    return this.http.post<MoveBatchResult>('/api/library/move', { paths, targetDir });
+    return this.http.post<MoveBatchResult>(`${this.api}/library/move`, { paths, targetDir });
   }
 
   newFolder(parent: string, name: string) {
-    return this.http.post<{ path: string }>('/api/library/new-folder', { parent, name });
+    return this.http.post<{ path: string }>(`${this.api}/library/new-folder`, { parent, name });
   }
 
   /** Removes an empty folder (the undo of New Folder). */
   removeEmptyFolder(path: string) {
-    return this.http.post<{ path: string }>('/api/library/remove-empty-folder', { path });
+    return this.http.post<{ path: string }>(`${this.api}/library/remove-empty-folder`, { path });
   }
 
   /** Copies a file next to itself as `name copy.stl`. */
   duplicate(path: string) {
-    return this.http.post<{ from: string; path: string }>('/api/library/duplicate', { path });
+    return this.http.post<{ from: string; path: string }>(`${this.api}/library/duplicate`, { path });
   }
 
   /** Shows the item in the Finder of the Mac that runs the API. */
   reveal(path: string) {
-    return this.http.post<{ path: string; absolute: string }>('/api/library/reveal', { path });
+    return this.http.post<{ path: string; absolute: string }>(`${this.api}/library/reveal`, { path });
   }
 
   /** Moves a file or directory to the Trash (like the Finder); `dryRun` only reports the documents that use it. */
   trash(path: string, dryRun = false) {
-    return this.http.post<TrashResult>('/api/library/trash', { path }, { params: dryRun ? { dryRun: true } : {} });
+    return this.http.post<TrashResult>(`${this.api}/library/trash`, { path }, { params: dryRun ? { dryRun: true } : {} });
   }
 
   /** Moves several items to the Trash as one action (a folder and things inside it count as the folder). */
   trashBatch(paths: string[], dryRun = false) {
-    return this.http.post<TrashBatchResult>('/api/library/trash-batch', { paths }, { params: dryRun ? { dryRun: true } : {} });
+    return this.http.post<TrashBatchResult>(`${this.api}/library/trash-batch`, { paths }, { params: dryRun ? { dryRun: true } : {} });
   }
 
   /** Deletes several items for good, without the Trash (⌥⌘⌫). A dry run lists them and the documents that use them. */
   deleteBatch(paths: string[], dryRun = false) {
-    return this.http.post<TrashBatchResult>('/api/library/delete-batch', { paths }, { params: dryRun ? { dryRun: true } : {} });
+    return this.http.post<TrashBatchResult>(`${this.api}/library/delete-batch`, { paths }, { params: dryRun ? { dryRun: true } : {} });
   }
 
   trashList() {
-    return this.http.get<TrashItem[]>('/api/library/trash');
+    return this.http.get<TrashItem[]>(`${this.api}/library/trash`);
   }
 
   putBack(id: string, onConflict?: 'rename') {
-    return this.http.post<{ id: string; path: string; name: string; kind: string; renamed: boolean }>(`/api/library/trash/${id}/put-back`, {}, { params: onConflict ? { onConflict } : {} });
+    return this.http.post<{ id: string; path: string; name: string; kind: string; renamed: boolean }>(`${this.api}/library/trash/${id}/put-back`, {}, { params: onConflict ? { onConflict } : {} });
   }
 
   deleteImmediately(id: string) {
-    return this.http.delete<{ removed: number }>(`/api/library/trash/${id}`);
+    return this.http.delete<{ removed: number }>(`${this.api}/library/trash/${id}`);
   }
 
   emptyTrash() {
-    return this.http.delete<{ removed: number }>('/api/library/trash');
+    return this.http.delete<{ removed: number }>(`${this.api}/library/trash`);
   }
 
   /** How many items the Trash holds (shown next to the Trash button). */
@@ -177,16 +205,16 @@ export class LibraryService {
 
   /** Which of these library paths are not files in the library (in the Trash, renamed or deleted outside the app). */
   async missing(paths: string[]): Promise<string[]> {
-    return (await firstValueFrom(this.http.post<{ missing: string[] }>('/api/library/missing', { paths }))).missing;
+    return (await firstValueFrom(this.http.post<{ missing: string[] }>(`${this.api}/library/missing`, { paths }))).missing;
   }
 
   /** Files and folders whose name contains the terms of `q` (see filter-terms.ts): any of them, or every one with `mode` 'all'. */
   search(q: string, mode: 'any' | 'all' = 'any') {
-    return this.http.get<LibraryEntry[]>('/api/search', { params: { q, mode } });
+    return this.http.get<LibraryEntry[]>(`${this.api}/search`, { params: { q, mode } });
   }
 
   fileUrl(path: string) {
-    return `/api/file?path=${encodeURIComponent(path)}`;
+    return `${this.api}/file?path=${encodeURIComponent(path)}`;
   }
 
   loadStl(path: string) {

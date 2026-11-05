@@ -81,7 +81,7 @@ export function buildViewSvg(renderer: THREE.WebGLRenderer, camera: THREE.Camera
 
   /** Hidden lines: every pixel along the edge is tested against the depth picture; visible runs go to `paths`, hidden runs (dashed mode) to `hiddenPaths`. */
   const drawSegment = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, ox: number, oy: number, oz: number,
-                       into = paths, hiddenInto: string[] | null = mode === 'hidden-shown' ? hiddenPaths : null) => {
+                       into = paths, hiddenInto: string[] | null = mode === 'hidden-shown' ? hiddenPaths : null, contour = false) => {
     a.set(ax + ox, ay + oy, az + oz, 1).applyMatrix4(viewProjection);
     b.set(bx + ox, by + oy, bz + oz, 1).applyMatrix4(viewProjection);
     if (a.w <= 1e-6 || b.w <= 1e-6) return; // behind the camera: not drawn
@@ -104,7 +104,16 @@ export function buildViewSvg(renderer: THREE.WebGLRenderer, camera: THREE.Camera
       let now: 'visible' | 'hidden' | null = null;
       if (nz >= -1 && nz <= 1 && px >= 0 && px < width && py >= 0 && py < height) {
         const column = Math.min(width - 1, Math.floor(px)), row = Math.min(height - 1, Math.floor(height - py)); // the picture's rows start at the bottom
-        const stored = 1 - depth[(row * width + column) * 4]; // MeshDepthMaterial writes 1 - depth; nothing drawn there = far
+        let stored = 1 - depth[(row * width + column) * 4]; // MeshDepthMaterial writes 1 - depth; nothing drawn there = far
+        if (contour) {
+          // A contour line of a smooth surface lies at the middle depth of that surface, while the wall in front of it, one pixel inside,
+          // is nearer by millimetres: tested against that pixel the line would be hidden, and which pixel a sample falls in would make it
+          // dashed. So it is tested against the farthest surface within one pixel around: on the rim of its own shape that is what lies behind.
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            const c = Math.min(width - 1, Math.max(0, column + dc)), r = Math.min(height - 1, Math.max(0, row + dr));
+            stored = Math.max(stored, 1 - depth[(r * width + c) * 4]);
+          }
+        }
         const seen = linear(nz * 0.5 + 0.5), blocker = linear(Math.min(1, Math.max(0, stored)));
         now = seen <= blocker + 0.25 + 0.0012 * blocker ? 'visible' : 'hidden'; // the edges lie on the faces that made the picture: a little room
       }
@@ -140,7 +149,7 @@ export function buildViewSvg(renderer: THREE.WebGLRenderer, camera: THREE.Camera
       n1.set(na.getX(i), na.getY(i), na.getZ(i));
       n2.set(nb.getX(i), nb.getY(i), nb.getZ(i));
       if (n1.dot(toEye) * n2.dot(toEye) >= 0) continue; // both faces look the same way: not the contour from here
-      drawSegment(sp.getX(i), sp.getY(i), sp.getZ(i), sp.getX(i + 1), sp.getY(i + 1), sp.getZ(i + 1), ox, oy, oz);
+      drawSegment(sp.getX(i), sp.getY(i), sp.getZ(i), sp.getX(i + 1), sp.getY(i + 1), sp.getZ(i + 1), ox, oy, oz, paths, undefined, true);
     }
   }
 

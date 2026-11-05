@@ -29,12 +29,14 @@ export function setSilhouetteEdges(on: boolean) {
 export const creaseDegrees = 25;
 /** Edges that bend less than this are flat triangulation lines: they can never be a silhouette, so they are left out. */
 const flatDegrees = 0.5;
+/** The same for a drawing (SVG): there the contour of a finely faceted cone or cylinder (facets bending less than 0.5°) must not break off. */
+export const drawingFlatDegrees = 0.05;
 
 /**
  * The smooth edges of `source` (bending between `flatDegrees` and `creaseDegrees`) as line segments with the attributes the shader needs:
  * `mid` (the edge's middle, so both ends decide the same way), `n1` and `n2` (the normals of the two triangles).
  */
-export function buildSilhouetteGeometry(source: THREE.BufferGeometry, crease = creaseDegrees): THREE.BufferGeometry {
+export function buildSilhouetteGeometry(source: THREE.BufferGeometry, crease = creaseDegrees, flat = flatDegrees): THREE.BufferGeometry {
   const position = source.getAttribute('position') as THREE.BufferAttribute;
   const index = source.getIndex();
   const triangleCount = (index ? index.count : position.count) / 3;
@@ -69,7 +71,7 @@ export function buildSilhouetteGeometry(source: THREE.BufferGeometry, crease = c
   }
 
   const cosCrease = Math.cos(THREE.MathUtils.degToRad(crease));
-  const cosFlat = Math.cos(THREE.MathUtils.degToRad(flatDegrees));
+  const cosFlat = Math.cos(THREE.MathUtils.degToRad(flat));
   const positions: number[] = [], mids: number[] = [], n1s: number[] = [], n2s: number[] = [];
   for (const [key, faces] of edgeFaces) {
     if (faces.length !== 2) continue; // open or non-manifold edges are not silhouettes
