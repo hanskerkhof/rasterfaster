@@ -543,10 +543,15 @@ export class App {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);
     }
-    if (event.code === 'KeyC' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat && !this.catalogOpen() // C: the parts catalog
-      && !(event.target as HTMLElement | null)?.closest('input, textarea, select, [contenteditable], dialog, [role="dialog"]')) {
+    const plain = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat;
+    const typing = !!(event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]');
+    if (event.code === 'KeyT' && plain && !typing && this.trashOpen()) { // T again closes the Trash
       event.preventDefault();
-      this.setCatalogOpen(true);
+      this.trashOpen.set(false);
+    } else if ((event.code === 'KeyC' || event.code === 'KeyT') && plain && !typing && !this.catalogOpen() && !this.trashOpen()
+      && !(event.target as HTMLElement | null)?.closest?.('dialog, [role="dialog"]')) { // C: the parts catalog, T: the Trash
+      event.preventDefault();
+      if (event.code === 'KeyC') this.setCatalogOpen(true); else this.trashOpen.set(true);
     }
     if (event.code === 'KeyM' && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) { // ⌥M: the step of Option moves, 1 mm / 0.1 mm
       event.preventDefault();

@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Key T opens the Trash (0.12.8)
+
+### Added
+- **FE** (`app.ts`, `app.html`): press **T** to open the Trash (under the same conditions as **C** for the catalog: not while typing, with a dialog open, or with a modifier key held); the Trash button shows the key. **T** again closes the Trash.
+
 ## 2026-11-05 - A toast after ADD TO DOCUMENT, FIND IN BROWSER for parts shown together, FIND remembered (0.12.7)
 
 ### Added
