@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Dragging in a long list scrolls it (0.12.19)
+
+### Fixed
+- **FE** (`drag-scroll.ts`, `document-panel.ts`, `views-panel.ts`): dragging a part (or a view) to the top or bottom edge of its list now scrolls the list (faster the closer the pointer is to the edge, or beyond it), so the first and the last place can be reached in a long list. The places are measured inside the list's content, so they stay right while it scrolls.
+
 ## 2026-11-05 - Folded groups are kept with the document (0.12.18)
 
 ### Changed

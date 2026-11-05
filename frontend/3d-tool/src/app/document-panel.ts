@@ -3,6 +3,7 @@ import { cubeKeepOut } from './view-cube';
 import { ReleaseFocus } from './release-focus';
 import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { BomDialog } from './bom-dialog';
+import { autoScroll } from './drag-scroll';
 import { VersionsDialog } from './versions-dialog';
 import { RenderService } from './render.service';
 import { ZipEntry, buildZip } from './zip';
@@ -745,29 +746,34 @@ export class DocumentPanel {
         : [listEl.querySelector(`.item[data-id="${unit.key}"]`)];
       return els.filter((el): el is Element => !!el).map(el => el.getBoundingClientRect());
     };
-    const span = (unit: Unit) => { const r = rowsOf(unit); return r.length ? { top: r[0].top, bottom: r[r.length - 1].bottom } : null; };
+    // all the positions are measured inside the list's content (not on the screen), so they stay right while the list scrolls
+    const listTop = listEl.getBoundingClientRect().top, scroll0 = listEl.scrollTop;
+    const span = (unit: Unit) => { const r = rowsOf(unit); return r.length ? { top: r[0].top - listTop + scroll0, bottom: r[r.length - 1].bottom - listTop + scroll0 } : null; };
     const own = (isGroup ? rowsOf({ key, ids: units.find(u => u.key === key)?.ids ?? [] })[0] : rowsOf({ key, ids: [key] })[0]);
     if (!own) return;
     const spans = choices.map(span);
-    const listTop = listEl.getBoundingClientRect().top;
-    const startY = event.clientY;
+    const ownTop = own.top - listTop + scroll0, startContentY = event.clientY - listTop + scroll0;
+    let pointerY = event.clientY;
     // where the dragged part lands when it is put at the end of its group: in front of the first part after the group (or at the end of the list)
     const lastOfGroup = groupId ? items.map((i, n) => (i.groupId === groupId ? n : -1)).reduce((a, b) => Math.max(a, b), -1) : -1;
     const afterGroup = groupId ? items[lastOfGroup + 1]?.id ?? null : null;
     const groupUnitIndex = groupId ? units.findIndex(u => u.key === 'g:' + groupId) : -1;
     const keyAfterGroup = groupId ? units[groupUnitIndex + 1]?.key ?? null : null;
     let target = -1;
-    const move = (e: PointerEvent) => {
-      const dy = e.clientY - startY;
-      const centre = own.top + own.height / 2 + dy;
+    const update = () => {
+      const dy = pointerY - listTop + listEl.scrollTop - startContentY;
+      const centre = ownTop + own.height / 2 + dy;
       const to = spans.filter(sp => sp && (sp.top + sp.bottom) / 2 < centre).length;
       target = to;
-      this.drag.set({ key, height: own.height, away: isGroup ? key.slice(2) : null, top: Math.max(0, Math.min(own.top - listTop + listEl.scrollTop + dy, listEl.scrollHeight - own.height)) });
+      this.drag.set({ key, height: own.height, away: isGroup ? key.slice(2) : null, top: Math.max(0, Math.min(ownTop + dy, listEl.scrollHeight - own.height)) });
       if (to < choices.length) { this.placeBefore.set(choices[to].key); this.placeEnd.set(false); }
       else if (groupId) { this.placeBefore.set(keyAfterGroup); this.placeEnd.set(keyAfterGroup === null); }
       else { this.placeBefore.set(null); this.placeEnd.set(true); }
     };
+    const move = (e: PointerEvent) => { pointerY = e.clientY; update(); };
+    const stopScroll = autoScroll(listEl, () => pointerY, update); // the list scrolls when the pointer is at its top or bottom edge
     const end = (commit: boolean) => {
+      stopScroll();
       grip.removeEventListener('pointermove', move);
       grip.removeEventListener('pointerup', up);
       grip.removeEventListener('pointercancel', cancel);

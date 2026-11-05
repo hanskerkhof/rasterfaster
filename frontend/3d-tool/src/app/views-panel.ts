@@ -1,6 +1,7 @@
 import { Component, ElementRef, computed, effect, inject, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 import { ReleaseFocus } from './release-focus';
+import { autoScroll } from './drag-scroll';
 import { ViewModeIcon, viewModeName } from './view-mode-icon';
 
 const storageKey = 'rasterfaster.viewsPanel';
@@ -131,24 +132,31 @@ export class ViewsPanel {
     grip.setPointerCapture(event.pointerId);
     const views = this.store.doc().views ?? [];
     const listEl = root.querySelector<HTMLElement>('.list')!;
-    const rows = [...root.querySelectorAll<HTMLElement>('.list .view:not(.slot)')].map(el => el.getBoundingClientRect());
+    const listTop = listEl.getBoundingClientRect().top, scroll0 = listEl.scrollTop;
+    // measured inside the list's content (not on the screen), so the positions stay right while the list scrolls
+    const rows = [...root.querySelectorAll<HTMLElement>('.list .view:not(.slot)')].map(el => { const r = el.getBoundingClientRect(); return { top: r.top - listTop + scroll0, height: r.height }; });
     const from = views.findIndex(v => v.id === id);
     if (from < 0 || rows.length !== views.length) return;
     const startY = event.clientY, others = views.filter(v => v.id !== id);
     this.dragTarget = from;
-    const listTop = listEl.getBoundingClientRect().top, own = rows[from];
-    const move = (e: PointerEvent) => {
-      const dy = e.clientY - startY;
+    const own = rows[from];
+    const startContentY = startY - listTop + scroll0;
+    let pointerY = startY;
+    const update = () => {
+      const dy = pointerY - listTop + listEl.scrollTop - startContentY;
       const centre = own.top + own.height / 2 + dy;
       // its place among the other rows: after every row whose middle it has passed
       const to = rows.filter((r, i) => i !== from && r.top + r.height / 2 < centre).length;
       this.dragTarget = to;
       // the lifted row follows the pointer inside the list; a gap of its height shows where it would land
-      this.drag.set({ id, height: own.height, top: Math.max(0, Math.min(own.top - listTop + listEl.scrollTop + dy, listEl.scrollHeight - own.height)) });
+      this.drag.set({ id, height: own.height, top: Math.max(0, Math.min(own.top + dy, listEl.scrollHeight - own.height)) });
       this.placeBefore.set(to < others.length ? others[to].id : null);
       this.placeEnd.set(to >= others.length);
     };
+    const move = (e: PointerEvent) => { pointerY = e.clientY; update(); };
+    const stopScroll = autoScroll(listEl, () => pointerY, update); // the list scrolls when the pointer is at its top or bottom edge
     const end = (commit: boolean) => {
+      stopScroll();
       grip.removeEventListener('pointermove', move);
       grip.removeEventListener('pointerup', up);
       grip.removeEventListener('pointercancel', cancel);
