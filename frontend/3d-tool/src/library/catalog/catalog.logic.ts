@@ -177,3 +177,36 @@ export function filesIn(entries: readonly CatalogEntry[], folder: string): Catal
 export function isWithin(folder: string, ancestor: string): boolean {
   return !ancestor || folder === ancestor || folder.startsWith(ancestor + '/');
 }
+
+/**
+ * The filename convention for parts that belong together: names that are the same except for one of these pairs of words (whole words, any case)
+ * are companions, e.g. `3.43 USB-C FEMALE FRONT` and `3.43 USB-C FEMALE BACK`, `CORNER LEFT 3h` and `CORNER RIGHT 3h`, or the four of `TOP LEFT`,
+ * `TOP RIGHT`, `BOTTOM LEFT`, `BOTTOM RIGHT`. They stay separate parts; the page of a part can show them together.
+ */
+export const pairWords: { id: string; words: string[] }[] = [
+  { id: 'side', words: ['LEFT', 'RIGHT'] },
+  { id: 'height', words: ['TOP', 'BOTTOM'] },
+  { id: 'depth', words: ['FRONT', 'BACK'] },
+  { id: 'level', words: ['UPPER', 'LOWER'] },
+];
+
+const pairPattern = new RegExp(`(?<![A-Za-z])(${pairWords.flatMap(pair => pair.words).join('|')})(?![A-Za-z])`, 'gi');
+
+/** A name with its pair words replaced by their pair (`3.43 USB-C FEMALE {depth}`): parts with the same key belong together. Null when the name has no pair word. */
+export function companionKey(name: string): string | null {
+  const stem = name.replace(/\.stl$/i, '');
+  let found = false;
+  const key = stem.replace(pairPattern, word => {
+    found = true;
+    return `{${pairWords.find(pair => pair.words.includes(word.toUpperCase()))!.id}}`;
+  });
+  return found ? key.toLowerCase() : null;
+}
+
+/** The parts that belong together with this one: the same folder, the same name but for the pair words. Empty when there are none. By name. */
+export function companionsOf(entries: readonly CatalogEntry[], path: string): CatalogEntry[] {
+  const self = entries.find(entry => entry.path === path);
+  const key = self ? companionKey(self.name) : null;
+  if (!self || key === null) return [];
+  return sortCatalog(entries.filter(entry => entry.path !== path && parentFolder(entry.path) === parentFolder(path) && companionKey(entry.name) === key), 'name', true);
+}

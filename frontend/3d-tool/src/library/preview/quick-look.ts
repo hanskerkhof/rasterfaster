@@ -2,10 +2,14 @@ import { Component, ElementRef, OnDestroy, computed, untracked, afterNextRender,
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { Subscription } from 'rxjs';
+import { Subscription, forkJoin } from 'rxjs';
 import { LibraryService } from '../core/library.service';
 import { ViewMode, buildParts, clearParts, previewStyle } from './model-render';
 import { buildSilhouetteGeometry, creaseDegrees, silhouetteEdges } from './silhouette';
+import { companionColors, distinctLabels } from './together';
+
+/** A file shown in the viewer: its geometry (moved only by the offset that centres the whole scene), and what the hidden-line modes need of it. */
+interface Loaded { path: string; geometry: THREE.BufferGeometry; edges: THREE.EdgesGeometry | null; silhouette: THREE.BufferGeometry | null; color: number }
 
 const modeStorageKey = 'rasterfaster.quickLookMode';
 const sizeStorageKey = 'rasterfaster.quickLookSize';
@@ -59,6 +63,9 @@ function readMode(): ViewMode {
         <div #host class="host"></div>
         @if (state()) { <div class="state">{{ state() }}</div> }
         @if (info()) { <div class="dims" title="Width × depth × height of the STL">{{ info() }}</div> }
+        @if (legend().length) {
+          <div class="legend">@for (l of legend(); track l.path) { <span [class.focus]="l.focus" [title]="l.path"><i [style.background]="l.hex"></i>{{ l.name }}</span> }</div>
+        }
       </div>
       @if (!embedded()) { <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ add to document (closes this) · drag to orbit · drag the corner to resize</footer> }
     </div>
@@ -83,6 +90,8 @@ function readMode(): ViewMode {
                      min-width: 0 !important; min-height: 0 !important; resize: none; z-index: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
     .card.embedded .modes { flex-wrap: wrap; border-bottom: 0; background: transparent; position: absolute; top: 32px; left: 6px; right: 6px; padding: 0; z-index: 1; } /* under the page's own DRAWING | 3D switch */
     .card.embedded .dims { display: none; } /* the page shows the size itself */
+    .legend { position: absolute; left: 8px; bottom: 26px; display: flex; flex-direction: column; gap: 3px; pointer-events: none; font-size: 11px; opacity: .85; text-shadow: 0 1px 3px #000; }
+    .legend span { display: flex; align-items: center; gap: 6px; } .legend span.focus { font-weight: 700; opacity: 1; } .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
     .dims { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 13px; font-weight: 600; opacity: .8; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 3px #000; }
   `,
 })
@@ -91,6 +100,8 @@ export class QuickLook implements OnDestroy {
   readonly path = input.required<string>();
   /** Shown inside another page: it fills its box and has no frame, header or footer (the view-mode buttons stay). */
   readonly embedded = input(false);
+  /** Several files to show in one scene (with `path` among them): each keeps the place its own STL gives it, so parts exported from one assembly fit together as they do in a document; each has a colour of its own. Empty: only `path`, centred. */
+  readonly together = input<string[]>([]);
   /** Viewport x of the card's left edge (just right of the list). */
   readonly left = input(392);
   readonly closed = output<void>();
@@ -125,9 +136,8 @@ export class QuickLook implements OnDestroy {
   private controls!: OrbitControls;
   private readonly model = new THREE.Group();
   private readonly keyLight = new THREE.DirectionalLight(0xffffff, 1.8);
-  private geometry: THREE.BufferGeometry | null = null;
-  private edges: THREE.EdgesGeometry | null = null;
-  private silhouette: THREE.BufferGeometry | null = null;
+  private parts: Loaded[] = [];
+  protected readonly legend = signal<{ path: string; name: string; hex: string; focus: boolean }[]>([]);
   private radius = 1;
   private frame = 0;
   private ro?: ResizeObserver;
@@ -136,8 +146,8 @@ export class QuickLook implements OnDestroy {
   constructor() {
     afterNextRender(() => { this.init(); this.ready.set(true); });
     effect(() => {
-      const path = this.path();
-      if (this.ready()) this.load(path);
+      const path = this.path(), together = this.together();
+      if (this.ready()) this.load(path, together);
     });
     effect(() => {
       silhouetteEdges(); // the setting in the view cube menu changed: redraw the loaded file
@@ -184,33 +194,38 @@ export class QuickLook implements OnDestroy {
     this.camera.updateProjectionMatrix();
   }
 
-  private load(path: string) {
+  private load(path: string, together: string[]) {
+    const paths = together.length > 1 ? together : [path];
     this.name.set(path.split('/').pop()!.replace(/\.stl$/i, ''));
     this.state.set('Loading…');
     this.loadSub?.unsubscribe(); // arrowing quickly: drop the download of the file we left
-    this.loadSub = this.library.loadStl(path).subscribe({
-      next: buffer => this.show(buffer),
+    this.loadSub = forkJoin(paths.map(file => this.library.loadStl(file))).subscribe({
+      next: buffers => this.show(paths, buffers),
       error: () => this.state.set('Could not load this file'),
     });
   }
 
-  private show(buffer: ArrayBuffer) {
+  private disposeParts() {
     clearParts(this.model);
-    this.geometry?.dispose();
-    this.edges?.dispose();
-    this.silhouette?.dispose();
-    const geometry = new THREE.BufferGeometry().copy(new STLLoader().parse(buffer));
-    geometry.computeBoundingBox();
-    const box = geometry.boundingBox!;
-    const center = box.getCenter(new THREE.Vector3());
-    geometry.translate(-center.x, -center.y, -center.z);
-    geometry.computeBoundingSphere();
-    this.geometry = geometry;
-    this.edges = null;
-    this.silhouette = null;
-    const size = box.getSize(new THREE.Vector3());
-    this.radius = geometry.boundingSphere!.radius;
-    this.info.set(`${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
+    for (const part of this.parts) { part.geometry.dispose(); part.edges?.dispose(); part.silhouette?.dispose(); }
+    this.parts = [];
+  }
+
+  private show(paths: string[], buffers: ArrayBuffer[]) {
+    this.disposeParts();
+    const geometries = buffers.map(buffer => new THREE.BufferGeometry().copy(new STLLoader().parse(buffer)));
+    const union = new THREE.Box3();
+    for (const geometry of geometries) { geometry.computeBoundingBox(); union.union(geometry.boundingBox!); }
+    const center = union.getCenter(new THREE.Vector3());
+    // every file moves by the same offset (that of the middle of the whole), so files keep their places relative to one another: the origins of the STL files are respected
+    for (const geometry of geometries) { geometry.translate(-center.x, -center.y, -center.z); geometry.computeBoundingSphere(); }
+    const together = geometries.length > 1;
+    this.parts = geometries.map((geometry, i) => ({ path: paths[i], geometry, edges: null, silhouette: null, color: companionColors[i % companionColors.length] }));
+    const size = union.getSize(new THREE.Vector3());
+    this.radius = together ? Math.max(...geometries.map(g => g.boundingSphere!.center.length() + g.boundingSphere!.radius)) : geometries[0].boundingSphere!.radius;
+    this.info.set(`${together ? geometries.length + ' parts · ' : ''}${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
+    const labels = distinctLabels(paths.map(file => file.split('/').pop()!.replace(/\.stl$/i, '')));
+    this.legend.set(together ? paths.map((file, i) => ({ path: file, name: labels[i], hex: '#' + companionColors[i % companionColors.length].toString(16).padStart(6, '0'), focus: file === this.path() })) : []);
     this.rebuild();
     // Isometric, like the main view; the user's orbit is reset per file so every preview starts comparable.
     this.camera.zoom = 1;
@@ -244,16 +259,18 @@ export class QuickLook implements OnDestroy {
     this.rebuild();
   }
 
-  /** (Re)creates the meshes of the loaded file in the chosen view mode; the camera stays where the user put it. */
+  /** (Re)creates the meshes of the loaded files in the chosen view mode; the camera stays where the user put it. */
   private rebuild() {
-    const geometry = this.geometry;
-    if (!geometry) return;
     clearParts(this.model);
-    this.model.add(...buildParts(geometry, this.mode(), {
-      ...previewStyle, background: this.scene.background as THREE.Color, radius: this.radius,
-      edges: () => (this.edges ??= new THREE.EdgesGeometry(geometry, creaseDegrees)),
-      silhouette: () => (this.silhouette ??= buildSilhouetteGeometry(geometry)),
-    }));
+    const together = this.parts.length > 1;
+    for (const part of this.parts) {
+      const look = together ? { solid: part.color, line: part.color, wire: part.color } : {}; // together: every part in a colour of its own, in the line views too
+      this.model.add(...buildParts(part.geometry, this.mode(), {
+        ...previewStyle, ...look, background: this.scene.background as THREE.Color, radius: this.radius,
+        edges: () => (part.edges ??= new THREE.EdgesGeometry(part.geometry, creaseDegrees)),
+        silhouette: () => (part.silhouette ??= buildSilhouetteGeometry(part.geometry)),
+      }));
+    }
   }
 
   ngOnDestroy() {
@@ -263,10 +280,7 @@ export class QuickLook implements OnDestroy {
     removeEventListener('resize', this.onWindowResize);
     this.loadSub?.unsubscribe();
     this.ro?.disconnect();
-    clearParts(this.model);
-    this.geometry?.dispose();
-    this.edges?.dispose();
-    this.silhouette?.dispose();
+    this.disposeParts();
     // dispose() frees GPU resources but not the WebGL context itself. Browsers allow ~16 live contexts and then drop the oldest
     // one, which would be the main 3D view (it turned white after many previews), so give the context back explicitly.
     this.renderer?.dispose();

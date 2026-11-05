@@ -6,12 +6,13 @@ import { ManageService } from '../core/manage.service';
 import { RF_PART_FINDERS, RfFinderResult } from '../core/part-finder';
 import { ManageToggle } from '../core/manage-toggle';
 import { QuickLook } from '../preview/quick-look';
+import { companionColors } from '../preview/together';
 import { rangeBetween } from '../tree/tree-selection';
 import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf } from './catalog.logic';
 
 type CheckMode = 'exact' | 'shape';
 interface ScanState { state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }
@@ -36,8 +37,8 @@ function readSpecWidth(): number {
   return defaultSpecWidth;
 }
 
-function readFigView(): 'drawing' | '3d' {
-  try { return localStorage.getItem(figViewKey) === '3d' ? '3d' : 'drawing'; } catch { return 'drawing'; }
+function readFigView(): 'drawing' | '3d' | 'together' {
+  try { const stored = localStorage.getItem(figViewKey); return stored === '3d' || stored === 'together' ? stored : 'drawing'; } catch { return 'drawing'; }
 }
 
 function readFolderView(): 'list' | 'strip' {
@@ -198,9 +199,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             <div class="dcols">
             <div class="left">
             <div class="fig">
-              @if (figView() === '3d') {
+              @if (figShown() !== 'drawing') {
                 @if (tooLarge(d)) { <span class="note">TOO LARGE TO PREVIEW · {{ kb(d.size) }}</span> }
-                @else { <div class="viewer3d"><app-quick-look [path]="d.path" [embedded]="true" /></div> }
+                @else { <div class="viewer3d"><app-quick-look [path]="d.path" [together]="togetherPaths()" [embedded]="true" /></div> }
               } @else {
                 @switch (bigState()) {
                   @case ('ready') { <img [src]="bigUrl()!" alt="" draggable="false" /> }
@@ -208,8 +209,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
                 }
               }
-              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figView() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figView() === '3d'" (click)="setFigView('3d')">3D</button></span>
-              <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figView() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
+              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }</span>
+              <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figShown() === 'together' ? companions().length + 1 + ' PARTS AT THEIR OWN PLACES · DRAG TO ORBIT' : figShown() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
               <div class="shead">
@@ -237,7 +238,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <button type="button" class="sib dirrow" [title]="f.path" (click)="goFolder(f.path)"><span class="n">▸ {{ f.name }}</span><span class="k">{{ f.count }} {{ f.count === 1 ? 'PART' : 'PARTS' }}</span></button>
                   }
                   @for (s of browseFiles(); track s.path) {
-                    <button type="button" class="sib" [class.current]="s.path === detail()" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ kb(s.size) }}</span></button>
+                    <button type="button" class="sib" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)"><span class="n">{{ fileTitle(s) }}</span><span class="k">{{ s.path === detail() ? 'OPEN · ' : '' }}{{ kb(s.size) }}</span></button>
                   }
                 </div>
               } @else if (browseFiles().length || browseFolders().length) {
@@ -252,7 +253,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                       </button>
                     }
                     @for (s of browseFiles(); track s.path) {
-                      <button type="button" class="tile" [class.current]="s.path === detail()" [title]="s.path" (click)="detail.set(s.path)">
+                      <button type="button" class="tile" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)">
                         <span class="art">
                           @switch (thumbs.state(s)) {
                             @case ('drawn') { <img [src]="thumbs.url(s)" alt="" draggable="false" /> }
@@ -292,6 +293,15 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @if (partChecks()[d.path]; as r) { <span class="result">{{ r.identical.length + r.sameShape.length ? (r.identical.length ? r.identical.length + ' IDENTICAL' : '') + (r.identical.length && r.sameShape.length ? ' · ' : '') + (r.sameShape.length ? r.sameShape.length + ' SAME SHAPE' : '') : 'NONE FOUND' }}</span> }
                   @if (partError() && partChecking() !== d.path) { <span class="warn">{{ partError() }}</span> }
                 </dd></div>
+                @for (row of sameRows(); track row.label) {
+                  <div><dt>{{ row.label }}</dt><dd class="same">@for (other of row.paths.slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (row.paths.length > 6) { <span>+ {{ row.paths.length - 6 }} more</span> }</dd></div>
+                }
+                @if (companions().length) {
+                  <div><dt>TOGETHER</dt><dd class="same">
+                    <span class="check-row"><button type="button" class="tool" title="Show this part with the parts that belong with it, at the places their STL files give them" (click)="setFigView('together')">VIEW TOGETHER</button><span class="result">{{ companions().length + 1 }} PARTS</span></span>
+                    @for (c of companions(); track c.path) { <button type="button" class="link" [title]="c.path" (click)="openIdentical(c.path)">{{ fileTitle(c) }}</button> }
+                  </dd></div>
+                }
                 @for (finder of finders; track finder.id) {
                   <div><dt>{{ finder.id.toUpperCase() }}</dt><dd class="check-row">
                     @if (finderBusy() === finderKey(finder.id, d.path)) { <span class="busy">{{ finderProgress() || 'SEARCHING…' }}</span> }
@@ -299,9 +309,6 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     @if (finderResults()[finderKey(finder.id, d.path)]; as r) { <span class="result">{{ r.found ? r.hits.length + (r.more ? '+' : '') + ' FOUND' : 'NOT FOUND' }}</span> }
                     @if (finderError()[finderKey(finder.id, d.path)]; as e) { <span class="warn">{{ e }}</span> }
                   </dd></div>
-                }
-                @for (row of sameRows(); track row.label) {
-                  <div><dt>{{ row.label }}</dt><dd class="same">@for (other of row.paths.slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (row.paths.length > 6) { <span>+ {{ row.paths.length - 6 }} more</span> }</dd></div>
                 }
                 <div><dt>PATH</dt><dd class="path">{{ d.path }}</dd></div>
               </dl>
@@ -337,7 +344,12 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <button type="button" class="mg" (click)="openRename(d)">RENAME…</button>
                     <button type="button" class="mg" [disabled]="busy()" (click)="duplicate(d)">DUPLICATE</button>
                     <button type="button" class="mg" (click)="openMover([d.path])">MOVE…</button>
-                    <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
+                    @if (figShown() === 'together') {
+                      <button type="button" class="danger" title="Move this part and the parts it is shown together with to the Trash" (click)="trashTogether(d)">MOVE ALL {{ companions().length + 1 }} TOGETHER TO TRASH</button>
+                      <button type="button" class="danger" (click)="requestTrash([d.path])">ONLY THIS ONE TO TRASH</button>
+                    } @else {
+                      <button type="button" class="danger" (click)="requestTrash([d.path])">MOVE TO TRASH</button>
+                    }
                     @for (row of sameRows(); track row.label) { <button type="button" class="danger" (click)="requestTrash(row.paths, 'This file stays; the files ' + row.what + ' go.')" [title]="'Keep this file and move the files ' + row.what + ' to the Trash'">KEEP THIS, TRASH THE {{ row.paths.length === 1 ? 'OTHER' : row.paths.length + ' OTHERS' }}{{ row.label === 'SAME SHAPE' ? ' (SAME SHAPE)' : '' }}</button> }
                   </div>
                   @if (folderPathOf(d)) {
@@ -391,6 +403,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
         <div class="confirm" role="alertdialog" aria-label="Move to Trash">
           <h4>MOVE {{ c.paths.length === 1 ? (isFolder(c.paths[0]) ? '1 FOLDER' : '1 PART') : c.paths.length + ' ITEMS' }} TO THE TRASH?</h4>
           @if (c.paths.length === 1) { <p class="n">{{ c.paths[0] }}</p> }
+          @if (c.paths.length > 1 && c.paths.length <= 8) { @for (path of c.paths; track path) { <p class="n list">{{ path }}</p> } }
           @if (c.paths.length === 1 && isFolder(c.paths[0])) { <p>The folder and the {{ partsUnder(c.paths[0]) }} part{{ partsUnder(c.paths[0]) === 1 ? '' : 's' }} in it.</p> }
           @if (c.note) { <p>{{ c.note }}</p> }
           @if (c.documents.length) {
@@ -430,6 +443,8 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .shead > span:first-child { min-width: 0; } .crumbs { flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .crumbs::-webkit-scrollbar { display: none; }
     .subs { display: inline-flex; align-items: center; } .crumb.sub { color: #9db7f0; max-width: 200px; overflow: hidden; text-overflow: ellipsis; } .crumb.sub:hover { color: #fff; }
     .crumb { padding: 0 5px; color: #aaa; } .crumb:hover { color: #fff; } .crumb.on { background: #e6e6e6; color: #111; } .crumb.ahead { color: #666; } .crumb.ahead:hover { color: #fff; } .sepc { color: #555; }
+    .tile.together { box-shadow: inset 0 4px 0 var(--tc), inset -1px 0 #2c2d31; } .tile.together:not(.current) { outline: 2px solid var(--tc); outline-offset: -2px; background: color-mix(in srgb, var(--tc) 10%, transparent); }
+    .sib.together { box-shadow: inset 4px 0 0 var(--tc); background: color-mix(in srgb, var(--tc) 10%, transparent); } .sib.together.current { background: #26324a; }
     .sib.dirrow .n { color: #9db7f0; } .sib.current { background: #26324a; color: #fff; } .tile.current { background: #26324a; outline: 2px solid #2f6fed; outline-offset: -2px; } .tile.current .name { color: #fff; } .tile.current .meta { color: #9db7f0; } .tile.dirtile .art { color: #9db7f0; } .folder-glyph { font-size: 40px; }
     .shead .right { display: flex; align-items: baseline; gap: 14px; } .shead .chips button { color: #888; } .shead .chips button.on { background: #e6e6e6; color: #111; }
     .stripbox { position: relative; flex: 1 1 auto; min-height: 0; } .strip { height: 100%; display: flex; overflow-x: auto; scrollbar-width: none; } .strip::-webkit-scrollbar { display: none; }
@@ -480,6 +495,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .confirm .field { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 6px 8px; background: #111; border: 1px solid #3a3b40; color: #e6e6e6; } .confirm .field:focus { border-color: #2f6fed; }
     .confirm .hint { font-size: 10px; color: #777; } .folders-list { max-height: 240px; overflow: auto; margin-top: 6px; border: 1px solid #2c2d31; }
     .pick { display: block; width: 100%; box-sizing: border-box; padding: 4px 10px; text-align: left; color: #ccc; word-break: break-all; } .pick:hover:not(:disabled) { background: #26324a; color: #fff; } .pick:disabled { opacity: .35; cursor: default; } .pick.create { color: #9ad29a; }
+    .confirm .n.list { margin: 2px 0; font-size: 11px; }
     .confirm .actions { display: flex; gap: 8px; margin-top: 14px; }
     .scroller { flex: 1; min-height: 0; overflow: auto; border: 1px solid #2c2d31; outline: 0; }
     .space { position: relative; } .grid { position: absolute; left: 0; right: 0; top: 0; display: grid; }
@@ -729,7 +745,7 @@ export class CatalogDialog implements OnInit {
         result => { if (current) this.usedIn.set(Object.keys(result.documents ?? {}).length); },
         () => { /* unknown: stays … */ });
       this.bigState.set('loading');
-      if (this.figView() === '3d') return; // the drawing is made when the picture is switched back to it (the 3D view loads the file itself)
+      if (this.figView() !== 'drawing') return; // the drawing is made when the picture is switched back to it (the 3D view loads the file itself)
       void this.thumbs.drawLarge(entry).then(svg => {
         if (!current) return;
         this.setBig(svg ? URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })) : null);
@@ -827,6 +843,12 @@ export class CatalogDialog implements OnInit {
   protected pickAll() { this.picked.set(new Set(this.shown().map(e => e.path))); }
 
   /** Asks what would happen (a dry run: which documents use these files), then waits for a yes. */
+  /** TOGETHER is shown: the part and the parts shown with it go to the Trash as one batch (one Put Back brings them all back). */
+  protected trashTogether(entry: CatalogEntry) {
+    const paths = [entry.path, ...this.companions().map(c => c.path)];
+    void this.requestTrash(paths, 'These parts belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER).');
+  }
+
   protected async requestTrash(paths: string[], note = '') {
     if (!this.manage.enabled() || !paths.length) return;
     this.actionNote.set('');
@@ -1160,8 +1182,24 @@ export class CatalogDialog implements OnInit {
   }
 
   /** The picture of a part's page: the line drawing, or the part in 3D (the preview of the file list's Quick Look, to orbit). */
-  protected readonly figView = signal<'drawing' | '3d'>(readFigView());
-  protected setFigView(view: 'drawing' | '3d') {
+  protected readonly figView = signal<'drawing' | '3d' | 'together'>(readFigView());
+  /** The parts that belong with the open one by their names (LEFT / RIGHT, TOP / BOTTOM ...), in its folder. */
+  protected readonly companions = computed(() => { const path = this.detail(); return path ? companionsOf(this.entries(), path) : []; });
+  /** What the picture shows: TOGETHER only when the part has companions (else the plain 3D view). */
+  protected readonly figShown = computed(() => (this.figView() === 'together' && !this.companions().length ? '3d' : this.figView()));
+  /** The files of the together view (the open part and its companions, not too large to preview), in a fixed order so each keeps its colour whichever of them is open. */
+  protected readonly togetherPaths = computed(() => {
+    const open = this.detail();
+    if (this.figShown() !== 'together' || !open) return [];
+    return [open, ...this.companions().filter(c => !isTooLarge(c.size)).map(c => c.path)].sort((a, b) => a.localeCompare(b));
+  });
+  /** In the TOGETHER view: the colour of each part in the 3D view (a swatch of the legend), to mark its thumbnail or row in the same colour. */
+  protected readonly togetherColor = computed(() => {
+    const map = new Map<string, string>();
+    this.togetherPaths().forEach((path, i) => map.set(path, '#' + companionColors[i % companionColors.length].toString(16).padStart(6, '0')));
+    return map;
+  });
+  protected setFigView(view: 'drawing' | '3d' | 'together') {
     this.figView.set(view);
     try { localStorage.setItem(figViewKey, view); } catch { /* storage unavailable */ }
   }

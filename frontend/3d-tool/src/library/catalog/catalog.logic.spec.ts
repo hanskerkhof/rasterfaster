@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -129,5 +129,24 @@ describe('catalog logic', () => {
     expect(isWithin('AB', 'A')).toBe(false);
     expect(isWithin('A', 'A/B')).toBe(false);
     expect(isWithin('anything', '')).toBe(true);
+  });
+
+  it('knows which parts belong together by their names', () => {
+    expect(companionKey('3.43 USB-C FEMALE FRONT.stl')).toBe('3.43 usb-c female {depth}');
+    expect(companionKey('3.43 USB-C FEMALE BACK.stl')).toBe('3.43 usb-c female {depth}');
+    expect(companionKey('CORNER left 3h')).toBe(companionKey('Corner RIGHT 3h.stl'));
+    expect(companionKey('BOLT_S3_BLIND.stl')).toBeNull();
+    expect(companionKey('TOPLESS bar.stl')).toBeNull(); // whole words only
+    expect(companionKey('x BOTTOM LEFT.stl')).toBe(companionKey('x TOP RIGHT.stl')); // a name with two pairs: the four corners belong together
+    expect(companionKey('x TOP.stl')).not.toBe(companionKey('x TOP LEFT.stl')); // but not a part that has one pair only
+  });
+
+  it('finds the companions of a part in its own folder', () => {
+    const files = [entry('M/3.43 USB-C FEMALE FRONT.stl'), entry('M/3.43 USB-C FEMALE BACK.stl'), entry('M/3.43 USB-C FEMALE BACK (1).stl'), entry('N/3.43 USB-C FEMALE BACK.stl'), entry('M/other.stl'),
+      entry('M/c TOP LEFT.stl'), entry('M/c TOP RIGHT.stl'), entry('M/c BOTTOM LEFT.stl'), entry('M/c BOTTOM RIGHT.stl')];
+    expect(companionsOf(files, 'M/3.43 USB-C FEMALE FRONT.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE BACK.stl']); // not the "(1)" copy, not another folder
+    expect(companionsOf(files, 'M/c TOP LEFT.stl').map(e => e.name)).toEqual(['c BOTTOM LEFT.stl', 'c BOTTOM RIGHT.stl', 'c TOP RIGHT.stl']);
+    expect(companionsOf(files, 'M/other.stl')).toEqual([]);
+    expect(companionsOf(files, 'M/missing.stl')).toEqual([]);
   });
 });

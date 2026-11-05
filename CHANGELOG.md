@@ -2,6 +2,26 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: the doubles results under DOUBLES (0.11.80)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): on a part's page the `IDENTICAL` and `SAME SHAPE` rows now sit directly under the `DOUBLES` row that made them, above `TOGETHER` and `FUSION` (they were below the Fusion row).
+
+## 2026-11-05 - Catalog: Move to Trash takes the TOGETHER parts too (0.11.79)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): while a part is viewed TOGETHER, the trash button of its page reads **MOVE ALL n TOGETHER TO TRASH** and moves the part and all the parts it belongs with in one batch (one Put Back brings them back); **ONLY THIS ONE TO TRASH** is there for the open part alone. The question before it lists the files (up to eight), says why they belong together, and names the documents that use any of them. In the plain and the 3D view the button is the same as before.
+
+## 2026-11-05 - Catalog: the parts of the TOGETHER view marked in the strip and the list (0.11.78)
+
+### Added
+- **FE** (`catalog-dialog.ts`): while a part is viewed TOGETHER with its companions, their thumbnails in the strip and their rows in the list are marked in the colour the part has in the 3D view (a coloured bar and frame on a tile, a coloured bar and tint on a row; the open one keeps its blue frame and gets the bar too), so the legend and the folder panel match.
+
+## 2026-11-05 - Catalog: parts that belong together (0.11.77)
+
+### Added
+- **FE** (`catalog.logic.ts`, `preview/together.ts`, `preview/quick-look.ts`, `catalog-dialog.ts`): a **filename convention** for parts that belong together: names in the same folder that are the same except for one of the word pairs **LEFT / RIGHT**, **TOP / BOTTOM**, **FRONT / BACK** or **UPPER / LOWER** (whole words, any case: `3.43 USB-C FEMALE FRONT` and `3.43 USB-C FEMALE BACK`, `CORNER LEFT 3h` and `CORNER RIGHT 3h`; with two pairs in a name the four of `TOP LEFT`, `TOP RIGHT`, `BOTTOM LEFT`, `BOTTOM RIGHT`). They stay separate parts. On the page of one of them the picture has a **TOGETHER n** button (and the facts a `TOGETHER` row with **View together** and links to the others): the 3D view then shows all of them in one scene, each in a colour of its own with a legend (`FRONT`, `BACK`, the open one in bold), at the places their own STL files give them (the origins are respected, as when parts are added to a document in the app; the scene as a whole is centred), with the same orbit, zoom and view modes. Parts over 100 MB are left out. The word pairs are one list, `pairWords` in `catalog.logic.ts`.
+
 ## 2026-11-05 - Catalog: a 3D preview on a part's page (0.11.75, 0.11.76)
 
 ### Added
