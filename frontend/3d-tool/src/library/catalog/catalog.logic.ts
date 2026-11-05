@@ -203,10 +203,71 @@ export function companionKey(name: string): string | null {
   return found ? key.toLowerCase() : null;
 }
 
-/** The parts that belong together with this one: the same folder, the same name but for the pair words. Empty when there are none. By name. */
+/** A part number in a name: `P1`, `P2` ... on its own between separators (spaces, underscores, hyphens) or at the ends (`Screw-Terminal-P5.08` is a pitch, not a part number). */
+const partNumberPattern = /(?<=^|[\s_-])P(\d+)(?=[\s_-]|$)/gi;
+
+function stemOf(name: string): string {
+  return name.replace(/\.stl$/i, '');
+}
+
+/** The part number of a name (`3.21 P2 USBA TOP` -> 2), or null. */
+export function partNumber(name: string): number | null {
+  const found = [...stemOf(name).matchAll(partNumberPattern)];
+  return found.length ? Number(found[0][1]) : null;
+}
+
+/**
+ * The second way for parts to belong together: numbered parts `P1`, `P2`, `P3` of one set. What makes two names the same set is their text without
+ * the part number and without the position words (LEFT, TOP ...: each numbered part says where it sits), separators ignored: `3.21 P1 USBA BOTTOM ALT III EIGHT`,
+ * `3.21 USBA TOP_P2_ALT III  EIGHT` and `3.21 P3 USBA FRONT ALT III EIGHT` are one set. Null when the name has no part number.
+ */
+export function setKey(name: string): string | null {
+  const stem = stemOf(name);
+  if (!partNumberPattern.test(stem)) { partNumberPattern.lastIndex = 0; return null; }
+  partNumberPattern.lastIndex = 0;
+  return stem.replace(partNumberPattern, ' ').replace(pairPattern, ' ').toLowerCase().replace(/[\s_]+/g, ' ').trim();
+}
+
+/** A short name for the legend of the together view: the part number and the position words of the name (`P1 BOTTOM`), or null when it has neither. */
+export function companionLabel(name: string): string | null {
+  const stem = stemOf(name);
+  const number = partNumber(name);
+  const words = [...stem.matchAll(pairPattern)].map(match => match[1].toUpperCase());
+  const label = [...(number === null ? [] : [`P${number}`]), ...words].join(' ');
+  return label || null;
+}
+
+/** The parts that belong together with this one, in its own folder: the same name but for LEFT / RIGHT, TOP / BOTTOM ... (`companionKey`), or the same set of numbered parts P1, P2 ... (`setKey`). Empty when there are none. By part number, then name. */
 export function companionsOf(entries: readonly CatalogEntry[], path: string): CatalogEntry[] {
   const self = entries.find(entry => entry.path === path);
-  const key = self ? companionKey(self.name) : null;
-  if (!self || key === null) return [];
-  return sortCatalog(entries.filter(entry => entry.path !== path && parentFolder(entry.path) === parentFolder(path) && companionKey(entry.name) === key), 'name', true);
+  if (!self) return [];
+  const pairKey = companionKey(self.name), numbered = setKey(self.name);
+  if (pairKey === null && numbered === null) return [];
+  const folder = parentFolder(path);
+  const found = entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder
+    && ((pairKey !== null && companionKey(entry.name) === pairKey) || (numbered !== null && setKey(entry.name) === numbered)));
+  return found.sort((a, b) => (partNumber(a.name) ?? Infinity) - (partNumber(b.name) ?? Infinity) || naturalCompare(a.name, b.name));
+}
+
+/**
+ * For every part that belongs together with others (by `companionKey` or `setKey`, in its own folder): how many parts the set has, itself included. The same
+ * number as `companionsOf(...).length + 1`, for all parts at once (the cards of the catalog and the tiles of a part's page show it as a badge).
+ */
+export function companionCounts(entries: readonly CatalogEntry[]): Map<string, number> {
+  const byPair = new Map<string, string[]>(), bySet = new Map<string, string[]>();
+  const add = (map: Map<string, string[]>, key: string, path: string) => { const list = map.get(key); if (list) list.push(path); else map.set(key, [path]); };
+  for (const entry of entries) {
+    const folder = parentFolder(entry.path);
+    const pair = companionKey(entry.name), numbered = setKey(entry.name);
+    if (pair !== null) add(byPair, `${folder}\0${pair}`, entry.path);
+    if (numbered !== null) add(bySet, `${folder}\0${numbered}`, entry.path);
+  }
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    const folder = parentFolder(entry.path);
+    const pair = companionKey(entry.name), numbered = setKey(entry.name);
+    const members = new Set([...(pair !== null ? byPair.get(`${folder}\0${pair}`) ?? [] : []), ...(numbered !== null ? bySet.get(`${folder}\0${numbered}`) ?? [] : [])]);
+    if (members.size > 1) counts.set(entry.path, members.size);
+  }
+  return counts;
 }

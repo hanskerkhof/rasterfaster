@@ -12,7 +12,7 @@ import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf, companionCounts, partNumber, companionLabel } from './catalog.logic';
 
 type CheckMode = 'exact' | 'shape';
 interface ScanState { state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }
@@ -157,6 +157,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
               <button type="button" class="card" [class.selected]="card.entry.path === selected()" [class.picked]="isPicked(card.entry.path)" (click)="onCardClick($event, card.entry)" [title]="card.entry.path">
                 <span class="top"><span class="l">@if (manage.enabled()) { <span class="check" role="checkbox" [attr.aria-checked]="isPicked(card.entry.path)" [class.on]="isPicked(card.entry.path)" title="Select (Shift: a range)" (click)="pick($event, card.entry)">{{ isPicked(card.entry.path) ? '✓' : '' }}</span> }NO.{{ pad(card.number) }}</span><span>{{ code(card.entry.folder) }}</span></span>
                 <span class="art">
+                  @if (companionCount().get(card.entry.path); as n) { <span class="partsbadge" [title]="partsTitle(n)">{{ n }} PARTS</span> }
                   @switch (thumbs.state(card.entry)) {
                     @case ('drawn') { <img [src]="thumbs.url(card.entry)" alt="" loading="lazy" draggable="false" /> }
                     @case ('large') { <span class="note">LARGE FILE · {{ kb(card.entry.size) }}</span><span class="draw" role="button" tabindex="-1" (click)="draw($event, card.entry)">DRAW ANYWAY</span> }
@@ -201,7 +202,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
             <div class="fig">
               @if (figShown() !== 'drawing') {
                 @if (tooLarge(d)) { <span class="note">TOO LARGE TO PREVIEW · {{ kb(d.size) }}</span> }
-                @else { <div class="viewer3d"><app-quick-look [path]="d.path" [together]="togetherPaths()" [embedded]="true" /></div> }
+                @else { <div class="viewer3d"><app-quick-look [path]="d.path" [together]="togetherPaths()" [labels]="togetherLabels()" [embedded]="true" /></div> }
               } @else {
                 @switch (bigState()) {
                   @case ('ready') { <img [src]="bigUrl()!" alt="" draggable="false" /> }
@@ -209,7 +210,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
                 }
               }
-              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }</span>
+              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }</span>
               <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figShown() === 'together' ? companions().length + 1 + ' PARTS AT THEIR OWN PLACES · DRAG TO ORBIT' : figShown() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
@@ -255,6 +256,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     @for (s of browseFiles(); track s.path) {
                       <button type="button" class="tile" [class.current]="s.path === detail()" [class.together]="togetherColor().has(s.path)" [style.--tc]="togetherColor().get(s.path)" [title]="s.path" (click)="detail.set(s.path)">
                         <span class="art">
+                          @if (companionCount().get(s.path); as n) { <span class="partsbadge" [title]="partsTitle(n)">{{ n }} PARTS</span> }
                           @switch (thumbs.state(s)) {
                             @case ('drawn') { <img [src]="thumbs.url(s)" alt="" draggable="false" /> }
                             @case ('large') { <span class="note">LARGE FILE · {{ kb(s.size) }}</span> }
@@ -503,6 +505,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .card:hover { background: #1e2024; } .card.selected { background: #26324a; outline: 1px solid #2f6fed; outline-offset: -1px; }
     .top { flex: none; height: 16px; display: flex; justify-content: space-between; color: #777; }
     .art { flex: none; height: 156px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; }
+    .art { position: relative; } .partsbadge { position: absolute; top: 4px; right: 4px; z-index: 1; padding: 1px 6px; border: 1px solid #3a4a6a; border-radius: 3px; background: rgba(22,23,26,.88); color: #9db7f0; font-size: 9px; letter-spacing: .08em; line-height: 14px; cursor: help; }
     .art img { flex: none; image-rendering: auto; } /* shown as drawn: a fixed size in CSS pixels, not scaled */
     .note { color: #555; font-size: 10px; letter-spacing: .1em; } .note.pending { border: 1px dashed #333; padding: 28px 22px; }
     .draw { color: #aaa; border-bottom: 1px solid #555; cursor: pointer; font-size: 10px; } .draw:hover { color: #fff; }
@@ -678,6 +681,9 @@ export class CatalogDialog implements OnInit {
     const next = at >= 0 ? crumbs[at + 1]?.path : undefined;
     return this.browseFolders().filter(folder => folder.path !== next);
   });
+  /** How many parts the set of each part that belongs together with others has (for the badge on its thumbnail). */
+  protected readonly companionCount = computed(() => companionCounts(this.entries()));
+  protected partsTitle(n: number) { return `One of ${n} parts that belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set). Open it and choose TOGETHER to see them in one scene.`; }
   protected readonly browseFolders = computed(() => (this.pageOpen() ? childFolders(this.entries(), this.browse()) : []));
   protected readonly browseFiles = computed(() => (this.pageOpen() ? filesIn(this.entries(), this.browse()) : []));
   /** The files of the open part's own folder in the order the folder panel shows them (by name): what the arrow keys, ← and → and the buttons at the bottom walk through. */
@@ -846,7 +852,7 @@ export class CatalogDialog implements OnInit {
   /** TOGETHER is shown: the part and the parts shown with it go to the Trash as one batch (one Put Back brings them all back). */
   protected trashTogether(entry: CatalogEntry) {
     const paths = [entry.path, ...this.companions().map(c => c.path)];
-    void this.requestTrash(paths, 'These parts belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER).');
+    void this.requestTrash(paths, 'These parts belong together (their names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set).');
   }
 
   protected async requestTrash(paths: string[], note = '') {
@@ -1191,7 +1197,14 @@ export class CatalogDialog implements OnInit {
   protected readonly togetherPaths = computed(() => {
     const open = this.detail();
     if (this.figShown() !== 'together' || !open) return [];
-    return [open, ...this.companions().filter(c => !isTooLarge(c.size)).map(c => c.path)].sort((a, b) => a.localeCompare(b));
+    const names = [open, ...this.companions().filter(c => !isTooLarge(c.size)).map(c => c.path)];
+    // numbered parts in the order of their numbers (P1, P2, P3 ...), else by name: every part keeps its colour whichever of them is open
+    return names.sort((a, b) => (partNumber(a.split('/').pop()!) ?? Infinity) - (partNumber(b.split('/').pop()!) ?? Infinity) || a.localeCompare(b));
+  });
+  /** The legend names of the together view (`P1 BOTTOM`, `FRONT`), or null when a part has none (the viewer then shows what differs in the names). */
+  protected readonly togetherLabels = computed(() => {
+    const labels = this.togetherPaths().map(path => companionLabel(path.split('/').pop()!));
+    return labels.length && labels.every(label => label !== null) ? (labels as string[]) : null;
   });
   /** In the TOGETHER view: the colour of each part in the 3D view (a swatch of the legend), to mark its thumbnail or row in the same colour. */
   protected readonly togetherColor = computed(() => {

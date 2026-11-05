@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, partNumber, setKey, companionLabel, companionCounts, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -148,5 +148,54 @@ describe('catalog logic', () => {
     expect(companionsOf(files, 'M/c TOP LEFT.stl').map(e => e.name)).toEqual(['c BOTTOM LEFT.stl', 'c BOTTOM RIGHT.stl', 'c TOP RIGHT.stl']);
     expect(companionsOf(files, 'M/other.stl')).toEqual([]);
     expect(companionsOf(files, 'M/missing.stl')).toEqual([]);
+  });
+
+  it('knows numbered parts P1, P2, P3', () => {
+    expect(partNumber('3.21 P1 USBA BOTTOM ALT III EIGHT.stl')).toBe(1);
+    expect(partNumber('3.21 USBA TOP_P2_ALT III  EIGHT.stl')).toBe(2);
+    expect(partNumber('SV5W FRONT MOUNT ALT I P2.stl')).toBe(2); // at the end
+    expect(partNumber('Screw-Terminal-P5.08.step.stl')).toBeNull(); // a pitch
+    expect(partNumber('MP3 player.stl')).toBeNull();
+    expect(partNumber('SPACER.stl')).toBeNull();
+  });
+
+  it('puts the numbered parts of one set together, wherever the number and the position words sit', () => {
+    const names = ['3.21 P1 USBA BOTTOM ALT III EIGHT.stl', '3.21 USBA TOP_P2_ALT III  EIGHT.stl', '3.21 P3 USBA FRONT ALT III EIGHT.stl'];
+    const keys = names.map(setKey);
+    expect(keys[0]).toBe('3.21 usba alt iii eight');
+    expect(new Set(keys).size).toBe(1);
+    expect(setKey('3.21 USBA ALT III EIGHT.stl')).toBeNull(); // no part number
+    expect(setKey('3.22 P1 USBA BOTTOM ALT III EIGHT.stl')).not.toBe(keys[0]); // another set
+  });
+
+  it('finds the numbered companions, by part number, in the same folder only', () => {
+    const files = [entry('M/3.21 P3 USBA FRONT ALT III EIGHT.stl'), entry('M/3.21 USBA TOP_P2_ALT III  EIGHT.stl'), entry('M/3.21 P1 USBA BOTTOM ALT III EIGHT.stl'),
+      entry('N/3.21 P1 USBA BOTTOM ALT III EIGHT.stl'), entry('M/3.21 USBA ALT III EIGHT.stl'), entry('M/y P1 LEFT.stl'), entry('M/y P1 RIGHT.stl'), entry('M/y P2 LEFT.stl')];
+    expect(companionsOf(files, 'M/3.21 P1 USBA BOTTOM ALT III EIGHT.stl').map(e => e.name)).toEqual(['3.21 USBA TOP_P2_ALT III  EIGHT.stl', '3.21 P3 USBA FRONT ALT III EIGHT.stl']);
+    expect(companionsOf(files, 'M/3.21 P3 USBA FRONT ALT III EIGHT.stl').map(e => e.name)).toEqual(['3.21 P1 USBA BOTTOM ALT III EIGHT.stl', '3.21 USBA TOP_P2_ALT III  EIGHT.stl']);
+    expect(companionsOf(files, 'M/3.21 USBA ALT III EIGHT.stl')).toEqual([]);
+    // LEFT / RIGHT with the same number, and the same position with another number, both belong to the set
+    expect(companionsOf(files, 'M/y P1 LEFT.stl').map(e => e.name)).toEqual(['y P1 RIGHT.stl', 'y P2 LEFT.stl']);
+  });
+
+  it('labels the numbered parts for the legend', () => {
+    expect(companionLabel('3.21 P1 USBA BOTTOM ALT III EIGHT.stl')).toBe('P1 BOTTOM');
+    expect(companionLabel('3.21 USBA TOP_P2_ALT III  EIGHT.stl')).toBe('P2 TOP');
+    expect(companionLabel('3.43 USB-C FEMALE FRONT.stl')).toBe('FRONT');
+    expect(companionLabel('BOLT_S3_BLIND.stl')).toBeNull();
+  });
+
+  it('counts the parts of every set', () => {
+    const files = [entry('M/3.43 USB-C FEMALE FRONT.stl'), entry('M/3.43 USB-C FEMALE BACK.stl'), entry('M/x TOP LEFT.stl'), entry('M/x TOP RIGHT.stl'), entry('M/x BOTTOM LEFT.stl'), entry('M/x BOTTOM RIGHT.stl'),
+      entry('M/3.21 P1 USBA BOTTOM ALT.stl'), entry('M/3.21 USBA TOP_P2_ALT.stl'), entry('M/3.21 P3 USBA FRONT ALT.stl'), entry('M/y P1 LEFT.stl'), entry('M/y P1 RIGHT.stl'), entry('M/y P2 LEFT.stl'),
+      entry('N/3.43 USB-C FEMALE FRONT.stl'), entry('M/plain.stl')];
+    const counts = companionCounts(files);
+    expect(counts.get('M/3.43 USB-C FEMALE FRONT.stl')).toBe(2);
+    expect(counts.get('M/x BOTTOM RIGHT.stl')).toBe(4);
+    expect(counts.get('M/3.21 USBA TOP_P2_ALT.stl')).toBe(3);
+    expect(counts.get('M/y P2 LEFT.stl')).toBe(3);
+    expect(counts.has('M/plain.stl')).toBe(false);
+    expect(counts.has('N/3.43 USB-C FEMALE FRONT.stl')).toBe(false); // alone in its folder
+    for (const file of files) expect(counts.get(file.path) ?? 0).toBe(companionsOf(files, file.path).length ? companionsOf(files, file.path).length + 1 : 0); // the same as the page's companions
   });
 });

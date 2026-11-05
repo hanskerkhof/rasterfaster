@@ -102,6 +102,8 @@ export class QuickLook implements OnDestroy {
   readonly embedded = input(false);
   /** Several files to show in one scene (with `path` among them): each keeps the place its own STL gives it, so parts exported from one assembly fit together as they do in a document; each has a colour of its own. Empty: only `path`, centred. */
   readonly together = input<string[]>([]);
+  /** Names for the legend of the together view, one per file in `together` (null: the part of each name that differs from the others). */
+  readonly labels = input<string[] | null>(null);
   /** Viewport x of the card's left edge (just right of the list). */
   readonly left = input(392);
   readonly closed = output<void>();
@@ -224,7 +226,8 @@ export class QuickLook implements OnDestroy {
     const size = union.getSize(new THREE.Vector3());
     this.radius = together ? Math.max(...geometries.map(g => g.boundingSphere!.center.length() + g.boundingSphere!.radius)) : geometries[0].boundingSphere!.radius;
     this.info.set(`${together ? geometries.length + ' parts · ' : ''}${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)} mm`);
-    const labels = distinctLabels(paths.map(file => file.split('/').pop()!.replace(/\.stl$/i, '')));
+    const given = this.labels();
+    const labels = given && given.length === paths.length ? given : distinctLabels(paths.map(file => file.split('/').pop()!.replace(/\.stl$/i, '')));
     this.legend.set(together ? paths.map((file, i) => ({ path: file, name: labels[i], hex: '#' + companionColors[i % companionColors.length].toString(16).padStart(6, '0'), focus: file === this.path() })) : []);
     this.rebuild();
     // Isometric, like the main view; the user's orbit is reset per file so every preview starts comparable.

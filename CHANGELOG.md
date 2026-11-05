@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: an N PARTS badge on the thumbnails of parts that belong together (0.11.82)
+
+### Added
+- **FE** (`catalog.logic.ts`, `catalog-dialog.ts`): the thumbnails of parts that belong together (LEFT / RIGHT, TOP / BOTTOM ... pairs, and numbered P1, P2, P3 sets) have a badge in the upper right corner of the picture saying how many parts the set has (`3 PARTS`), on the cards of the catalog and on the tiles of the strip on a part's page; the tooltip says why and how to see them together.
+
+## 2026-11-05 - Catalog: numbered parts P1, P2, P3 belong together (0.11.81)
+
+### Added
+- **FE** (`catalog.logic.ts`, `preview/quick-look.ts`, `catalog-dialog.ts`, README): a second filename convention for parts that belong together: numbered parts **P1, P2, P3 ...** of one set. Names in one folder that are the same once the part number and the position words (LEFT, TOP ...) are taken out, wherever they sit and whatever the separators or double spaces (`3.21 P1 USBA BOTTOM ALT III EIGHT`, `3.21 USBA TOP_P2_ALT III  EIGHT`, `3.21 P3 USBA FRONT ALT III EIGHT`), are one set and can be viewed TOGETHER like the LEFT / RIGHT pairs. A part number is `P` and digits between separators (`Screw-Terminal-P5.08` is a pitch and does not count). The legend names the parts by number and position (`P1 BOTTOM`, `P2 TOP`, `P3 FRONT`), and the colours follow the part numbers, so each part keeps its colour whichever of them is open.
+
 ## 2026-11-05 - Catalog: the doubles results under DOUBLES (0.11.80)
 
 ### Changed
