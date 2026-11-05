@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Views panel: Design or Render view (0.12.15)
+
+### Added
+- **FE** (`views-panel.ts`): every saved view shows its mode before its name: a small blue-grey cube for a Design view, a warm camera for a Render view (views saved before the mode was kept show nothing). The hover text of the row starts with `Design view` or `Render view`. The same icon is in the view list of the Render dialog (`view-mode-icon.ts`, shared by both). In the Render dialog the Design views are dimmed, and picking one moves only the camera (`goToSavedView(id, cameraOnly)`): the app is no longer switched to Design mode behind the dialog, nor its display mode, light and ground changed.
+
 ## 2026-11-05 - ID codes without a digit: IDstrz (0.12.14)
 
 ### Fixed

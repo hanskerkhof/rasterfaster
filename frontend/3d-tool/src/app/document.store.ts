@@ -1061,7 +1061,7 @@ export class DocumentStore {
   viewSvg: (() => { svg: string; mode: string } | null) | null = null;
   /** Set by the 3D view: the camera and display of the moment (for saving a view) and the way back to a saved one (eased). */
   captureView: (() => Omit<DocSavedView, 'id' | 'name'> | null) | null = null;
-  recallView: ((view: DocSavedView) => void) | null = null;
+  recallView: ((view: DocSavedView, cameraOnly?: boolean) => void) | null = null;
 
   /** Saves the current camera and display as a named view, one undo step. Returns it, or null when there is no 3D view to take it from. */
   /** An animation (the fly-around or the turntable preview) is moving things: no saved view counts as the one the camera is on. */
@@ -1150,10 +1150,11 @@ export class DocumentStore {
   }
 
   /** Goes to a saved view (the nth, 1 based, when `which` is a number). */
-  goToSavedView(which: string | number) {
+  /** Goes to a saved view. `cameraOnly`: only the camera moves (the app mode, display mode, light and ground stay as they are). */
+  goToSavedView(which: string | number, cameraOnly = false) {
     const views = this.doc().views ?? [];
     const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
-    if (view) { this.setView(cameraOf(view)); this.recallView?.(view); this.holdOff(); this.lastViewId.set(view.id); this.viewDirty.set(false); } // the panel marks it at once, the camera glides there
+    if (view) { this.setView(cameraOf(view)); this.recallView?.(view, cameraOnly); this.holdOff(); this.lastViewId.set(view.id); this.viewDirty.set(false); } // the panel marks it at once, the camera glides there
   }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;

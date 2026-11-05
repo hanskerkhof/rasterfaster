@@ -1,6 +1,7 @@
 import { Component, ElementRef, computed, effect, inject, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 import { ReleaseFocus } from './release-focus';
+import { ViewModeIcon, viewModeName } from './view-mode-icon';
 
 const storageKey = 'rasterfaster.viewsPanel';
 const panelWidth = 230; // as in the styles
@@ -18,7 +19,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
 /** The saved views of the document in a small floating panel: drag it by its title, fold it with the arrow. */
 @Component({
   selector: 'app-views-panel',
-  imports: [ReleaseFocus],
+  imports: [ReleaseFocus, ViewModeIcon],
   host: { '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[class.placed]': 'spot() !== null', '[class.collapsed]': 'collapsed()' },
   template: `
     <div class="head" (pointerdown)="startDrag($event)" title="Drag to move the panel">
@@ -30,8 +31,9 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     @if (!collapsed()) {
       <div class="list">
         @for (view of store.doc().views ?? []; track view.id; let i = $index) {
-          <div class="view" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" title="Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept">
+          <div class="view" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" [title]="rowTitle(view)">
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
+            <app-view-mode-icon [mode]="view.appMode" />
             @if (editing() === view.id) {
               <input #nameInput class="rename" [value]="view.name" maxlength="80" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()" (keydown)="onKey($event, view.id, nameInput)" (blur)="commit(view.id, nameInput.value)" />
             } @else if (view.id === fromId()) { <span class="label back"><span class="was">{{ view.name }}</span><span class="now">Restore</span></span> } @else { <span class="label">{{ view.name }}</span> }
@@ -70,6 +72,7 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .changed:hover { background: #e0a030; color: #1b1d23; border-style: solid; } .changed:hover .was { visibility: hidden; } .changed:hover .now { visibility: visible; font-weight: 600; }
     .label.back { display: inline-grid; } .label.back span { grid-area: 1 / 1; } .label.back .now { visibility: hidden; font-style: italic; color: #e0a030; } .view.from:hover .label.back .was { visibility: hidden; } .view.from:hover .label.back .now { visibility: visible; } /* the name is swapped for a hint, in the same space */
     .view.from .replace { opacity: 1; color: #e0a030; }
+    .view.active app-view-mode-icon { filter: brightness(1.25); }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; } .x:hover { opacity: 1; background: transparent; color: #fff; }
@@ -101,6 +104,11 @@ export class ViewsPanel {
 
   protected toggle() { this.collapsed.update(v => !v); }
   protected save() { this.store.saveCurrentView(); }
+  /** The hover text of a row: the mode of the view, then what a click does. */
+  protected rowTitle(view: { appMode?: string | null }) {
+    const mode = viewModeName(view.appMode);
+    return (mode ? mode + ' · ' : '') + 'Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept';
+  }
   protected update(event: Event, id: string) { event.stopPropagation(); this.store.updateSavedView(id); }
   protected remove(event: Event, id: string) { event.stopPropagation(); this.store.removeSavedView(id); }
   /** The saved view the camera is on now, and the one it came from when it has moved on (both from the store: the Render dialog marks them too). */

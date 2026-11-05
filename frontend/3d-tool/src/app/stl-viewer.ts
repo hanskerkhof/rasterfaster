@@ -1526,18 +1526,20 @@ export class StlViewer implements OnDestroy {
   }
 
   /** Goes to a saved view: the display comes back at once, the camera glides there. */
-  private recallView(view: DocSavedView) {
+  private recallView(view: DocSavedView, cameraOnly = false) {
     if (!this.documentMode()) return;
     this.flying.set(false);
     this.snapAnimation = null; this.panAnimation = null; this.pivotGoal = null;
     this.touchView();
-    if (view.appMode === 'design' || view.appMode === 'render') this.store.setAppMode(view.appMode); // first: Render mode takes no other display mode
-    if (view.mode && view.mode !== this.mode()) this.modeRequest.emit(view.mode as ViewMode);
-    if (view.light !== undefined && JSON.stringify(view.light ?? null) !== JSON.stringify(this.store.doc().light ?? null)) this.store.setLight(view.light ?? null);
-    if (view.ground) this.groundMode.set(view.ground);
-    if (typeof view.groundColor === 'number') this.groundColor.set(view.groundColor);
-    if (typeof view.grid3d === 'boolean') this.grid3d.set(view.grid3d);
-    if (view.zGrid && zGridModes.some(m => m.id === view.zGrid)) this.zGridMode.set(view.zGrid as ZGridMode);
+    if (!cameraOnly) { // the whole view; with cameraOnly (a Design view picked in the Render dialog) only the camera goes there
+      if (view.appMode === 'design' || view.appMode === 'render') this.store.setAppMode(view.appMode); // first: Render mode takes no other display mode
+      if (view.mode && view.mode !== this.mode()) this.modeRequest.emit(view.mode as ViewMode);
+      if (view.light !== undefined && JSON.stringify(view.light ?? null) !== JSON.stringify(this.store.doc().light ?? null)) this.store.setLight(view.light ?? null);
+      if (view.ground) this.groundMode.set(view.ground);
+      if (typeof view.groundColor === 'number') this.groundColor.set(view.groundColor);
+      if (typeof view.grid3d === 'boolean') this.grid3d.set(view.grid3d);
+      if (view.zGrid && zGridModes.some(m => m.id === view.zGrid)) this.zGridMode.set(view.zGrid as ZGridMode);
+    }
     if (view.projection !== this.projection) {
       this.setProjection(view.projection);
       this.cameraMode.set(view.projection === 'persp' ? 'perspective' : 'orthographic');

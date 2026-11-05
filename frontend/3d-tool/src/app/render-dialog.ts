@@ -4,6 +4,7 @@ import { ImagesService } from './images.service';
 import { Aspect, RenderService, focusCentre, fxIds, fxNames, ambientNames, reflectionNames, aspectRatio, aspects, beamNames, hdQualities, hdWidths, videoWidths, strengthNames, turnDirections, turntableLengths, turntableMotions, turntableQualities } from './render.service';
 import { DocumentStore } from './document.store';
 import { ColorPalette } from './color-palette';
+import { ViewModeIcon, viewModeName } from './view-mode-icon';
 
 /**
  * A Cycles render of the scene (what the Blender file would render), made by the API through Blender in the background. Either a quick one
@@ -12,7 +13,7 @@ import { ColorPalette } from './color-palette';
  */
 @Component({
   selector: 'app-render-dialog',
-  imports: [ColorPalette],
+  imports: [ColorPalette, ViewModeIcon],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <div class="shell">
@@ -21,8 +22,8 @@ import { ColorPalette } from './color-palette';
         <div class="views-title">Views</div>
         <div class="views-list">
           @for (view of views(); track view.id; let i = $index) {
-            <button type="button" class="view" [class.on]="view.id === store.activeViewId()" [class.from]="view.id === store.fromViewId()" [disabled]="busy()" (click)="pickView(view)" [title]="'Go to ' + view.name + ' and render it as a quick render'">
-              <span class="num">{{ i < 9 ? i + 1 : '' }}</span><span class="label">{{ view.name }}</span>
+            <button type="button" class="view" [class.design]="view.appMode === 'design'" [class.on]="view.id === store.activeViewId()" [class.from]="view.id === store.fromViewId()" [disabled]="busy()" (click)="pickView(view)" [title]="(view.appMode === 'design' ? 'Design view: only its camera is used · ' : modeName(view.appMode) ? modeName(view.appMode) + ' · ' : '') + 'Go to ' + view.name + ' and render it as a quick render'">
+              <span class="num">{{ i < 9 ? i + 1 : '' }}</span><app-view-mode-icon [mode]="view.appMode" /><span class="label">{{ view.name }}</span>
             </button>
           }
         </div>
@@ -179,6 +180,7 @@ import { ColorPalette } from './color-palette';
     .views-title { font-weight: 600; opacity: .75; padding: 0 4px; }
     .views-list { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
     .views .view { display: flex; align-items: center; gap: 6px; text-align: left; padding: 4px 6px; background: transparent; color: inherit; border: 0; border-radius: 4px; font: inherit; cursor: pointer; } .views .view:hover:not(:disabled) { background: rgba(255,255,255,.1); } .views .view:disabled { opacity: .5; cursor: default; }
+    .views .view.design { opacity: .6; } .views .view.design:hover { opacity: 1; }
     .views .view.on { background: rgba(47,111,237,.4); box-shadow: inset 3px 0 0 #2f6fed; }
     .views .view.from { background: rgba(224,160,48,.14); box-shadow: inset 3px 0 0 #e0a030; } .views .view.from .num { color: #e0a030; }
     .views .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; } .views .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -385,11 +387,12 @@ export class RenderDialog implements OnInit, OnDestroy {
   }
 
   /** The saved views of the document (the column at the left of the dialog) and the one that was clicked last. */
+  protected readonly modeName = viewModeName;
   protected readonly views = computed(() => this.store.doc().views ?? []);
 
   /** Another view was chosen: the 3D view goes there (it glides for 0.6 s), then the quick render is made from that camera. */
-  protected async pickView(view: { id: string }) {
-    this.store.goToSavedView(view.id);
+  protected async pickView(view: { id: string; appMode?: string | null }) {
+    this.store.goToSavedView(view.id, view.appMode === 'design'); // a Design view: only its camera, the app stays in Render mode
     await new Promise(resolve => setTimeout(resolve, 750)); // until the camera is there
     const url = this.render.quickUrlProvider?.();
     if (url) this.render.openQuick(url); // the new address: the dialog renders it
