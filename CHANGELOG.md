@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - ESLint for the frontend (0.12.2)
+
+### Added
+- **Tool** (`frontend/3d-tool/eslint.config.js`, `package.json`): angular-eslint (TypeScript, Angular and template accessibility rules). `npm run lint` runs it, `npm run check` runs the boundary check and the lint. Result: 0 errors; 35 warnings left on purpose: 28 clickable elements without keyboard support (`click-events-have-key-events`, `interactive-supports-focus`, `mouse-events-have-key-events`) and 6 outputs named like DOM events (`no-output-native`), to be fixed one by one. `a && b()` and `a ? b() : c()` statements are allowed.
+
+### Fixed
+- **FE**: small lint findings: `prefer-const` (`document-panel.ts`), an `interface` for `ScreenRect`, `cause` kept on the import errors (`document.store.ts`), a useless escape (`name-similarity.ts`), a `for-of` in `zip.ts`, a comma expression in `svg-view.ts`.
+
 ## 2026-11-05 - Same shape also finds a part turned by quarter turns (0.12.1)
 
 ### Fixed

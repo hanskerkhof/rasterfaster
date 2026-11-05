@@ -791,6 +791,7 @@ export class StlViewer implements OnDestroy {
     this.renderer.domElement.addEventListener('pointerdown', () => this.touchView(), true); // any press on the view may move the camera
     this.renderer.domElement.addEventListener('pointerdown', this.onLightDown); // before the parts and the orbit controls: the light source can be grabbed
     // Also before OrbitControls: a drag that starts on a document object must move it, not orbit.
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const viewer = this; // the scene reads the *current* camera (it changes with the camera mode)
     this.documentScene = new DocumentScene({
       scene: this.scene, get camera() { return viewer.camera; }, canvas: this.renderer.domElement, host: (el.closest('.stage') as HTMLElement | null) ?? el, store: this.store,

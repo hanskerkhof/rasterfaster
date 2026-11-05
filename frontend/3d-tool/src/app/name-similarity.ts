@@ -1,6 +1,6 @@
 /** The name without extension, "(2)" copy numbers and trailing digits or separators: what makes `BOLT_S2` and `BOLT_S20` the same kind of part. */
 function stem(name: string): string {
-  return name.toLowerCase().replace(/\.stl$/, '').replace(/\(\s*\d+\s*\)/g, ' ').replace(/[\s_.\-]*\d+\s*$/, '').replace(/\s+/g, ' ').trim();
+  return name.toLowerCase().replace(/\.stl$/, '').replace(/\(\s*\d+\s*\)/g, ' ').replace(/[\s_.-]*\d+\s*$/, '').replace(/\s+/g, ' ').trim();
 }
 
 function editDistance(a: string, b: string): number {

@@ -17,6 +17,7 @@ export class ViewFocus {
  * `<button releaseFocus (click)="...">`. Buttons release on click, dropdowns once a value is chosen.
  */
 @Directive({
+  // eslint-disable-next-line @angular-eslint/directive-selector
   selector: '[releaseFocus]',
   host: { '(click)': 'onClick($event)', '(change)': 'viewFocus.release()' },
 })

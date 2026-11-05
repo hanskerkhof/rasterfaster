@@ -18,7 +18,8 @@ const sideGap = 12;
 
 /** Magnets for a moved panel: it snaps to the right edge of the view, and it never covers the view cube (it is put just below it instead). */
 function snapPanel(g: PanelGeometry, parentWidth: number, parentHeight: number): PanelGeometry {
-  let { left, top, width, height } = g;
+  let { left, top, height } = g;
+  const { width } = g;
   const snapRight = parentWidth - (left + width) < snapDistance;
   if (snapRight) left = parentWidth - width - sideGap;
   if (left + width > parentWidth - cubeKeepOut.width && top < cubeKeepOut.bottom) {

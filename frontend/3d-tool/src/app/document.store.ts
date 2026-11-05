@@ -586,7 +586,7 @@ export class DocumentStore {
     } catch (error) {
       if (error instanceof HttpErrorResponse && error.status === 409 && error.error?.detail?.existing) return { conflictWith: error.error.detail.existing };
       const detail = error instanceof HttpErrorResponse ? error.error?.detail : null;
-      throw new Error(typeof detail === 'string' ? detail : Array.isArray(detail) ? 'this is not a Rasterfaster document file' : 'import failed');
+      throw new Error(typeof detail === 'string' ? detail : Array.isArray(detail) ? 'this is not a Rasterfaster document file' : 'import failed', { cause: error });
     }
   }
 
@@ -602,7 +602,7 @@ export class DocumentStore {
       return report;
     } catch (error) {
       const detail = error instanceof HttpErrorResponse ? error.error?.detail : null;
-      throw new Error(typeof detail === 'string' ? detail : 'import failed');
+      throw new Error(typeof detail === 'string' ? detail : 'import failed', { cause: error });
     }
   }
 

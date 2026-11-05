@@ -12,7 +12,7 @@ cd frontend/3d-tool && npm start      # http://localhost:4200
 
 Tests: `cd backend && .venv1/bin/python -m pytest`
 
-Library code is kept apart from the document code so it can be published on its own (plan: `docs/library-catalog-plan.md`): the API is the `backend/rf_library` package (router, `ops.py`, `searchterms.py`; `main.py` mounts it), the UI is `frontend/3d-tool/src/library/`, imported as `@rasterfaster/library` (its `public-api.ts`; the API base is `RF_LIBRARY_CONFIG`). The library never imports from `src/app`, and the app never deep-imports the library: `npm run check:boundaries` checks both.
+Library code is kept apart from the document code so it can be published on its own (plan: `docs/library-catalog-plan.md`): the API is the `backend/rf_library` package (router, `ops.py`, `searchterms.py`; `main.py` mounts it), the UI is `frontend/3d-tool/src/library/`, imported as `@rasterfaster/library` (its `public-api.ts`; the API base is `RF_LIBRARY_CONFIG`). The library never imports from `src/app`, and the app never deep-imports the library: `npm run check:boundaries` checks both. `npm run lint` runs ESLint (angular-eslint; warnings are known keyboard-support gaps to fix gradually), `npm run check` runs both.
 
 Pick up backend code changes without killing the process (re-execs in place, same PID):
 

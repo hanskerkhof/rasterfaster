@@ -96,7 +96,7 @@ function measure(geometry: THREE.BufferGeometry): PartStats {
   return { size: [size.x, size.y, size.z], volumeCm3: Math.abs(volume) / 1000, triangles };
 }
 
-type ScreenRect = { left: number; right: number; top: number; bottom: number };
+interface ScreenRect { left: number; right: number; top: number; bottom: number }
 
 /** Liang-Barsky: does the segment (x0,y0)-(x1,y1) cross or lie inside the rectangle? */
 export function segmentTouchesRect(x0: number, y0: number, x1: number, y1: number, r: ScreenRect) {

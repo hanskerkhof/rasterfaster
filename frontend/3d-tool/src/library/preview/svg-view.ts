@@ -153,7 +153,7 @@ export function buildViewSvg(renderer: THREE.WebGLRenderer, camera: THREE.Camera
     }
   }
 
-  if (!paths.length && !gridPaths.length) minX = minY = 0, maxX = width, maxY = height;
+  if (!paths.length && !gridPaths.length) { minX = minY = 0; maxX = width; maxY = height; }
   const x0 = Math.floor(minX - margin), y0 = Math.floor(minY - margin);
   const w = Math.ceil(maxX - minX + 2 * margin), h = Math.ceil(maxY - minY + 2 * margin);
   const title = (options.title ?? 'View').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]!));
