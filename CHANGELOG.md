@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Paste puts the copies where the originals are (0.12.9)
+
+### Changed
+- **FE** (`document.store.ts`, `document.store.spec.ts`): ⌘V (and Paste in the object menu) places the copied parts exactly at the position of the originals, as Fusion 360 does, instead of at the view centre snapped to the grid. The new parts are selected, so they can be moved right away; the paste is one undo step as before; after Cut it puts the parts back where they were.
+
 ## 2026-11-05 - Key T opens the Trash (0.12.8)
 
 ### Added

@@ -1170,16 +1170,11 @@ export class DocumentStore {
     if (this.copySelection()) this.removeSelected();
   }
 
-  /** Pastes the clipboard at the view centre as ONE undo step and selects the new parts. Returns how many were pasted. */
+  /** Pastes the clipboard at the place of the originals (as Fusion does), as ONE undo step, and selects the new parts so they can be moved at once. Returns how many were pasted. */
   pasteClipboard(): number {
     const clip = this.clipboard();
     if (!clip) return 0;
-    const round = (v: number) => Math.round(v * 1000) / 1000;
-    const created = pasteItems(clip, this.viewCenter?.() ?? null, snapStepMm, (position, item) => {
-      const size = this.sizeOf?.({ path: item.path, rotation: item.rotation, scale: item.scale } as DocItem) ?? undefined; // unknown until its geometry has loaded
-      const placed = item.centered && size ? cellCenteredPosition(position, size, this.zMode?.()) : (position.map(round) as Vec3);
-      return clampToWorkArea(placed, size);
-    });
+    const created = pasteItems(clip, null, { x: 0, y: 0 }, position => position); // no shift: exactly where the copied parts were (cut and paste: where they were taken from)
     return this.addItems(created);
   }
 

@@ -313,6 +313,23 @@ describe('Design and Render mode', () => {
   });
 });
 
+describe('Paste', () => {
+  it('pastes the copied parts exactly where the originals are, and selects the new ones', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    const a = store.addItem(part([40, 60, 6])), b = store.addItem(part([100, 60, 6]));
+    store.selectedIds.set([a.id, b.id]);
+    store.copySelection();
+    expect(store.pasteClipboard()).toBe(2);
+    const items = store.doc().items;
+    expect(items.length).toBe(4);
+    expect(items[2].position).toEqual([40, 60, 6]);
+    expect(items[3].position).toEqual([100, 60, 6]);
+    expect(store.selectedIds()).toEqual([items[2].id, items[3].id]); // the copies are selected, ready to move
+  });
+});
+
 describe('Colours by mode', () => {
   let store: DocumentStore;
   let a: string, b: string;
