@@ -2,6 +2,22 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - The parts catalog, and the library as a package of its own (0.12.0)
+
+The release of everything between 0.11.32 and 0.11.83 (the entries below tell each step). In short:
+
+### Added
+- **FE**, **BE**: **The Catalog** (button next to the Trash): a near full-screen dialog with a numbered card for every STL of the library, a line drawing on every card (drawn in the browser, kept in `RASTERFASTER_APP/.catalog-cache`), folder chips, Find (the file list's syntax), sort, and a scroll that handles thousands of parts. `GET /api/catalog` and the thumbnail cache are its API.
+- **FE**: **A page for every part** (click a card, `#part=` link): the drawing, or the part in 3D (the Quick Look preview, embedded), the facts (size, volume, file size, documents that use it, path), the files and folders around it as a list or a strip with a breadcrumb trail (subfolders included), ← → through the folder, a resizable facts column, and **Add to document**, **Find in browser**, **Reveal in Finder**.
+- **FE**: **Management** (the **Manage** switch in the panel header and the catalog, on by default; off makes the library read-only): tick boxes, Move to Trash with Undo (the same Trash as the file list; a dry run names the documents that use the files; Enter says yes, Backspace asks), Rename, Duplicate, Move (with new folders), and the same for a whole folder.
+- **FE**, **BE**: **Clean-up tools you start yourself**: the **_OLD** and **UNUSED** filters, **Check for doubles** (exactly the same files) and **Check for same shape** (a part exported again, triangulated differently or moved in an assembly: the box, volume, surface and centre of mass agree), each with a list of groups and Open / Rename / Move / Trash on every copy; **Check this part** on a part's page; nothing is marked or decided for you.
+- **FE**: **Parts that belong together**: a filename convention (LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK, UPPER / LOWER pairs, and numbered parts P1, P2, P3 of one set) shows them in one 3D scene, each in its own colour, at the places their STL files give them, with an `N PARTS` badge on their thumbnails and Move to Trash for the whole group.
+- **FE**, **BE**: **FIND IN FUSION** on a part's page: in which of your `.f3d` files (the local Fusion folder, `RF_FUSION`, and Fusion's cache; each hit labelled LOCAL or CACHE) the part is a component, with where it sits and Reveal; `GET /api/fusion/*`, built on `scripts/f3dsearch.py`.
+
+### Changed
+- **FE**, **BE**: **The library is its own unit**: the API is the package `backend/rf_library` (router, `ops.py`, `searchterms.py`), the UI is `frontend/3d-tool/src/library`, imported as `@rasterfaster/library` (a barrel, `RF_LIBRARY_CONFIG`, a plug-in point for finders), with `npm run check:boundaries` keeping the app's dependency on it one way. Ready to be published separately; the file list follows the Manage switch.
+- **FE**: the hidden-line drawing code (`svg-view.ts`) lives in the library; the contour lines of curved parts are no longer dashed.
+
 ## 2026-11-05 - Catalog: Backspace on a part's page asks to move it to the Trash (0.11.83)
 
 ### Added
