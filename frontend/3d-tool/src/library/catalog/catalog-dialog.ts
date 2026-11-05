@@ -573,7 +573,7 @@ export class CatalogDialog implements OnInit {
     { key: 'exact', check: 'CHECK FOR DOUBLES', again: 'CHECK DOUBLES AGAIN', chip: 'DOUBLES', busy: 'CHECKING FOR DOUBLES', what: 'IDENTICAL FILES', files: 'IDENTICAL FILES',
       title: 'Looks for files that are exactly the same (same size first, then the content). Nothing is changed; you decide what to do with the result.' },
     { key: 'shape', check: 'CHECK FOR SAME SHAPE', again: 'CHECK SAME SHAPE AGAIN', chip: 'SAME SHAPE', busy: 'CHECKING THE SHAPES', what: 'FILES WITH THE SAME SHAPE', files: 'FILES WITH THE SAME SHAPE',
-      title: 'Looks for files with the same shape: a part exported again, triangulated differently, or at another place of an assembly (any file size, position, header or triangle order; the box, volume, surface and centre of mass agree). Nothing is changed.' },
+      title: 'Looks for files with the same shape: a part exported again, triangulated differently, or at another place of an assembly, also turned by quarter turns (any file size, position, header or triangle order; the box, volume, surface, centre of mass and weight spread agree, so a LEFT part is not taken for its RIGHT mirror image). Nothing is changed.' },
   ];
   protected readonly groupsBy = signal<Record<CheckMode, DuplicateGroup[] | null>>({ exact: null, shape: null });
   protected readonly scanBy = signal<Record<CheckMode, ScanState>>({ exact: { ...idleScan }, shape: { ...idleScan } });

@@ -2,6 +2,7 @@
 the SHA-1 of the content of the files that share a size. A hash is remembered by path, size and modified time, so a second scan only reads
 what changed. Empty files are left out (they are all "the same" and say nothing)."""
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -60,8 +61,10 @@ def read_triangles(file: Path) -> np.ndarray:
 
 def shape_features(file: Path) -> list[float]:
     """Measurements of the shape that do not depend on where the part sits, on the header, on the normals, on the order of the triangles or on
-    how the surface is divided into triangles: the size of the box round it, its volume, its surface area and its centre of mass relative to
-    that box. The same part exported again (or with another triangulation, or at another place of an assembly) gives the same numbers."""
+    how the surface is divided into triangles: [box x, y, z, volume, surface area, centre of mass x, y, z, the spread of the mass about its centre (the
+    second moments xx, yy, zz, xy, xz, yz) and its lopsidedness (the third moments xxx, yyy, zzz)], all relative to the box. The spread and the
+    lopsidedness tell a part from its mirror image, which the other numbers cannot. The same part exported again (or with another triangulation, or at
+    another place of an assembly) gives the same numbers."""
     triangles = read_triangles(file)
     if len(triangles) == 0:
         raise ValueError("no triangles")
@@ -72,11 +75,24 @@ def shape_features(file: Path) -> list[float]:
     signed = np.einsum("ij,ij->i", a, np.cross(b, c)) / 6.0  # the volume of the tetrahedron of each triangle with the origin
     volume = float(signed.sum())
     area = float(np.linalg.norm(np.cross(b - a, c - a), axis=1).sum()) / 2.0
-    if abs(volume) > 1e-9:
-        centre = ((a + b + c) / 4.0 * signed[:, None]).sum(axis=0) / volume  # the centre of mass of the solid
-    else:
-        centre = moved.reshape(-1, 3).mean(axis=0)  # an open surface has no volume: the middle of its corners
-    return [*map(float, size), abs(volume), area, *map(float, centre)]
+    if abs(volume) <= 1e-9:  # an open surface has no volume: the middle of its corners, and no moments
+        return [*map(float, size), 0.0, area, *map(float, moved.reshape(-1, 3).mean(axis=0)), 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    total = a + b + c
+    first = ((total / 4.0) * signed[:, None]).sum(axis=0)  # the integral of x, y, z over the solid
+    second = np.empty((3, 3))
+    for i in range(3):
+        for j in range(i, 3):  # the integral of x_i x_j: a tetrahedron's V/20 (a_i a_j + b_i b_j + c_i c_j + S_i S_j)
+            second[i, j] = second[j, i] = (signed / 20.0 * (a[:, i] * a[:, j] + b[:, i] * b[:, j] + c[:, i] * c[:, j] + total[:, i] * total[:, j])).sum()
+    third = np.empty(3)
+    for i in range(3):  # the integral of x_i^3: V/20 (sum of the cubes + sum of v^2 w over the ordered pairs + the product of the three)
+        p, q, r = a[:, i], b[:, i], c[:, i]
+        pairs = p * p * q + p * p * r + q * q * p + q * q * r + r * r * p + r * r * q
+        third[i] = (signed / 20.0 * (p ** 3 + q ** 3 + r ** 3 + pairs + p * q * r)).sum()
+    centre = first / volume
+    spread = second / volume - np.outer(centre, centre)  # the second moments about the centre of mass
+    lopsided = third / volume - 3 * centre * np.diag(second) / volume + 2 * centre ** 3  # the third central moments (diagonal)
+    return [*map(float, size), abs(volume), area, *map(float, centre), float(spread[0, 0]), float(spread[1, 1]), float(spread[2, 2]),
+            float(spread[0, 1]), float(spread[0, 2]), float(spread[1, 2]), float(lopsided[0]), float(lopsided[1]), float(lopsided[2])]
 
 
 boxTolerance = 0.05  # mm, for the box and the centre of mass
@@ -84,11 +100,46 @@ volumeTolerance = 1e-3  # relative
 areaTolerance = 1.5e-3  # relative
 
 
+def _proper_rotations() -> list[tuple[tuple[int, int, int], tuple[int, int, int]]]:
+    """The 24 ways to turn a part by quarter turns about its axes, as (which axis each new axis was, whether it is flipped): the signed permutations that are no mirroring."""
+    rotations = []
+    for perm in itertools.permutations(range(3)):
+        parity = 1 if sum(1 for i in range(3) for j in range(i + 1, 3) if perm[i] > perm[j]) % 2 == 0 else -1
+        for signs in itertools.product((1, -1), repeat=3):
+            if parity * signs[0] * signs[1] * signs[2] == 1:
+                rotations.append((perm, signs))
+    return rotations
+
+
+_rotations = _proper_rotations()
+
+
+momentTolerance = 2e-3  # relative to the size of the box
+
+
 def same_shape(first: list[float], second: list[float]) -> bool:
-    """Do two sets of measurements describe the same shape? (the box and the centre of mass within 0.05 mm, the volume within 0.1 %, the surface within 0.15 %)"""
-    if any(abs(x - y) > boxTolerance for x, y in list(zip(first[0:3], second[0:3])) + list(zip(first[5:8], second[5:8]))):
+    """Do two sets of measurements describe the same shape? The volume within 0.1 % and the surface within 0.15 %, and the box, the centre of mass and the
+    spread and lopsidedness of the mass: as exported, or with one of the parts turned by quarter turns about its axes (a part lying flat is the same part
+    standing up). A mirror image is not the same shape (a LEFT and a RIGHT part are two parts), unless the part is symmetric."""
+    if abs(first[3] - second[3]) > volumeTolerance * max(first[3], second[3], 1.0) or abs(first[4] - second[4]) > areaTolerance * max(first[4], second[4], 1.0):
         return False
-    return abs(first[3] - second[3]) <= volumeTolerance * max(first[3], second[3], 1.0) and abs(first[4] - second[4]) <= areaTolerance * max(first[4], second[4], 1.0)
+    box, centre = second[0:3], second[5:8]
+    spread = [[second[8], second[11], second[12]], [second[11], second[9], second[13]], [second[12], second[13], second[10]]]
+    lopsided = second[14:17]
+    for perm, signs in _rotations:
+        turnedBox = [box[perm[i]] for i in range(3)]
+        if any(abs(x - y) > boxTolerance for x, y in zip(first[0:3], turnedBox)):
+            continue
+        turnedCentre = [centre[perm[i]] if signs[i] > 0 else box[perm[i]] - centre[perm[i]] for i in range(3)]
+        if any(abs(x - y) > boxTolerance for x, y in zip(first[5:8], turnedCentre)):
+            continue
+        size = first[0:3]
+        mine = [[first[8], first[11], first[12]], [first[11], first[9], first[13]], [first[12], first[13], first[10]]]
+        if any(abs(mine[i][j] - signs[i] * signs[j] * spread[perm[i]][perm[j]]) > momentTolerance * size[i] * size[j] + 1e-6 for i in range(3) for j in range(3)):
+            continue
+        if all(abs(first[14 + i] - signs[i] * lopsided[perm[i]]) <= momentTolerance * size[i] ** 3 + 1e-6 for i in range(3)):
+            return True
+    return False
 
 
 def walk_stl(root: Path):
@@ -133,7 +184,7 @@ def scan(root: Path, cacheFile: Path, progress: Callable[[int, int], None] | Non
     else:
         found = candidates(root)
     cache = read_cache(cacheFile)
-    key = "measures" if mode == "shape" else "sha1"
+    key = "moments" if mode == "shape" else "sha1"
     measured: dict[str, object] = {}
     changed = False
     for done, (path, size, modified) in enumerate(found, start=1):
@@ -182,7 +233,8 @@ def scan(root: Path, cacheFile: Path, progress: Callable[[int, int], None] | Non
 
 
 sizeWindow = 0.30  # a part exported again may be 30 % bigger or smaller as a file
-maxShapeCandidates = 600
+maxShapeCandidates = 4000
+maxShapeCandidateBytes = 500 * 1024 * 1024  # what one check may read at most (the closest in size first)
 
 
 def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> dict:
@@ -194,7 +246,13 @@ def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> di
     size = stat.st_size
     everything = [item for item in walk_stl(root) if item[0] != relative]
     exactCandidates = [item for item in everything if item[1] == size]
-    shapeCandidates = sorted((item for item in everything if abs(item[1] - size) <= sizeWindow * size and item[1] <= maxShapeBytes), key=lambda item: abs(item[1] - size))[:maxShapeCandidates]
+    nearest = sorted((item for item in everything if abs(item[1] - size) <= sizeWindow * size and item[1] <= maxShapeBytes), key=lambda item: abs(item[1] - size))
+    shapeCandidates, readBytes = [], 0
+    for item in nearest[:maxShapeCandidates]:
+        if readBytes + item[1] > maxShapeCandidateBytes:
+            break
+        shapeCandidates.append(item)
+        readBytes += item[1]
     exact, shape = read_cache(exactCache), read_cache(shapeCache)
     changed = {"exact": False, "shape": False}
 
@@ -208,7 +266,7 @@ def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> di
 
     mine = value(exact, "exact", "sha1", relative, size, stat.st_mtime, sha1_of)
     try:
-        myShape = value(shape, "shape", "measures", relative, size, stat.st_mtime, shape_features) if 0 < size <= maxShapeBytes else None
+        myShape = value(shape, "shape", "moments", relative, size, stat.st_mtime, shape_features) if 0 < size <= maxShapeBytes else None
     except (ValueError, struct.error):
         myShape = None  # not a readable STL: it can still have exact copies
     identical: list[str] = []
@@ -226,14 +284,14 @@ def matches(root: Path, relative: str, exactCache: Path, shapeCache: Path) -> di
             if path in identical:
                 continue
             try:
-                if same_shape(myShape, value(shape, "shape", "measures", path, fileSize, modified, shape_features)):
+                if same_shape(myShape, value(shape, "shape", "moments", path, fileSize, modified, shape_features)):
                     sameShape.append(path)
             except (OSError, ValueError, struct.error):
                 continue
         for path, record in list(shape.items()):  # what a library-wide check has measured already is compared whatever its size: no reading needed
-            if path in near or path in identical or path == relative or path not in known or "measures" not in record:
+            if path in near or path in identical or path == relative or path not in known or "moments" not in record:
                 continue
-            if record.get("size") == known[path][0] and abs(record.get("modified", 0) - known[path][1]) <= 1e-3 and same_shape(myShape, record["measures"]):
+            if record.get("size") == known[path][0] and abs(record.get("modified", 0) - known[path][1]) <= 1e-3 and same_shape(myShape, record["moments"]):
                 sameShape.append(path)
     for kind, cache, file in (("exact", exact, exactCache), ("shape", shape, shapeCache)):
         if changed[kind]:

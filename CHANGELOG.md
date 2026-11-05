@@ -2,6 +2,12 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Same shape also finds a part turned by quarter turns (0.12.1)
+
+### Fixed
+- **BE** (`backend/rf_library/duplicates.py`): the shape check missed a part exported lying down and again standing up (e.g. `3.26 - GBJ - 4w DC 1x CENTERED` and its twin in the DC jack mount). A shape now matches under any of the 24 quarter turns, using the box, volume, surface and centre of mass plus second and third moments (weight spread and lopsidedness), so a LEFT part is still not matched with its RIGHT mirror image. Symmetric parts do match their mirror. Cached measures are renamed `moments` (old ones are recomputed once). Per-part checks look at the closest sizes first, up to 4000 files / 500 MB.
+- **FE** (`catalog-dialog.ts`): the tooltip of the shape check says so. Version 0.12.1.
+
 ## 2026-11-05 - The parts catalog, and the library as a package of its own (0.12.0)
 
 The release of everything between 0.11.32 and 0.11.83 (the entries below tell each step). In short:

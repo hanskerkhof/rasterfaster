@@ -569,3 +569,46 @@ def test_matches_use_what_a_library_check_has_measured(client, tmp_path):
     assert client.get("/api/catalog/matches", params={"path": "part.stl"}).json()["sameShape"] == []  # not measured, not near in size
     assert [g["paths"] for g in _scan_mode(client, "shape")["groups"]] == [["fine.stl", "part.stl"]]
     assert client.get("/api/catalog/matches", params={"path": "part.stl"}).json()["sameShape"] == ["fine.stl"]  # now it is known
+
+
+def _turn(triangles, rotation):
+    """The triangles with every corner mapped by a function (x, y, z) -> (x', y', z')."""
+    return [tuple(rotation(*corner) for corner in t) for t in triangles]
+
+
+def _box_triangles(x0, y0, z0, x1, y1, z1):
+    """The 12 triangles of a box, wound outwards."""
+    p = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0), (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    faces = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4), (2, 3, 7), (2, 7, 6), (1, 2, 6), (1, 6, 5), (3, 0, 4), (3, 4, 7)]
+    return [(p[a], p[b], p[c]) for a, b, c in faces]
+
+
+def test_same_shape_matches_a_part_turned_by_quarter_turns_but_not_a_mirror_image(tmp_path):
+    from rf_library import duplicates
+    # a solid that is not symmetric: a long block with a smaller block on one end and a flat tab at the side
+    base = _box_triangles(0, 0, 0, 40, 10, 6) + _box_triangles(0, 0, 6, 10, 10, 12) + _box_triangles(15, 10, 0, 25, 14, 3)
+    variants = {
+        "a": base,
+        "standing": _turn(base, lambda x, y, z: (x, -z, y)),  # a quarter turn about X: lying flat becomes standing
+        "turned": _turn(base, lambda x, y, z: (-y, x, z)),  # a quarter turn about Z
+        "upside": _turn(base, lambda x, y, z: (x, -y, -z)),  # a half turn about X
+        "moved": _turn(base, lambda x, y, z: (x + 70, y - 3, z + 5)),
+        "mirror": _turn(base, lambda x, y, z: (-x, y, z)),  # left becomes right: a different part
+        "other": _box_triangles(0, 0, 0, 40, 10, 6) + _box_triangles(0, 0, 6, 10, 10, 12) + _box_triangles(15, 10, 0, 25, 14, 3.5),  # the tab a little thicker
+    }
+    for name, triangles in variants.items():
+        (tmp_path / f"{name}.stl").write_bytes(_binary_stl(triangles))
+    features = {name: duplicates.shape_features(tmp_path / f"{name}.stl") for name in variants}
+    for name in ("standing", "turned", "upside", "moved"):
+        assert duplicates.same_shape(features["a"], features[name]), name
+        assert duplicates.same_shape(features[name], features["a"]), name  # the other way round too
+    assert not duplicates.same_shape(features["a"], features["mirror"])  # a LEFT and a RIGHT part are two parts
+    assert not duplicates.same_shape(features["a"], features["other"])
+
+
+def test_a_symmetric_part_is_the_same_shape_as_its_mirror_image(tmp_path):
+    from rf_library import duplicates
+    base = _box_triangles(0, 0, 0, 40, 10, 6) + _box_triangles(15, 0, 6, 25, 10, 12)  # a bar with a block in the middle: symmetric
+    (tmp_path / "left.stl").write_bytes(_binary_stl(base))
+    (tmp_path / "right.stl").write_bytes(_binary_stl(_turn(base, lambda x, y, z: (-x, y, z))))
+    assert duplicates.same_shape(duplicates.shape_features(tmp_path / "left.stl"), duplicates.shape_features(tmp_path / "right.stl"))
