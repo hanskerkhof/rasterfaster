@@ -192,9 +192,58 @@ export const pairWords: { id: string; words: string[] }[] = [
 
 const pairPattern = new RegExp(`(?<![A-Za-z])(${pairWords.flatMap(pair => pair.words).join('|')})(?![A-Za-z])`, 'gi');
 
+/**
+ * The second filename convention, alternatives: `ALT I`, `ALT II` ... (also `ALTI`, `ALT_II`, `alt-III`; a roman numeral) marks an alternative of the base
+ * model, which is the same name without ALT. A slot has the base or any one of its alternatives, never several at once (`3.43 USB-C FEMALE BACK`, `... BACK ALT I`).
+ */
+const altPattern = /(?<![A-Za-z])ALT[\s_-]*([IVX]+)(?![A-Za-z])/i;
+
+/** The value of a roman numeral up to XXIX (`III` -> 3), or null when it is not one. */
+function romanValue(text: string): number | null {
+  const upper = text.toUpperCase();
+  if (!/^(X{0,2})(IX|IV|V?I{0,3})$/.test(upper) || !upper) return null;
+  const digits: Record<string, number> = { I: 1, V: 5, X: 10 };
+  let total = 0;
+  for (let i = 0; i < upper.length; i++) { const v = digits[upper[i]], next = digits[upper[i + 1]] ?? 0; total += v < next ? -v : v; }
+  return total;
+}
+
+/** The alternative number of a name (`... ALT II` -> 2); 0 for the base (a name without ALT). */
+export function altLevel(name: string): number {
+  const match = altPattern.exec(stemOf(name));
+  return (match && romanValue(match[1])) || 0;
+}
+
+/** A name without its ALT mark: what the alternatives of one slot have in common. An `ALT` that is not followed by a roman numeral is left alone. */
+function withoutAlt(stem: string): string {
+  let found = false;
+  const stripped = stem.replace(altPattern, (whole, roman: string) => (romanValue(roman) === null ? whole : (found = true, ' ')));
+  return found ? stripped.replace(/ {2,}/g, ' ').trim() : stem;
+}
+
+/** The key of a slot: the name without the ALT mark, lower case, separators ignored (`3.43 USB-C FEMALE BACK ALT I` and `3.43 USB-C FEMALE BACK` share it). */
+export function altKey(name: string): string {
+  return withoutAlt(stemOf(name)).toLowerCase().replace(/[\s_]+/g, ' ').replace(/[\s-]+$/, '').trim();
+}
+
+/** `BASE` or `ALT II` for the button of an alternative. */
+export function altLabel(name: string): string {
+  const level = altLevel(name);
+  return level ? 'ALT ' + (altPattern.exec(stemOf(name))![1].toUpperCase()) : 'BASE';
+}
+
+/** The base and the alternatives of this part (itself included), in its own folder: same slot, base first, then ALT I, II ... Empty when it has none. */
+export function alternativesOf(entries: readonly CatalogEntry[], path: string): CatalogEntry[] {
+  const self = entries.find(entry => entry.path === path);
+  if (!self) return [];
+  const key = altKey(self.name), folder = parentFolder(path);
+  const found = entries.filter(entry => parentFolder(entry.path) === folder && altKey(entry.name) === key);
+  return found.length > 1 ? found.sort((a, b) => altLevel(a.name) - altLevel(b.name) || naturalCompare(a.name, b.name)) : [];
+}
+
 /** A name with its pair words replaced by their pair (`3.43 USB-C FEMALE {depth}`): parts with the same key belong together. Null when the name has no pair word. */
 export function companionKey(name: string): string | null {
-  const stem = name.replace(/\.stl$/i, '');
+  const stem = withoutAlt(name.replace(/\.stl$/i, ''));
   let found = false;
   const key = stem.replace(pairPattern, word => {
     found = true;
@@ -222,7 +271,7 @@ export function partNumber(name: string): number | null {
  * `3.21 USBA TOP_P2_ALT III  EIGHT` and `3.21 P3 USBA FRONT ALT III EIGHT` are one set. Null when the name has no part number.
  */
 export function setKey(name: string): string | null {
-  const stem = stemOf(name);
+  const stem = withoutAlt(stemOf(name));
   if (!partNumberPattern.test(stem)) { partNumberPattern.lastIndex = 0; return null; }
   partNumberPattern.lastIndex = 0;
   return stem.replace(partNumberPattern, ' ').replace(pairPattern, ' ').toLowerCase().replace(/[\s_]+/g, ' ').trim();
@@ -244,9 +293,14 @@ export function companionsOf(entries: readonly CatalogEntry[], path: string): Ca
   const pairKey = companionKey(self.name), numbered = setKey(self.name);
   if (pairKey === null && numbered === null) return [];
   const folder = parentFolder(path);
-  const found = entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder
+  const slot = altKey(self.name), level = altLevel(self.name);
+  const candidates = entries.filter(entry => entry.path !== path && parentFolder(entry.path) === folder && altKey(entry.name) !== slot
     && ((pairKey !== null && companionKey(entry.name) === pairKey) || (numbered !== null && setKey(entry.name) === numbered)));
-  return found.sort((a, b) => (partNumber(a.name) ?? Infinity) - (partNumber(b.name) ?? Infinity) || naturalCompare(a.name, b.name));
+  // a companion that has alternatives counts once: the one with the same ALT as this part, else the base, else the first alternative
+  const bySlot = new Map<string, CatalogEntry>();
+  const rank = (entry: CatalogEntry) => (altLevel(entry.name) === level ? 0 : altLevel(entry.name) === 0 ? 1 : 2 + altLevel(entry.name));
+  for (const entry of candidates) { const key = altKey(entry.name), had = bySlot.get(key); if (!had || rank(entry) < rank(had)) bySlot.set(key, entry); }
+  return [...bySlot.values()].sort((a, b) => (partNumber(a.name) ?? Infinity) - (partNumber(b.name) ?? Infinity) || naturalCompare(a.name, b.name));
 }
 
 /**
@@ -267,7 +321,8 @@ export function companionCounts(entries: readonly CatalogEntry[]): Map<string, n
     const folder = parentFolder(entry.path);
     const pair = companionKey(entry.name), numbered = setKey(entry.name);
     const members = new Set([...(pair !== null ? byPair.get(`${folder}\0${pair}`) ?? [] : []), ...(numbered !== null ? bySet.get(`${folder}\0${numbered}`) ?? [] : [])]);
-    if (members.size > 1) counts.set(entry.path, members.size);
+    const slots = new Set([...members].map(path => altKey(path.split('/').pop()!)));
+    if (slots.size > 1) counts.set(entry.path, slots.size);
   }
   return counts;
 }

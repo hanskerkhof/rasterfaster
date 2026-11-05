@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, partNumber, setKey, companionLabel, companionCounts, sortCatalog, visibleRows } from './catalog.logic';
+import { CatalogEntry, displayName, filterCatalog, folderCode, folderCounts, parentFolder, siblingsOf, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, crumbsOf, childFolders, filesIn, isWithin, companionKey, companionsOf, altLevel, altKey, altLabel, alternativesOf, partNumber, setKey, companionLabel, companionCounts, sortCatalog, visibleRows } from './catalog.logic';
 
 const entry = (path: string, modified = 1, size = 1): CatalogEntry => {
   const parts = path.split('/');
@@ -162,7 +162,7 @@ describe('catalog logic', () => {
   it('puts the numbered parts of one set together, wherever the number and the position words sit', () => {
     const names = ['3.21 P1 USBA BOTTOM ALT III EIGHT.stl', '3.21 USBA TOP_P2_ALT III  EIGHT.stl', '3.21 P3 USBA FRONT ALT III EIGHT.stl'];
     const keys = names.map(setKey);
-    expect(keys[0]).toBe('3.21 usba alt iii eight');
+    expect(keys[0]).toBe('3.21 usba eight'); // the ALT mark belongs to the slot, not to the set
     expect(new Set(keys).size).toBe(1);
     expect(setKey('3.21 USBA ALT III EIGHT.stl')).toBeNull(); // no part number
     expect(setKey('3.22 P1 USBA BOTTOM ALT III EIGHT.stl')).not.toBe(keys[0]); // another set
@@ -197,5 +197,38 @@ describe('catalog logic', () => {
     expect(counts.has('M/plain.stl')).toBe(false);
     expect(counts.has('N/3.43 USB-C FEMALE FRONT.stl')).toBe(false); // alone in its folder
     for (const file of files) expect(counts.get(file.path) ?? 0).toBe(companionsOf(files, file.path).length ? companionsOf(files, file.path).length + 1 : 0); // the same as the page's companions
+  });
+
+  it('reads ALT I, II ... in all the ways the files are named', () => {
+    expect(['x ALT I.stl', 'x ALTII.stl', 'x ALT_III.stl', 'x alt-IV.stl', 'x Alt V', 'x ALT IX.stl', 'x.stl'].map(altLevel)).toEqual([1, 2, 3, 4, 5, 9, 0]);
+    expect(altLevel('ALTERNATOR.stl')).toBe(0);
+    expect(altLevel('x ALT VIEW.stl')).toBe(0); // not a numeral
+    expect(altLevel('x ALTIIII.stl')).toBe(0);
+    expect(altLabel('x Alt II.stl')).toBe('ALT II');
+    expect(altLabel('x.stl')).toBe('BASE');
+    expect(altKey('3.43 USB-C FEMALE BACK ALT I.stl')).toBe(altKey('3.43 USB-C FEMALE BACK.stl'));
+    expect(altKey('3.43 USB-C FEMALE BACK alt-III.stl')).toBe(altKey('3.43 usb-c female back'));
+    expect(altKey('a ALT I_4w.stl')).toBe(altKey('a_4w.stl'));
+  });
+
+  it('finds the base and the alternatives of a part, in its own folder', () => {
+    const names = ['3.43 USB-C FEMALE BACK ALT I.stl', '3.43 USB-C FEMALE BACK Alt II.stl', '3.43 USB-C FEMALE BACK alt-III.stl', '3.43 USB-C FEMALE BACK.stl', '3.43 USB-C FEMALE FRONT.stl'];
+    const files = [...names.map(name => ({ path: 'M/' + name, name } as CatalogEntry)), { path: 'N/3.43 USB-C FEMALE BACK ALT I.stl', name: '3.43 USB-C FEMALE BACK ALT I.stl' } as CatalogEntry];
+    const expected = ['3.43 USB-C FEMALE BACK.stl', '3.43 USB-C FEMALE BACK ALT I.stl', '3.43 USB-C FEMALE BACK Alt II.stl', '3.43 USB-C FEMALE BACK alt-III.stl'];
+    expect(alternativesOf(files, 'M/3.43 USB-C FEMALE BACK Alt II.stl').map(e => e.name)).toEqual(expected);
+    expect(alternativesOf(files, 'M/3.43 USB-C FEMALE BACK.stl').map(e => e.name)).toEqual(expected);
+    expect(alternativesOf(files, 'M/3.43 USB-C FEMALE FRONT.stl')).toEqual([]);
+    // only alternatives, no base: still a choice
+    expect(alternativesOf([files[0], files[1]], files[1].path).map(e => e.name)).toEqual([files[0].name, files[1].name]);
+  });
+
+  it('shows the alternatives of a part as one slot of the parts that belong together', () => {
+    const names = ['3.43 USB-C FEMALE BACK ALT I.stl', '3.43 USB-C FEMALE BACK Alt II.stl', '3.43 USB-C FEMALE BACK.stl', '3.43 USB-C FEMALE FRONT.stl', '3.43 USB-C FEMALE FRONT ALT II.stl'];
+    const files = names.map(name => ({ path: 'M/' + name, name } as CatalogEntry));
+    // the alternatives of BACK are not companions of each other; FRONT counts once, as the one with the same ALT
+    expect(companionsOf(files, 'M/3.43 USB-C FEMALE BACK Alt II.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE FRONT ALT II.stl']);
+    expect(companionsOf(files, 'M/3.43 USB-C FEMALE BACK ALT I.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE FRONT.stl']); // no FRONT ALT I: the base
+    expect(companionsOf(files, 'M/3.43 USB-C FEMALE FRONT.stl').map(e => e.name)).toEqual(['3.43 USB-C FEMALE BACK.stl']);
+    expect(companionCounts(files).get('M/3.43 USB-C FEMALE BACK ALT I.stl')).toBe(2); // two slots, not five files
   });
 });

@@ -12,7 +12,7 @@ import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
 import { ThumbnailService } from './thumbnail.service';
 import { formatDims, isTooLarge } from './thumbnail.logic';
-import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf, companionCounts, partNumber, companionLabel } from './catalog.logic';
+import { CatalogEntry, CatalogSortKey, displayName, filterCatalog, folderCode, folderCounts, parentFolder, sortCatalog, visibleRows, withoutPaths, folderPaths, cleanFolderPath, isOldPath, groupCopies, remapPath, documentsOf, DuplicateGroup, crumbsOf, childFolders, filesIn, isWithin, companionsOf, alternativesOf, altLabel, companionCounts, partNumber, companionLabel } from './catalog.logic';
 
 type CheckMode = 'exact' | 'shape';
 interface ScanState { state: 'idle' | 'running' | 'done' | 'error'; scanned: number; total: number; error: string }
@@ -210,7 +210,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                   @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
                 }
               }
-              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }</span>
+              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figShown() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figShown() === '3d'" (click)="setFigView('3d')">3D</button>@if (companions().length) { <button type="button" [class.on]="figShown() === 'together'" title="This part and the parts that belong with it (the names differ only in LEFT / RIGHT, TOP / BOTTOM, FRONT / BACK or UPPER / LOWER, or they are numbered parts P1, P2, P3 of one set), at the places their STL files give them" (click)="setFigView('together')">TOGETHER {{ companions().length + 1 }}</button> }@for (alt of alternatives(); track alt.path; let first = $first) { <button type="button" class="alt" [class.first]="first" [class.on]="alt.path === detail()" [title]="'Alternative: ' + alt.name + ' (the base model and its ALT I, ALT II ... are alternatives of each other: use one of them)'" (click)="openIdentical(alt.path)">{{ altLabel(alt.name) }}</button> }</span>
               <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figShown() === 'together' ? companions().length + 1 + ' PARTS AT THEIR OWN PLACES · DRAG TO ORBIT' : figShown() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
@@ -297,6 +297,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 </dd></div>
                 @for (row of sameRows(); track row.label) {
                   <div><dt>{{ row.label }}</dt><dd class="same">@for (other of row.paths.slice(0, 6); track other) { <button type="button" class="link" [title]="other" (click)="openIdentical(other)">{{ other }}</button> } @if (row.paths.length > 6) { <span>+ {{ row.paths.length - 6 }} more</span> }</dd></div>
+                }
+                @if (alternatives().length) {
+                  <div><dt>ALTERNATIVES</dt><dd class="same"><span class="check-row">@for (alt of alternatives(); track alt.path) { <button type="button" class="tool" [class.on]="alt.path === detail()" [title]="alt.path" (click)="openIdentical(alt.path)">{{ altLabel(alt.name) }}</button> }<span class="result">{{ alternatives().length }} TO CHOOSE FROM</span></span></dd></div>
                 }
                 @if (companions().length) {
                   <div><dt>TOGETHER</dt><dd class="same">
@@ -458,7 +461,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .sib { display: flex; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 3px 10px; text-align: left; color: #bbb; } .sib:hover { background: #1e2024; color: #fff; }
     .sib .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sib .k { flex: none; color: #666; }
     .fig { position: relative; flex: 1 1 auto; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
-    .viewer3d { position: absolute; inset: 0; } .figmode { position: absolute; top: 6px; left: 6px; z-index: 2; } .figmode button { color: #888; } .figmode button.on { background: #e6e6e6; color: #111; } .fig .cap { z-index: 2; pointer-events: none; }
+    .viewer3d { position: absolute; inset: 0; } .figmode { position: absolute; top: 6px; left: 6px; z-index: 2; } .figmode button { color: #888; } .figmode button.on { background: #e6e6e6; color: #111; } .figmode button.alt.first { margin-left: 8px; } .check-row .tool.on { background: #e6e6e6; color: #111; } .fig .cap { z-index: 2; pointer-events: none; }
     .fig img { flex: none; } .cap { position: absolute; bottom: 8px; color: #555; font-size: 10px; } .cap.l { left: 10px; } .cap.r { right: 10px; }
     .spec { flex: none; min-width: 0; }
     .grip { position: relative; flex: none; width: 28px; cursor: col-resize; touch-action: none; } .grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: transparent; transition: background .12s; } .grip:hover::after, .grip.active::after { background: #2f6fed; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
@@ -1202,6 +1205,8 @@ export class CatalogDialog implements OnInit {
   /** The picture of a part's page: the line drawing, or the part in 3D (the preview of the file list's Quick Look, to orbit). */
   protected readonly figView = signal<'drawing' | '3d' | 'together'>(readFigView());
   /** The parts that belong with the open one by their names (LEFT / RIGHT, TOP / BOTTOM ...), in its folder. */
+  /** The base and the alternatives (ALT I, ALT II ...) of the open part, itself included: empty when it has none. */
+  protected readonly alternatives = computed(() => { const path = this.detail(); return path ? alternativesOf(this.entries(), path) : []; });
   protected readonly companions = computed(() => { const path = this.detail(); return path ? companionsOf(this.entries(), path) : []; });
   /** What the picture shows: TOGETHER only when the part has companions (else the plain 3D view). */
   protected readonly figShown = computed(() => (this.figView() === 'together' && !this.companions().length ? '3d' : this.figView()));
@@ -1310,6 +1315,7 @@ export class CatalogDialog implements OnInit {
 
   protected folderOf(entry: CatalogEntry) { return parentFolder(entry.path) || 'LIBRARY ROOT'; }
   protected tooLarge(entry: CatalogEntry) { return isTooLarge(entry.size); }
+  protected readonly altLabel = altLabel;
   protected fileTitle(entry: CatalogEntry) { return displayName(entry.name); }
   protected dimsOf(entry: CatalogEntry) { return formatDims(this.thumbs.drawn().get(entry.path)?.dims ?? this.thumbs.measured().get(entry.path)?.dims ?? entry.dims); }
   protected volumeOf(entry: CatalogEntry) { const v = this.thumbs.drawn().get(entry.path)?.volume ?? this.thumbs.measured().get(entry.path)?.volume ?? entry.volume; return v == null ? '…' : `${(v / 1000).toFixed(v >= 100000 ? 0 : 1)} cm³`; }

@@ -2,6 +2,14 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: alternatives ALT I, ALT II ... can be toggled (0.12.3)
+
+### Added
+- **FE** (`catalog.logic.ts`, `catalog-dialog.ts`): the filename convention for alternatives. `ALT I`, `ALT II` ... (also `ALTI`, `ALT_II`, `alt-III`, any case; a roman numeral) marks an alternative of the base model, which is the same name without ALT; a slot has the base or one alternative (`altLevel`, `altKey`, `altLabel`, `alternativesOf`). A part's page shows an **ALTERNATIVES** row in the data panel (BASE, ALT I, ALT II ...) and the same buttons next to DRAWING / 3D / TOGETHER over the picture; click one to switch to it (the picture mode stays).
+
+### Changed
+- **FE**: alternatives are not companions of each other. The parts that belong together (TOGETHER, the `N PARTS` badge) now ignore the ALT mark and count a part with alternatives once: its companion is shown with the same ALT as the open part, else its base, else its first alternative. `3.43 USB-C FEMALE BACK ALT I` goes with `3.43 USB-C FEMALE FRONT`.
+
 ## 2026-11-05 - ESLint for the frontend (0.12.2)
 
 ### Added
