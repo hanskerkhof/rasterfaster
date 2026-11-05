@@ -90,6 +90,8 @@ export interface ItemRender {
 export interface DocGroup {
   id: string;
   name: string;
+  /** Folded in the part list: kept with the document (quietly, like the camera: no undo step, no new version). */
+  collapsed?: boolean;
 }
 
 /** Measured from a part's STL as stored in the library (unrotated). */
@@ -184,7 +186,7 @@ export interface RfDocument {
 
 /** What the undo history compares and stores: the document without its camera view (moving the camera is not an edit). */
 function historyOf(doc: RfDocument): string {
-  return JSON.stringify({ ...doc, view: undefined, render: undefined, cameraModes: undefined });
+  return JSON.stringify({ ...doc, view: undefined, render: undefined, cameraModes: undefined, groups: doc.groups?.map(g => ({ ...g, collapsed: undefined })) });
 }
 
 const legacyStorageKey = 'rasterfaster.document'; // pre-API documents lived in the browser; migrated once on startup
@@ -205,6 +207,18 @@ export type SaveState = 'saved' | 'saving' | 'unsaved' | 'error';
 const maxCoordinateMm = 20000;
 
 /** Replaces non-finite or absurd positions/rotations (from an earlier drag glitch) with safe values. Returns whether anything changed. */
+/**
+ * The items with `ids` (kept in their own order) put in front of the item `beforeId`, or at the end when it is null / one of them. A group moved
+ * this way stays together; a part moved inside its group stays in it (nothing here changes who belongs to which group).
+ */
+export function reorderItems(items: readonly DocItem[], ids: readonly string[], beforeId: string | null): DocItem[] {
+  const moving = new Set(ids);
+  const moved = items.filter(i => moving.has(i.id));
+  const rest = items.filter(i => !moving.has(i.id));
+  const at = beforeId === null || moving.has(beforeId) ? rest.length : rest.findIndex(i => i.id === beforeId);
+  return [...rest.slice(0, at < 0 ? rest.length : at), ...moved, ...rest.slice(at < 0 ? rest.length : at)];
+}
+
 function sanitize(doc: RfDocument): boolean {
   let changed = false;
   for (const item of doc.items) {
@@ -872,10 +886,18 @@ export class DocumentStore {
     try { localStorage.setItem(imagesOpenStorageKey, String(open)); } catch { /* storage unavailable */ }
   }
 
-  readonly collapsedGroups = signal<ReadonlySet<string>>(new Set());
+  /** The groups that are folded in the part list (saved with the document). */
+  readonly collapsedGroups = computed<ReadonlySet<string>>(() => new Set((this.doc().groups ?? []).filter(g => g.collapsed).map(g => g.id)));
 
+  /** Folds or unfolds a group in the part list: kept in the document, quietly like the camera view (no undo step, no version diamond). */
   toggleGroupFolded(id: string) {
-    this.collapsedGroups.update(set => { const next = new Set(set); next.has(id) ? next.delete(id) : next.add(id); return next; });
+    const current = this.doc();
+    if (!(current.groups ?? []).some(g => g.id === id)) return;
+    this.doc.set({ ...current, groups: (current.groups ?? []).map(g => (g.id === id ? (g.collapsed ? { id: g.id, name: g.name } : { ...g, collapsed: true }) : g)) });
+    if (this.viewing() !== null || !this.docId()) return; // an old version being looked at, or no saved document yet: only on screen
+    this.dirty = true;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => void this.flush(), 800);
   }
 
   /** Library paths of document parts whose file is not in the library (trashed, renamed or deleted elsewhere); the app keeps it up to date. */
@@ -1132,6 +1154,27 @@ export class DocumentStore {
     this.mutate('Rename view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...v, name: clean } : v)) }));
   }
 
+  /** Moves parts (or all the parts of a group) in front of another part of the list, or to the end: one undo step. The order of the list is the order of the BOM and the exports. */
+  moveItems(ids: readonly string[], beforeId: string | null) {
+    const next = reorderItems(this.doc().items, ids, beforeId);
+    if (next.every((item, i) => item === this.doc().items[i])) return;
+    this.mutate('Reorder parts', d => ({ ...d, items: reorderItems(d.items, ids, beforeId) }));
+  }
+
+  /** Puts a saved view at another place of the list (`toIndex` is its place in the new order): the keys 1 – 9 follow the order. One undo step. */
+  moveSavedView(id: string, toIndex: number) {
+    const views = this.doc().views ?? [];
+    const from = views.findIndex(v => v.id === id);
+    const to = Math.max(0, Math.min(views.length - 1, Math.round(toIndex)));
+    if (from < 0 || from === to) return;
+    this.mutate('Reorder views', d => {
+      const list = [...(d.views ?? [])];
+      const [moved] = list.splice(from, 1);
+      list.splice(to, 0, moved);
+      return { ...d, views: list };
+    });
+  }
+
   removeSavedView(id: string) {
     this.mutate('Delete view', d => ({ ...d, views: (d.views ?? []).filter(v => v.id !== id) }));
   }
@@ -1326,7 +1369,10 @@ export class DocumentStore {
 
   private restore(json: string) {
     this.committed = json;
-    this.doc.set({ ...JSON.parse(json), view: this.doc().view, render: this.doc().render, cameraModes: this.doc().cameraModes }); // undoing does not move the camera or change the render settings
+    const folded = this.collapsedGroups();
+    const restored = JSON.parse(json) as RfDocument;
+    if (restored.groups?.length) restored.groups = restored.groups.map(g => (folded.has(g.id) ? { ...g, collapsed: true } : g)); // folding is not an edit: undoing does not unfold
+    this.doc.set({ ...restored, view: this.doc().view, render: this.doc().render, cameraModes: this.doc().cameraModes }); // undoing does not move the camera or change the render settings
     const present = new Set(this.doc().items.map(i => i.id));
     this.selectedIds.update(ids => ids.filter(id => present.has(id)));
     this.updateFlags();

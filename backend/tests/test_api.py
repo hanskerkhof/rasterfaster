@@ -612,3 +612,12 @@ def test_a_symmetric_part_is_the_same_shape_as_its_mirror_image(tmp_path):
     (tmp_path / "left.stl").write_bytes(_binary_stl(base))
     (tmp_path / "right.stl").write_bytes(_binary_stl(_turn(base, lambda x, y, z: (-x, y, z))))
     assert duplicates.same_shape(duplicates.shape_features(tmp_path / "left.stl"), duplicates.shape_features(tmp_path / "right.stl"))
+
+
+def test_a_folded_group_is_kept_with_the_document(client):
+    item = sample_item()
+    created = client.post("/api/documents", json={"name": "G", "items": [{**item, "groupId": "g1"}, {**item, "groupId": "g1"}], "groups": [{"id": "g1", "name": "Group 1", "collapsed": True}]}).json()
+    again = client.get(f"/api/documents/{created['id']}").json()
+    assert again["groups"] == [{"id": "g1", "name": "Group 1", "collapsed": True}]
+    unfolded = client.put(f"/api/documents/{created['id']}", json={"name": "G", "items": again["items"], "groups": [{"id": "g1", "name": "Group 1"}]}).json()
+    assert not unfolded["groups"][0].get("collapsed")  # not folded: off (or none)

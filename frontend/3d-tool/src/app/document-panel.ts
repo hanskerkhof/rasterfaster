@@ -146,13 +146,17 @@ function readGeometry(): PanelGeometry | null {
     <div class="list" tabindex="0" (mousedown)="lastListPointer = performance.now()"> <!-- focusable, so the stage shortcuts (V, arrows...) reach the scene from here: its keydown listener is on an ancestor -->
       @for (item of store.doc().items; track item.id) {
        @if (groupHeader(item); as group) {
-        <div class="item group" [class.sel]="groupSelected(group.id)" (click)="onGroupClick($event, group.id)" (dblclick)="renameGroupPrompt(group.id)" title="Group: click selects all its parts · double-click renames · ▾ folds it">
+        @if (placeBefore() === 'g:' + group.id) { <div class="place" [style.height.px]="drag()?.height"></div> }
+        <div class="item group" [attr.data-gid]="group.id" [class.lift]="drag()?.key === 'g:' + group.id" [style.top.px]="drag()?.key === 'g:' + group.id ? drag()!.top : null" [style.height.px]="drag()?.key === 'g:' + group.id ? drag()!.height : null" [class.sel]="groupSelected(group.id)" (click)="onGroupClick($event, group.id)" (dblclick)="renameGroupPrompt(group.id)" title="Group: click selects all its parts · double-click renames · ▾ folds it">
+          <span class="rowgrip" title="Drag to move the group in the list" (pointerdown)="startRowDrag($event, 'g:' + group.id)" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">⋮⋮</span>
           <button type="button" class="fold" [title]="folded(group.id) ? 'Unfold the group' : 'Fold the group'" (click)="foldGroup($event, group.id)">{{ folded(group.id) ? '▸' : '▾' }}</button>
           <span class="label">{{ group.name }}</span><span class="badge" title="Parts in this group">{{ store.membersOf(group.id).length }}</span>
         </div>
        }
        @if (!item.groupId || !folded(item.groupId)) {
-        <div class="item" [class.grouped]="item.groupId" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted || store.isHiddenNow(item)" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · the group row selects the whole group">
+        @if (placeBefore() === item.id) { <div class="place" [style.height.px]="drag()?.height"></div> }
+        <div class="item" [class.grouped]="item.groupId" [class.away]="item.groupId && drag()?.away === item.groupId" [class.lift]="drag()?.key === item.id" [style.top.px]="drag()?.key === item.id ? drag()!.top : null" [style.height.px]="drag()?.key === item.id ? drag()!.height : null" [attr.data-id]="item.id" [class.sel]="isSelected(item.id)" (click)="onItemClick($event, item.id)" (dblclick)="centerItem.emit(item.id)" (contextmenu)="onItemContextMenu($event, item.id)" [class.muted]="item.muted || store.isHiddenNow(item)" title="Double-click: centre the view · right-click: menu · ⌘-click: add or remove · ⇧-click: a range · the group row selects the whole group">
+          <span class="rowgrip" title="Drag to change the order (the order of the list is the order of the BOM and the exports)" (pointerdown)="startRowDrag($event, item.id)" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">⋮⋮</span>
           <span class="dot" [style.background]="hex(item)"></span>
           <span class="label" [title]="item.path">{{ item.name }}</span>
           @if (store.missingPaths().has(item.path)) { <span class="badge warn" [title]="missingTip(item.path)">⚠</span> }
@@ -169,6 +173,7 @@ function readGeometry(): PanelGeometry | null {
       } @empty {
         <div class="empty">Empty. Select an .stl in the list and press ⌘↓ (or double-click it).</div>
       }
+      @if (placeEnd()) { <div class="place" [style.height.px]="drag()?.height"></div> }
     </div>
     @if (store.selectedIds().length > 1) {
       <div class="multi">{{ store.selectedIds().length }} selected · drag, arrows and rotate keys move/turn them together · ⌘-click to add or remove · ⇧-click for a range</div>
@@ -221,6 +226,11 @@ function readGeometry(): PanelGeometry | null {
     button:hover:not(:disabled) { background: #2f6fed; color: #fff; }
     button:disabled { opacity: .35; cursor: default; }
     .list { flex: 0 1 auto; overflow: auto; min-height: 84px; max-height: 60vh; border: 1px solid rgba(255,255,255,.1); border-radius: 4px; outline: none; }
+    .list { position: relative; }
+    .rowgrip { flex: none; width: 9px; text-align: center; font-size: 11px; line-height: 1; letter-spacing: -2px; color: inherit; opacity: 0; cursor: grab; touch-action: none; user-select: none; } .item:hover .rowgrip { opacity: .6; } .item.lift .rowgrip { opacity: .9; cursor: grabbing; }
+    .item.lift { position: absolute; left: 0; right: 0; box-sizing: border-box; z-index: 2; opacity: .6; background: #3a4152; box-shadow: 0 6px 16px rgba(0,0,0,.55); outline: 1px solid #2f6fed; cursor: grabbing; pointer-events: none; }
+    .item.away { display: none; }
+    .place { box-sizing: border-box; border: 1px dashed rgba(47,111,237,.8); background: rgba(47,111,237,.12); }
     .item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: default; user-select: none; }
     .item:hover { background: rgba(255,255,255,.07); }
     .item.muted .label { opacity: .45; font-style: italic; }
@@ -697,6 +707,87 @@ export class DocumentPanel {
   protected folded(id: string) { return this.store.collapsedGroups().has(id); }
   protected groupSelected(id: string) { return this.store.membersOf(id).every(i => this.store.selectedIds().includes(i.id)); }
   protected foldGroup(event: Event, id: string) { event.stopPropagation(); this.store.toggleGroupFolded(id); }
+  // --- drag a part (or a group) to another place of the list, by its grip --------------------------------------------------------------
+
+  /** What is dragged (`key`: the part's id, or `g:` and the group's id), where its lifted row is and how high, and the group whose parts are hidden while the group is dragged. */
+  protected readonly drag = signal<{ key: string; top: number; height: number; away: string | null } | null>(null);
+  /** Where it would land: a gap of its height in front of this row (the part's id, or `g:` and the group's id), or at the end of the list. */
+  protected readonly placeBefore = signal<string | null>(null);
+  protected readonly placeEnd = signal(false);
+
+  /**
+   * A part of the list is a part, or a whole group (its header and parts move together). A part of a group moves inside its group only, so a drag
+   * never changes who is in which group.
+   */
+  protected startRowDrag(event: PointerEvent, key: string) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const listEl = (event.currentTarget as HTMLElement).closest<HTMLElement>('.list');
+    if (!listEl) return;
+    const grip = event.currentTarget as HTMLElement;
+    grip.setPointerCapture(event.pointerId);
+    const items = this.store.doc().items;
+    interface Unit { key: string; ids: string[] }
+    const units: Unit[] = [], seen = new Set<string>();
+    for (const item of items) {
+      if (!item.groupId) units.push({ key: item.id, ids: [item.id] });
+      else if (!seen.has(item.groupId)) { seen.add(item.groupId); units.push({ key: 'g:' + item.groupId, ids: items.filter(i => i.groupId === item.groupId).map(i => i.id) }); }
+    }
+    const isGroup = key.startsWith('g:');
+    const dragged = isGroup ? undefined : items.find(i => i.id === key);
+    // the choices: the other parts / groups of the list, or (for a part of a group) the other parts of its group
+    const groupId = dragged?.groupId ?? null;
+    const choices: Unit[] = groupId ? items.filter(i => i.groupId === groupId && i.id !== key).map(i => ({ key: i.id, ids: [i.id] })) : units.filter(u => u.key !== key);
+    const rowsOf = (unit: Unit): DOMRect[] => {
+      const els = unit.key.startsWith('g:')
+        ? [listEl.querySelector(`.item.group[data-gid="${unit.key.slice(2)}"]`), ...unit.ids.map(id => listEl.querySelector(`.item[data-id="${id}"]`))]
+        : [listEl.querySelector(`.item[data-id="${unit.key}"]`)];
+      return els.filter((el): el is Element => !!el).map(el => el.getBoundingClientRect());
+    };
+    const span = (unit: Unit) => { const r = rowsOf(unit); return r.length ? { top: r[0].top, bottom: r[r.length - 1].bottom } : null; };
+    const own = (isGroup ? rowsOf({ key, ids: units.find(u => u.key === key)?.ids ?? [] })[0] : rowsOf({ key, ids: [key] })[0]);
+    if (!own) return;
+    const spans = choices.map(span);
+    const listTop = listEl.getBoundingClientRect().top;
+    const startY = event.clientY;
+    // where the dragged part lands when it is put at the end of its group: in front of the first part after the group (or at the end of the list)
+    const lastOfGroup = groupId ? items.map((i, n) => (i.groupId === groupId ? n : -1)).reduce((a, b) => Math.max(a, b), -1) : -1;
+    const afterGroup = groupId ? items[lastOfGroup + 1]?.id ?? null : null;
+    const groupUnitIndex = groupId ? units.findIndex(u => u.key === 'g:' + groupId) : -1;
+    const keyAfterGroup = groupId ? units[groupUnitIndex + 1]?.key ?? null : null;
+    let target = -1;
+    const move = (e: PointerEvent) => {
+      const dy = e.clientY - startY;
+      const centre = own.top + own.height / 2 + dy;
+      const to = spans.filter(sp => sp && (sp.top + sp.bottom) / 2 < centre).length;
+      target = to;
+      this.drag.set({ key, height: own.height, away: isGroup ? key.slice(2) : null, top: Math.max(0, Math.min(own.top - listTop + listEl.scrollTop + dy, listEl.scrollHeight - own.height)) });
+      if (to < choices.length) { this.placeBefore.set(choices[to].key); this.placeEnd.set(false); }
+      else if (groupId) { this.placeBefore.set(keyAfterGroup); this.placeEnd.set(keyAfterGroup === null); }
+      else { this.placeBefore.set(null); this.placeEnd.set(true); }
+    };
+    const end = (commit: boolean) => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('keydown', onKey, true);
+      this.drag.set(null); this.placeBefore.set(null); this.placeEnd.set(false);
+      if (!commit || target < 0) return;
+      const ids = isGroup ? units.find(u => u.key === key)?.ids ?? [] : [key];
+      // the first part of the choice it goes in front of; the end of a group: in front of what follows the group
+      const before = target < choices.length ? choices[target].ids[0] : groupId ? afterGroup : null;
+      this.store.moveItems(ids, before);
+    };
+    const up = () => end(true);
+    const cancel = () => end(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); end(false); } };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', cancel);
+    document.addEventListener('keydown', onKey, true);
+  }
+
   protected onGroupClick(event: MouseEvent, id: string) {
     const first = this.store.membersOf(id)[0];
     if (!first) return;

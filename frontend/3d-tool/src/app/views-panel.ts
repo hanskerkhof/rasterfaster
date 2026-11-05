@@ -31,7 +31,9 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     @if (!collapsed()) {
       <div class="list">
         @for (view of store.doc().views ?? []; track view.id; let i = $index) {
-          <div class="view" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" [title]="rowTitle(view)">
+          @if (placeBefore() === view.id) { <div class="place" [style.height.px]="drag()?.height"></div> }
+          <div class="view" [class.lift]="drag()?.id === view.id" [style.top.px]="drag()?.id === view.id ? drag()!.top : null" [style.height.px]="drag()?.id === view.id ? drag()!.height : null" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" [title]="rowTitle(view)">
+            <span class="grip" title="Drag to change the order (the keys 1 – 9 follow it)" (pointerdown)="startViewDrag($event, view.id)" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">⋮⋮</span>
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
             <app-view-mode-icon [mode]="view.appMode" />
             @if (editing() === view.id) {
@@ -42,14 +44,15 @@ function read(): { spot: Spot | null; collapsed: boolean } {
             <button type="button" class="x" title="Delete this view" (click)="remove($event, view.id)">✕</button>
           </div>
         }
+        @if (placeEnd()) { <div class="place" [style.height.px]="drag()?.height"></div> }
         @for (slot of freeSlots(); track slot; let first = $first) {
           <div class="view slot" [class.next]="first" [attr.title]="first ? 'Empty: click to save the current view here (key ' + slot + ' then goes to it)' : 'Empty'" (click)="first && save()">
-            <span class="num">{{ slot }}</span><span class="label">empty</span>
+            <span class="grip ph"></span><span class="num">{{ slot }}</span><span class="label">empty</span>
           </div>
         }
       </div>
       <details class="keys"><summary>Keys and mouse</summary>
-        <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ (or ⇧ and its number) replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views, ⇧1 – ⇧9 replace them by the current view (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file</div>
+        <div class="hint">+ Save view: keeps the camera (position, zoom, perspective or orthographic), the display mode, the light direction and the ground and grid options under a name · click a view: go there (the camera glides) · double-click its name: rename it in place (Enter keeps, Esc cancels) · ⟳ (or ⇧ and its number) replaces it by what you see now · ✕ deletes it · keys 1 – 9: go to the first nine views, ⇧1 – ⇧9 replace them by the current view (the list or the 3D view must have focus) · drag the title bar: move the panel · ▾: fold it · the views are saved with the document, its versions and the document file · drag the ⋮⋮ grip of a view: change the order (the keys 1 – 9 follow it; Esc cancels)</div>
       </details>
     }
   `,
@@ -73,6 +76,11 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .label.back { display: inline-grid; } .label.back span { grid-area: 1 / 1; } .label.back .now { visibility: hidden; font-style: italic; color: #e0a030; } .view.from:hover .label.back .was { visibility: hidden; } .view.from:hover .label.back .now { visibility: visible; } /* the name is swapped for a hint, in the same space */
     .view.from .replace { opacity: 1; color: #e0a030; }
     .view.active app-view-mode-icon { filter: brightness(1.25); }
+    .view { position: relative; padding-left: 3px; }
+    .grip { flex: none; width: 9px; text-align: center; font-size: 11px; line-height: 1; letter-spacing: -2px; color: #8a93a2; opacity: 0; cursor: grab; touch-action: none; user-select: none; } .view:hover .grip { opacity: .9; } .grip.ph { cursor: default; }
+    .list { position: relative; }
+    .view.lift { position: absolute; left: 4px; right: 4px; box-sizing: border-box; z-index: 2; opacity: .6; background: #3a4152; box-shadow: 0 6px 16px rgba(0,0,0,.55); outline: 1px solid #2f6fed; cursor: grabbing; pointer-events: none; } .view.lift .grip { opacity: .9; cursor: grabbing; }
+    .place { flex: none; box-sizing: border-box; margin: 0; border: 1px dashed rgba(47,111,237,.8); background: rgba(47,111,237,.12); border-radius: 4px; }
     .num { flex: none; width: 12px; text-align: center; color: #8a93a2; font-size: 11px; }
     .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .6; } .x:hover { opacity: 1; background: transparent; color: #fff; }
@@ -104,6 +112,60 @@ export class ViewsPanel {
 
   protected toggle() { this.collapsed.update(v => !v); }
   protected save() { this.store.saveCurrentView(); }
+
+  // --- drag a view to another place of the list (by its grip) ------------------------------------------------------------------------
+
+  /** The view being dragged and how far (px) it is from its row; null when nothing is dragged. */
+  protected readonly drag = signal<{ id: string; top: number; height: number } | null>(null);
+  /** Where it would land (a gap of its own height is shown there): in front of this view, or at the end of the list. */
+  protected readonly placeBefore = signal<string | null>(null);
+  protected readonly placeEnd = signal(false);
+  private dragTarget = 0;
+
+  protected startViewDrag(event: PointerEvent, id: string) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation(); // not the click of the row, not the drag of the panel
+    const root = this.element.nativeElement;
+    const grip = event.currentTarget as HTMLElement;
+    grip.setPointerCapture(event.pointerId);
+    const views = this.store.doc().views ?? [];
+    const listEl = root.querySelector<HTMLElement>('.list')!;
+    const rows = [...root.querySelectorAll<HTMLElement>('.list .view:not(.slot)')].map(el => el.getBoundingClientRect());
+    const from = views.findIndex(v => v.id === id);
+    if (from < 0 || rows.length !== views.length) return;
+    const startY = event.clientY, others = views.filter(v => v.id !== id);
+    this.dragTarget = from;
+    const listTop = listEl.getBoundingClientRect().top, own = rows[from];
+    const move = (e: PointerEvent) => {
+      const dy = e.clientY - startY;
+      const centre = own.top + own.height / 2 + dy;
+      // its place among the other rows: after every row whose middle it has passed
+      const to = rows.filter((r, i) => i !== from && r.top + r.height / 2 < centre).length;
+      this.dragTarget = to;
+      // the lifted row follows the pointer inside the list; a gap of its height shows where it would land
+      this.drag.set({ id, height: own.height, top: Math.max(0, Math.min(own.top - listTop + listEl.scrollTop + dy, listEl.scrollHeight - own.height)) });
+      this.placeBefore.set(to < others.length ? others[to].id : null);
+      this.placeEnd.set(to >= others.length);
+    };
+    const end = (commit: boolean) => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      grip.removeEventListener('pointercancel', cancel);
+      document.removeEventListener('keydown', key, true);
+      const to = this.dragTarget;
+      this.drag.set(null); this.placeBefore.set(null); this.placeEnd.set(false);
+      if (commit && to !== from) this.store.moveSavedView(id, to);
+    };
+    const up = () => end(true);
+    const cancel = () => end(false);
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); end(false); } };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+    grip.addEventListener('pointercancel', cancel);
+    document.addEventListener('keydown', key, true);
+  }
+
   /** The hover text of a row: the mode of the view, then what a click does. */
   protected rowTitle(view: { appMode?: string | null }) {
     const mode = viewModeName(view.appMode);

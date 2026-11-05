@@ -2,6 +2,21 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Folded groups are kept with the document (0.12.18)
+
+### Changed
+- **FE**, **BE** (`document.store.ts`, `backend/main.py`): folding or unfolding a group in the part list is saved with the document (`collapsed` on the group), quietly like the camera: no undo step, no new version, and undoing an edit does not unfold a group. It was only remembered until the page was reloaded. Store and backend tests cover it.
+
+## 2026-11-05 - The part list can be reordered by dragging (0.12.17)
+
+### Added
+- **FE** (`document-panel.ts`, `document.store.ts`): the parts list of the document panel has the same drag as the Views: a **⋮⋮ grip** on every part and group row (on hover); the dragged row lifts and is dimmed, a dashed gap of its height shows where it lands, Esc cancels. A **group** is dragged by its header and moves with all its parts as one block (its parts are hidden while it is dragged); a **part of a group** moves inside its group only, so a drag never changes who is in which group (ungroup first to move it out). `moveItems` / `reorderItems` make it one undo step ("Reorder parts"); two store tests cover them. The order of the list is the order of the BOM and the exports.
+
+## 2026-11-05 - Views panel: drag a view to another place (0.12.16)
+
+### Added
+- **FE** (`views-panel.ts`, `document.store.ts`): a view can be dragged by its **⋮⋮ grip** (shown on hover): the row lifts and is dimmed, a dashed gap of the row's own height shows where it will land (the other rows make room), the numbers follow when it is dropped, Esc cancels. The keys 1 – 9 follow the order. `moveSavedView` makes it one undo step ("Reorder views"); a store test covers it.
+
 ## 2026-11-05 - Views panel: Design or Render view (0.12.15)
 
 ### Added

@@ -111,6 +111,7 @@ class DocumentItem(BaseModel):
 class DocumentGroup(BaseModel):
     id: str = Field(max_length=64)
     name: str = Field(max_length=120)
+    collapsed: bool | None = None  # folded in the part list (kept quietly with the document)
 
 
 class DocumentLight(BaseModel):

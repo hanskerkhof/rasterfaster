@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { vi } from 'vitest';
-import { DocItem, DocumentStore, Vec3, cellCenteredPosition } from './document.store';
+import { DocItem, DocumentStore, Vec3, cellCenteredPosition, reorderItems } from './document.store';
 
 const part = (position: [number, number, number] = [0, 0, 0]): Omit<DocItem, 'id'> => ({
   path: 'a.stl', name: 'a', color: 0xff0000, position, rotation: [0, 0, 0, 1],
@@ -310,6 +310,78 @@ describe('Design and Render mode', () => {
     store.copySelection();
     store.pasteClipboard();
     expect(store.doc().items[1].render).toEqual({ finish: 'metal', color: 0x336699 });
+  });
+});
+
+describe('Saved views order', () => {
+  it('moves a view to another place as one undo step; the keys 1 - 9 follow', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    const cam = { position: [0, 0, 1] as [number, number, number], target: [0, 0, 0] as [number, number, number], zoom: 1, radius: 1, projection: 'persp' as const };
+    store.captureView = () => ({ ...cam, name: '', id: '' } as never);
+    for (const name of ['A', 'B', 'C', 'D']) { store.saveCurrentView(); const v = store.doc().views!; store.renameSavedView(v[v.length - 1].id, name); }
+    const names = () => store.doc().views!.map(v => v.name).join('');
+    expect(names()).toBe('ABCD');
+    store.moveSavedView(store.doc().views![3].id, 1);
+    expect(names()).toBe('ADBC');
+    store.undo();
+    expect(names()).toBe('ABCD');
+    store.moveSavedView(store.doc().views![0].id, 9); // past the end: the end
+    expect(names()).toBe('BCDA');
+    store.moveSavedView(store.doc().views![1].id, 1); // same place: nothing
+    expect(names()).toBe('BCDA');
+  });
+});
+
+describe('Folded groups', () => {
+  it('folding is kept in the document without an undo step', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    const a = store.addItem(part()).id, b = store.addItem(part([20, 0, 0])).id;
+    store.selectedIds.set([a, b]);
+    store.groupSelected();
+    const group = store.doc().groups![0].id;
+    store.toggleGroupFolded(group);
+    expect(store.collapsedGroups().has(group)).toBe(true);
+    expect(store.doc().groups![0].collapsed).toBe(true);
+    store.moveItems([a], null); // an edit after the fold: undoing it does not unfold the group
+    store.undo();
+    expect(store.collapsedGroups().has(group)).toBe(true);
+    store.redo();
+    expect(store.collapsedGroups().has(group)).toBe(true);
+    store.toggleGroupFolded(group);
+    expect(store.collapsedGroups().has(group)).toBe(false);
+    expect(store.doc().groups![0]).toEqual({ id: group, name: 'Group 1' });
+  });
+});
+
+describe('Reorder parts', () => {
+  const item = (id: string, groupId: string | null = null) => ({ id, groupId } as DocItem);
+  const order = (items: DocItem[]) => items.map(i => i.id).join('');
+
+  it('puts parts in front of another part or at the end, keeping their own order', () => {
+    const items = ['a', 'b', 'c', 'd'].map(id => item(id));
+    expect(order(reorderItems(items, ['d'], 'b'))).toBe('adbc');
+    expect(order(reorderItems(items, ['a'], null))).toBe('bcda');
+    expect(order(reorderItems(items, ['a', 'b'], 'd'))).toBe('cabd'); // a group moves as one block
+    expect(order(reorderItems(items, ['b'], 'b'))).toBe('acdb'); // in front of itself: it goes to the end (the panel never asks for this)
+    expect(order(reorderItems(items, ['c'], 'zzz'))).toBe('abdc'); // an unknown place: the end
+  });
+
+  it('moves parts as one undo step', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    const [a, b, c] = ['a', 'b', 'c'].map(n => store.addItem({ ...part(), name: n }).id);
+    const names = () => store.doc().items.map(i => i.name).join('');
+    store.moveItems([c], a);
+    expect(names()).toBe('cab');
+    store.undo();
+    expect(names()).toBe('abc');
+    store.moveItems([a], b); // already there: no change, no undo step
+    expect(names()).toBe('abc');
   });
 });
 
