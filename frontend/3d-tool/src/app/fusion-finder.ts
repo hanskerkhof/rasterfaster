@@ -35,12 +35,16 @@ export class FusionFinder implements RfPartFinder {
   private async search(path: string, pending: number): Promise<RfFinderResult> {
     const found = await firstValueFrom(this.http.get<FusionFind>('/api/fusion/find', { params: { path } }));
     const hits: RfFinderHit[] = found.designs.map(d => ({
-      title: d.design, subtitle: d.folder + (d.source === 'fusion cache' ? '  (Fusion cache)' : ''), matches: d.matches, moreMatches: d.moreMatches, note: d.note, path: d.path, exact: d.exact,
+      title: d.design, subtitle: d.folder, matches: d.matches, moreMatches: d.moreMatches, note: d.note, path: d.path, exact: d.exact,
+      badge: d.source === 'fusion cache'
+        ? { label: '☁ CACHE', tone: 'blue' as const, title: 'In the Fusion cache: the copy of a cloud design that Fusion keeps on this Mac (the designs you opened in Fusion). Not one of your own files; it can be older than the cloud.' }
+        : { label: '▤ LOCAL', tone: 'green' as const, title: 'In one of your own .f3d files (the local Fusion folder).' },
     }));
+    const local = hits.filter(h => h.badge?.tone === 'green').length, cache = hits.length - local;
     const result: RfFinderResult = {
       found: found.found,
       summary: found.found
-        ? `“${found.query}” is in ${hits.length}${found.moreDesigns ? '+' : ''} Fusion design${hits.length === 1 ? '' : 's'}${hits.some(h => h.exact) ? '' : ' (only as part of longer names)'}`
+        ? `“${found.query}” is in ${hits.length}${found.moreDesigns ? '+' : ''} Fusion design${hits.length === 1 ? '' : 's'}: ${local} local, ${cache} in the cache${hits.some(h => h.exact) ? '' : ' (only as part of longer names)'}`
         : `“${found.query}” was not found in ${found.indexed} indexed Fusion designs`,
       hits, more: found.moreDesigns,
     };

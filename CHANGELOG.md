@@ -2,6 +2,21 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: a 3D preview on a part's page (0.11.75, 0.11.76)
+
+### Added
+- **FE** (`src/library/preview/quick-look.ts`, `catalog-dialog.ts`): a **DRAWING | 3D** switch on the picture of a part's page (remembered, `rasterfaster.catalogFigView`). **3D** shows the part in the preview of the file list's Quick Look (isometric to start with; drag to orbit, scroll to zoom; Solid, Outline, Wireframe and the hidden-line modes), filling the picture; it follows ← → and the thumbnails, and takes the width of the resize bar. Parts over 100 MB are not previewed. Quick Look has an `embedded` mode for this (no frame, header or resize corner); the line drawing is not made while 3D is shown. (0.11.76: the mode buttons sit under the switch, not over it, and the size is not repeated over the caption.)
+
+## 2026-11-05 - FIND IN FUSION: a label for the cache and for your own files (0.11.74)
+
+### Added
+- **FE** (`part-finder.ts`, `fusion-finder.ts`, `catalog-dialog.ts`), **BE** (`fusionfind.py`): every hit has a label by its name: a blue **☁ CACHE** (the copy of a cloud design that Fusion keeps on this Mac) or a green **▤ LOCAL** (one of your own .f3d files in the local Fusion folder), with a tooltip saying what that means; the summary says how many of each (`7 Fusion designs: 4 local, 3 in the cache`), and within the exact names your own files are listed before the cache.
+
+## 2026-11-05 - Catalog: the resize bar runs the whole length of the facts (0.11.73)
+
+### Fixed
+- **FE** (`catalog-dialog.ts`): on a part's page the resize bar was only as tall as the window, so it stopped where a long facts column (a Fusion result, many doubles) went on below; the three columns now sit in one box that is as tall as the longest of them, and the drawing column stays no taller than the window.
+
 ## 2026-11-05 - Catalog: the subfolders in the breadcrumb (0.11.72)
 
 ### Added

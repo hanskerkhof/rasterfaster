@@ -10,6 +10,8 @@ export interface RfFinderHit {
   moreMatches: number;
   /** A note about the hit (older versions, ...). */
   note: string;
+  /** A small label on the hit (where it comes from: a cache, one of your own files ...), with a colour and a tooltip. */
+  badge?: { label: string; tone: 'blue' | 'green' | 'amber' | 'grey'; title: string };
   /** A path `reveal` can show in the Finder. */
   path?: string;
   /** The name is exactly the part's name, not only part of a longer one. */

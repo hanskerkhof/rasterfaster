@@ -111,7 +111,7 @@ def find_part(index: dict, fileName: str) -> dict:
             designs.append({"design": name, "path": key, "folder": str(Path(key).parent), "source": "fusion cache" if str(f3dsearch.fusionCache) in key else "local",
                             "matches": matches, "moreMatches": max(0, len(matching) - maxNames), "exact": any(m["exact"] for m in matches), "note": note,
                             "size": entry["size"], "modified": entry["mtime"]})
-        designs.sort(key=lambda d: (not d["exact"], d["design"].lower()))
+        designs.sort(key=lambda d: (not d["exact"], d["source"] != "local", d["design"].lower()))  # the exact names first, your own files before the cache
         return {"found": True, "query": query, "queries": queries, "designs": designs, "moreDesigns": max(0, len(hits) - maxDesigns), "indexed": len(index["files"])}
     return {"found": False, "query": queries[0] if queries else "", "queries": queries, "designs": [], "moreDesigns": 0, "indexed": len(index["files"])}
 

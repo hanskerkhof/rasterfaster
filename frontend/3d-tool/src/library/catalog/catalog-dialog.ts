@@ -5,6 +5,7 @@ import { LibraryService } from '../core/library.service';
 import { ManageService } from '../core/manage.service';
 import { RF_PART_FINDERS, RfFinderResult } from '../core/part-finder';
 import { ManageToggle } from '../core/manage-toggle';
+import { QuickLook } from '../preview/quick-look';
 import { rangeBetween } from '../tree/tree-selection';
 import { closeOnEscape } from '../util/escape-close';
 import { highlightParts } from '../util/filter-terms';
@@ -17,6 +18,7 @@ interface ScanState { state: 'idle' | 'running' | 'done' | 'error'; scanned: num
 const idleScan: ScanState = { state: 'idle', scanned: 0, total: 0, error: '' };
 const sortStorageKey = 'rasterfaster.catalogSort';
 const folderViewKey = 'rasterfaster.catalogFolderView';
+const figViewKey = 'rasterfaster.catalogFigView';
 const specWidthKey = 'rasterfaster.catalogSpecWidth';
 const defaultSpecWidth = 380;
 const minSpecWidth = 260;
@@ -32,6 +34,10 @@ function readSpecWidth(): number {
     if (Number.isFinite(stored) && stored >= minSpecWidth) return Math.round(stored);
   } catch { /* storage unavailable */ }
   return defaultSpecWidth;
+}
+
+function readFigView(): 'drawing' | '3d' {
+  try { return localStorage.getItem(figViewKey) === '3d' ? '3d' : 'drawing'; } catch { return 'drawing'; }
 }
 
 function readFolderView(): 'list' | 'strip' {
@@ -54,7 +60,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
  */
 @Component({
   selector: 'app-catalog-dialog',
-  imports: [DatePipe, ManageToggle],
+  imports: [DatePipe, ManageToggle, QuickLook],
   template: `
     <div class="backdrop" (click)="close.emit()"></div>
     <section class="dialog" role="dialog" aria-label="Parts catalog">
@@ -189,14 +195,21 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
         <section class="detail" aria-label="Part">
           <div class="dhead"><span>NO.{{ number() }} / {{ shown().length }} · {{ code(d.folder) }}</span><button type="button" class="close" (click)="closeDetail()">BACK [ESC]</button></div>
           <div class="dbody">
+            <div class="dcols">
             <div class="left">
             <div class="fig">
-              @switch (bigState()) {
-                @case ('ready') { <img [src]="bigUrl()!" alt="" draggable="false" /> }
-                @case ('loading') { <span class="note">DRAWING…</span> }
-                @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
+              @if (figView() === '3d') {
+                @if (tooLarge(d)) { <span class="note">TOO LARGE TO PREVIEW · {{ kb(d.size) }}</span> }
+                @else { <div class="viewer3d"><app-quick-look [path]="d.path" [embedded]="true" /></div> }
+              } @else {
+                @switch (bigState()) {
+                  @case ('ready') { <img [src]="bigUrl()!" alt="" draggable="false" /> }
+                  @case ('loading') { <span class="note">DRAWING…</span> }
+                  @default { <span class="note">{{ tooLarge(d) ? 'TOO LARGE TO DRAW · ' + kb(d.size) : 'NO DRAWING' }}</span> }
+                }
               }
-              <span class="cap l">FIG. {{ number() }}</span><span class="cap r">LINE DRAWING · HIDDEN LINES REMOVED</span>
+              <span class="figmode chips" role="group" aria-label="Picture"><button type="button" [class.on]="figView() === 'drawing'" (click)="setFigView('drawing')">DRAWING</button><button type="button" [class.on]="figView() === '3d'" (click)="setFigView('3d')">3D</button></span>
+              <span class="cap l">FIG. {{ number() }}</span><span class="cap r">{{ figView() === '3d' ? '3D PREVIEW · DRAG TO ORBIT · SCROLL TO ZOOM' : 'LINE DRAWING · HIDDEN LINES REMOVED' }}</span>
             </div>
             <div class="siblings" [class.as-strip]="siblingView() === 'strip'">
               <div class="shead">
@@ -298,7 +311,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                     <div class="fhead"><span>{{ finder.id.toUpperCase() }}</span><span>{{ r.summary }}</span></div>
                     @for (hit of r.hits; track hit.path ?? hit.title) {
                       <div class="hit" [class.exact]="hit.exact">
-                        <div class="hline"><b>{{ hit.title }}</b>@if (hit.exact) { <small class="tag">EXACT NAME</small> }@if (finder.reveal && hit.path) { <button type="button" class="link" title="Show the file in the Finder" (click)="revealHit(finder.id, hit.path)">REVEAL</button> }</div>
+                        <div class="hline"><b>{{ hit.title }}</b>@if (hit.badge; as badge) { <small class="badge" [class]="'badge tone-' + badge.tone" [title]="badge.title">{{ badge.label }}</small> }@if (hit.exact) { <small class="tag">EXACT NAME</small> }@if (finder.reveal && hit.path) { <button type="button" class="link" title="Show the file in the Finder" (click)="revealHit(finder.id, hit.path)">REVEAL</button> }</div>
                         <div class="hsub" [title]="hit.subtitle">{{ hit.subtitle }}</div>
                         @for (m of hit.matches; track m.name) {
                           <div class="hmatch"><span [class.exactname]="m.exact">{{ m.name }}</span>@if (m.places.length) { <small>in {{ m.places.join(' · ') }}</small> }</div>
@@ -338,6 +351,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
                 </div>
               }
               @if (actionNote()) { <p class="empty">{{ actionNote() }}</p> }
+            </div>
             </div>
           </div>
           <div class="dnav">
@@ -408,8 +422,9 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .list { display: flex; flex-direction: column; flex: 1; min-height: 0; } .list[hidden] { display: none; }
     .detail { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .dhead { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #2c2d31; color: #888; }
-    .dbody { flex: 1; min-height: 0; display: flex; gap: 0; padding: 16px 0; overflow: auto; }
-    .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+    .dbody { flex: 1; min-height: 0; padding: 16px 0; overflow: auto; container-type: size; }
+    .dcols { display: flex; min-height: 100cqh; } /* as tall as the longest column, so the resize bar runs along all of a long facts column */
+    .left { flex: 1 1 60%; min-width: 0; display: flex; flex-direction: column; gap: 12px; max-height: 100cqh; } /* the drawing column is never taller than the window, however long the facts are */
     .siblings { flex: none; height: 260px; display: flex; flex-direction: column; border: 1px solid #2c2d31; overflow: hidden; } /* the same height as a list and as a strip: nothing jumps when you switch */
     .listbox { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .shead > span:first-child { min-width: 0; } .crumbs { flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none; white-space: nowrap; } .crumbs::-webkit-scrollbar { display: none; }
@@ -426,6 +441,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .sib { display: flex; justify-content: space-between; gap: 16px; width: 100%; box-sizing: border-box; padding: 3px 10px; text-align: left; color: #bbb; } .sib:hover { background: #1e2024; color: #fff; }
     .sib .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .sib .k { flex: none; color: #666; }
     .fig { position: relative; flex: 1 1 auto; min-width: 0; min-height: 320px; display: flex; align-items: center; justify-content: center; border: 1px solid #2c2d31; overflow: auto; }
+    .viewer3d { position: absolute; inset: 0; } .figmode { position: absolute; top: 6px; left: 6px; z-index: 2; } .figmode button { color: #888; } .figmode button.on { background: #e6e6e6; color: #111; } .fig .cap { z-index: 2; pointer-events: none; }
     .fig img { flex: none; } .cap { position: absolute; bottom: 8px; color: #555; font-size: 10px; } .cap.l { left: 10px; } .cap.r { right: 10px; }
     .spec { flex: none; min-width: 0; }
     .grip { position: relative; flex: none; width: 28px; cursor: col-resize; touch-action: none; } .grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: transparent; transition: background .12s; } .grip:hover::after, .grip.active::after { background: #2f6fed; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
@@ -447,6 +463,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .mg { padding: 3px 10px; border: 1px solid #6b5a2a; color: #e8c470; } .mg:hover:not(:disabled) { background: #3a3320; color: #ffe27a; border-color: #c9a64e; } .mg:disabled { opacity: .4; }
     .finds { margin-top: 12px; border: 1px solid #2c2d31; } .fhead { display: flex; justify-content: space-between; gap: 12px; padding: 5px 10px; background: #1a1b1f; color: #888; } .fhead span:last-child { color: #e8c470; text-align: right; }
     .hit { padding: 6px 10px; border-top: 1px solid #2c2d31; } .hit.exact { background: rgba(154,210,154,.05); } .hline { display: flex; align-items: baseline; gap: 10px; } .hline b { font-weight: 400; color: #e6e6e6; word-break: break-all; } .tag { color: #9ad29a; font-size: 9px; letter-spacing: .08em; }
+    .badge { padding: 0 6px; border: 1px solid; border-radius: 3px; font-size: 9px; letter-spacing: .08em; cursor: help; } .tone-blue { color: #9db7f0; border-color: #3a4a6a; background: rgba(61,90,160,.18); } .tone-green { color: #8fd0a0; border-color: #2f6a47; background: rgba(60,150,90,.16); } .tone-amber { color: #e8c470; border-color: #6b5a2a; } .tone-grey { color: #aaa; border-color: #444; }
     .hsub { color: #777; font-size: 10px; word-break: break-all; } .hmatch { padding-left: 10px; color: #bbb; } .hmatch small { color: #777; margin-left: 8px; } .exactname { color: #9ad29a; }
     .hint-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid #2c2d31; }
     .check-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; } .check-row .result { color: #e8c470; }
@@ -708,15 +725,16 @@ export class CatalogDialog implements OnInit {
       if (!entry) { this.setBig(null); return; }
       let current = true;
       onCleanup(() => { current = false; });
+      void firstValueFrom(this.lib.trashBatch([entry.path], true)).then( // a dry run only reports which documents use the file
+        result => { if (current) this.usedIn.set(Object.keys(result.documents ?? {}).length); },
+        () => { /* unknown: stays … */ });
       this.bigState.set('loading');
+      if (this.figView() === '3d') return; // the drawing is made when the picture is switched back to it (the 3D view loads the file itself)
       void this.thumbs.drawLarge(entry).then(svg => {
         if (!current) return;
         this.setBig(svg ? URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' })) : null);
         this.bigState.set(svg ? 'ready' : 'none');
       });
-      void firstValueFrom(this.lib.trashBatch([entry.path], true)).then( // a dry run only reports which documents use the file
-        result => { if (current) this.usedIn.set(Object.keys(result.documents ?? {}).length); },
-        () => { /* unknown: stays … */ });
     });
     effect(() => { // the address of the open part, so a reload (or a copied link) comes back to it
       const path = this.detail();
@@ -1139,6 +1157,13 @@ export class CatalogDialog implements OnInit {
     this.resizing.set(false);
     try { (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId); } catch { /* already released */ }
     this.setSpecWidth(this.specWidth()); // keep it
+  }
+
+  /** The picture of a part's page: the line drawing, or the part in 3D (the preview of the file list's Quick Look, to orbit). */
+  protected readonly figView = signal<'drawing' | '3d'>(readFigView());
+  protected setFigView(view: 'drawing' | '3d') {
+    this.figView.set(view);
+    try { localStorage.setItem(figViewKey, view); } catch { /* storage unavailable */ }
   }
 
   protected setSiblingView(view: 'list' | 'strip') {

@@ -41,13 +41,15 @@ function readMode(): ViewMode {
 @Component({
   selector: 'app-quick-look',
   template: `
-    <div #card class="card" [style.left.px]="leftPx()" [style.top.px]="top" [style.width.px]="size()?.w" [style.height.px]="size()?.h"
+    <div #card class="card" [class.embedded]="embedded()" [style.left.px]="leftPx()" [style.top.px]="top" [style.width.px]="size()?.w" [style.height.px]="size()?.h"
          [style.max-width.px]="availWidth()" [style.max-height.px]="availHeight()" [style.min-width.px]="minWidth()" [style.min-height.px]="minHeight()" role="dialog" aria-label="Quick look" (mousedown)="onMouseDown($event)">
-      <header>
-        <span class="title" [title]="path()">{{ name() }}</span>
-        <span class="info">{{ info() }}</span>
-        <button type="button" aria-label="Close preview" (click)="closed.emit()">✕</button>
-      </header>
+      @if (!embedded()) {
+        <header>
+          <span class="title" [title]="path()">{{ name() }}</span>
+          <span class="info">{{ info() }}</span>
+          <button type="button" aria-label="Close preview" (click)="closed.emit()">✕</button>
+        </header>
+      }
       <div class="modes" role="group" aria-label="View mode">
         @for (m of quickModes; track m.id) {
           <button type="button" [class.on]="mode() === m.id" [title]="m.title" (click)="setMode(m.id)">{{ m.label }}</button>
@@ -58,7 +60,7 @@ function readMode(): ViewMode {
         @if (state()) { <div class="state">{{ state() }}</div> }
         @if (info()) { <div class="dims" title="Width × depth × height of the STL">{{ info() }}</div> }
       </div>
-      <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ add to document (closes this) · drag to orbit · drag the corner to resize</footer>
+      @if (!embedded()) { <footer>Space or Esc to close · ↑ ↓ browse · ⌘↓ add to document (closes this) · drag to orbit · drag the corner to resize</footer> }
     </div>
   `,
   styles: `
@@ -76,12 +78,19 @@ function readMode(): ViewMode {
     .stage { position: relative; flex: 1; min-height: 0; display: flex; } .host { position: relative; flex: 1; min-width: 0; min-height: 0; background: #1b1d22; }
     .state { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: .6; font-style: italic; }
     footer { padding: 5px 10px; opacity: .45; font-size: 11px; border-top: 1px solid #000; }
+    /* inside another page (the part page of the catalog): fills its box, no frame, no resize corner */
+    .card.embedded { position: relative !important; left: auto !important; top: auto !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important;
+                     min-width: 0 !important; min-height: 0 !important; resize: none; z-index: auto; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+    .card.embedded .modes { flex-wrap: wrap; border-bottom: 0; background: transparent; position: absolute; top: 32px; left: 6px; right: 6px; padding: 0; z-index: 1; } /* under the page's own DRAWING | 3D switch */
+    .card.embedded .dims { display: none; } /* the page shows the size itself */
     .dims { position: absolute; left: 0; right: 0; bottom: 6px; text-align: center; font-size: 13px; font-weight: 600; opacity: .8; font-variant-numeric: tabular-nums; pointer-events: none; text-shadow: 0 1px 3px #000; }
   `,
 })
 export class QuickLook implements OnDestroy {
   private readonly library = inject(LibraryService);
   readonly path = input.required<string>();
+  /** Shown inside another page: it fills its box and has no frame, header or footer (the view-mode buttons stay). */
+  readonly embedded = input(false);
   /** Viewport x of the card's left edge (just right of the list). */
   readonly left = input(392);
   readonly closed = output<void>();
