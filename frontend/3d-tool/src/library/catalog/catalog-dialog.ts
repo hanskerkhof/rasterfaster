@@ -472,7 +472,7 @@ function readSort(): { key: CatalogSortKey; ascending: boolean } {
     .viewer3d { position: absolute; inset: 0; } .figmode { position: absolute; top: 6px; left: 6px; z-index: 2; } .figmode button { color: #888; } .figmode button.on { background: #e6e6e6; color: #111; } .figmode button.alt.first { margin-left: 8px; } .check-row .tool.on { background: #e6e6e6; color: #111; } .fig .cap { z-index: 2; pointer-events: none; }
     .fig img { flex: none; } .cap { position: absolute; bottom: 8px; color: #555; font-size: 10px; } .cap.l { left: 10px; } .cap.r { right: 10px; }
     .spec { flex: none; min-width: 0; }
-    .grip { position: relative; flex: none; width: 28px; cursor: col-resize; touch-action: none; } .grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: transparent; transition: background .12s; } .grip:hover::after, .grip.active::after { background: #2f6fed; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
+    .grip { position: relative; flex: none; width: 28px; cursor: col-resize; touch-action: none; } .grip::after { content: ''; position: absolute; top: 0; bottom: 0; left: 13px; width: 2px; background: transparent; transition: background .12s; } .grip:hover::after, .grip.active::after { background: #2f6fed; } .where { color: #888; } h3 { margin: 4px 0 14px; font-size: 20px; line-height: 28px; font-weight: 400; color: #e6e6e6; word-break: break-word; }
     dl { margin: 0; } dl > div { display: flex; gap: 16px; padding: 6px 0; border-top: 1px solid #2c2d31; } dl > div:last-child { border-bottom: 1px solid #2c2d31; }
     dt { flex: none; width: 84px; color: #888; } dd { margin: 0; min-width: 0; color: #e6e6e6; word-break: break-word; } .path { font-size: 10px; color: #aaa; }
     .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; } .ghost { border: 1px solid #444; padding: 3px 10px; color: #ccc; } .ghost:hover { border-color: #888; color: #fff; }
@@ -1337,7 +1337,7 @@ export class CatalogDialog implements OnInit {
     const together = many ? [] : companionsOf(this.entries(), e.path);
     const alternatives = many ? [] : alternativesOf(this.entries(), e.path).filter(a => a.path !== e.path);
     const items: MenuItem[] = [
-      { id: 'open', icon: '▦', label: 'Open page', hint: 'its page, with the 3D view', disabled: many },
+      { id: 'open', icon: '▦', label: 'Open page', hint: this.detail() === e.path ? 'you are on this page' : 'its page, with the 3D view', disabled: many || this.detail() === e.path },
       { id: 'add', icon: '＋', label: many ? `Add ${n} Parts to Document` : 'Add to Document', hint: 'into the open document' },
       ...(together.length ? [{ id: 'addTogether', icon: '＋', label: `Add ${together.length + 1} Parts Together`, hint: 'with the parts that belong together' }] : []),
       { sep: true },
@@ -1351,7 +1351,7 @@ export class CatalogDialog implements OnInit {
     ];
     if (together.length || alternatives.length) {
       items.push({ sep: true });
-      if (together.length) items.push({ id: 'together', icon: '◫', label: 'Show together', hint: `${together.length + 1} parts that belong together` });
+      if (together.length) items.push({ id: 'together', icon: '◫', label: 'Show together', hint: this.detail() === e.path ? 'use TOGETHER on this page' : `${together.length + 1} parts that belong together`, disabled: this.detail() === e.path });
       if (alternatives.length) items.push({ icon: '⇄', label: 'Alternatives', hint: `${alternatives.length} other${alternatives.length === 1 ? '' : 's'}`, children: alternatives.map(a => ({ id: 'alt:' + a.path, icon: '▦', label: altLabel(a.name), hint: displayName(a.name) })) });
     }
     items.push({ sep: true }, { id: 'check', icon: '⊞', label: 'Check this part', hint: many ? 'select one part' : 'for doubles and the same shape', disabled: many });

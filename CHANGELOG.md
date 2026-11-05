@@ -2,6 +2,16 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: more line spacing in a long part title (0.12.22)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): the title on a part's page has a line height of 28 px (20 px text), so a long name that wraps onto two lines is no longer cramped.
+
+## 2026-11-05 - Catalog menu: Open page and Show together are off on the page itself (0.12.21)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): in the context menu of a part, **Open page** and **Show together** are disabled (hints: "you are on this page", "use TOGETHER on this page") for the part whose page is open: the page has its own TOGETHER button.
+
 ## 2026-11-05 - Dragging in a long list scrolls it (0.12.19)
 
 ### Fixed
