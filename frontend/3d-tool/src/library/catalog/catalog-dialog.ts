@@ -772,7 +772,11 @@ export class CatalogDialog implements OnInit {
       const gone = result.results.map(r => r.path);
       const open = this.detail();
       const openGone = !!open && gone.some(path => open === path || open.startsWith(path + '/'));
-      const next = openGone ? (gone.some(path => open!.startsWith(path + '/')) ? null : (this.following() ?? this.previous())?.path ?? null) : open;
+      // after the open part is trashed: the next thumbnail or row of the folder panel, else the one before it, else the next part of the whole list
+      const inFolder = this.browseFiles().map(file => file.path);
+      const at = inFolder.indexOf(open ?? '');
+      const folderNext = at < 0 ? undefined : [...inFolder.slice(at + 1), ...inFolder.slice(0, at).reverse()].find(path => !gone.some(g => path === g || path.startsWith(g + '/')));
+      const next = openGone ? (gone.some(path => open!.startsWith(path + '/')) ? null : folderNext ?? (this.following() ?? this.previous())?.path ?? null) : open;
       const before = this.entries().length;
       this.entries.update(list => withoutPaths(list, gone));
       const parts = before - this.entries().length;

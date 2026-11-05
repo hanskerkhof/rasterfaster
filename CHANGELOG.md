@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-05 - Catalog: after a Move to Trash the page goes to the next thumbnail (0.11.67)
+
+### Changed
+- **FE** (`catalog-dialog.ts`): when the open part is moved to the Trash from its page, the page moves on to the next thumbnail (or row) of the folder panel, else the one before it, else the next part of the whole list (it always took the next of the whole list, which is often in another folder).
+
 ## 2026-11-05 - Catalog: Check this part on a part's page (0.11.66)
 
 ### Added
