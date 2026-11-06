@@ -178,6 +178,11 @@ export interface QueuedRender {
   aspect?: number;
 }
 
+const seenStorageKey = 'rasterfaster.renderSeen';
+function readSeen(): string | null {
+  try { return localStorage.getItem(seenStorageKey); } catch { return null; }
+}
+
 export interface RenderState {
   id: string;
   name: string;
@@ -479,8 +484,8 @@ export class RenderService {
     this.track(message as RenderState);
     const next = message.state && message.state !== ('idle' as string) ? (message as RenderState) : null;
     this.state.set(next && next.state !== 'cancelled' ? next : null);
-    if (next?.state === 'done' && (before?.id !== next.id || before.state !== 'done')) this.toast.set(next);
-    else if (next?.state === 'error') this.toast.set(next);
+    if (next?.state === 'done' && next.id !== this.seenId && (before?.id !== next.id || before.state !== 'done')) this.toast.set(next); // not for a render whose message was closed or opened already (a page that loads is told about the newest render again)
+    else if (next?.state === 'error' && next.id !== this.seenId) this.toast.set(next);
     else if (!next || next.state === 'cancelled') this.toast.set(null); // a finished picture's message stays while the next render runs
   }
 
@@ -721,9 +726,24 @@ export class RenderService {
     }
   }
 
+  /** The render whose message the user has closed or opened last: its message does not come back, not after a reload either. */
+  private seenId = readSeen();
+  private markSeen(id: string) {
+    this.seenId = id;
+    try { localStorage.setItem(seenStorageKey, id); } catch { /* storage unavailable */ }
+  }
+
+  /** The ✕ of the message: it goes, and stays away for this render. */
+  dismissToast() {
+    const shown = this.toast();
+    if (shown && 'id' in shown) this.markSeen(shown.id);
+    this.toast.set(null);
+  }
+
   /** The toast was clicked: the finished render opens in the dialog. */
   view() {
     const shown = this.toast();
+    if (shown && 'id' in shown) this.markSeen(shown.id);
     this.toast.set(null);
     if (shown && 'id' in shown && shown.state === 'done') this.dialog.set({ url: '', jobId: shown.id });
   }

@@ -8,6 +8,9 @@ import { ViewsPanel } from './views-panel';
 import { ImagesPanel } from './images-panel';
 import { ObjectMenu } from './object-menu';
 import { ReleaseFocus } from './release-focus';
+import { DragHandle } from './drag-handle';
+import { PanelFold } from './panel-fold';
+import { Dockable, PanelDock } from './panel-dock';
 import { DocItem, DocumentStore } from './document.store';
 import { StlViewer, ViewMode } from './stl-viewer';
 import { RenderDialog } from './render-dialog';
@@ -48,6 +51,17 @@ function readFilterMode(): 'any' | 'all' {
 }
 
 const catalogOpenKey = 'rasterfaster.catalogOpen';
+const renderSpotKey = 'rasterfaster.renderProgressSpot';
+const renderCollapsedKey = 'rasterfaster.renderProgressCollapsed';
+function readRenderCollapsed(): boolean {
+  try { return localStorage.getItem(renderCollapsedKey) === 'true'; } catch { return false; }
+}
+function readRenderSpot(): { dx: number; dy: number } {
+  try {
+    const stored = JSON.parse(localStorage.getItem(renderSpotKey) ?? 'null');
+    return stored && Number.isFinite(stored.dx) && Number.isFinite(stored.dy) ? { dx: stored.dx, dy: stored.dy } : { dx: 0, dy: 0 };
+  } catch { return { dx: 0, dy: 0 }; }
+}
 
 function readCatalogOpen(): boolean {
   try { return sessionStorage.getItem(catalogOpenKey) === '1' || location.hash.startsWith('#part='); } catch { return false; }
@@ -55,7 +69,7 @@ function readCatalogOpen(): boolean {
 
 @Component({
   selector: 'app-root',
-  imports: [TreePanel, TrashDialog, CatalogDialog, ManageToggle, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus],
+  imports: [TreePanel, TrashDialog, CatalogDialog, ManageToggle, RenderDialog, StlViewer, DocumentPanel, ViewsPanel, ImagesPanel, ObjectMenu, ReleaseFocus, DragHandle, PanelFold, Dockable],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   host: { '[style.grid-template-columns]': 'columnsCss()', '[style.--panel-w]': 'panelWidthCss()', '[class.sliding]': 'sliding()' },
@@ -64,6 +78,62 @@ export class App {
   protected readonly lib = inject(LibraryService);
   protected readonly store = inject(DocumentStore);
   protected readonly render = inject(RenderService);
+  protected readonly dock = inject(PanelDock);
+
+  /** Where the render progress panel was moved to (px from where it sits by itself): remembered in this browser. */
+  protected readonly renderSpot = signal<{ dx: number; dy: number }>(readRenderSpot());
+  protected readonly renderTransform = computed(() => `translate(calc(-50% + ${this.renderSpot().dx}px), ${this.renderSpot().dy}px)`);
+
+  /** Drag the render progress panel anywhere (not by its buttons); it keeps inside the window. Double-click puts it back. */
+  /** The bar of the render panel: it moves the panel, or (docked) pulls it out of the dock when moved up. */
+  protected renderBarDown(event: PointerEvent) {
+    if (event.button !== 0 || (event.target as HTMLElement).closest('button')) return;
+    if (this.dock.isDocked('render')) { this.dock.dragUp(event, 'render'); return; }
+    this.startRenderDrag(event);
+  }
+  private startRenderDrag(event: PointerEvent) {
+    const el = event.currentTarget as HTMLElement; // the top bar: it takes the pointer, the whole panel moves
+    const box = (el.closest('.notice') ?? el).getBoundingClientRect(), start = this.renderSpot(), x0 = event.clientX, y0 = event.clientY;
+    el.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    const parentBox = ((el.closest('.notice') as HTMLElement | null)?.offsetParent as HTMLElement | null)?.getBoundingClientRect();
+    let atBottom = false;
+    const move = (e: PointerEvent) => {
+      const dx = Math.min(Math.max(e.clientX - x0, -box.left), window.innerWidth - box.right);
+      const dy = Math.min(Math.max(e.clientY - y0, -box.top), window.innerHeight - box.bottom);
+      this.renderSpot.set({ dx: Math.round(start.dx + dx), dy: Math.round(start.dy + dy) });
+      atBottom = !!parentBox && box.bottom + dy >= parentBox.bottom - 1; // at the bottom of the view: it would be docked
+      this.dock.hint.set(atBottom);
+    };
+    const end = () => {
+      el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', end); el.removeEventListener('pointercancel', end);
+      this.dock.hint.set(false);
+      if (atBottom && this.dock.dock('render', () => this.renderSpot.set(start))) { try { localStorage.setItem(renderSpotKey, JSON.stringify(start)); } catch { /* storage unavailable */ } return; }
+      try { localStorage.setItem(renderSpotKey, JSON.stringify(this.renderSpot())); } catch { /* storage unavailable */ }
+    };
+    el.addEventListener('pointermove', move); el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+  }
+  /** The render panel folded to its top bar (the step and the percentage stay in sight): remembered in this browser. */
+  protected readonly renderCollapsed = signal(readRenderCollapsed());
+  protected toggleRenderCollapsed() {
+    this.renderCollapsed.update(v => !v);
+    try { localStorage.setItem(renderCollapsedKey, String(this.renderCollapsed())); } catch { /* storage unavailable */ }
+  }
+  /** The render panel stays inside the window: when the window got smaller (or the panel was left near an edge), it moves back in. */
+  @HostListener('window:resize')
+  protected keepRenderInside() {
+    const el = document.querySelector<HTMLElement>('.notice.render-progress');
+    const spot = this.renderSpot();
+    if (!el || (!spot.dx && !spot.dy)) return;
+    const box = el.getBoundingClientRect();
+    const dx = box.left < 0 ? -box.left : box.right > window.innerWidth ? window.innerWidth - box.right : 0;
+    const dy = box.top < 0 ? -box.top : box.bottom > window.innerHeight ? window.innerHeight - box.bottom : 0;
+    if (dx || dy) this.renderSpot.set({ dx: Math.round(spot.dx + dx), dy: Math.round(spot.dy + dy) });
+  }
+  protected resetRenderSpot() {
+    this.renderSpot.set({ dx: 0, dy: 0 });
+    try { localStorage.removeItem(renderSpotKey); } catch { /* storage unavailable */ }
+  }
   protected readonly aspects = aspects;
   protected readonly fxChoices = fxIds.map((id, i) => ({ id, label: fxNames[i] }));
 
@@ -160,6 +230,7 @@ export class App {
       this.lib.trashCount(); this.libraryTick();
       untracked(() => this.scheduleMissingCheck(key ? key.split('\n') : []));
     });
+    effect(() => { if (this.render.state()?.state === 'running') setTimeout(() => this.keepRenderInside()); }); // it appears where it was left: inside the window
     effect(() => {
       const request = this.store.catalogRequest();
       if (request) untracked(() => this.openCatalogAt(request.path));
@@ -559,15 +630,10 @@ export class App {
       event.preventDefault();
       this.setMode(this.modes[+digit[1] - 1].id);
     }
-    const plain = !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat;
-    const typing = !!(event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable]');
-    if (event.code === 'KeyT' && plain && !typing && this.trashOpen()) { // T again closes the Trash
+    if (event.code === 'KeyC' && !event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey && !event.repeat && !this.catalogOpen() // C: the parts catalog
+      && !(event.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable], dialog, [role="dialog"]')) {
       event.preventDefault();
-      this.trashOpen.set(false);
-    } else if ((event.code === 'KeyC' || event.code === 'KeyT') && plain && !typing && !this.catalogOpen() && !this.trashOpen()
-      && !(event.target as HTMLElement | null)?.closest?.('dialog, [role="dialog"]')) { // C: the parts catalog, T: the Trash
-      event.preventDefault();
-      if (event.code === 'KeyC') this.setCatalogOpen(true); else this.trashOpen.set(true);
+      this.setCatalogOpen(true);
     }
     if (event.code === 'KeyM' && event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) { // ⌥M: the step of Option moves, 1 mm / 0.1 mm
       event.preventDefault();

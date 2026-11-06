@@ -433,7 +433,7 @@ export class DocumentStore {
     this.conflict.set(null);
     this.viewing.set(null);
     this.docId.set(id);
-    this.lastViewId.set(null);
+    this.markView(null);
     this.viewDirty.set(false);
     this.writeCurrentId(id);
     this.doc.set(doc);
@@ -1100,6 +1100,8 @@ export class DocumentStore {
     const now = this.livePose() ?? this.doc().view;
     if (!now || this.animating() || this.viewDirty()) return null; // while an animation runs the view shows as changed, and is not updated by it
     const near = (a: readonly number[], b: readonly number[]) => a.every((v, i) => Math.abs(v - b[i]) < 0.05);
+    const cleared = this.clearedPose();
+    if (cleared && cleared.projection === now.projection && near(cleared.position, now.position) && near(cleared.target, now.target)) return null; // the mark was cleared here
     return this.doc().views?.find(v => v.projection === now.projection && near(v.position, now.position) && near(v.target, now.target) && Math.abs(v.zoom - now.zoom) <= 0.001 * Math.max(v.zoom, now.zoom))?.id ?? null;
   });
 
@@ -1113,6 +1115,16 @@ export class DocumentStore {
     return !this.settling() && id && !this.activeViewId() && this.doc().views?.some(v => v.id === id) ? id : null;
   });
 
+  /** The camera pose at which the user cleared the mark of a view (a second click on the marked view): no view is shown as marked there until one is chosen, saved or replaced again. */
+  private readonly clearedPose = signal<DocView | null>(null);
+  /** The view the camera was last put on (or none): the mark follows it, and a cleared mark is back. */
+  private markView(id: string | null) { this.lastViewId.set(id); this.clearedPose.set(null); }
+  /** Deselects the marked view: the blue (camera on it) and the amber (camera came from it) mark go away, until a view is chosen, saved or replaced again. */
+  clearViewMark() {
+    this.clearedPose.set(this.livePose() ?? this.doc().view ?? null);
+    this.lastViewId.set(null);
+  }
+
   /** The saved view the camera was last put on (saved, gone to or replaced): when the camera has moved on from it, the Views panel shows it as changed. */
   readonly lastViewId = signal<string | null>(null);
 
@@ -1124,7 +1136,7 @@ export class DocumentStore {
     const view: DocSavedView = { ...captured, id: crypto.randomUUID(), name: (name?.trim() || `View ${number}`).slice(0, 80) };
     this.mutate('Save view', d => ({ ...d, views: [...(d.views ?? []), view] }));
     this.setView(cameraOf(view)); // the camera is on this view now: the panel marks it
-    this.lastViewId.set(view.id);
+    this.markView(view.id);
     this.viewDirty.set(false);
     return view;
   }
@@ -1136,7 +1148,7 @@ export class DocumentStore {
     const name = this.doc().views?.find(v => v.id === id)?.name;
     this.mutate('Update view', d => ({ ...d, views: (d.views ?? []).map(v => (v.id === id ? { ...captured, id: v.id, name: v.name } : v)) }));
     this.setView(cameraOf(captured));
-    this.lastViewId.set(id);
+    this.markView(id);
     this.viewDirty.set(false);
     this.announce(`View "${name ?? ''}" replaced by the current view`, 2500); // also when nothing differed: the click is answered
   }
@@ -1197,7 +1209,7 @@ export class DocumentStore {
   goToSavedView(which: string | number, cameraOnly = false) {
     const views = this.doc().views ?? [];
     const view = typeof which === 'number' ? views[which - 1] : views.find(v => v.id === which);
-    if (view) { this.setView(cameraOf(view)); this.recallView?.(view, cameraOnly); this.holdOff(); this.lastViewId.set(view.id); this.viewDirty.set(false); } // the panel marks it at once, the camera glides there
+    if (view) { this.setView(cameraOf(view)); this.recallView?.(view, cameraOnly); this.holdOff(); this.markView(view.id); this.viewDirty.set(false); } // the panel marks it at once, the camera glides there
   }
   /** Selects these parts and zooms the 3D view to them (set by the viewer). */
   showInAssembly: ((ids: readonly string[]) => void) | null = null;

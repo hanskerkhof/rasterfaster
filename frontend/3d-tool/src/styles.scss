@@ -1,1 +1,24 @@
 html, body { margin: 0; height: 100%; background: #1b1d22; }
+
+/*
+ * Floating panels (Views, Gallery, the document panel, the Rendering… panel, and every panel to come) share one look:
+ *   class "float-panel" on the panel (its host element), class "panel-bar" on its top bar, an <app-drag-handle /> in that bar.
+ * Three parts: `.bar-start` (title, counts), the handle in the middle, `.bar-end` (buttons, the fold button last). The whole bar lights up on hover.
+ */
+.float-panel { z-index: 5; box-sizing: border-box; font-size: 12px; color: #dde1e8; background: rgba(35,38,45,.92); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+.panel-bar { position: relative; flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 6px; min-height: 24px; padding: 4px 6px; border-radius: 5px 5px 0 0; cursor: grab; user-select: none; touch-action: none; }
+.panel-bar:active { cursor: grabbing; }
+.panel-bar:hover { background: rgba(255,255,255,.07); }
+.panel-bar > .bar-start, .panel-bar > .bar-end { display: flex; align-items: center; gap: 6px; min-width: 0; align-self: stretch; } .panel-bar > .bar-end { justify-content: flex-end; }
+.panel-bar:hover > app-drag-handle { color: #dde1e8; }
+.panel-bar .title { font-weight: 600; }
+.panel-bar button, .panel-bar input, .panel-bar select { cursor: pointer; }
+.panel-bar button { white-space: nowrap; }
+
+/* A docked panel (see PanelDock): only its top bar, in the dock row along the bottom of the view; the fold button turns into the undock button. */
+.float-panel.docked { position: absolute !important; left: var(--dock-left) !important; width: var(--dock-width) !important; top: auto !important; right: auto !important; bottom: 4px !important; height: 28px !important; min-height: 0 !important; max-height: none !important; padding: 0 !important; overflow: hidden !important; transform: none !important; z-index: 6; }
+.float-panel.docked > :not(.panel-bar) { display: none !important; }
+.float-panel.docked > .panel-bar { margin: 0 !important; height: 26px !important; cursor: default; }
+.float-panel.docked > .panel-bar > app-drag-handle { display: none; }
+.float-panel.docked > .panel-bar .bar-end > *:not(app-panel-fold) { display: none !important; }
+.dock-zone { position: absolute; left: 6px; right: 6px; bottom: 4px; height: 34px; display: flex; align-items: center; justify-content: center; border: 1px dashed #2f6fed; background: rgba(47,111,237,.14); border-radius: 6px; color: #8fb0ff; font: 11px system-ui, sans-serif; pointer-events: none; z-index: 4; }

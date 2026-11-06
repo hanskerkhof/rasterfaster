@@ -1,7 +1,11 @@
 import { LibraryService, rangeEndingAt } from '@rasterfaster/library';
 import { cubeKeepOut } from './view-cube';
 import { ReleaseFocus } from './release-focus';
-import { Component, DestroyRef, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { DragHandle } from './drag-handle';
+import { PanelFold } from './panel-fold';
+import { PanelEdges } from './panel-edges';
+import { FloatingPanel, PanelGeometry } from './floating-panel';
+import { Component, HostListener, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { BomDialog } from './bom-dialog';
 import { autoScroll } from './drag-scroll';
 import { VersionsDialog } from './versions-dialog';
@@ -9,16 +13,16 @@ import { RenderService } from './render.service';
 import { ZipEntry, buildZip } from './zip';
 import { DocItem, DocumentStore, clampToWorkArea, snapStepMm } from './document.store';
 
-/** `snapRight`: the panel sits against the right edge of the view and stays there when the view gets wider or narrower (e.g. the file panel is collapsed). */
-interface PanelGeometry { left: number; top: number; width: number; height: number; snapRight?: boolean }
 /** The display mode in the name of an SVG view file. */
 const viewModeShort: Record<string, string> = { solid: 'solid', 'solid-outline': 'outline', shaded: 'shaded', wireframe: 'wire', 'hidden-removed': 'hidden', 'hidden-shown': 'dashed' };
-const geometryStorageKey = 'rasterfaster.docPanelGeometry';
+const legacyGeometryKey = 'rasterfaster.docPanelGeometry';
+const legacyCollapsedKey = 'rasterfaster.docPanelCollapsed';
 const snapDistance = 24; // px from the right edge of the view at which the panel snaps to it
 const sideGap = 12;
 
 /** Magnets for a moved panel: it snaps to the right edge of the view, and it never covers the view cube (it is put just below it instead). */
-function snapPanel(g: PanelGeometry, parentWidth: number, parentHeight: number): PanelGeometry {
+type SizedGeometry = PanelGeometry & { width: number; height: number };
+function snapPanel(g: SizedGeometry | { left: number; top: number; width: number; height: number }, parentWidth: number, parentHeight: number): SizedGeometry {
   let { left, top, height } = g;
   const { width } = g;
   const snapRight = parentWidth - (left + width) < snapDistance;
@@ -30,52 +34,34 @@ function snapPanel(g: PanelGeometry, parentWidth: number, parentHeight: number):
   return { left: Math.max(0, left), top: Math.max(0, Math.min(top, parentHeight - height)), width, height, snapRight };
 }
 
-const collapsedStorageKey = 'rasterfaster.docPanelCollapsed';
-
-function readCollapsed(): boolean {
-  try { return localStorage.getItem(collapsedStorageKey) === 'true'; } catch { return false; }
-}
-
-function readGeometry(): PanelGeometry | null {
+/** What the panel remembered before it was a FloatingPanel (its place and size, and whether it was folded, under two keys). */
+function legacy(): { geom: PanelGeometry | null; collapsed: boolean } | null {
   try {
-    const g = JSON.parse(localStorage.getItem(geometryStorageKey) ?? 'null');
-    return g && [g.left, g.top, g.width, g.height].every(Number.isFinite) ? g : null;
+    const g = JSON.parse(localStorage.getItem(legacyGeometryKey) ?? 'null');
+    const geom = g && [g.left, g.top, g.width, g.height].every(Number.isFinite) ? g as PanelGeometry : null;
+    const collapsed = localStorage.getItem(legacyCollapsedKey) === 'true';
+    return geom || collapsed ? { geom, collapsed } : null;
   } catch { return null; }
 }
 
 @Component({
   selector: 'app-document-panel',
-  imports: [BomDialog, VersionsDialog, ReleaseFocus],
-  host: {
-    '[class.sized]': 'geom() !== null',
-    '[class.collapsed]': 'collapsed()',
-    '[style.left.px]': 'geom()?.left',
-    '[style.top.px]': 'geom()?.top',
-    '[style.width.px]': 'geom()?.width',
-    '[style.height.px]': 'collapsed() ? null : geom()?.height',
-    '[style.right]': "geom() ? 'auto' : null",
-    '[style.max-height]': "geom() ? 'none' : null",
-  },
+  imports: [BomDialog, VersionsDialog, ReleaseFocus, DragHandle, PanelFold, PanelEdges],
   template: `
-    <div class="header">
+    <div class="header panel-bar" title="Drag to move the panel · double-click to put it back" (pointerdown)="barDown($event)" (dblclick)="resetGeometry()">
+  <div class="bar-start">
+  <span class="title">Document</span>
+  </div><app-drag-handle />
+  <div class="bar-end">
   <span class="status" [class.error]="store.saveState() === 'error'" [title]="statusTitle()"><span class="diamond" [attr.data-state]="versionState()">{{ versionState() === 'none' ? '◇' : '◆' }}</span><i class="dot" [attr.data-state]="store.saveState()"></i>{{ statusLabel() }}</span>
-  <div class="grip" title="Drag to move the panel · double-click to put it back" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()"></div>
-  <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="(collapsed() ? 'Expand the panel' : 'Collapse the panel') + ' (⌥D)'" (click)="toggleCollapsed()">
-        <svg viewBox="0 0 12 12" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          @if (collapsed()) { <path d="M2.5 4.5 6 8l3.5-3.5"/> } @else { <path d="M2.5 7.5 6 4l3.5 3.5"/> }
-        </svg>
-      </button>
+  <app-panel-fold dockId="document" [collapsed]="collapsed()" label="the panel" hint="⌥D" (toggle)="toggleCollapsed()" /></div>
     </div>
 
     @if (collapsed()) {
       <div class="mini" (dblclick)="toggleCollapsed()" title="Double-click to expand">{{ store.doc().name }} <small>{{ store.doc().items.length }} parts</small>@if (warnings(); as w) { <span class="mini-warn" [title]="w.tip">⚠ {{ w.ids.length }}</span> }</div>
     }
 
-    <div class="edge w" (pointerdown)="startDrag($event, 'w')"></div>
-    <div class="edge e" (pointerdown)="startDrag($event, 'e')"></div>
-    <div class="edge s" (pointerdown)="startDrag($event, 's')"></div>
-    <div class="edge sw" (pointerdown)="startDrag($event, 'sw')"></div>
-    <div class="edge se" (pointerdown)="startDrag($event, 'se')"></div>
+    <app-panel-edges [collapsed]="collapsed()" (start)="startResize($event.event, $event.mode)" />
     <div class="picker">
       <select releaseFocus aria-label="Open document" (change)="open($any($event.target).value)">
         @for (d of store.documents(); track d.id) {
@@ -196,8 +182,7 @@ function readGeometry(): PanelGeometry | null {
 
   `,
   styles: `
-    :host { display: flex; flex-direction: column; gap: 6px; min-height: min-content; padding: 0 8px 8px; max-height: 100%; box-sizing: border-box; font-size: 12px; color: #dde1e8;
-            background: rgba(35,38,45,.9); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+    :host { display: flex; flex-direction: column; gap: 6px; min-height: min-content; padding: 0 8px 8px; max-height: 100%; }
     .head { display: flex; gap: 6px; align-items: center; }
     .ver { flex: none; padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 10px; font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap; }
     .ver .diamond { margin-right: 5px; vertical-align: 1px; }
@@ -218,7 +203,7 @@ function readGeometry(): PanelGeometry | null {
     .problems { max-height: 160px; overflow-y: auto; margin-top: 6px; padding-top: 4px; border-top: 1px solid #6b5a20; word-break: break-word; }
     .problems div + div { margin-top: 3px; }
     .import-ask .buttons { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-    .status { flex: none; width: 96px; display: flex; align-items: center; gap: 5px; font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; } /* fixed width: the text changing never moves the grip or the fold button */
+    .status { flex: none; width: 76px; display: flex; align-items: center; gap: 5px; font-size: 11px; opacity: .65; white-space: nowrap; overflow: hidden; } /* fixed width: the text changing never moves the grip or the fold button */
     .diamond { flex: none; width: 10px; text-align: center; font-size: 10px; line-height: 1; } /* the version: dark grey outline = none yet, green = the newest version is the working copy, amber = changes since it */
     .diamond[data-state='none'] { color: #5a5f6b; } .diamond[data-state='saved'] { color: #5bbf73; } .diamond[data-state='edited'] { color: #f0b232; }
     .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #5bbf73; } .dot[data-state='saving'], .dot[data-state='unsaved'] { background: #f0b232; } .dot[data-state='error'] { background: #ff6b6b; }
@@ -255,51 +240,26 @@ function readGeometry(): PanelGeometry | null {
     .pos input { width: 100%; box-sizing: border-box; padding: 3px 4px; background: #1b1d22; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; font-weight: 400; }
     .relink { flex: none; padding: 0 5px; background: transparent; color: inherit; border: 1px solid rgba(255,255,255,.25); border-radius: 4px; font: inherit; font-size: 11px; cursor: pointer; }
     .relink:hover { background: #2f6fed; color: #fff; }
-    .header { flex: none; display: flex; align-items: stretch; height: 24px; margin: 0 -8px; padding: 0 4px 0 8px; }
-    .fold { flex: none; width: 26px; padding: 0; display: flex; align-items: center; justify-content: center; background: transparent; color: inherit; border: 0; border-radius: 4px; opacity: .55; cursor: pointer; }
-    .fold:hover { opacity: 1; }
+    .header { height: 24px; margin: 0 -8px; padding: 0 4px 0 8px; }
     .mini { display: flex; align-items: baseline; gap: 6px; padding: 0 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .mini small { font-weight: 400; opacity: .6; } .mini-warn { color: #f0b232; margin-left: auto; }
-    :host(.collapsed) > *:not(.header):not(.mini):not(.edge) { display: none; }
-    :host(.collapsed) .edge.s, :host(.collapsed) .edge.sw, :host(.collapsed) .edge.se { display: none; }
+    :host(.collapsed) > *:not(.header):not(.mini):not(app-panel-edges) { display: none; }
     :host(.collapsed) { padding-bottom: 8px; }
-    .grip { flex: 1; position: relative; cursor: grab; touch-action: none; }
-    .grip::after { content: ''; position: absolute; top: 10px; left: calc(50% - 16px); width: 32px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.25); }
-    .grip:hover::after { background: rgba(255,255,255,.5); }
-    .edge { position: absolute; touch-action: none; z-index: 1; }
-    .edge.w { left: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; }
-    .edge.e { right: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; }
-    .edge.s { left: 12px; right: 12px; bottom: -3px; height: 7px; cursor: ns-resize; }
-    .edge.sw { left: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nesw-resize; }
-    .edge.se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
-    .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55; /* the resize corner, drawn like the browser's own */
-      background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); }
-    .edge.se:hover::after { opacity: 1; }
     :host(.sized) .list { flex: 1 1 0; min-height: 84px; max-height: none; } /* 3 rows at least: with the host's min-content height the panel never gets smaller than its content */
     .hint { opacity: .55; font-size: 11px; line-height: 1.35; }
     .keys { flex: none; } .keys summary { cursor: pointer; opacity: .6; font-size: 11px; user-select: none; } .keys summary:hover { opacity: 1; } .keys[open] .hint { margin-top: 4px; }
   `,
 })
-export class DocumentPanel {
+export class DocumentPanel extends FloatingPanel {
   protected readonly store = inject(DocumentStore);
   private readonly lib = inject(LibraryService);
-  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly destroyRef = inject(DestroyRef);
 
-  /** Where the user put the panel and how big they made it (relative to the view); null = the default place and size. Remembered. */
-  protected readonly geom = signal<PanelGeometry | null>(readGeometry());
   /** When the pointer last went down in the parts list (a selection right after it is not scrolled to). */
   protected lastListPointer = -Infinity;
   protected readonly performance = performance;
 
   constructor() {
-    afterNextRender(() => {
-      this.clampToParent();
-      const parent = this.element.nativeElement.parentElement; // the view the panel floats in
-      if (!parent) return;
-      const observer = new ResizeObserver(() => this.clampToParent()); // the view itself changes size without the window doing so (the file panel collapses / opens)
-      observer.observe(parent);
-      this.destroyRef.onDestroy(() => observer.disconnect());
-    });
+    super();
+    this.setup({ id: 'document', minWidth: 260, defaultWidth: 260, minHeight: 'content', fixSizeOnMove: true, legacy });
     // A part was selected (in the 3D view, or by a command): its row scrolls into view in the list (centred in the list, smoothly).
     effect(() => {
       const ids = this.store.selectedIds();
@@ -310,13 +270,26 @@ export class DocumentPanel {
     });
   }
 
-  @HostListener('window:resize')
-  protected clampToParent() {
-    const g = this.geom(), parent = this.element.nativeElement.offsetParent as HTMLElement | null;
-    if (!g || !parent) return;
+  /** The view got smaller (the window, the file panel) or the panel was left near an edge: back inside, against the right edge when it was there, off the view cube. */
+  protected override clampToParent(parent: HTMLElement) {
+    const g = this.geom();
+    if (!g || g.width === undefined || g.height === undefined) return;
     const width = Math.min(g.width, parent.clientWidth), height = Math.min(g.height, parent.clientHeight);
     const next = snapPanel({ width, height, left: g.snapRight ? parent.clientWidth - width - sideGap : Math.max(0, Math.min(g.left, parent.clientWidth - width)), top: Math.max(0, Math.min(g.top, parent.clientHeight - height)) }, parent.clientWidth, parent.clientHeight);
     if (next.left !== g.left || next.top !== g.top || next.width !== g.width || next.height !== g.height) this.geom.set(next);
+  }
+
+  /** The magnets act on release, not while dragging: the right edge of the view, and the view cube. */
+  protected override settleMove(g: PanelGeometry, parentWidth: number, parentHeight: number): PanelGeometry {
+    return g.width === undefined || g.height === undefined ? g : snapPanel({ left: g.left, top: g.top, width: g.width, height: g.height }, parentWidth, parentHeight);
+  }
+  /** A resize keeps its place; the panel stays against the right edge when it was there. */
+  protected override settleResize(g: PanelGeometry, parentWidth: number): PanelGeometry {
+    return g.width === undefined ? g : { ...g, snapRight: parentWidth - (g.left + g.width) < snapDistance };
+  }
+  /** Above the bottom of the view cube the panel may not grow under it. */
+  protected override reach(top: number, parentWidth: number): number {
+    return top < cubeKeepOut.bottom ? parentWidth - cubeKeepOut.width : parentWidth;
   }
 
   /** Parts that have a warning in the list (their file is missing, or they use the geometry of an imported 3MF); null when there are none. */
@@ -357,8 +330,6 @@ export class DocumentPanel {
     if (ids) this.store.selectMany(ids);
   }
 
-  protected readonly collapsed = signal(readCollapsed());
-
   /** ⌥D folds / unfolds the panel (not while typing in a text field). */
   @HostListener('document:keydown', ['$event'])
   protected onFoldKey(event: KeyboardEvent) {
@@ -368,64 +339,9 @@ export class DocumentPanel {
     this.toggleCollapsed();
   }
 
-  protected toggleCollapsed() {
-    this.collapsed.update(v => !v);
-    try { localStorage.setItem(collapsedStorageKey, String(this.collapsed())); } catch { /* storage unavailable */ }
-  }
-
   protected relink(event: Event, id: string) {
     event.stopPropagation();
     this.store.relinkRequest.set([id]);
-  }
-
-  protected resetGeometry() {
-    this.geom.set(null);
-    try { localStorage.removeItem(geometryStorageKey); } catch { /* storage unavailable */ }
-  }
-
-  /** Moves (the grip) or resizes (an edge or corner) the panel with the pointer; the result is remembered. */
-  protected startDrag(event: PointerEvent, mode: 'move' | 'w' | 'e' | 's' | 'sw' | 'se') {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const host = this.element.nativeElement, parent = host.offsetParent as HTMLElement | null;
-    if (!parent) return;
-    const box = host.getBoundingClientRect(), area = parent.getBoundingClientRect();
-    const start: PanelGeometry = { left: box.left - area.left, top: box.top - area.top, width: box.width, height: box.height };
-    this.geom.set(start);
-    // The least height: everything fits and the list shows 3 parts (measured: the host's min-height is its min-content).
-    const keep = host.style.height;
-    host.style.height = '1px';
-    const floor = host.offsetHeight;
-    host.style.height = keep;
-    const minWidth = 200, minHeight = Math.max(160, floor);
-    const move = (e: PointerEvent) => {
-      const dx = e.clientX - event.clientX, dy = e.clientY - event.clientY;
-      let { left, top, width, height } = start;
-      if (mode === 'move') {
-        left = Math.max(0, Math.min(start.left + dx, parent.clientWidth - width));
-        top = Math.max(0, Math.min(start.top + dy, parent.clientHeight - height));
-      } else {
-        if (mode.includes('w')) { width = Math.max(minWidth, Math.min(start.width - dx, start.left + start.width)); left = start.left + start.width - width; }
-        if (mode.includes('e')) {
-          const reach = start.top < cubeKeepOut.bottom ? parent.clientWidth - cubeKeepOut.width : parent.clientWidth; // above the cube's bottom the panel may not grow under it
-          width = Math.max(minWidth, Math.min(start.width + dx, reach - start.left));
-        }
-        if (mode.includes('s')) height = Math.max(minHeight, Math.min(start.height + dy, parent.clientHeight - start.top));
-      }
-      this.geom.set({ left, top, width, height });
-    };
-    const end = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', end);
-      window.removeEventListener('pointercancel', end);
-      const g = this.geom();
-      if (mode === 'move' && g) this.geom.set(snapPanel(g, parent.clientWidth, parent.clientHeight)); // the magnets act on release, not while dragging
-      else if (g) this.geom.set({ ...g, snapRight: parent.clientWidth - (g.left + g.width) < snapDistance }); // a resize keeps its place; it stays against the right edge when it was there
-      try { localStorage.setItem(geometryStorageKey, JSON.stringify(this.geom())); } catch { /* storage unavailable */ }
-    };
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', end);
-    window.addEventListener('pointercancel', end);
   }
 
   /** Double-click on a list item: the viewer should centre on it. */

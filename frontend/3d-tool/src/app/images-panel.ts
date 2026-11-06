@@ -1,24 +1,25 @@
-import { Component, untracked, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal } from '@angular/core';
+import { Component, untracked, DestroyRef, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { closeOnEscape } from '@rasterfaster/library';
 import { DocumentStore } from './document.store';
 import { ImageNote, ImagesService } from './images.service';
 import { RenderService, ambientNames, aspectRatio, reflectionNames, fxIds, fxNames, beamNames, hdWidths, strengthNames } from './render.service';
 import { ReleaseFocus } from './release-focus';
+import { DragHandle } from './drag-handle';
+import { FloatingPanel, PanelGeometry } from './floating-panel';
+import { PanelEdges } from './panel-edges';
+import { PanelFold } from './panel-fold';
 
-const storageKey = 'rasterfaster.imagesPanel';
 
-interface Geometry { left: number; top: number; width?: number; height?: number }
+const legacyKey = 'rasterfaster.imagesPanel';
 
-const minWidth = 220, minHeight = 150;
-const defaultWidth = 280; // as in the styles
-
-function read(): { geom: Geometry | null; collapsed: boolean } {
+/** What the panel remembered before it was a FloatingPanel (a place, a size and the folded state in one record). */
+function legacy(): { geom: PanelGeometry | null; collapsed: boolean } | null {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
-    const geom = stored && Number.isFinite(stored.left) && Number.isFinite(stored.top)
-      ? { left: stored.left, top: stored.top, ...(Number.isFinite(stored.width) && Number.isFinite(stored.height) ? { width: stored.width, height: stored.height } : {}) } : null;
-    return { geom, collapsed: stored?.collapsed === true };
-  } catch { return { geom: null, collapsed: false }; }
+    const stored = JSON.parse(localStorage.getItem(legacyKey) ?? 'null');
+    if (!stored) return null;
+    const placed = Number.isFinite(stored.left) && Number.isFinite(stored.top);
+    return { geom: placed ? { left: stored.left, top: stored.top, ...(Number.isFinite(stored.width) && Number.isFinite(stored.height) ? { width: stored.width, height: stored.height } : {}) } : null, collapsed: stored.collapsed === true };
+  } catch { return null; }
 }
 
 /**
@@ -28,27 +29,23 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
  */
 @Component({
   selector: 'app-images-panel',
-  imports: [ReleaseFocus],
+  imports: [ReleaseFocus, DragHandle, PanelFold, PanelEdges],
   host: {
+    class: 'float-panel',
     '(dragover)': 'onDragOver($event)', '(dragleave)': 'dropping.set(false)', '(drop)': 'onDrop($event)', '[class.dropping]': 'dropping()',
-    '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[style.width.px]': 'geom()?.width', '[style.height.px]': 'collapsed() ? null : geom()?.height',
-    '[class.placed]': 'geom() !== null', '[class.sized]': 'geom()?.height !== undefined', '[class.collapsed]': 'collapsed()', '[style.max-height]': "geom()?.height !== undefined ? 'none' : null",
   },
   template: `
-    @if (!collapsed()) {
-      <div class="edge w" (pointerdown)="startDrag($event, 'w')"></div>
-      <div class="edge e" (pointerdown)="startDrag($event, 'e')"></div>
-      <div class="edge s" (pointerdown)="startDrag($event, 's')"></div>
-      <div class="edge sw" (pointerdown)="startDrag($event, 'sw')"></div>
-      <div class="edge se" (pointerdown)="startDrag($event, 'se')"></div>
-    }
-    <div class="head" (pointerdown)="startDrag($event, 'move')" (dblclick)="resetGeometry()" title="Drag to move the panel · double-click to put it back">
-      <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the gallery' : 'Collapse the gallery'" (pointerdown)="$event.stopPropagation()" (click)="toggle()">{{ collapsed() ? '▸' : '▾' }}</button>
-      <span class="title">Gallery</span>
-      @if (service.images().length) { <span class="count">{{ service.images().length }}</span> }
+    <app-panel-edges [collapsed]="collapsed()" (start)="startResize($event.event, $event.mode)" />
+    <div class="head panel-bar" (pointerdown)="barDown($event)" (dblclick)="resetGeometry()" title="Drag to move the panel · double-click to put it back">
+      <div class="bar-start"><span class="title">Gallery</span>
+      @if (service.images().length) { <span class="count">{{ service.images().length }}</span> }</div>
+      <app-drag-handle />
+      <div class="bar-end">
       <button type="button" class="add" releaseFocus title="Put a PNG picture or an MP4 video of your own in the gallery (or drop files on the panel)" (pointerdown)="$event.stopPropagation()" (click)="fileInput.click()">Add file…</button>
       <input #fileInput type="file" hidden multiple accept="image/png,video/mp4,.png,.mp4" (change)="addFiles($any($event.target).files); $any($event.target).value = ''" />
       <button type="button" class="x close" releaseFocus title="Close the panel (I)" (pointerdown)="$event.stopPropagation()" (click)="store.toggleImages()">✕</button>
+      <app-panel-fold dockId="gallery" [collapsed]="collapsed()" label="the gallery" (toggle)="toggleCollapsed()" />
+      </div>
     </div>
     @if (!collapsed()) {
       @if (service.error()) { <div class="error">{{ service.error() }}</div> }
@@ -194,22 +191,13 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .viewer .rename { font: inherit; font-size: 14px; color: inherit; background: #1b1d23; border: 1px solid #2f6fed; border-radius: 3px; padding: 1px 4px; outline: none; min-width: 200px; }
     .button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; text-decoration: none; } .button:hover { background: #2f6fed; color: #fff; }
     .viewer button.sure { background: #a33a3a; color: #fff; }
-    :host { position: absolute; left: 12px; bottom: 36px; z-index: 5; width: 280px; max-height: 60%; display: flex; flex-direction: column; box-sizing: border-box; font-size: 12px; color: #dde1e8;
-            background: rgba(35,38,45,.94); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+    :host { position: absolute; left: 12px; bottom: 36px; z-index: 5; width: 300px; max-height: 60%; display: flex; flex-direction: column; }
     :host(.placed) { bottom: auto; }
     :host(.sized) .grid { flex: 1 1 0; min-height: 0; }
-    .edge { position: absolute; z-index: 1; touch-action: none; }
-    .edge.w { left: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; } .edge.e { right: -3px; top: 24px; bottom: 12px; width: 7px; cursor: ew-resize; }
-    .edge.s { left: 12px; right: 12px; bottom: -3px; height: 7px; cursor: ns-resize; }
-    .edge.sw { left: -3px; bottom: -3px; width: 14px; height: 14px; cursor: nesw-resize; } .edge.se { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
-    .edge.se::after { content: ''; position: absolute; right: 2px; bottom: 2px; width: 11px; height: 11px; opacity: .55;
-      background: linear-gradient(135deg, transparent 0 45%, currentColor 45% 53%, transparent 53% 72%, currentColor 72% 80%, transparent 80%); } .edge.se:hover::after { opacity: 1; }
-    .head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: grab; user-select: none; touch-action: none; } .head:active { cursor: grabbing; }
     :host(.dropping) { outline: 2px dashed #2f6fed; outline-offset: -3px; background: rgba(47,111,237,.18); }
     .add { margin-left: auto; font-size: 11px; padding: 1px 8px; } .add + input + .close { margin-left: 0; }
     .title { font-weight: 600; } .count { color: #8a93a2; font-size: 11px; } .close { margin-left: 0; }
     button { background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; padding: 2px 8px; cursor: pointer; } button:hover { background: #2f6fed; color: #fff; }
-    .fold { padding: 0 4px; background: transparent; border: 0; } .fold:hover { background: transparent; color: #fff; }
     .x { padding: 0 5px; background: transparent; border: 0; opacity: .7; } .x:hover { opacity: 1; background: transparent; color: #fff; }
     .error { margin: 0 6px 6px; padding: 4px 6px; background: #3a2323; border: 1px solid #7a3030; border-radius: 4px; }
     .clean { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 6px 6px; } .clean .label { color: #8a93a2; } .muted { color: #8a93a2; }
@@ -234,13 +222,9 @@ function read(): { geom: Geometry | null; collapsed: boolean } {
     .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.25); border-top-color: #2f6fed; border-radius: 50%; animation: spin .8s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
   `,
 })
-export class ImagesPanel {
+export class ImagesPanel extends FloatingPanel {
   protected readonly store = inject(DocumentStore);
   protected readonly service = inject(ImagesService);
-  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly initial = read();
-  protected readonly geom = signal<Geometry | null>(this.initial.geom);
-  protected readonly collapsed = signal(this.initial.collapsed);
   protected readonly confirming = signal<'older' | 'quick' | null>(null);
   /** The picture shown large. */
   protected readonly viewing = signal<ImageNote | null>(null);
@@ -349,7 +333,8 @@ export class ImagesPanel {
   protected readonly quickCount = computed(() => this.service.images().filter(n => n.kind === 'quick').length);
 
   constructor() {
-    effect(() => this.remember(this.geom(), this.collapsed()));
+    super();
+    this.setup({ id: 'gallery', minWidth: 285, defaultWidth: 300, minHeight: 150, legacy });
     effect(() => { this.viewing(); untracked(() => this.zoomFit()); }); // another picture (or none): back to fitting it
     closeOnEscape(() => this.closeMenu(), () => this.menu() !== null);
     closeOnEscape(() => this.viewing.set(null), () => this.viewing() !== null && !this.renaming());
@@ -364,10 +349,6 @@ export class ImagesPanel {
     };
     document.addEventListener('keydown', arrows, true);
     inject(DestroyRef).onDestroy(() => document.removeEventListener('keydown', arrows, true));
-  }
-
-  private remember(geom: Geometry | null, collapsed: boolean) {
-    try { localStorage.setItem(storageKey, JSON.stringify({ ...geom, collapsed })); } catch { /* storage unavailable */ }
   }
 
   protected readonly render = inject(RenderService);
@@ -449,7 +430,6 @@ export class ImagesPanel {
     void this.addFiles(event.dataTransfer?.files ?? null);
   }
 
-  protected toggle() { this.collapsed.update(v => !v); }
   /** v13, v13* when the working copy was ahead of it, and a dash when no version had been saved yet. */
   protected versionLabel(note: ImageNote) { return note.version ? `v${note.version}${note.edited ? '*' : ''}` : 'no version'; }
   /** The render settings of a picture, in words: one chip per setting. */
@@ -538,43 +518,5 @@ export class ImagesPanel {
   @HostListener('document:pointerdown', ['$event'])
   protected away(event: PointerEvent) {
     if (this.confirming() && !(event.target as HTMLElement | null)?.closest('.clean')) this.confirming.set(null);
-  }
-
-  /** Where the panel is, as the 3D view allows: when the view gets narrower (the file panel opens) the panel keeps inside it, and goes back when the view is wide again. */
-  protected readonly leftCss = computed(() => (this.geom() ? `min(${this.geom()!.left}px, calc(100% - ${this.geom()!.width ?? defaultWidth}px))` : null));
-  protected readonly topCss = computed(() => (this.geom() ? `min(${this.geom()!.top}px, calc(100% - 40px))` : null));
-
-  protected resetGeometry() {
-    this.geom.set(null);
-  }
-
-  /** Moves (the title bar) or resizes (an edge or corner) the panel with the pointer; the result is remembered. It stays inside the 3D view. */
-  protected startDrag(event: PointerEvent, mode: 'move' | 'w' | 'e' | 's' | 'sw' | 'se') {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    const host = this.element.nativeElement, parent = host.offsetParent as HTMLElement | null;
-    if (!parent) return;
-    const box = host.getBoundingClientRect(), area = parent.getBoundingClientRect();
-    const start = { left: box.left - area.left, top: box.top - area.top, width: box.width, height: box.height };
-    if (mode !== 'move') this.geom.set(start); // from now on the panel has a size of its own
-    else this.geom.update(g => g ?? { left: start.left, top: start.top });
-    const move = (e: PointerEvent) => {
-      const dx = e.clientX - event.clientX, dy = e.clientY - event.clientY;
-      let { left, top, width, height } = start;
-      if (mode === 'move') {
-        left = Math.max(0, Math.min(start.left + dx, parent.clientWidth - width));
-        top = Math.max(0, Math.min(start.top + dy, Math.max(0, parent.clientHeight - 28)));
-        this.geom.update(g => ({ ...g, left, top }));
-        return;
-      }
-      if (mode.includes('w')) { width = Math.max(minWidth, Math.min(start.width - dx, start.left + start.width)); left = start.left + start.width - width; }
-      if (mode.includes('e')) width = Math.max(minWidth, Math.min(start.width + dx, parent.clientWidth - start.left));
-      if (mode.includes('s')) height = Math.max(minHeight, Math.min(start.height + dy, parent.clientHeight - start.top));
-      this.geom.set({ left, top, width, height });
-    };
-    const end = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
-    addEventListener('pointermove', move);
-    addEventListener('pointerup', end);
-    addEventListener('pointercancel', end);
   }
 }

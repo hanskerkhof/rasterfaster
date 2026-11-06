@@ -2,6 +2,83 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-06 - The document panel is on top of the view's overlays (0.12.36)
+
+### Fixed
+- **FE** (`src/styles.scss`): the document panel had no stacking order of its own, so the dashed picture frame and the other overlays of the 3D view were drawn over it (the Views panel, with `z-index: 5`, was on top). Every floating panel (`float-panel`) now has `z-index: 5`.
+
+## 2026-11-05 - A closed "Render ... is ready" message stays closed (0.12.35)
+
+### Fixed
+- **FE** (`render.service.ts`, `app.html`): the message "Render of … is ready: click to view" came back after it was closed: every page that loads (or reloads, e.g. into a new version) is told about the newest finished render by the API and showed its message again. The id of the render whose message was closed (✕) or opened is now kept in this browser (`rasterfaster.renderSeen`), and a render that was seen does not raise its message again (a new render does).
+
+## 2026-11-05 - Docking: the panel itself has to reach the bottom (0.12.34)
+
+### Fixed
+- **FE** (`floating-panel.ts`): the drop zone never showed when a panel was dragged "all the way down": the rule was that the *pointer* had to reach the bottom edge, but the panel stops at the bottom with the pointer still on its bar, far above it. Now it docks when the panel's bottom edge reaches the bottom of the view and the drag goes on downward (a short drag down does not dock; a panel that was already hanging out of the view is fitted into it, 40 px short of the bottom, when the drag starts).
+
+## 2026-11-05 - The button is called + View (0.12.32)
+
+### Changed
+- **FE** (`views-panel.ts`): **+ Save view** is **+ View** (its hover text says what it saves); the Views panel is 220 px wide by default (at least 200) now that its bar needs less room.
+
+## 2026-11-05 - Docking: a panel dragged to the bottom becomes its top bar (0.12.33)
+
+### Added
+- **FE** (`panel-dock.ts`, `styles.scss`, `app.html`): **docking**. Drag a panel (Document, Views, Gallery or the Rendering… panel) down until its bottom edge is at the bottom of the view and you push on: a dashed zone shows ("Release to dock"), and on release the panel shrinks to its **top bar** in a row along the bottom (side by side, in the order they were docked, none wider than 260 px). On a docked bar the fold button is the **undock** button (⤢): the panel glides back to the place and size it had **before** the drag, in full; pressing the docked bar and moving up does the same. The move is a 280 ms glide. Docking only changes how a panel is drawn (`.float-panel.docked`), so its saved place and size are untouched; which panels are docked is remembered in this browser (`rasterfaster.dockedPanels`).
+
+### Changed
+- **FE** (`floating-panel.ts`, `panel-edges.ts`, `panel-fold.ts`, `views-panel.ts`, `images-panel.ts`, `document-panel.ts`): the panels share their code. **`FloatingPanel`** is the base of Views, Gallery and Document (place and size, fold, saving, move, resize, staying inside the view, docking; the document panel adds its magnets and the view-cube keep-out as overrides), `<app-panel-edges>` holds the resize handles, `<app-panel-fold dockId=…>` the fold / undock button. A new panel is: extend `FloatingPanel`, `this.setup({ id, minWidth, defaultWidth, minHeight })`, a `panel-bar` with `(pointerdown)="barDown($event)"`, `<app-panel-edges>`, a body. Places are kept under `rasterfaster.panel.<id>` (the old keys are read once). Moving a panel with a size of its own fits it in the view first.
+
+## 2026-11-05 - The document panel has a title (0.12.31)
+
+### Added
+- **FE** (`document-panel.ts`, `app.scss`): the document panel's bar has the title **Document** on the left, like Views and Gallery; the save status (◇ ■ Saved) moved to the right, next to the fold button. The panel is 260 px wide by default (it was 240; at least 260 when resized) so both sides of the bar have room.
+
+## 2026-11-05 - Every panel folds from the right of its bar; none leaves the screen (0.12.30)
+
+### Added
+- **FE** (`panel-fold.ts`, `keep-inside.ts`, `drag-scroll.ts` untouched): the collapse / expand button is one shared component, the last thing on the right of the top bar of the document panel, the Views panel, the Gallery and the **Rendering…** panel (which can now be folded to its bar; the percentage stays in sight; remembered). The bar of each panel is three parts: title and counts on the left, the grip in the middle, buttons and the fold button on the right (`.bar-start`, `.bar-end` in `src/styles.scss`), so the grip never sits behind a button; the Views panel is 250 px wide by default (at least 245) and the Gallery 300 (at least 285) to make room for that.
+- **FE**: no panel can be dragged out of the view any more: the Views panel and the Gallery stay completely inside while they are dragged (they could be pushed down to a 28 px strip), come back inside when the view gets smaller or the file panel opens (`watchInside`), and the Rendering… panel moves back in when the window gets smaller or when it appears. The document panel already did this.
+
+### Fixed
+- **FE**: the shared panel class of 0.12.29 was called `panel`, which the file panel's `aside.panel` already used: its styles put the Views panel (and the document panel) out of position, below the window. It is called `float-panel` now.
+
+## 2026-11-05 - One look for all panels (0.12.29)
+
+### Changed
+- **FE** (`src/styles.scss`, `drag-handle.ts`, the four panels): the floating panels share their styling: the global classes **`float-panel`** (the box: colour, border, radius, text size) and **`panel-bar`** (the top bar) with an `<app-drag-handle />` in it. A new panel only needs those three. The **whole top bar** lights up on hover (the document panel only had its middle part) with the same hover text everywhere, and the grip dots sit in the **middle** of every bar. The **Rendering…** panel now has a top bar of its own with the step ("Rendering…", "Loading the scene…") in it; it is moved by that bar (double-click puts it back), no longer by its body. The document panel's bar is a drag bar except where it holds buttons.
+
+## 2026-11-05 - Views panel: change the size like the document panel (0.12.28)
+
+### Added
+- **FE** (`views-panel.ts`): the Views panel can be resized like the document panel: drag its left or right edge, its bottom edge or either bottom corner (the corner shows a small mark); the list of views scrolls inside when the panel is lower than its views. Size and place are remembered in this browser; double-click the title bar for the default size. Minimum 180 × 110 px.
+
+## 2026-11-05 - A drag handle in the bar of every movable panel (0.12.27)
+
+### Added
+- **FE** (`drag-handle.ts`, `views-panel.ts`, `images-panel.ts`, `document-panel.ts`, `app.html`): the panels that can be moved show six grip dots (⠿) in their top bar: at the left of the Views and Gallery bars, in the middle of the free part of the document panel's bar (it had a faint line), and at the top of the Rendering… panel. The bar lights up and the dots get brighter while the pointer is over it (cursor: grab).
+
+## 2026-11-05 - The quick draft in the render progress panel (0.12.26)
+
+### Added
+- **FE** (`app.html`, `app.scss`): the **Rendering…** panel shows the quick draft of the render that runs (the picture, or the draft video of a turntable: the one the Gallery's pending card shows) as a small thumbnail at its left, as soon as the API has made it.
+
+## 2026-11-05 - The render progress panel can be moved (0.12.25)
+
+### Added
+- **FE** (`app.ts`, `app.html`, `app.scss`): the **Rendering…** panel can be dragged anywhere (by its body, not its buttons), stays inside the window, and double-click puts it back. The place is remembered in this browser (`rasterfaster.renderProgressSpot`).
+
+## 2026-11-05 - Views: click the marked view again to deselect it (0.12.24)
+
+### Added
+- **FE** (`views-panel.ts`, `document.store.ts`): a second click on the view the camera is on clears its mark (`clearViewMark`): the blue mark goes, and so does the amber "changed" mark of a view the camera came from. It stays clear, also when the camera comes back to that pose, until a view is chosen, saved or replaced again. The hover text says "again: deselect". A store test covers it.
+
+## 2026-11-05 - The T key for the Trash is gone (0.12.23)
+
+### Removed
+- **FE** (`app.ts`, `app.html`, `README.md`): the **T** key that opened and closed the Trash, and the T on the Trash button. The Trash opens from its button; **C** still opens the catalog.
+
 ## 2026-11-05 - Catalog: more line spacing in a long part title (0.12.22)
 
 ### Changed

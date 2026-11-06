@@ -68,7 +68,7 @@
   <div class="trash-bar">
     <button type="button" class="trash-button" title="The parts catalog: browse every part of the library (key C)" (click)="setCatalogOpen(true)">▦ Catalog <kbd>C</kbd></button>
     <button type="button" class="trash-button" title="Read the library from disk again: use it after changing files outside the app" [disabled]="rereading()" (click)="rereadLibrary()">{{ rereading() ? '⟳ Reading…' : '⟳ Reload' }}</button>
-    <button type="button" class="trash-button" title="The Trash: put files back or delete them for good (key T)" (click)="trashOpen.set(true)">🗑 Trash <kbd>T</kbd>@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
+    <button type="button" class="trash-button" title="The Trash: put files back or delete them for good" (click)="trashOpen.set(true)">🗑 Trash@if (lib.trashCount()) { <span class="count">{{ lib.trashCount() }}</span> }</button>
   </div>
   </div>
 </aside>
@@ -114,6 +114,7 @@
     <app-stl-viewer #v [data]="null" [mode]="mode()" [documentMode]="true" (modeRequest)="setMode($event)" />
     <app-document-panel class="docpanel" [viewProvider]="v.viewParam" [lightProvider]="v.lightParam" (centerItem)="v.centerOnItem($event)" />
     <app-views-panel />
+    @if (dock.hint()) { <div class="dock-zone">Release to dock</div> }
     @if (store.imagesOpen()) { <app-images-panel /> }
     @if (error()) { <div class="overlay err">{{ error() }}</div> }
     @if (store.viewing(); as shown) {
@@ -128,12 +129,23 @@
     }
     @if (render.state(); as r) {
       @if (r.state === 'running') {
-        <div class="notice render-progress" role="status" aria-label="Render in progress">
-          <div class="step">{{ render.currentStep()?.label ?? 'Rendering' }}…</div>
+        <div class="notice render-progress float-panel" dockable="render" role="status" aria-label="Render in progress" [style.transform]="renderTransform()">
+          <div class="panel-bar" title="Drag to move the panel · double-click to put it back" (pointerdown)="renderBarDown($event)" (dblclick)="resetRenderSpot()">
+            <div class="bar-start"><span class="title">{{ render.currentStep()?.label ?? 'Rendering' }}…</span>
+            @if (renderCollapsed()) { <span class="rp-mini">{{ render.percentText() }}%</span> }</div>
+            <app-drag-handle />
+            <div class="bar-end"><app-panel-fold dockId="render" [collapsed]="renderCollapsed()" label="the render panel" (toggle)="toggleRenderCollapsed()" /></div>
+          </div>
+          @if (!renderCollapsed()) {
+          <div class="rp-body">
           <div class="bar steps">
             @for (s of render.steps(); track s.name) { <span class="seg" [class]="'seg ' + s.name" [style.flex-grow]="s.duration" [title]="s.label"><i [style.width.%]="s.fill * 100"></i></span> }
           </div>
           <div class="line">
+            @if (r.preview) {
+              @if (r.previewMedia === 'mp4') { <video class="pthumb" [src]="'/api/render-jobs/' + r.id + '/preview.mp4'" autoplay loop muted playsinline title="The quick draft of this render"></video> }
+              @else { <img class="pthumb" [src]="'/api/render-jobs/' + r.id + '/preview.png'" alt="" title="The quick draft of this render" /> }
+            }
             <span class="spinner"></span>
             <span class="text">
               <span class="r1">@if (r.kind === 'turntable') { <b>Turntable</b> · }{{ r.name }} · {{ r.width }} px{{ render.sizeSuffix(r.width) }}@if (r.kind === 'turntable') { · frame <span class="v n3">{{ render.frameNow() }}</span> of {{ r.frames }}, sample <span class="v n3">{{ r.sample ?? 0 }}</span>/{{ r.samples }}<span class="v frames">{{ r.frameSeconds ? ' (' + r.frameSeconds + ' s a frame)' : '' }}</span> }</span>
@@ -155,6 +167,8 @@
               @if (render.queue().length > 5) { <div class="queue-more">and {{ render.queue().length - 5 }} more</div> }
             </div>
           }
+          </div>
+          }
         </div>
       }
     }
@@ -172,7 +186,7 @@
               <small class="legend">@for (s of render.steps(); track s.name) { <span class="key"><b [class]="s.name"></b>{{ s.label }} {{ time(s.duration) }}</span> }</small>
             }</span>
         } @else { {{ t.error }} }
-        <button type="button" class="close" title="Close this message" aria-label="Close" (click)="$event.stopPropagation(); render.toast.set(null)">✕</button>
+        <button type="button" class="close" title="Close this message" aria-label="Close" (click)="$event.stopPropagation(); render.dismissToast()">✕</button>
       </div>
     }
     @if (render.dialog(); as d) { <app-render-dialog [url]="d.url" [jobId]="d.jobId" [name]="store.doc().name" (close)="render.dialog.set(null)" /> }

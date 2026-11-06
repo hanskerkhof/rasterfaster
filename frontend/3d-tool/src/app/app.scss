@@ -57,7 +57,7 @@ main { display: flex; flex-direction: column; min-width: 0; }
 .sort button { padding: 2px 8px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; }
 .sort button.on { background: #2f6fed; color: #fff; }
 .hint { padding: 6px 12px; opacity: .5; font-style: italic; }
-.docpanel { position: absolute; top: 202px; right: 12px; width: 240px; max-height: calc(100% - 242px); }
+.docpanel { position: absolute; top: 202px; right: 12px; width: 260px; max-height: calc(100% - 242px); }
 .banner { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 12px; z-index: 5;
           background: rgba(35,38,45,.95); border: 1px solid #ffe066; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 12px; }
 .banner button { padding: 3px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; cursor: pointer; font: inherit; }
@@ -94,7 +94,7 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .trash-button .count { margin-left: 6px; padding: 0 6px; font-size: 10px; background: #31353f; border-radius: 8px; }
 .trash-button kbd { margin-left: 4px; font: inherit; font-size: 11px; opacity: .55; }
 .notice.undo { bottom: 48px; }
-.notice.render-progress { bottom: 84px; width: min(900px, 94vw); box-sizing: border-box; padding: 8px 12px; } /* a fixed width: the toast does not grow and shrink with its numbers */
+.notice.render-progress { user-select: none; bottom: 84px; width: min(900px, 94vw); box-sizing: border-box; padding: 0; border-radius: 6px; } .notice.render-progress .rp-body { padding: 6px 12px 8px; } .notice.render-progress .rp-mini { opacity: .7; font-variant-numeric: tabular-nums; } /* a fixed width: the toast does not grow and shrink with its numbers */
 .notice.render-progress .bar { height: 4px; margin-bottom: 7px; background: #14161a; border-radius: 2px; overflow: hidden; }
 .notice.render-progress .bar span { display: block; height: 100%; background: #2f6fed; transition: width .6s linear; }
 .notice .bar.steps { display: flex; gap: 2px; height: 6px; background: transparent; overflow: visible; }
@@ -102,13 +102,13 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice .bar.steps .seg i { display: block; height: 100%; transition: width .6s linear; }
 .notice .seg.prepare i, .notice .key b.prepare { background: #9a82e8; } .notice .seg.load i, .notice .key b.load { background: #3aa6c9; }
 .notice .seg.render i, .notice .key b.render { background: #4ec27a; } .notice .seg.finish i, .notice .key b.finish { background: #e0a23a; }
-.notice.render-progress .step { margin-bottom: 5px; font-weight: 600; font-size: 12px; }
 .notice .bar.steps.done { display: flex; margin-top: 4px; width: 100%; }
 .notice .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; } .notice .legend .key { display: inline-flex; align-items: center; gap: 4px; }
 .notice .legend .key b { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 .notice.render-progress .line { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.notice.render-progress .pthumb { flex: none; width: 80px; max-height: 54px; object-fit: contain; border-radius: 3px; background: #000; pointer-events: none; } /* the quick draft of the render that runs */
 .notice.render-progress .spinner { flex: none; width: 10px; height: 10px; border: 2px solid rgba(255,255,255,.3); border-top-color: #2f6fed; border-radius: 50%; animation: render-spin .8s linear infinite; }
-.notice.render-progress button { margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
+.notice.render-progress button { cursor: pointer; margin-left: auto; padding: 1px 10px; background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; cursor: pointer; }
 .notice.render-progress .queue { color: #e0a23a; font-weight: 600; }
 .notice.render-progress .line button + button { margin-left: 6px; }
 .notice.render-progress .queue-list { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.12); font-size: 11px; }

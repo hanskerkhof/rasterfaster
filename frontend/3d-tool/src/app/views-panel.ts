@@ -1,39 +1,45 @@
-import { Component, ElementRef, computed, effect, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DocumentStore } from './document.store';
 import { ReleaseFocus } from './release-focus';
+import { DragHandle } from './drag-handle';
+import { FloatingPanel, PanelGeometry } from './floating-panel';
+import { PanelEdges } from './panel-edges';
+import { PanelFold } from './panel-fold';
 import { autoScroll } from './drag-scroll';
 import { ViewModeIcon, viewModeName } from './view-mode-icon';
 
-const storageKey = 'rasterfaster.viewsPanel';
-const panelWidth = 230; // as in the styles
+const legacyKey = 'rasterfaster.viewsPanel';
 
-interface Spot { left: number; top: number }
-
-function read(): { spot: Spot | null; collapsed: boolean } {
+/** What the panel remembered before it was a FloatingPanel (a place, a size and the folded state in one record). */
+function legacy(): { geom: PanelGeometry | null; collapsed: boolean } | null {
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
-    const spot = stored && Number.isFinite(stored.left) && Number.isFinite(stored.top) ? { left: stored.left, top: stored.top } : null;
-    return { spot, collapsed: stored?.collapsed === true };
-  } catch { return { spot: null, collapsed: false }; }
+    const stored = JSON.parse(localStorage.getItem(legacyKey) ?? 'null');
+    if (!stored) return null;
+    const placed = Number.isFinite(stored.left) && Number.isFinite(stored.top);
+    return { geom: placed ? { left: stored.left, top: stored.top, ...(Number.isFinite(stored.width) && Number.isFinite(stored.height) ? { width: stored.width, height: stored.height } : {}) } : null, collapsed: stored.collapsed === true };
+  } catch { return null; }
 }
 
 /** The saved views of the document in a small floating panel: drag it by its title, fold it with the arrow. */
 @Component({
   selector: 'app-views-panel',
-  imports: [ReleaseFocus, ViewModeIcon],
-  host: { '[style.left]': 'leftCss()', '[style.top]': 'topCss()', '[class.placed]': 'spot() !== null', '[class.collapsed]': 'collapsed()' },
+  imports: [ReleaseFocus, ViewModeIcon, DragHandle, PanelFold, PanelEdges],
   template: `
-    <div class="head" (pointerdown)="startDrag($event)" title="Drag to move the panel">
-      <button type="button" class="fold" releaseFocus [attr.aria-expanded]="!collapsed()" [title]="collapsed() ? 'Expand the views' : 'Collapse the views'" (pointerdown)="$event.stopPropagation()" (click)="toggle()">{{ collapsed() ? '▸' : '▾' }}</button>
-      <span class="title">Views</span>
-      @if (store.doc().views?.length) { <span class="count">{{ store.doc().views!.length }}</span> }
-      <button type="button" class="add" releaseFocus title="Save the camera, display mode, light and ground as a view (keys 1 – 9 go to the first nine)" (pointerdown)="$event.stopPropagation()" (click)="save()">+ Save view</button>
+    <app-panel-edges [collapsed]="collapsed()" (start)="startResize($event.event, $event.mode)" />
+    <div class="head panel-bar" (pointerdown)="barDown($event)" (dblclick)="resetGeometry()" title="Drag to move the panel · drag its edges to change the size · double-click: back to the default size">
+      <div class="bar-start"><span class="title">Views</span>
+      @if (store.doc().views?.length) { <span class="count">{{ store.doc().views!.length }}</span> }</div>
+      <app-drag-handle />
+      <div class="bar-end">
+      <button type="button" class="add" releaseFocus title="Save the camera, display mode, light and ground as a view (keys 1 – 9 go to the first nine)" (pointerdown)="$event.stopPropagation()" (click)="save()">+ View</button>
+      <app-panel-fold dockId="views" [collapsed]="collapsed()" label="the views" (toggle)="toggleCollapsed()" />
+      </div>
     </div>
     @if (!collapsed()) {
       <div class="list">
         @for (view of store.doc().views ?? []; track view.id; let i = $index) {
           @if (placeBefore() === view.id) { <div class="place" [style.height.px]="drag()?.height"></div> }
-          <div class="view" [class.lift]="drag()?.id === view.id" [style.top.px]="drag()?.id === view.id ? drag()!.top : null" [style.height.px]="drag()?.id === view.id ? drag()!.height : null" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="store.goToSavedView(view.id)" (dblclick)="startRename(view.id)" [title]="rowTitle(view)">
+          <div class="view" [class.lift]="drag()?.id === view.id" [style.top.px]="drag()?.id === view.id ? drag()!.top : null" [style.height.px]="drag()?.id === view.id ? drag()!.height : null" [class.active]="view.id === activeId()" [class.from]="view.id === fromId()" [attr.aria-current]="view.id === activeId() ? 'true' : null" (click)="pick(view.id)" (dblclick)="startRename(view.id)" [title]="rowTitle(view)">
             <span class="grip" title="Drag to change the order (the keys 1 – 9 follow it)" (pointerdown)="startViewDrag($event, view.id)" (click)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()">⋮⋮</span>
             <span class="num">{{ i < 9 ? i + 1 : '' }}</span>
             <app-view-mode-icon [mode]="view.appMode" />
@@ -58,15 +64,13 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     }
   `,
   styles: `
-    :host { position: absolute; left: 12px; bottom: 36px; z-index: 5; width: 230px; max-height: 50%; display: flex; flex-direction: column; box-sizing: border-box; font-size: 12px; color: #dde1e8;
-            background: rgba(35,38,45,.92); border: 1px solid rgba(255,255,255,.12); border-radius: 6px; }
+    :host { position: absolute; left: 12px; bottom: 36px; z-index: 5; width: 220px; max-height: 50%; display: flex; flex-direction: column; }
     :host(.placed) { bottom: auto; }
-    .head { display: flex; align-items: center; gap: 6px; padding: 4px 6px; cursor: grab; user-select: none; touch-action: none; }
-    .head:active { cursor: grabbing; }
-    .title { font-weight: 600; } .count { color: #8a93a2; font-size: 11px; } .head .add { margin-left: auto; }
+    :host(.sized) .list { flex: 1 1 auto; min-height: 0; }
+    :host(.sized.collapsed) { height: auto; }
+    .title { font-weight: 600; } .count { color: #8a93a2; font-size: 11px; } .head .add { margin-left: auto; } .head .add + app-panel-fold { margin-left: 0; }
     button { background: #31353f; color: inherit; border: 1px solid #000; border-radius: 4px; font: inherit; padding: 2px 8px; cursor: pointer; }
     button:hover { background: #2f6fed; color: #fff; }
-    .fold { padding: 0 4px; background: transparent; border: 0; } .fold:hover { background: transparent; color: #fff; }
     .list { overflow-y: auto; padding: 0 4px 6px; display: flex; flex-direction: column; gap: 2px; }
     .view { display: flex; align-items: center; gap: 6px; padding: 3px 6px; cursor: pointer; border-radius: 4px; } .view:hover { background: rgba(255,255,255,.08); }
     .view.active { background: rgba(47,111,237,.35); box-shadow: inset 3px 0 0 #2f6fed; } .view.active:hover { background: rgba(47,111,237,.45); } .view.active .num { color: #fff; }
@@ -92,27 +96,19 @@ function read(): { spot: Spot | null; collapsed: boolean } {
     .slot { cursor: default; color: #6b7382; font-style: italic; } .slot:hover { background: transparent; } .slot.next { cursor: pointer; } .slot.next:hover { background: rgba(255,255,255,.08); color: #dde1e8; }
   `,
 })
-export class ViewsPanel {
+export class ViewsPanel extends FloatingPanel {
   protected readonly store = inject(DocumentStore);
-  private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
-  private readonly initial = read();
-  protected readonly spot = signal<Spot | null>(this.initial.spot);
-  protected readonly collapsed = signal(this.initial.collapsed);
 
   constructor() {
-    effect(() => this.remember(this.spot(), this.collapsed()));
+    super();
+    this.setup({ id: 'views', minWidth: 200, defaultWidth: 220, minHeight: 110, legacy });
   }
 
-  /** Where the panel is, as the 3D view allows: when the view gets narrower (the file panel opens) the panel keeps inside it, and goes back when the view is wide again. */
-  protected readonly leftCss = computed(() => (this.spot() ? `min(${this.spot()!.left}px, calc(100% - ${panelWidth}px))` : null));
-  protected readonly topCss = computed(() => (this.spot() ? `min(${this.spot()!.top}px, calc(100% - 40px))` : null));
-
-  private remember(spot: Spot | null, collapsed: boolean) {
-    try { localStorage.setItem(storageKey, JSON.stringify({ ...spot, collapsed })); } catch { /* storage unavailable */ }
-  }
-
-  protected toggle() { this.collapsed.update(v => !v); }
   protected save() { this.store.saveCurrentView(); }
+  /** A click goes to the view; a second click on the view the camera is on clears the mark (nothing is selected). */
+  protected pick(id: string) {
+    if (id === this.activeId()) this.store.clearViewMark(); else this.store.goToSavedView(id);
+  }
 
   // --- drag a view to another place of the list (by its grip) ------------------------------------------------------------------------
 
@@ -177,7 +173,7 @@ export class ViewsPanel {
   /** The hover text of a row: the mode of the view, then what a click does. */
   protected rowTitle(view: { appMode?: string | null }) {
     const mode = viewModeName(view.appMode);
-    return (mode ? mode + ' · ' : '') + 'Click: go to this view · double-click: rename · the camera, display mode, light and ground are kept';
+    return (mode ? mode + ' · ' : '') + 'Click: go to this view (again: deselect) · double-click: rename · the camera, display mode, light and ground are kept';
   }
   protected update(event: Event, id: string) { event.stopPropagation(); this.store.updateSavedView(id); }
   protected remove(event: Event, id: string) { event.stopPropagation(); this.store.removeSavedView(id); }
@@ -207,25 +203,5 @@ export class ViewsPanel {
     if (this.editing() !== id) return;
     this.editing.set(null);
     this.store.renameSavedView(id, name);
-  }
-
-  /** Dragging the title bar moves the panel; it stays inside the 3D view. */
-  protected startDrag(event: PointerEvent) {
-    if (event.button !== 0) return;
-    const host = this.element.nativeElement;
-    const parent = host.offsetParent as HTMLElement | null;
-    if (!parent) return;
-    const box = host.getBoundingClientRect(), area = parent.getBoundingClientRect();
-    const offsetX = event.clientX - box.left, offsetY = event.clientY - box.top;
-    const move = (e: PointerEvent) => {
-      const left = Math.min(Math.max(0, e.clientX - area.left - offsetX), Math.max(0, parent.clientWidth - box.width));
-      const top = Math.min(Math.max(0, e.clientY - area.top - offsetY), Math.max(0, parent.clientHeight - 28));
-      this.spot.set({ left, top });
-    };
-    const end = () => { removeEventListener('pointermove', move); removeEventListener('pointerup', end); removeEventListener('pointercancel', end); };
-    addEventListener('pointermove', move);
-    addEventListener('pointerup', end);
-    addEventListener('pointercancel', end);
-    event.preventDefault();
   }
 }

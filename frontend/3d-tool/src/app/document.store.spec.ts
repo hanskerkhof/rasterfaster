@@ -313,6 +313,29 @@ describe('Design and Render mode', () => {
   });
 });
 
+describe('Marked view', () => {
+  it('a second click clears the mark of the view the camera is on, until a view is chosen again', () => {
+    localStorage.clear();
+    TestBed.configureTestingModule({ providers: [provideHttpClient()] });
+    const store = TestBed.inject(DocumentStore);
+    const pose = { position: [10, 0, 5] as [number, number, number], target: [0, 0, 0] as [number, number, number], zoom: 1, radius: 10, projection: 'persp' as const };
+    store.captureView = () => ({ ...pose } as never);
+    store.saveCurrentView();
+    const id = store.doc().views![0].id;
+    store.livePose.set(pose);
+    expect(store.activeViewId()).toBe(id); // the camera is on it
+    store.clearViewMark();
+    expect(store.activeViewId()).toBeNull();
+    expect(store.fromViewId()).toBeNull();
+    store.livePose.set({ ...pose, position: [50, 0, 5] }); // moved away: nothing to show
+    expect(store.fromViewId()).toBeNull();
+    store.livePose.set(pose); // and back on it: still not marked
+    expect(store.activeViewId()).toBeNull();
+    store.goToSavedView(id); // chosen again: marked
+    expect(store.activeViewId()).toBe(id);
+  });
+});
+
 describe('Saved views order', () => {
   it('moves a view to another place as one undo step; the keys 1 - 9 follow', () => {
     localStorage.clear();
