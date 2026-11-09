@@ -96,6 +96,7 @@ interface Row {
           <button type="button" role="menuitem" [disabled]="m.paths.length > 1 || m.files.length !== 1" (click)="openInCatalogFromMenu(m.files[0])">Open in Catalog</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, true)">{{ m.paths.length > 1 ? 'Copy Paths' : 'Copy Path' }}</button>
           <button type="button" role="menuitem" (click)="copyPaths(m.paths, false)">{{ m.paths.length > 1 ? 'Copy Relative Paths' : 'Copy Relative Path' }}</button>
+          <button type="button" role="menuitem" title="The name only, without the folder and without .stl" (click)="copyNames(m.paths)">{{ m.paths.length > 1 ? 'Copy Names' : 'Copy Name' }}</button>
           @if (manage.enabled()) {
             <div class="sep"></div>
             <button type="button" role="menuitem" (click)="requestTrash(m.paths)">{{ m.paths.length > 1 ? 'Move ' + m.paths.length + ' Items to Trash' : 'Move to Trash' }}<span class="key">⌘⌫</span></button>
@@ -819,6 +820,17 @@ export class TreePanel {
       this.note(paths.length > 1 ? `${paths.length} paths copied` : 'Path copied');
     } catch {
       this.note('Could not copy the path');
+    }
+  }
+
+  /** Copies the names (the last part of the path; a file without its .stl), one per line. */
+  protected async copyNames(paths: string[]) {
+    this.menu.set(null);
+    try {
+      await navigator.clipboard.writeText(paths.map(path => path.split('/').pop()!.replace(/\.stl$/i, '')).join('\n'));
+      this.note(paths.length > 1 ? `${paths.length} names copied` : 'Name copied');
+    } catch {
+      this.note('Could not copy the name');
     }
   }
 

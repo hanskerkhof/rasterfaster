@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-09 - File list menu: Copy Name (0.12.37)
+
+### Added
+- **FE** (`library/tree/tree-panel.ts`): the context menu of the file list has **Copy Name** (**Copy Names** for several): the name only, without the folder and without `.stl`, one per line (a folder keeps its whole name, also when it has a dot in it).
+
 ## 2026-11-06 - The document panel is on top of the view's overlays (0.12.36)
 
 ### Fixed
