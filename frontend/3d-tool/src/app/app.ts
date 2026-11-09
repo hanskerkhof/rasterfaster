@@ -389,6 +389,7 @@ export class App {
   /** The catalog stays open when the page is reloaded (kept per browser tab). */
   protected readonly catalogOpen = signal(readCatalogOpen());
   protected setCatalogOpen(open: boolean) {
+    if (open) this.treePanel()?.closeQuickLook(); // the preview of the file list would stay on top of the catalog
     this.catalogOpen.set(open);
     try { open ? sessionStorage.setItem(catalogOpenKey, '1') : sessionStorage.removeItem(catalogOpenKey); } catch { /* storage unavailable */ }
   }

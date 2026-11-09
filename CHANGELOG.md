@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-09 - Opening the catalog closes the file list's preview (0.12.38)
+
+### Fixed
+- **FE** (`app.ts`): the Quick Look preview of the file list stayed open, on top of the catalog, after **Open in Catalog** (and the **C** key or the Catalog button). Opening the catalog closes it now.
+
 ## 2026-11-09 - File list menu: Copy Name (0.12.37)
 
 ### Added
