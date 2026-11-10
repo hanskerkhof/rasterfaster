@@ -2,6 +2,11 @@
 
 Newest first. Every bullet starts with its scope: **FE** (frontend, `frontend/3d-tool`) or **BE** (API, `backend`).
 
+## 2026-11-10 - Rendering panel: thumbnails in the queue (0.12.39)
+
+### Changed
+- **FE** (`app.html`, `app.scss`): the *Up next* list of the Rendering panel shows the quick draft of each waiting render (a picture, or the short video for a turntable) in front of its line, like the render that runs; a grey box of the same size stands in until its draft is made, so the rows do not jump. The API already made these drafts and told the page about them, so nothing changed in the backend.
+
 ## 2026-11-09 - Opening the catalog closes the file list's preview (0.12.38)
 
 ### Fixed

@@ -114,6 +114,9 @@ app-object-menu { display: contents; } /* only fixed-position overlays: must not
 .notice.render-progress .queue-list { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.12); font-size: 11px; }
 .notice.render-progress .queue-title { opacity: .6; margin-bottom: 3px; }
 .notice.render-progress .queue-row { display: flex; align-items: center; gap: 8px; padding: 1px 0; } .notice.render-progress .queue-row .n { width: 12px; text-align: right; opacity: .55; }
+.notice.render-progress .queue-row { padding: 2px 0; }
+.notice.render-progress .queue-row .qthumb { flex: none; width: 48px; height: 32px; object-fit: contain; border-radius: 3px; background: #000; pointer-events: none; } /* the quick draft of a waiting render */
+.notice.render-progress .queue-row .qthumb.wait { display: inline-block; background: rgba(255,255,255,.06); }
 .notice.render-progress .queue-row .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notice.render-progress .queue-row .x { margin-left: 0; padding: 0 6px; background: transparent; border: 0; opacity: .6; } .notice.render-progress .queue-row .x:hover { opacity: 1; background: transparent; color: #fff; }
 .notice.render-progress .queue-more { opacity: .6; padding-left: 20px; }

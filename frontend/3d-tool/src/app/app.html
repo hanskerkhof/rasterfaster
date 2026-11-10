@@ -160,6 +160,10 @@
               @for (q of render.queue().slice(0, 5); track q.id; let i = $index) {
                 <div class="queue-row">
                   <span class="n">{{ i + 1 }}</span>
+                  @if (q.preview) {
+                    @if (q.previewMedia === 'mp4') { <video class="qthumb" [src]="'/api/render-jobs/' + q.id + '/preview.mp4'" autoplay loop muted playsinline title="The quick draft of this render"></video> }
+                    @else { <img class="qthumb" [src]="'/api/render-jobs/' + q.id + '/preview.png'" alt="" title="The quick draft of this render" /> }
+                  } @else { <span class="qthumb wait" title="The quick draft is being made"></span> }
                   <span class="what">@if (q.kind === 'turntable') { <b>Turntable</b> · }{{ q.name }} · {{ q.size }}{{ render.sizeSuffix(q.width) }} · {{ q.samples }} samples@if (q.kind === 'turntable') { · {{ q.frames }} frames · {{ q.motion === 'spin' ? 'objects turn' : 'camera circles' }} }</span>
                   <button type="button" class="x" title="Take this render out of the queue" (click)="render.cancelWaiting(q.id)">✕</button>
                 </div>
